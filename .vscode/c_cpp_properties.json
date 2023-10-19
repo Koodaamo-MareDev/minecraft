@@ -1,0 +1,37 @@
+{
+    "configurations": [
+        {
+            "name": "wii",
+            "includePath": [
+                "C:\\devkitPro\\portlibs\\wii",
+                "C:\\devkitPro\\libogc\\include",
+                "C:\\devkitPro\\portlibs\\ppc\\include",
+                "C:\\devkitPro\\portlibs\\ppc\\include\\freetype2",
+                "${workspaceFolder}\\source",
+                "${workspaceFolder}\\build"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE",
+                "HW_RVL",
+                "__wii__",
+                "GEKKO"
+            ],
+            "windowsSdkVersion": "10.0.19041.0",
+            "compilerPath": "C:/devkitPro/devkitPPC/bin/powerpc-eabi-g++.exe",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "${default}",
+            "mergeConfigurations": false,
+            "browse": {
+                "path": [
+                    "${workspaceFolder}"
+                ],
+                "limitSymbolsToIncludedHeaders": true
+            },
+            "compilerArgs": []
+        }
+    ],
+    "version": 4
+}
