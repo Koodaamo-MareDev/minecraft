@@ -56,6 +56,7 @@ void light_engine_loop()
     {
         lightupdate_t update = pending_light_updates.front();
         __update_light(update.pos, update.block);
+        cast_skylight(update.pos.x, update.pos.z);
         pending_light_updates.pop();
     }
 }
@@ -74,28 +75,26 @@ void cast_skylight(int x, int z)
     chunk_t *chunk = get_chunk(x >> 4, z >> 4, false);
     if (!chunk)
         return;
-    lock_chunk_cache(chunk);
-    // bool obstructed = false;
     for (int y = 255; y >= 0; y--)
     {
         block_t *block = chunk->get_block(x, y, z);
         block->set_blocklight(15);
         if (get_block_opacity(block->get_blockid()) > 0)
         {
-            update_light({vec3i{x, y, z}, 0});
+            __update_light({x, y, z}, 0);
             break;
         }
     }
-    unlock_chunk_cache();
 }
 
 void update_light(lightupdate_t lu)
 {
-    if(lu.pos.y > 255 || lu.pos.y < 0)
+    if (lu.pos.y > 255 || lu.pos.y < 0)
         return;
     chunk_t *chunk = lu.chunk ? lu.chunk : get_chunk(lu.pos.x >> 4, lu.pos.z >> 4, false);
     if (!chunk)
         return;
+    lu.chunk = chunk;
     pending_light_updates.push(lu);
 }
 

@@ -47,7 +47,6 @@ public:
     void update_blockI(int index);
     void update_block(vec3i local_pos);
     void recalculate();
-    void recalculate_section_later(int section);
     void recalculate_section(int section);
     void build_all_vbos();
     void destroy_vbo(int section, unsigned char which);
@@ -61,11 +60,20 @@ public:
 private:
 };
 
+struct vertex_property_t
+{
+    vec3f pos;
+    uint8_t x_uv;
+    uint8_t y_uv;
+    uint8_t index;
+};
 // 0 = -x, -z
 // 1 = +x, -z
 // 2 = +x, +z
 // 3 = -x, +z
 extern const vec3i face_offsets[];
+
+extern bool vtx_is_drawing;
 
 chunk_t *get_chunks();
 chunkvbo_t **sort_vbos(guVector pos);
@@ -79,4 +87,6 @@ void get_neighbors(vec3i pos, block_t **neighbors);
 void lock_chunk_cache(chunk_t *chunk = nullptr);
 void unlock_chunk_cache();
 void update_block_at(vec3i pos);
+
+void GX_Vertex(vertex_property_t vert, float light);
 #endif

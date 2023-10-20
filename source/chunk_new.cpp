@@ -33,7 +33,7 @@ chunkvbo_t *global_vbos[VBO_COUNT];
 chunk_t *chunks = nullptr;
 chunk_t invalid_chunk;
 
-bool is_drawing = false;
+bool vtx_is_drawing = false;
 bool cachelock = false;
 
 void lock_chunk_cache(chunk_t *chunk)
@@ -252,29 +252,10 @@ void update_block_at(vec3i pos)
     chunk_t *chunk = get_chunk(pos.x >> 4, pos.z >> 4, false);
     if (!chunk)
         return;
-    cast_skylight(pos.x, pos.z);
-    chunk->recalculate_section_later(pos.y >> 4);
-}
-
-void chunk_t::recalculate_section_later(int section)
-{
-    int chunkY = section << 4;
-    for (int x = 0; x < 16; x++)
-    {
-        for (int y = 0; y < 16; y++)
-        {
-            for (int z = 0; z < 16; z++)
-            {
-                block_t *block = this->get_block(x, y + chunkY, z);
-                block_t *neighbor_py = get_block_at(vec3i{x, y + chunkY + 1, z});
-                BlockID block_id = block->get_blockid();
-                uint8_t full = 0;
-                if (neighbor_py && is_fluid(neighbor_py->get_blockid()))
-                    full = 1;
-                block->visibility_flags = 0x7F * (block_id != BlockID::air && !(is_flowing_fluid(block_id) && full));
-            }
-        }
-    }
+    block_t *block = chunk->get_block(pos.x, pos.y, pos.z);
+    if (!block)
+        return;
+    update_light({pos, 0, 0, chunk});
 }
 
 // recalculates the blockstates of a section
@@ -286,30 +267,7 @@ void chunk_t::recalculate_section(int section)
     int chunkY = section << 4;
 
     vec3i chunk_pos = {chunkX, chunkY, chunkZ};
-    /*
-    for (int x = 0; x < 16; x++)
-    {
-        for (int y = 0; y < 16; y++)
-        {
-            for (int z = 0; z < 16; z++)
-            {
-                block_t *block = this->get_block(x, y + chunkY, z);
-                BlockID block_id = block->get_blockid();
-                if (block_id == BlockID::flowing_water)
-                {
-                    vec3i top_pos = {x, y + chunkY + 1, z};
-                    block_t *top = this->get_block(top_pos.x, top_pos.y, top_pos.z);
-                    if (top)
-                    {
-                        BlockID top_id = top->get_blockid();
-                        if (top_id == BlockID::flowing_water || top_id == BlockID::water)
-                            block->visibility_flags = 0x7F;
-                    }
-                }
-            }
-        }
-    }
-    */
+    
     for (int x = 0; x < 16; x++)
     {
         for (int y = 0; y < 16; y++)
@@ -320,7 +278,7 @@ void chunk_t::recalculate_section(int section)
                 block_t *block = this->get_block(x, y + chunkY, z);
                 BlockID block_id = block->get_blockid();
                 vec3i local_pos = {x, y, z};
-                block->visibility_flags &= ~0x3F;
+                block->visibility_flags = 0x40 * (block_id != BlockID::air);
                 if (block->get_visibility())
                 {
                     for (int i = 0; i < 6; i++)
@@ -346,16 +304,6 @@ void chunk_t::recalculate_section(int section)
                         {
                             block->set_opacity(i, true);
                         }
-                        if (other_block && (is_still_fluid(block_id)) && is_flowing_fluid(other_id))
-                        {
-                            block->set_opacity(i, false);
-                        }
-                        vec3i py_pos = chunk_pos + vec3i{x, y, z};
-                        block_t *py_block = get_block_at(py_pos);
-                        if (is_flowing_fluid(block_id) && !(py_block && is_fluid(py_block->get_blockid())))
-                        {
-                            block->set_opacity(i, false);
-                        }
                     }
                 }
 
@@ -363,7 +311,6 @@ void chunk_t::recalculate_section(int section)
             }
         }
     }
-    light_engine_update();
 }
 
 void chunk_t::destroy_vbo(int section, unsigned char which)
@@ -748,7 +695,7 @@ int chunk_t::pre_render_fluid_mesh(int section, bool transparent)
 }
 int chunk_t::render_fluid_mesh(int section, bool transparent, int vertexCount)
 {
-    is_drawing = true;
+    vtx_is_drawing = true;
     GX_Begin(GX_TRIANGLES, GX_VTXFMT0, vertexCount);
     vertexCount = 0;
     for (size_t l = 0; l < water_levels.size(); l++)
@@ -763,26 +710,18 @@ int chunk_t::render_fluid_mesh(int section, bool transparent, int vertexCount)
         }
     }
     GX_End();
-    is_drawing = false;
+    vtx_is_drawing = false;
     return vertexCount;
 }
-
-struct vertex_property_t
-{
-    vec3f pos;
-    uint8_t x_uv;
-    uint8_t y_uv;
-    uint8_t index;
-};
 
 bool CompareVertices(const vertex_property_t &a, const vertex_property_t &b)
 {
     return a.pos.y < b.pos.y;
 }
 
-inline void GX_Vertex(vertex_property_t vert, float light)
+void GX_Vertex(vertex_property_t vert, float light)
 {
-    if (!is_drawing)
+    if (!vtx_is_drawing)
         return;
     GX_Position3f32(vert.pos.x, vert.pos.y, vert.pos.z);
     GX_Color3f32(light, light, light);

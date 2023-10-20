@@ -153,13 +153,31 @@ void PrepareOutline()
     outline = ret;
 }
 
+void ExtractTPLInfo(texanim_t &anim, bool dst, TPLFile *tpl, int index = 0)
+{
+    uint32_t fmt;
+    uint16_t w;
+    uint16_t h;
+    TPL_GetTextureInfo(tpl, index, &fmt, &w, &h);
+    if (dst)
+    {
+        anim.dst_format = fmt;
+        anim.dst_width = w;
+    }
+    else
+    {
+        anim.src_format = fmt;
+        anim.src_width = w;
+        anim.src_height = h;
+    }
+}
+
 int main(int argc, char **argv)
 {
 
     u32 fb = 0;
     f32 yscale;
     u32 xfbHeight;
-    u32 first_frame = 1;
     Mtx view; // view and perspective matrices
     Mtx44 perspective;
     void *gpfifo = NULL;
@@ -263,18 +281,17 @@ int main(int argc, char **argv)
     GX_InitTexObjFilterMode(&texture, GX_NEAR, GX_NEAR);
 
     uint32_t texture_buflen = GX_GetTexBufferSize(GX_GetTexObjWidth(&texture), GX_GetTexObjHeight(&texture), GX_GetTexObjFmt(&texture), GX_FALSE, GX_FALSE);
-    void *texture_ptr = (GX_GetTexObjData(&texture));
+    void *texture_ptr = MEM_PHYSICAL_TO_K1(GX_GetTexObjData(&texture));
 
     texanim_t water_still_anim;
-    water_still_anim.source = (uint32_t *)MEM_PHYSICAL_TO_K1(GX_GetTexObjData(&water_still_texture));
-    water_still_anim.target = (uint32_t *)texture_ptr;
-    water_still_anim.source_width = GX_GetTexObjWidth(&water_still_texture);
-    water_still_anim.source_height = GX_GetTexObjHeight(&water_still_texture);
-    water_still_anim.target_width = GX_GetTexObjWidth(&texture);
-    water_still_anim.copy_width = 16;
-    water_still_anim.copy_height = 16;
-    water_still_anim.copy_x = 208;
-    water_still_anim.copy_y = 192;
+    water_still_anim.source = MEM_PHYSICAL_TO_K1(GX_GetTexObjData(&water_still_texture));
+    water_still_anim.target = texture_ptr;
+    ExtractTPLInfo(water_still_anim, TA_SRC, &water_stillTPL, water_still);
+    ExtractTPLInfo(water_still_anim, TA_DST, &blockmapTPL, blockmap);
+    water_still_anim.tile_width = 16;
+    water_still_anim.tile_height = 16;
+    water_still_anim.dst_x = 208;
+    water_still_anim.dst_y = 192;
 
     // setup our camera at the origin
     // looking down the -z axis with y up
@@ -298,10 +315,6 @@ int main(int argc, char **argv)
     printf("Initialized chunks.\n");
     VIDEO_Flush();
     VIDEO_WaitVSync();
-    // prepare_chunks();
-    printf("Rendered chunks.\n");
-    VIDEO_Flush();
-    VIDEO_WaitVSync();
     PrepareOutline();
     GX_SetFog(GX_FOG_LIN, 8, 22, 0.1F, 300.0F, background);
     GX_SetZCompLoc(GX_FALSE);
@@ -316,11 +329,6 @@ int main(int argc, char **argv)
             PrepareTexture(texture);
         }
         GetInput();
-        if (first_frame)
-        {
-            printf("Rendering first frame.\n");
-            first_frame = 0;
-        }
         // u64 frame_start = time_get();
 
         // Draw opaque buffer
@@ -368,8 +376,8 @@ int main(int argc, char **argv)
     VIDEO_Flush();
     VIDEO_WaitVSync();
     SYS_ResetSystem(SYS_POWEROFF, 0, 0);
-    while (1)
-        ;
+    // while (1)
+    //     ;
     return 0;
 }
 
@@ -621,12 +629,9 @@ bool DrawScene(Mtx view, bool transparency)
             vec3i editable_pos = destroy_block ? (rc_block) : (rc_block + rc_block_face);
             block_t *editable_block = get_block_at(editable_pos);
             if (place_block)
-                update_block_at(rc_block + rc_block_face);
-            else
-            {
-                for (int i = 0; i < 6; i++)
-                    update_block_at(rc_block + face_offsets[i]);
-            }
+                update_block_at(editable_pos);
+            for (int i = 0; i < 6; i++)
+                update_block_at(editable_pos + face_offsets[i]);
             if (editable_block)
             {
                 editable_block->set_blockid(target_blockid);
@@ -648,7 +653,8 @@ bool DrawScene(Mtx view, bool transparency)
     relative.x = 0;
     relative.y = 0;
     relative.z = 0;
-    light_engine_update();
+    if (transparency)
+        light_engine_update();
     for (int i = 0; i < CHUNK_COUNT; i++)
     {
         chunk_t *chunk = &chunks[i];
@@ -663,12 +669,7 @@ bool DrawScene(Mtx view, bool transparency)
                 chunkPos.z = -(chunk->z << 4);
                 if (fabs(chunkPos.x - pos.x - 8) > 56 || fabs(chunkPos.y - pos.y - 8) > 56 || fabs(chunkPos.z - pos.z - 8) > 56)
                 {
-                    /*
-                    if(chunk->vbos[j].solid_buffer || chunk->vbos[j].transparent_buffer)
-                    {
-                        printf("Forgetting VBO %d, %d, %d", chunk->x, j, chunk->z);
-                    }
-                    */
+                    // Free vbo if the section is out of range.
                     chunk->vbos[j].solid_buffer = nullptr;
                     chunk->vbos[j].solid_buffer_length = 0;
                     chunk->vbos[j].transparent_buffer = nullptr;
@@ -678,6 +679,10 @@ bool DrawScene(Mtx view, bool transparency)
                 }
                 if (fabs(chunkPos.x - pos.x - 8) > 40 || fabs(chunkPos.y - pos.y - 8) > 40 || fabs(chunkPos.z - pos.z - 8) > 40)
                     continue;
+                if (transparency && frameCounter % 12 == 0)
+                {
+                    RecalcSectionWater(chunk, j);
+                }
                 // Visibility check - don't render things behind the camera
                 /*
                 if (relative.x >= 0.5 && chunkPos.x + 16 > pos.x)
@@ -694,33 +699,12 @@ bool DrawScene(Mtx view, bool transparency)
                     continue;
                 */
                 vbo.visible = true;
-                if (transparency && frameCounter % 12 == 0)
-                {
-                    RecalcSectionWater(chunk, j);
-                }
-                if (vbo.dirty && !light_engine_busy() && transparency)
-                {
-                    chunk->recalculate_section_later(j);
-                }
-            }
-        }
-    }
-
-    for (int i = 0; i < CHUNK_COUNT; i++)
-    {
-        chunk_t *chunk = &chunks[i];
-        if (chunk)
-        {
-            for (int j = VERTICAL_SECTION_COUNT - 1; j >= 0; j--)
-            {
-                chunkvbo_t &vbo = chunk->vbos[j];
-                if (vbo.dirty && !light_engine_busy() && vbo.visible)
+                if (vbo.dirty && vbo.visible && !light_engine_busy())
                 {
                     vbo.dirty = false;
                     chunk->recalculate_section(j);
                     chunk->build_vbo(j, false);
                     chunk->build_vbo(j, true);
-                    // VIDEO_Flush();
                 }
                 if (vbo.solid_buffer != vbo.cached_solid_buffer)
                 {
@@ -730,7 +714,6 @@ bool DrawScene(Mtx view, bool transparency)
                     }
                     vbo.cached_solid_buffer = vbo.solid_buffer;
                     vbo.cached_solid_buffer_length = vbo.solid_buffer_length;
-                    // DCFlushRange(vbo.cached_solid_buffer, vbo.solid_buffer_length);
                 }
                 if (vbo.transparent_buffer != vbo.cached_transparent_buffer)
                 {
@@ -740,7 +723,6 @@ bool DrawScene(Mtx view, bool transparency)
                     }
                     vbo.cached_transparent_buffer = vbo.transparent_buffer;
                     vbo.cached_transparent_buffer_length = vbo.transparent_buffer_length;
-                    // DCFlushRange(vbo.cached_transparent_buffer, vbo.transparent_buffer_length);
                 }
             }
         }
@@ -775,40 +757,7 @@ bool DrawScene(Mtx view, bool transparency)
             }
         }
     }
-    /*
-    for (int i = 0; i < CHUNK_COUNT; i++)
-    {
-        chunk_t *chunk = &chunks[i];
-        if (chunk)
-        {
-            for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
-            {
-                if (!vbo.cached_transparent_buffer || !vbo.cached_transparent_buffer_length || !vbo.visible)
-                    continue;
-                chunkPos.x = (chunk->x << 4);
-                chunkPos.y = (j << 4);
-                chunkPos.z = (chunk->z << 4);
-                Render(view, chunkPos, vbo.cached_transparent_buffer, vbo.cached_transparent_buffer_length);
-            }
-        }
-    }
-    for (int i = 0; i < CHUNK_COUNT; i++)
-    {
-        chunk_t *chunk = &chunks[i];
-        if (chunk)
-        {
-            for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
-            {
-                if (!vbo.cached_solid_buffer || !vbo.cached_solid_buffer_length || !vbo.visible)
-                    continue;
-                chunkPos.x = (chunk->x << 4);
-                chunkPos.y = (j << 4);
-                chunkPos.z = (chunk->z << 4);
-                Render(view, chunkPos, vbo.cached_solid_buffer, vbo.cached_solid_buffer_length);
-            }
-        }
-    }*/
-    if (!transparency && outline && draw_block_outline)
+    if (transparency && outline && draw_block_outline)
     {
         GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
         guVector outlinePos = guVector();
@@ -816,6 +765,16 @@ bool DrawScene(Mtx view, bool transparency)
         outlinePos.y = +rc_block.y - .5;
         outlinePos.z = +rc_block.z - .5;
         Render(view, outlinePos, outline, outline_len);
+        Transform(view, outlinePos);
+
+        vtx_is_drawing = true;
+        GX_Begin(GX_QUADS, GX_VTXFMT0, 4);
+        GX_Vertex(vertex_property_t{vec3f{-2, 1.1f, -2}, 0, 0, 0}, 1.0f);
+        GX_Vertex(vertex_property_t{vec3f{2, 1.1f, -2}, 128, 0, 0}, 1.0f);
+        GX_Vertex(vertex_property_t{vec3f{2, 1.1f, 2}, 128, 128, 0}, 1.0f);
+        GX_Vertex(vertex_property_t{vec3f{-2, 1.1f, 2}, 0, 128, 0}, 1.0f);
+        GX_End();
+        vtx_is_drawing = false;
     }
     return true;
 }

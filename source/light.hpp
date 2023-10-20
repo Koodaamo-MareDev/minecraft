@@ -8,8 +8,8 @@
 struct lightupdate_t
 {
     vec3i pos{0};
-    uint8_t block;
-    uint8_t sky;
+    uint8_t block = 0;
+    uint8_t sky = 0;
     chunk_t* chunk = nullptr;
 };
 
