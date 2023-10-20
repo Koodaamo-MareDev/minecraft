@@ -129,7 +129,7 @@ $(OFILES_SOURCES) : $(HFILES)
 
 %_alpha.o %_alpha.h %_alpha.c : %.png
 	@echo $(notdir $<)
-	@$(LOCALAPPDATA)/Programs/Python/Python310/python.exe ../extract_alpha.py $<
+	@python ../extract_alpha.py $<
 
 #---------------------------------------------------------------------------------
 # This rule links in binary data with the .bin extension
