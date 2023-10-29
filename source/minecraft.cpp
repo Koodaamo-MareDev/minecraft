@@ -23,6 +23,7 @@
 #include "raycast.hpp"
 #include "light.hpp"
 #include "texanim.hpp"
+#include "base3d.hpp"
 #define DEFAULT_FIFO_SIZE (256 * 1024)
 #define CLASSIC_CONTROLLER_THRESHOLD 4
 #define MAX_PARTICLES 100
@@ -32,12 +33,12 @@ float lerp(float a, float b, float f)
 {
     return a * (1.0 - f) + (b * f);
 }
+bool debug_spritesheet = false;
 
 f32 xrot = -22.5f;
 f32 yrot = 0.0f;
 guVector pos = {0.F, 80.0F, 0.F};
 void *frameBuffer[2] = {NULL, NULL};
-// static void *dstBuffer[2] = {NULL, NULL};
 static GXRModeObj *rmode = NULL;
 
 void *outline = nullptr;
@@ -59,7 +60,7 @@ void PrepareTexture(GXTexObj texture);
 void GetInput();
 guVector cam = {0.0F, 0.0F, 0.0F},
          up = {0.0F, 1.0F, 0.0F},
-         look = {0.0F, 0.0F, 1.0F};
+         look = {0.0F, 0.0F, -1.0F};
 //---------------------------------------------------------------------------------
 bool isExiting = false;
 void PowerOffCallback()
@@ -110,16 +111,14 @@ void PrepareOutline()
         return;
     GX_SetLineWidth(24, 0);
     GX_BeginDispList(ret, len);
-    GX_Begin(GX_LINES, GX_VTXFMT0, 24);
+    GX_BeginGroup(GX_LINES, 24);
     for (int i = 0; i < 2; i++)
     {
         for (int j = 0; j < 2; j++)
         {
             for (int k = 0; k < 2; k++)
             {
-                GX_Position3f32(k, i, j);
-                GX_Color3f32(0, 0, 0);
-                GX_TexCoord2u8(0, 0);
+                GX_Vertex(vertex_property_t(vec3f(k, i, j), 0, 0, 0, 0, 0));
             }
         }
     }
@@ -129,9 +128,7 @@ void PrepareOutline()
         {
             for (int k = 0; k < 2; k++)
             {
-                GX_Position3f32(i, k, j);
-                GX_Color3f32(0, 0, 0);
-                GX_TexCoord2u8(0, 0);
+                GX_Vertex(vertex_property_t(vec3f(i, k, j), 0, 0, 0, 0, 0));
             }
         }
     }
@@ -141,13 +138,11 @@ void PrepareOutline()
         {
             for (int k = 0; k < 2; k++)
             {
-                GX_Position3f32(i, j, k);
-                GX_Color3f32(0, 0, 0);
-                GX_TexCoord2u8(0, 0);
+                GX_Vertex(vertex_property_t(vec3f(i, j, k), 0, 0, 0, 0, 0));
             }
         }
     }
-    GX_End();
+    GX_EndGroup();
     outline_len = GX_EndDispList();
     DCInvalidateRange(ret, len);
     outline = ret;
@@ -319,6 +314,9 @@ int main(int argc, char **argv)
     GX_SetFog(GX_FOG_LIN, 8, 22, 0.1F, 300.0F, background);
     GX_SetZCompLoc(GX_FALSE);
     time_reset();
+    pos.x = 0;
+    pos.y = -1000;
+    pos.z = 0;
     while (!isExiting)
     {
         if (fb)
@@ -370,14 +368,16 @@ int main(int argc, char **argv)
         background.b = u8(current_lerpvalue * default_background.b);
         GX_SetCopyClear(background, 0x00FFFFFF);
         GX_SetFog(GX_FOG_LIN, 8, 22, 0.1F, 300.0F, background);
+        if (pos.y < -999)
+            pos.y = skycast(pos.x, pos.z) + 2;
     }
     light_engine_deinit();
     printf("Exiting...");
     VIDEO_Flush();
     VIDEO_WaitVSync();
-    SYS_ResetSystem(SYS_POWEROFF, 0, 0);
-    // while (1)
-    //     ;
+    WII_ReturnToMenu();
+    //  while (1)
+    //      ;
     return 0;
 }
 
@@ -497,14 +497,9 @@ guVector RotateVectorAround(guVector vec, float x, float y, float z, guVector ar
 
 guVector AnglesToVector(float x, float y, float distance, guVector vec = guVector())
 {
-    vec.x += cos(DegToRad(x)) * sin(DegToRad(y));
-    vec.y += -sin(DegToRad(x));
-    vec.z += cos(DegToRad(x)) * cos(DegToRad(y));
-    /*
-    vec.x += cos(DegToRad(x)) * cos(DegToRad(y)) * distance;
-    vec.z += sin(DegToRad(x)) * cos(DegToRad(y)) * distance;
-    vec.y += sin(DegToRad(y)) * distance;
-     */
+    vec.x += cos(DegToRad(x)) * sin(DegToRad(y)) * distance;
+    vec.y += -sin(DegToRad(x)) * distance;
+    vec.z += cos(DegToRad(x)) * cos(DegToRad(y)) * distance;
     return vec;
 }
 
@@ -527,7 +522,7 @@ void Transform(Mtx view, guVector chunkPos)
     guMtxIdentity(rotx);
 
     // Position the chunks on the screen
-    guMtxTrans(offset, chunkPos.x, -chunkPos.y, chunkPos.z);
+    guMtxTrans(offset, -chunkPos.x, -chunkPos.y, -chunkPos.z);
     guMtxTrans(posmtx, pos.x, pos.y, pos.z);
 
     // Rotate view
@@ -567,9 +562,9 @@ bool WaterLevelComparer(const block_t *&a, const block_t *&b)
 void RecalcSectionWater(chunk_t *chunk, int section)
 {
     static std::vector<std::vector<vec3i>> water_levels(9);
-    int y_off = (section << 4);
-    int x_off = (chunk->x << 4);
-    int z_off = (chunk->z << 4);
+    int y_off = (section * 16);
+    int x_off = (chunk->x * 16);
+    int z_off = (chunk->z * 16);
 
     for (size_t i = 0; i < water_levels.size(); i++)
         water_levels[i].clear();
@@ -610,14 +605,14 @@ bool DrawScene(Mtx view, bool transparency)
     relative.x = 0;
     relative.y = 0;
     relative.z = 0;
-    relative = AnglesToVector(-xrot, yrot, 1);
-    chunk_t *chunks = get_chunks();
+    relative = AnglesToVector(xrot, yrot, -1);
+    std::list<chunk_t *> &chunks = get_chunks();
 
     vec3i rc_block;
     vec3i rc_block_face;
     bool draw_block_outline = false;
     bool facing_block = false;
-    if (raycast(vec3d{-pos.x - .5, pos.y - .5, -pos.z - .5}, vec3d{relative.x, relative.y, relative.z}, 4, &rc_block, &rc_block_face))
+    if (raycast(vec3d{pos.x - .5, pos.y - .5, pos.z - .5}, vec3d{relative.x, relative.y, relative.z}, 4, &rc_block, &rc_block_face))
     {
         draw_block_outline = facing_block = true;
     }
@@ -650,61 +645,78 @@ bool DrawScene(Mtx view, bool transparency)
     }
     place_block = false;
     destroy_block = false;
-    relative.x = 0;
-    relative.y = 0;
-    relative.z = 0;
+    for (std::list<chunk_t *>::iterator it = chunks.begin(); it != chunks.end(); it++)
+    {
+        chunk_t *chunk = *it;
+        if (chunk && chunk->valid)
+        {
+            for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
+            {
+                chunk->vbos[j].visible = false;
+            }
+            float distance = std::max(fabs((chunk->x * 16) - pos.x), fabs((chunk->z * 16) - pos.z));
+            if (distance > 56)
+            {
+                chunk->valid = false;
+                for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
+                {
+                    chunkvbo_t &vbo = chunk->vbos[j];
+                    // Free vbo if the section is out of range.
+                    vbo.visible = false;
+                    vbo.solid_buffer = nullptr;
+                    vbo.solid_buffer_length = 0;
+                    vbo.transparent_buffer = nullptr;
+                    vbo.transparent_buffer_length = 0;
+                    if (vbo.cached_solid_buffer && vbo.cached_solid_buffer_length)
+                    {
+                        free(vbo.cached_solid_buffer);
+                        vbo.cached_solid_buffer = nullptr;
+                        vbo.cached_solid_buffer_length = 0;
+                    }
+                    if (vbo.cached_transparent_buffer && vbo.cached_transparent_buffer_length)
+                    {
+                        free(vbo.cached_transparent_buffer);
+                        vbo.cached_transparent_buffer = nullptr;
+                        vbo.cached_transparent_buffer_length = 0;
+                    }
+                }
+                continue;
+            }
+            bool visible = false;
+            for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
+            {
+                chunkvbo_t &vbo = chunk->vbos[j];
+                chunkPos.y = (j * 16);
+                distance = fabs(chunkPos.y - pos.y);
+                if (!(vbo.visible = (distance <= 40)))
+                    continue;
+                visible = true;
+                if (transparency && frameCounter % 12 == 0)
+                    RecalcSectionWater(chunk, j);
+            }
+            if (visible)
+                chunk->light_up();
+        }
+    }
     if (transparency)
         light_engine_update();
-    for (int i = 0; i < CHUNK_COUNT; i++)
+    for (std::list<chunk_t *>::iterator it = chunks.begin(); it != chunks.end(); it++)
     {
-        chunk_t *chunk = &chunks[i];
-        if (chunk)
+        chunk_t *chunk = *it;
+        if (chunk && chunk->valid)
         {
             for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
             {
                 chunkvbo_t &vbo = chunk->vbos[j];
-                vbo.visible = false;
-                chunkPos.x = -(chunk->x << 4);
-                chunkPos.y = (j << 4) + 16;
-                chunkPos.z = -(chunk->z << 4);
-                if (fabs(chunkPos.x - pos.x - 8) > 56 || fabs(chunkPos.y - pos.y - 8) > 56 || fabs(chunkPos.z - pos.z - 8) > 56)
-                {
-                    // Free vbo if the section is out of range.
-                    chunk->vbos[j].solid_buffer = nullptr;
-                    chunk->vbos[j].solid_buffer_length = 0;
-                    chunk->vbos[j].transparent_buffer = nullptr;
-                    chunk->vbos[j].transparent_buffer_length = 0;
-                    chunk->vbos[j].dirty = true;
+                if (!vbo.visible)
                     continue;
-                }
-                if (fabs(chunkPos.x - pos.x - 8) > 40 || fabs(chunkPos.y - pos.y - 8) > 40 || fabs(chunkPos.z - pos.z - 8) > 40)
-                    continue;
-                if (transparency && frameCounter % 12 == 0)
-                {
-                    RecalcSectionWater(chunk, j);
-                }
-                // Visibility check - don't render things behind the camera
-                /*
-                if (relative.x >= 0.5 && chunkPos.x + 16 > pos.x)
-                    continue;
-                if (relative.x <= -0.5 && chunkPos.x - 16 < pos.x)
-                    continue;
-                if (relative.y >= 0.5 && chunkPos.y + 16 > pos.y)
-                    continue;
-                if (relative.y <= -0.5 && chunkPos.y - 16 < pos.y)
-                    continue;
-                if (relative.z >= 0.5 && chunkPos.y + 16 > pos.z)
-                    continue;
-                if (relative.z <= -0.5 && chunkPos.y - 16 < pos.z)
-                    continue;
-                */
-                vbo.visible = true;
-                if (vbo.dirty && vbo.visible && !light_engine_busy())
+                if (vbo.dirty && !light_engine_busy())
                 {
                     vbo.dirty = false;
                     chunk->recalculate_section(j);
                     chunk->build_vbo(j, false);
                     chunk->build_vbo(j, true);
+                    chunk->lit_state = 2;
                 }
                 if (vbo.solid_buffer != vbo.cached_solid_buffer)
                 {
@@ -727,19 +739,19 @@ bool DrawScene(Mtx view, bool transparency)
             }
         }
     }
-    for (int i = 0; i < CHUNK_COUNT; i++)
+    for (std::list<chunk_t *>::iterator it = chunks.begin(); it != chunks.end(); it++)
     {
-        chunk_t *chunk = &chunks[i];
-        if (chunk)
+        chunk_t *chunk = *it;
+        if (chunk && chunk->valid && chunk->lit_state == 2)
         {
             for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
             {
                 chunkvbo_t &vbo = chunk->vbos[j];
                 if (!vbo.visible)
                     continue;
-                chunkPos.x = (chunk->x << 4);
-                chunkPos.y = (j << 4);
-                chunkPos.z = (chunk->z << 4);
+                chunkPos.x = (chunk->x * 16);
+                chunkPos.y = (j * 16);
+                chunkPos.z = (chunk->z * 16);
                 if (!transparency)
                 {
                     if (vbo.cached_solid_buffer && vbo.cached_solid_buffer_length)
@@ -757,6 +769,29 @@ bool DrawScene(Mtx view, bool transparency)
             }
         }
     }
+    for (std::list<chunk_t *>::iterator it = chunks.begin(); it != chunks.end();)
+    {
+        chunk_t *&chunk = *it;
+        if (chunk && !chunk->valid)
+        {
+            delete chunk;
+            chunk = nullptr;
+            it = chunks.erase(it);
+        }
+        else
+            ++it;
+    }
+    for (int x = pos.x - 32; x < pos.x + 32; x += 16)
+    {
+        if (chunks.size() >= CHUNK_COUNT)
+            break;
+        for (int z = pos.z - 32; z < pos.z + 32; z += 16)
+        {
+            if (chunks.size() >= CHUNK_COUNT)
+                break;
+            get_chunk_from_pos(x, z, true);
+        }
+    }
     if (transparency && outline && draw_block_outline)
     {
         GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
@@ -766,15 +801,15 @@ bool DrawScene(Mtx view, bool transparency)
         outlinePos.z = +rc_block.z - .5;
         Render(view, outlinePos, outline, outline_len);
         Transform(view, outlinePos);
-
-        vtx_is_drawing = true;
-        GX_Begin(GX_QUADS, GX_VTXFMT0, 4);
-        GX_Vertex(vertex_property_t{vec3f{-2, 1.1f, -2}, 0, 0, 0}, 1.0f);
-        GX_Vertex(vertex_property_t{vec3f{2, 1.1f, -2}, 128, 0, 0}, 1.0f);
-        GX_Vertex(vertex_property_t{vec3f{2, 1.1f, 2}, 128, 128, 0}, 1.0f);
-        GX_Vertex(vertex_property_t{vec3f{-2, 1.1f, 2}, 0, 128, 0}, 1.0f);
-        GX_End();
-        vtx_is_drawing = false;
+    }
+    if (debug_spritesheet)
+    {
+        GX_BeginGroup(GX_QUADS, 4);
+        GX_Vertex(vertex_property_t(vec3f(-2.0f, 1.1f, -2.0f), 0, 0));
+        GX_Vertex(vertex_property_t(vec3f(2.0f, 1.1f, -2.0f), 128, 0));
+        GX_Vertex(vertex_property_t(vec3f(2.0f, 1.1f, 2.0f), 128, 128));
+        GX_Vertex(vertex_property_t(vec3f(-2.0f, 1.1f, 2.0f), 0, 128));
+        GX_EndGroup();
     }
     return true;
 }

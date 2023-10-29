@@ -29,7 +29,7 @@ bool is_face_transparent(int texture_index)
     return blockmap_alpha[texture_index & 0xFF] == 0;
 }
 
-int get_face_texture_index(block_t *block, int face)
+uint32_t get_face_texture_index(block_t *block, int face)
 {
     if (!block)
         return 0;
@@ -134,10 +134,10 @@ int get_face_texture_index(block_t *block, int face)
 
 bool update_fluid(block_t *block, vec3i pos)
 {
-    chunk_t *chunk = get_chunk(pos.x >> 4, pos.z >> 4, true);
     BlockID block_id = block->get_blockid();
     if (!is_fluid(block_id))
         return false;
+    chunk_t *chunk = get_chunk_from_pos(pos.x, pos.z, false);
     if (!(block->meta & FLUID_UPDATE_REQUIRED_FLAG))
         return false;
     uint8_t old_level = get_fluid_meta_level(block);
@@ -177,70 +177,89 @@ bool update_fluid(block_t *block, vec3i pos)
                 }
             }
         }
-
-        // Level 0 -> air
-        if (level >= 8)
-        {
-            block->set_blockid(BlockID::air);
-            block->meta = 0;
-        }
-        // Level 1-6 -> flow
-        else
-        {
-            block->set_blockid(BlockID::flowing_water);
-            set_fluid_level(block, level);
-        }
         // When dealing with 0-3, "& 2" is the cheaper version of ">= 2"
-        if ((surrounding_sources & 2))
+        if (surrounding_sources >= 2)
         {
-            level = 0;
             BlockID ny_blockid = ny ? ny->get_blockid() : BlockID::air;
-
             // Convert to source only if the fluid cannot flow downwards.
             if ((!is_fluid_overridable(ny_blockid) && !is_fluid(ny_blockid)))
             {
+                level = 0;
                 block->set_blockid(BlockID::water);
                 block->meta = 0;
+            }
+            else
+            {
+                level = 1;
+                block->set_blockid(BlockID::flowing_water);
+                set_fluid_level(block, level);
+            }
+        }
+        else
+        {
+            // Level 0 -> air
+            if (level >= 8)
+            {
+                block->set_blockid(BlockID::air);
+                block->meta = 0;
+            }
+            // Level 1-6 -> flow
+            else
+            {
+                block->set_blockid(BlockID::flowing_water);
+                set_fluid_level(block, level);
             }
         }
     }
 
     // Fluid spread:
-    if (level < 7)
-    {
-        for (int i = 0; i < 5; i++)
+    if (level != old_level || block->get_blockid() != block_id)
+        if (level < 7)
         {
-            block_t *surrounding = surroundings[i];
-            if (surrounding)
+            for (int i = 0; i < 5; i++)
             {
-                BlockID surround_id = surrounding->get_blockid();
-                if (is_fluid_overridable(surround_id))
+                block_t *surrounding = surroundings[i];
+                if (surrounding)
                 {
-                    surrounding->set_blockid(BlockID::flowing_water);
-                    if (surrounding_dirs[i] == FACE_NY)
+                    BlockID surround_id = surrounding->get_blockid();
+                    vec3i surrounding_pos = pos + face_offsets[surrounding_dirs[i]];
+                    chunk_t *surrounding_chunk = get_chunk_from_pos(surrounding_pos.x, surrounding_pos.z, false);
+                    if (is_fluid_overridable(surround_id))
                     {
-                        set_fluid_level(surrounding, 0);
-                        break;
-                    }
-                    else
-                    {
-                        set_fluid_level(surrounding, level + 1);
+                        if (surrounding_dirs[i] == FACE_NY)
+                        {
+                            if (surround_id != BlockID::flowing_water || get_fluid_meta_level(surrounding) != 0)
+                            {
+                                surrounding->meta |= FLUID_UPDATE_REQUIRED_FLAG;
+                                vec3i surrounding_pos = pos + face_offsets[surrounding_dirs[i]];
+                                chunk_t *surrounding_chunk = get_chunk_from_pos(surrounding_pos.x, surrounding_pos.z, false);
+                                if (surrounding_chunk)
+                                    surrounding_chunk->vbos[surrounding_pos.y / 16].dirty = true;
+                            }
+                            surrounding->set_blockid(BlockID::flowing_water);
+                            set_fluid_level(surrounding, 0);
+                            break;
+                        }
+                        else
+                        {
+                            if (surround_id != BlockID::flowing_water || get_fluid_meta_level(surrounding) != level + 1)
+                            {
+                                surrounding->meta |= FLUID_UPDATE_REQUIRED_FLAG;
+                                if (surrounding_chunk)
+                                    surrounding_chunk->vbos[surrounding_pos.y / 16].dirty = true;
+                            }
+                            surrounding->set_blockid(BlockID::flowing_water);
+                            set_fluid_level(surrounding, level + 1);
+                        }
                     }
                 }
             }
         }
-    }
+
+    block->meta &= ~FLUID_UPDATE_REQUIRED_FLAG;
 
     if (level != old_level || block->get_blockid() != block_id)
-    {
-        for (int i = 0; i < 6; i++)
-        {
-            if (surroundings[i])
-                surroundings[i]->meta |= FLUID_UPDATE_REQUIRED_FLAG;
-        }
-        block->meta &= ~FLUID_UPDATE_REQUIRED_FLAG;
-        return (chunk->vbos[pos.y >> 4].dirty = true);
-    }
+        return (chunk->vbos[pos.y / 16].dirty = true);
     return false;
 }
 
@@ -318,7 +337,7 @@ uint8_t get_fluid_meta_level(block_t *block)
         if (is_flowing_fluid(block_id))
             return block->meta & 0xF;
     }
-    return 0;
+    return 8;
 }
 
 uint8_t get_fluid_visual_level(vec3i pos, BlockID block_id)

@@ -127,7 +127,7 @@ $(OUTPUT).elf: $(OFILES)
 
 $(OFILES_SOURCES) : $(HFILES)
 
-%_alpha.o %_alpha.h %_alpha.c : %.png
+%_alpha.h %_alpha.c : %.png
 	@echo $(notdir $<)
 	@python ../extract_alpha.py $<
 

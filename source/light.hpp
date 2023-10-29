@@ -10,9 +10,8 @@ struct lightupdate_t
     vec3i pos{0};
     uint8_t block = 0;
     uint8_t sky = 0;
-    chunk_t* chunk = nullptr;
+    lightupdate_t(vec3i pos, uint8_t block = 0, uint8_t sky = 0) : pos(pos), block(block), sky(sky) {}
 };
-
 
 bool light_engine_busy();
 void light_engine_init();

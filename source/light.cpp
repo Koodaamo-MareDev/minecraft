@@ -3,16 +3,19 @@
 #include "vec3i.hpp"
 #include "blocks.hpp"
 #include "block.hpp"
+#include <sys/unistd.h>
 #include <gccore.h>
 #include <vector>
 #include <queue>
 #include <cstdio>
 static lwp_t __light_engine_thread_handle = (lwp_t)NULL;
 static bool __light_engine_init_done = false;
+static bool __light_engine_busy = false;
+static bool __light_engine_requested = false;
 
 std::queue<lightupdate_t> pending_light_updates;
 
-void __update_light(vec3i coords, uint8_t light, chunk_t *chunk = nullptr);
+void __update_light(vec3i coords, uint8_t light);
 void __propagate_light(vec3i coords);
 void *__light_engine_init_internal(void *);
 
@@ -33,46 +36,51 @@ void *__light_engine_init_internal(void *)
 {
     while (__light_engine_init_done)
     {
-        light_engine_loop();
-        LWP_SuspendThread(__light_engine_thread_handle);
+        if (__light_engine_requested)
+            light_engine_loop();
+        LWP_YieldThread();
     }
     return NULL;
 }
 
 bool light_engine_busy()
 {
-    return !LWP_ThreadIsSuspended(__light_engine_thread_handle);
+    return __light_engine_busy;
 }
 
 void light_engine_update()
 {
     if (__light_engine_init_done && pending_light_updates.size() > 0)
-        LWP_ResumeThread(__light_engine_thread_handle);
+        __light_engine_requested = true;
 }
 
 void light_engine_loop()
 {
-    while (pending_light_updates.size() > 0)
+    while (pending_light_updates.size() > 0 && __light_engine_init_done && __light_engine_requested)
     {
+        __light_engine_busy = true;
         lightupdate_t update = pending_light_updates.front();
         __update_light(update.pos, update.block);
         cast_skylight(update.pos.x, update.pos.z);
         pending_light_updates.pop();
     }
+    __light_engine_busy = false;
+    __light_engine_requested = false;
 }
 void light_engine_deinit()
 {
     if (__light_engine_init_done)
     {
         __light_engine_init_done = false;
-        LWP_ResumeThread(__light_engine_thread_handle);
+        __light_engine_requested = false;
+
         LWP_JoinThread(__light_engine_thread_handle, NULL);
     }
 }
 
 void cast_skylight(int x, int z)
 {
-    chunk_t *chunk = get_chunk(x >> 4, z >> 4, false);
+    chunk_t *chunk = get_chunk_from_pos(x, z, false);
     if (!chunk)
         return;
     for (int y = 255; y >= 0; y--)
@@ -81,7 +89,7 @@ void cast_skylight(int x, int z)
         block->set_blocklight(15);
         if (get_block_opacity(block->get_blockid()) > 0)
         {
-            __update_light({x, y, z}, 0);
+            __update_light(vec3i(x, y, z), 0);
             break;
         }
     }
@@ -89,19 +97,19 @@ void cast_skylight(int x, int z)
 
 void update_light(lightupdate_t lu)
 {
-    if (lu.pos.y > 255 || lu.pos.y < 0)
+    if (lu.pos.y > 255 || lu.pos.y < -1)
         return;
-    chunk_t *chunk = lu.chunk ? lu.chunk : get_chunk(lu.pos.x >> 4, lu.pos.z >> 4, false);
+    chunk_t *chunk = get_chunk_from_pos(lu.pos.x, lu.pos.z, false);
     if (!chunk)
         return;
-    lu.chunk = chunk;
     pending_light_updates.push(lu);
 }
 
-void __update_light(vec3i coords, uint8_t light, chunk_t *chunk)
+void __update_light(vec3i coords, uint8_t light)
 {
-    LWP_YieldThread();
-    chunk = chunk ? chunk : get_chunk(coords.x >> 4, coords.z >> 4, false);
+    if (coords.y > 255 || coords.y < 0)
+        return;
+    chunk_t *chunk = get_chunk_from_pos(coords.x, coords.z, false);
     if (!chunk)
         return;
     if ((light & 0xF) != light)
@@ -112,7 +120,7 @@ void __update_light(vec3i coords, uint8_t light, chunk_t *chunk)
 
     int old_light = block->get_blocklight();
     int old_cast_light = block->get_castlight();
-    chunk->vbos[coords.y >> 4].dirty = true;
+    chunk->vbos[coords.y / 16].dirty = true;
 
     if (old_light != light)
     {

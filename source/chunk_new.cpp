@@ -7,6 +7,9 @@
 #include "timers.hpp"
 #include "light.hpp"
 #include "opensimplexnoise/open-simplex-noise.h"
+#include "base3d.hpp"
+#include "render.hpp"
+#include <list>
 #include <vector>
 #include <algorithm>
 #include <gccore.h>
@@ -15,7 +18,7 @@
 #include <math.h>
 #include <stdio.h>
 extern bool isExiting;
-std::vector<std::vector<vec3i>> water_levels(9);
+std::vector<std::list<vec3i>> water_levels(9);
 const vec3i face_offsets[] = {
     vec3i{-1, +0, +0},
     vec3i{+1, +0, +0},
@@ -26,168 +29,115 @@ const vec3i face_offsets[] = {
 void *get_aligned_pointer_32(void *ptr)
 {
     return (void *)((u64(ptr) + 0x1F) & (~0x1F));
-    // return (void *)((((size_t)ptr + ((((size_t)ptr & 31) != 0) << 5))) & ~31);
 }
+osn_context *ctx;
 
-chunkvbo_t *global_vbos[VBO_COUNT];
-chunk_t *chunks = nullptr;
-chunk_t invalid_chunk;
+std::list<chunk_t *> chunks;
 
-bool vtx_is_drawing = false;
-bool cachelock = false;
-
-void lock_chunk_cache(chunk_t *chunk)
-{
-    if (chunk)
-        get_chunk(chunk->x, chunk->z, false);
-    cachelock = true;
-}
-
-void unlock_chunk_cache()
-{
-    cachelock = false;
-}
-
-chunk_t *get_chunks()
+std::list<chunk_t *> &get_chunks()
 {
     return chunks;
+}
+chunk_t *get_chunk_from_pos(int x, int z, bool load)
+{
+    x -= 15 * (x < 0);
+    z -= 15 * (z < 0);
+    return get_chunk(x / 16, z / 16, load);
 }
 
 chunk_t *get_chunk(int chunkX, int chunkZ, bool load)
 {
-    // Simple cache for fast fetching
-    static int lastFetchX = 0;
-    static int lastFetchZ = 0;
-    static chunk_t *lastFetchChunk = nullptr;
-
-    if (lastFetchChunk && lastFetchX == chunkX && lastFetchZ == chunkZ)
-        return lastFetchChunk;
-    if (!cachelock)
-    {
-        lastFetchX = chunkX;
-        lastFetchZ = chunkZ;
-    }
-
     // Chunk lookup based on x and z position
-    for (int i = 0; i < CHUNK_COUNT; i++)
+    for (std::list<chunk_t *>::iterator it = chunks.begin(); it != chunks.end(); it++)
     {
-        if (chunks[i].x == chunkX && chunks[i].z == chunkZ)
+        chunk_t *chunk = *it;
+        if (chunk && chunk->valid)
+            if (chunk->x == chunkX && chunk->z == chunkZ)
+            {
+                return chunk;
+            }
+    }
+    if (load)
+    {
+        if (chunks.size() >= CHUNK_COUNT)
+            return nullptr;
+        generate_chunk(chunkX, chunkZ);
+        return chunks.back();
+    }
+    return nullptr;
+}
+
+void generate_chunk(int chunk_x, int chunk_z)
+{
+    chunk_t *chunk = new chunk_t;
+    chunk->x = chunk_x;
+    chunk->z = chunk_z;
+    int x_offset = (chunk->x * 16);
+    int z_offset = (chunk->z * 16);
+    double scale = 32;
+    double intensity = 2.5;
+    for (int x = 0, noise_x = x_offset; x < 16; x++, noise_x++)
+    {
+        for (int z = 0, noise_z = z_offset; z < 16; z++, noise_z++)
         {
-            if (!cachelock)
-                lastFetchChunk = &chunks[i];
-            return &chunks[i];
+            double value = open_simplex_noise3(ctx, (double)noise_x / scale, (double)noise_z / scale, 1 / 1000.) * 3;
+            value *= open_simplex_noise3(ctx, (double)noise_x / scale, (double)noise_z / scale, 1 / 500.);
+            value *= open_simplex_noise3(ctx, (double)noise_x / scale, (double)noise_z / scale, 1 / 300.);
+            value = value * intensity * 16 + 64;
+            for (int y = 0; y < 256; y++)
+            {
+                block_t *block = chunk->get_block(x, y, z);
+                block->visibility_flags = 0x00;
+                block->light = 0x00;
+                double carve = open_simplex_noise3(ctx, (double)noise_x / (scale * 0.25) + 0.5, (double)y / (scale * 0.25) + 0.5, noise_z / (scale * 0.25) + 0.5);
+                double boolval = open_simplex_noise3(ctx, (double)noise_x / (scale * 0.25) + 0.25, (double)y / (scale * 0.25) + 0.25, noise_z / (scale * 0.25) + 0.25);
+                double thresh = y / 256.;
+                thresh *= thresh * thresh * 4;
+                thresh = std::max(.4, thresh);
+                if (value > 64 && carve > 0.55)
+                {
+                    block->set_blockid(BlockID::air);
+                }
+                else if (y < value)
+                {
+                    if (y < value - 4 && boolval > thresh)
+                    {
+                        block->set_blockid(BlockID::air);
+                    }
+                    else
+                    {
+                        BlockID blockid = (y < value - 1) ? BlockID::dirt : BlockID::grass;
+                        blockid = (y < value - 3) ? BlockID::stone : blockid;
+                        block->visibility_flags = 0x7F;
+                        block->set_blockid(blockid);
+                    }
+                }
+                else
+                {
+                    if (y > 64)
+                        block->set_blockid(BlockID::air);
+                    else
+                    {
+                        block->visibility_flags = 0x7F;
+                        block->set_blockid(BlockID::water);
+                    }
+                }
+            }
         }
     }
-    if (!cachelock)
-        lastFetchChunk = nullptr;
-    return nullptr;
-    // return lastFetchChunk = &invalid_chunk;
+    chunk->valid = true;
+    chunks.push_back(chunk);
+}
+
+void deinit_chunks()
+{
+    open_simplex_noise_free(ctx);
 }
 
 // create chunk
 void init_chunks()
 {
-    if (!chunks)
-    {
-        struct osn_context *ctx;
-
-        open_simplex_noise(rand() & 32767, &ctx);
-        double scale = 32;
-        double intensity = 2.5;
-
-        chunks = new chunk_t[CHUNK_COUNT]; //(chunk_t *)calloc(CHUNK_COUNT, sizeof(chunk_t));
-        for (int i = 0; i < CHUNK_COUNT; i++)
-        {
-            chunks[i].x = (i % RENDER_DISTANCE);
-            chunks[i].z = (i / RENDER_DISTANCE);
-            chunks[i].valid = true;
-        }
-        for (int i = 0; i < CHUNK_COUNT; i++)
-        {
-            printf("Generating Chunk %d\n", i);
-            chunk_t *chunk = &chunks[i];
-            int x_offset = (chunk->x << 4);
-            int z_offset = (chunk->z << 4);
-            for (int x = 0, noise_x = x_offset; x < 16; x++, noise_x++)
-            {
-                for (int z = 0, noise_z = z_offset; z < 16; z++, noise_z++)
-                {
-                    double value = open_simplex_noise3(ctx, (double)noise_x / scale, (double)noise_z / scale, 1 / 1000.) * 3;
-                    value *= open_simplex_noise3(ctx, (double)noise_x / scale, (double)noise_z / scale, 1 / 500.);
-                    value *= open_simplex_noise3(ctx, (double)noise_x / scale, (double)noise_z / scale, 1 / 300.);
-                    value = value * intensity * 16 + 64;
-                    for (int y = 0; y < 256; y++)
-                    {
-                        block_t *block = chunk->get_block(x, y, z);
-                        block->visibility_flags = 0x00;
-                        block->light = 0x00;
-                        double carve = open_simplex_noise3(ctx, (double)noise_x / (scale * 0.25) + 0.5, (double)y / (scale * 0.25) + 0.5, noise_z / (scale * 0.25) + 0.5);
-                        double boolval = open_simplex_noise3(ctx, (double)noise_x / (scale * 0.25) + 0.25, (double)y / (scale * 0.25) + 0.25, noise_z / (scale * 0.25) + 0.25);
-                        double thresh = y / 256.;
-                        thresh *= thresh * thresh * 4;
-                        thresh = std::max(.4, thresh);
-                        if (value > 64 && carve > 0.55)
-                        {
-                            block->set_blockid(BlockID::air);
-                        }
-                        else if (y < value)
-                        {
-                            if (y < value - 4 && boolval > thresh)
-                            {
-                                block->set_blockid(BlockID::air);
-                            }
-                            else
-                            {
-                                BlockID blockid = (y < value - 1) ? BlockID::dirt : BlockID::grass;
-                                blockid = (y < value - 3) ? BlockID::stone : blockid;
-                                block->visibility_flags = 0x7F;
-                                block->set_blockid(blockid);
-                            }
-                        }
-                        else
-                        {
-                            if (y > 64)
-                                block->set_blockid(BlockID::air);
-                            else
-                            {
-                                block->visibility_flags = 0x7F;
-                                block->set_blockid(BlockID::water);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        open_simplex_noise_free(ctx);
-
-        // Calculate lighting values
-
-        for (int i = 0; i < CHUNK_COUNT; i++)
-        {
-            chunk_t *chunk = &chunks[i];
-            int x_offset = (chunk->x << 4);
-            int z_offset = (chunk->z << 4);
-            for (int x = 0; x < 16; x++)
-            {
-                for (int z = 0; z < 16; z++)
-                {
-                    cast_skylight(x_offset + x, z_offset + z);
-                }
-            }
-        }
-    }
-}
-
-void prepare_chunks()
-{
-    if (chunks)
-    {
-        for (int i = 0; i < CHUNK_COUNT; i++)
-        {
-            chunks[i].prepare_render();
-            printf("Chunk %d rendered.\n", i);
-        }
-    }
+    open_simplex_noise(rand() & 32767, &ctx);
 }
 
 BlockID get_block_id_at(vec3i position, BlockID default_id)
@@ -201,7 +151,7 @@ block_t *get_block_at(vec3i position)
 {
     if (position.y < 0 || position.y > 255)
         return nullptr;
-    chunk_t *chunk = get_chunk(position.x >> 4, position.z >> 4, false);
+    chunk_t *chunk = get_chunk_from_pos(position.x, position.z, false);
     if (!chunk)
         return nullptr;
     position.x &= 0x0F;
@@ -231,7 +181,7 @@ void chunk_t::update_blockI(int index)
 
 void chunk_t::update_block(vec3i local_pos)
 {
-    vec3i chunk_pos = vec3i{(this->x << 4) + x, 0, (this->z << 4) + z};
+    vec3i chunk_pos = vec3i{(this->x * 16) + x, 0, (this->z * 16) + z};
     vec3i pos = local_pos + chunk_pos;
     block_t *block = this->get_block(local_pos.x, local_pos.y, local_pos.z);
     switch (block->get_blockid())
@@ -249,25 +199,41 @@ void update_block_at(vec3i pos)
 {
     if (pos.y > 255 || pos.y < 0)
         return;
-    chunk_t *chunk = get_chunk(pos.x >> 4, pos.z >> 4, false);
+    chunk_t *chunk = get_chunk_from_pos(pos.x, pos.z, false);
     if (!chunk)
         return;
     block_t *block = chunk->get_block(pos.x, pos.y, pos.z);
     if (!block)
         return;
-    update_light({pos, 0, 0, chunk});
+    update_light({pos, 0});
+}
+
+void chunk_t::light_up()
+{
+    if (!this->lit_state)
+    {
+        int chunkX = this->x * 16;
+        int chunkZ = this->z * 16;
+        for (int x = 0; x < 16; x++)
+        {
+            for (int z = 0; z < 16; z++)
+            {
+                update_light(lightupdate_t(vec3i(chunkX + x, -1, chunkZ + z), 0));
+            }
+        }
+        lit_state = 1;
+    }
 }
 
 // recalculates the blockstates of a section
 void chunk_t::recalculate_section(int section)
 {
 
-    int chunkX = this->x << 4;
-    int chunkZ = this->z << 4;
-    int chunkY = section << 4;
+    int chunkX = this->x * 16;
+    int chunkZ = this->z * 16;
+    int chunkY = section * 16;
 
     vec3i chunk_pos = {chunkX, chunkY, chunkZ};
-    
     for (int x = 0; x < 16; x++)
     {
         for (int y = 0; y < 16; y++)
@@ -294,6 +260,10 @@ void chunk_t::recalculate_section(int section)
                         {
                             other_face_transparent = is_face_transparent(get_face_texture_index(other_block, i ^ 1));
                             other_visibility = other_block->get_visibility();
+                        }
+                        else if (other.y >= 0 && other.y <= 255)
+                        {
+                            continue;
                         }
 
                         if ((!face_transparent && other_face_transparent) || !other_visibility)
@@ -348,43 +318,16 @@ void chunk_t::rebuild_vbo(int section, bool transparent)
     if (this->build_vbo(section, transparent))
         printf("BuildVBO failed.\n");
 }
-
-#define UNLOCK_RETURN(VAL)    \
-    {                         \
-        unlock_chunk_cache(); \
-        return (VAL);         \
-    }
 int chunk_t::build_vbo(int section, bool transparent)
 {
-    lock_chunk_cache(this);
-    // uint64_t time_start = time_get();
-    int faceCount = 0;
-    int chunkX = this->x << 4;
-    int chunkY = section << 4;
-    int chunkZ = this->z << 4;
+    uint64_t time_start = time_get();
+    int chunkX = this->x * 16;
+    int chunkY = section * 16;
+    int chunkZ = this->z * 16;
     this->vbos[section].x = chunkX;
     this->vbos[section].y = chunkY;
     this->vbos[section].z = chunkZ;
-    vec3i chunk_pos = vec3i{chunkX, chunkY, chunkZ};
-    // Count faces
-    for (int x = 0; x < 16; x++)
-    {
-        for (int y = 0; y < 16; y++)
-        {
-            for (int z = 0; z < 16; z++)
-            {
-                block_t *block = this->get_block(x, y + chunkY, z);
-                if (!block->get_visibility() || is_fluid(block->get_blockid()))
-                    continue;
-                for (int i = 0; i < 6; i++)
-                {
-                    if (block->get_opacity(i) && transparent == is_face_transparent(get_face_texture_index(block, i)))
-                        faceCount++;
-                }
-            }
-        }
-    }
-    int quadVertexCount = faceCount * 4;
+    int quadVertexCount = pre_render_block_mesh(section, transparent);
     int triaVertexCount = pre_render_fluid_mesh(section, transparent);
     if (!quadVertexCount && !triaVertexCount)
     {
@@ -398,7 +341,7 @@ int chunk_t::build_vbo(int section, bool transparent)
             this->vbos[section].solid_buffer = nullptr;
             this->vbos[section].solid_buffer_length = 0;
         }
-        UNLOCK_RETURN(0);
+        return (0);
     }
 
     // Calculate potential memory usage
@@ -420,7 +363,7 @@ int chunk_t::build_vbo(int section, bool transparent)
     if (displist_vbo == nullptr)
     {
         printf("Failed to allocate %d bytes for section %d VBO at (%d, %d)\n", estimatedMemory, section, this->x, this->z);
-        UNLOCK_RETURN(1);
+        return (1);
     }
     DCInvalidateRange(ALIGNPTR(displist_vbo), estimatedMemory);
     // memset(ALIGNPTR(displist_vbo), 0, estimatedMemory);
@@ -428,193 +371,19 @@ int chunk_t::build_vbo(int section, bool transparent)
     GX_BeginDispList(ALIGNPTR(displist_vbo), estimatedMemory);
     if (quadVertexCount)
     {
-        GX_Begin(GX_QUADS, GX_VTXFMT0, quadVertexCount); // Start drawing
-
-        // Build the mesh from the blockstates
-        for (int x = 0; x < 16; x++)
+        int newQuadVertexCount;
+        if ((newQuadVertexCount = render_block_mesh(section, transparent, quadVertexCount)) != quadVertexCount)
         {
-            for (int y = 0; y < 16; y++)
-            {
-                for (int z = 0; z < 16; z++)
-                {
-                    block_t *block = this->get_block(x, y + chunkY, z);
-                    if (!block->get_visibility() || is_fluid(block->get_blockid()))
-                        continue;
-                    int texture_index = 0;
-                    int i = 0;
-                    // block_t *block_above = get_block_at(face_offsets[FACE_PY] + vec3i{x, y, z} + chunk_pos);
-                    float block_height_half = 0.5f; // (is_fluid(block->get_blockid()) && !(block_above && is_fluid(block_above->get_blockid()))) ? 0.375 : 0.5f;
-                    if (block->get_opacity(i) && transparent == is_face_transparent(texture_index = get_face_texture_index(block, i)))
-                    {
-                        vec3i other = face_offsets[i] + vec3i{x, y, z} + chunk_pos;
-                        block_t *other_block = get_block_at(other);
-                        float facelight = 0.05f;
-                        if (other_block)
-                            facelight = std::min(1.0f, other_block->get_blocklight() / 15.0f + 0.05f);
-                        float lightAmount = 0.9f * facelight;
-
-                        GX_Position3f32(x + -.5f, y + -.5f, z + -.5f);
-                        GX_Color3f32(lightAmount, lightAmount, lightAmount);
-                        GX_TexCoord2u8(UV_SCALE * TEXTURE_X(texture_index), (UV_SCALE * TEXTURE_Y(texture_index) + UV_SCALE));
-
-                        GX_Position3f32(x + -.5f, y + block_height_half, z + -.5f);
-                        GX_Color3f32(lightAmount, lightAmount, lightAmount);
-                        GX_TexCoord2u8(UV_SCALE * TEXTURE_X(texture_index), (UV_SCALE * TEXTURE_Y(texture_index)));
-
-                        GX_Position3f32(x + -.5f, y + block_height_half, z + 0.5f);
-                        GX_Color3f32(lightAmount, lightAmount, lightAmount);
-                        GX_TexCoord2u8(UV_SCALE * TEXTURE_X(texture_index) + UV_SCALE, (UV_SCALE * TEXTURE_Y(texture_index)));
-
-                        GX_Position3f32(x + -.5f, y + -.5f, z + 0.5f);
-                        GX_Color3f32(lightAmount, lightAmount, lightAmount);
-                        GX_TexCoord2u8(UV_SCALE * TEXTURE_X(texture_index) + UV_SCALE, (UV_SCALE * TEXTURE_Y(texture_index) + UV_SCALE));
-                    }
-                    i++;
-
-                    if (block->get_opacity(i) && transparent == is_face_transparent(texture_index = get_face_texture_index(block, i)))
-                    {
-                        vec3i other = face_offsets[i] + vec3i{x, y, z} + chunk_pos;
-                        block_t *other_block = get_block_at(other);
-                        float facelight = 0.05f;
-                        if (other_block)
-                            facelight = std::min(1.0f, other_block->get_blocklight() / 15.0f + 0.05f);
-                        float lightAmount = 0.9f * facelight;
-
-                        GX_Position3f32(x + 0.5f, y + -.5f, z + 0.5f);
-                        GX_Color3f32(lightAmount, lightAmount, lightAmount);
-                        GX_TexCoord2u8(UV_SCALE * TEXTURE_X(texture_index) + UV_SCALE, (UV_SCALE * TEXTURE_Y(texture_index) + UV_SCALE));
-
-                        GX_Position3f32(x + 0.5f, y + block_height_half, z + 0.5f);
-                        GX_Color3f32(lightAmount, lightAmount, lightAmount);
-                        GX_TexCoord2u8(UV_SCALE * TEXTURE_X(texture_index) + UV_SCALE, (UV_SCALE * TEXTURE_Y(texture_index)));
-
-                        GX_Position3f32(x + 0.5f, y + block_height_half, z + -.5f);
-                        GX_Color3f32(lightAmount, lightAmount, lightAmount);
-                        GX_TexCoord2u8(UV_SCALE * TEXTURE_X(texture_index), (UV_SCALE * TEXTURE_Y(texture_index)));
-
-                        GX_Position3f32(x + 0.5f, y + -.5f, z + -.5f);
-                        GX_Color3f32(lightAmount, lightAmount, lightAmount);
-                        GX_TexCoord2u8(UV_SCALE * TEXTURE_X(texture_index), (UV_SCALE * TEXTURE_Y(texture_index) + UV_SCALE));
-                    }
-                    i++;
-
-                    if (block->get_opacity(i) && transparent == is_face_transparent(texture_index = get_face_texture_index(block, i)))
-                    {
-                        vec3i other = face_offsets[i] + vec3i{x, y, z} + chunk_pos;
-                        block_t *other_block = get_block_at(other);
-                        float facelight = 0.05f;
-                        if (other_block)
-                            facelight = std::min(1.0f, other_block->get_blocklight() / 15.0f + 0.05f);
-                        float lightAmount = 0.85f * facelight;
-
-                        GX_Position3f32(x + -.5f, y + -.5f, z + -.5f);
-                        GX_Color3f32(lightAmount, lightAmount, lightAmount);
-                        GX_TexCoord2u8(UV_SCALE * TEXTURE_X(texture_index), (UV_SCALE * TEXTURE_Y(texture_index) + UV_SCALE));
-
-                        GX_Position3f32(x + -.5f, y + -.5f, z + 0.5f);
-                        GX_Color3f32(lightAmount, lightAmount, lightAmount);
-                        GX_TexCoord2u8(UV_SCALE * TEXTURE_X(texture_index), (UV_SCALE * TEXTURE_Y(texture_index)));
-
-                        GX_Position3f32(x + 0.5f, y + -.5f, z + 0.5f);
-                        GX_Color3f32(lightAmount, lightAmount, lightAmount);
-                        GX_TexCoord2u8(UV_SCALE * TEXTURE_X(texture_index) + UV_SCALE, (UV_SCALE * TEXTURE_Y(texture_index)));
-
-                        GX_Position3f32(x + 0.5f, y + -.5f, z + -.5f);
-                        GX_Color3f32(lightAmount, lightAmount, lightAmount);
-                        GX_TexCoord2u8(UV_SCALE * TEXTURE_X(texture_index) + UV_SCALE, (UV_SCALE * TEXTURE_Y(texture_index) + UV_SCALE));
-                    }
-                    i++;
-
-                    if (block->get_opacity(i) && transparent == is_face_transparent(texture_index = get_face_texture_index(block, i)))
-                    {
-                        vec3i other = face_offsets[i] + vec3i{x, y, z} + chunk_pos;
-                        block_t *other_block = get_block_at(other);
-                        float facelight = 0.05f;
-                        if (other_block)
-                            facelight = std::min(1.0f, other_block->get_blocklight() / 15.0f + 0.05f);
-                        float lightAmount = 1.0f * facelight;
-
-                        GX_Position3f32(x + 0.5f, y + block_height_half, z + -.5f);
-                        GX_Color3f32(lightAmount, lightAmount, lightAmount);
-                        GX_TexCoord2u8(UV_SCALE * TEXTURE_X(texture_index) + UV_SCALE, (UV_SCALE * TEXTURE_Y(texture_index) + UV_SCALE));
-
-                        GX_Position3f32(x + 0.5f, y + block_height_half, z + 0.5f);
-                        GX_Color3f32(lightAmount, lightAmount, lightAmount);
-                        GX_TexCoord2u8(UV_SCALE * TEXTURE_X(texture_index) + UV_SCALE, (UV_SCALE * TEXTURE_Y(texture_index)));
-
-                        GX_Position3f32(x + -.5f, y + block_height_half, z + 0.5f);
-                        GX_Color3f32(lightAmount, lightAmount, lightAmount);
-                        GX_TexCoord2u8(UV_SCALE * TEXTURE_X(texture_index), (UV_SCALE * TEXTURE_Y(texture_index)));
-
-                        GX_Position3f32(x + -.5f, y + block_height_half, z + -.5f);
-                        GX_Color3f32(lightAmount, lightAmount, lightAmount);
-                        GX_TexCoord2u8(UV_SCALE * TEXTURE_X(texture_index), (UV_SCALE * TEXTURE_Y(texture_index) + UV_SCALE));
-                    }
-                    i++;
-
-                    if (block->get_opacity(i) && transparent == is_face_transparent(texture_index = get_face_texture_index(block, i)))
-                    {
-                        vec3i other = face_offsets[i] + vec3i{x, y, z} + chunk_pos;
-                        block_t *other_block = get_block_at(other);
-                        float facelight = 0.05f;
-                        if (other_block)
-                            facelight = std::min(1.0f, other_block->get_blocklight() / 15.0f + 0.05f);
-                        float lightAmount = 0.98f * facelight;
-
-                        GX_Position3f32(x + 0.5f, y + -.5f, z + -.5f);
-                        GX_Color3f32(lightAmount, lightAmount, lightAmount);
-                        GX_TexCoord2u8(UV_SCALE * TEXTURE_X(texture_index) + UV_SCALE, (UV_SCALE * TEXTURE_Y(texture_index) + UV_SCALE));
-
-                        GX_Position3f32(x + 0.5f, y + block_height_half, z + -.5f);
-                        GX_Color3f32(lightAmount, lightAmount, lightAmount);
-                        GX_TexCoord2u8(UV_SCALE * TEXTURE_X(texture_index) + UV_SCALE, (UV_SCALE * TEXTURE_Y(texture_index)));
-
-                        GX_Position3f32(x + -.5f, y + block_height_half, z + -.5f);
-                        GX_Color3f32(lightAmount, lightAmount, lightAmount);
-                        GX_TexCoord2u8(UV_SCALE * TEXTURE_X(texture_index), (UV_SCALE * TEXTURE_Y(texture_index)));
-
-                        GX_Position3f32(x + -.5f, y + -.5f, z + -.5f);
-                        GX_Color3f32(lightAmount, lightAmount, lightAmount);
-                        GX_TexCoord2u8(UV_SCALE * TEXTURE_X(texture_index), (UV_SCALE * TEXTURE_Y(texture_index) + UV_SCALE));
-                    }
-                    i++;
-
-                    if (block->get_opacity(i) && transparent == is_face_transparent(texture_index = get_face_texture_index(block, i)))
-                    {
-                        vec3i other = face_offsets[i] + vec3i{x, y, z} + chunk_pos;
-                        block_t *other_block = get_block_at(other);
-                        float facelight = 0.05f;
-                        if (other_block)
-                            facelight = std::min(1.0f, other_block->get_blocklight() / 15.0f + 0.05f);
-                        float lightAmount = 0.98f * facelight;
-
-                        GX_Position3f32(x + -.5f, y + -.5f, z + 0.5f);
-                        GX_Color3f32(lightAmount, lightAmount, lightAmount);
-                        GX_TexCoord2u8(UV_SCALE * TEXTURE_X(texture_index), (UV_SCALE * TEXTURE_Y(texture_index) + UV_SCALE));
-
-                        GX_Position3f32(x + -.5f, y + block_height_half, z + 0.5f);
-                        GX_Color3f32(lightAmount, lightAmount, lightAmount);
-                        GX_TexCoord2u8(UV_SCALE * TEXTURE_X(texture_index), (UV_SCALE * TEXTURE_Y(texture_index)));
-
-                        GX_Position3f32(x + 0.5f, y + block_height_half, z + 0.5f);
-                        GX_Color3f32(lightAmount, lightAmount, lightAmount);
-                        GX_TexCoord2u8(UV_SCALE * TEXTURE_X(texture_index) + UV_SCALE, (UV_SCALE * TEXTURE_Y(texture_index)));
-
-                        GX_Position3f32(x + 0.5f, y + -.5f, z + 0.5f);
-                        GX_Color3f32(lightAmount, lightAmount, lightAmount);
-                        GX_TexCoord2u8(UV_SCALE * TEXTURE_X(texture_index) + UV_SCALE, (UV_SCALE * TEXTURE_Y(texture_index) + UV_SCALE));
-                    }
-                }
-            }
+            printf("Invalid vtx count while rendering blocks: expected %d, got %d", quadVertexCount, newQuadVertexCount);
+            isExiting = true;
         }
-        GX_End();
     }
     if (triaVertexCount)
     {
         int newTriaVertexCount;
         if ((newTriaVertexCount = render_fluid_mesh(section, transparent, triaVertexCount)) != triaVertexCount)
         {
-            printf("Invalid vtx count while rendering water: expected %d, got %d", triaVertexCount, newTriaVertexCount);
+            printf("Invalid vtx count while rendering fluid: expected %d, got %d", triaVertexCount, newTriaVertexCount);
             isExiting = true;
         }
     }
@@ -624,14 +393,14 @@ int chunk_t::build_vbo(int section, bool transparent)
     {
         printf("Failed to create display list for section %d at (%d, %d)\n", section, this->x, this->z);
         printf("Size should be %d\n", estimatedMemory);
-        UNLOCK_RETURN(2);
+        return (2);
     }
     if (preciseMemory != estimatedMemory)
     {
         if (abs(preciseMemory - estimatedMemory) >= 64)
         {
             printf("Sizes differ too much: %d != %d, diff=%d\n", preciseMemory, estimatedMemory, preciseMemory - estimatedMemory);
-            UNLOCK_RETURN(2);
+            return (2);
         }
     }
 
@@ -645,16 +414,16 @@ int chunk_t::build_vbo(int section, bool transparent)
         this->vbos[section].solid_buffer = displist_vbo;
         this->vbos[section].solid_buffer_length = preciseMemory;
     }
-    // printf("Took %dms\n", time_diff_ms(time_start, time_get()));
-    // printf("Face count: %d, Memory: %d", faceCount, preciseMemory);
-    // free(displist_vbo);
-    UNLOCK_RETURN(0);
+    uint64_t taken_time = time_diff_us(time_start, time_get());
+    if (taken_time >= 10000) // 10ms
+        printf("Took %llus\n", taken_time);
+    return (0);
 }
 
 int chunk_t::pre_render_fluid_mesh(int section, bool transparent)
 {
     int vertexCount = 0;
-    vec3i chunk_offset = vec3i{this->x << 4, section << 4, this->z << 4};
+    vec3i chunk_offset = vec3i{this->x * 16, section * 16, this->z * 16};
 
     for (size_t i = 0; i < water_levels.size(); i++)
         water_levels[i].clear();
@@ -677,16 +446,13 @@ int chunk_t::pre_render_fluid_mesh(int section, bool transparent)
         }
     }
 
-    // For some god damn reason we have to precalculate
-    // the mesh at least 2 times to have a stable vertex
-    // count. This shall be fixed at some point!
     for (size_t l = 0; l < water_levels.size(); l++)
     {
-        std::vector<vec3i> &levels = water_levels[water_levels.size() - 1 - l];
-        // std::vector<vec3i> &levels = water_levels[l];
-        for (size_t b = 0; b < levels.size(); b++)
+        std::list<vec3i> &levels = water_levels[water_levels.size() - 1 - l];
+
+        for (std::list<vec3i>::iterator it = levels.begin(); it != levels.end(); it++)
         {
-            vec3i blockpos = levels[b];
+            vec3i blockpos = *it;
             block_t *block = get_block(blockpos.x, blockpos.y, blockpos.z);
             vertexCount += render_fluid(block, blockpos);
         }
@@ -695,22 +461,63 @@ int chunk_t::pre_render_fluid_mesh(int section, bool transparent)
 }
 int chunk_t::render_fluid_mesh(int section, bool transparent, int vertexCount)
 {
-    vtx_is_drawing = true;
-    GX_Begin(GX_TRIANGLES, GX_VTXFMT0, vertexCount);
+    GX_BeginGroup(GX_TRIANGLES, vertexCount);
     vertexCount = 0;
     for (size_t l = 0; l < water_levels.size(); l++)
     {
-        std::vector<vec3i> &levels = water_levels[water_levels.size() - 1 - l];
-        // std::vector<vec3i> &levels = water_levels[l];
-        for (size_t b = 0; b < levels.size(); b++)
+        std::list<vec3i> &levels = water_levels[water_levels.size() - 1 - l];
+        for (std::list<vec3i>::iterator it = levels.begin(); it != levels.end(); it++)
         {
-            vec3i blockpos = levels[b];
+            vec3i blockpos = *it;
             block_t *block = get_block(blockpos.x, blockpos.y, blockpos.z);
             vertexCount += render_fluid(block, blockpos);
         }
     }
-    GX_End();
-    vtx_is_drawing = false;
+    GX_EndGroup();
+    return vertexCount;
+}
+
+int chunk_t::pre_render_block_mesh(int section, bool transparent)
+{
+    int vertexCount = 0;
+    vec3i chunk_pos = vec3i(this->x * 16, section * 16, this->z * 16);
+    GX_BeginGroup(GX_QUADS, 0);
+    // Build the mesh from the blockstates
+    for (int x = 0; x < 16; x++)
+    {
+        for (int y = 0; y < 16; y++)
+        {
+            for (int z = 0; z < 16; z++)
+            {
+                block_t *block = this->get_block(x, y + chunk_pos.y, z);
+                vertexCount += render_block(block, chunk_pos + vec3i(x, y, z), transparent);
+            }
+        }
+    }
+    GX_EndGroup();
+    return vertexCount;
+}
+
+int chunk_t::render_block_mesh(int section, bool transparent, int vertexCount)
+{
+    vec3i chunk_pos = vec3i{this->x * 16, section * 16, this->z * 16};
+    GX_BeginGroup(GX_QUADS, vertexCount);
+    vertexCount = 0;
+    // Build the mesh from the blockstates
+    for (int x = 0; x < 16; x++)
+    {
+        for (int y = 0; y < 16; y++)
+        {
+            for (int z = 0; z < 16; z++)
+            {
+                block_t *block = this->get_block(x, y + chunk_pos.y, z);
+                vertexCount += render_block(block, chunk_pos + vec3i(x, y, z), transparent);
+            }
+        }
+    }
+    uint16_t vtxCount = GX_EndGroup();
+    if (vtxCount != vertexCount)
+        printf("VTXCOUNT: %d != %d", vertexCount, vtxCount);
     return vertexCount;
 }
 
@@ -719,39 +526,31 @@ bool CompareVertices(const vertex_property_t &a, const vertex_property_t &b)
     return a.pos.y < b.pos.y;
 }
 
-void GX_Vertex(vertex_property_t vert, float light)
-{
-    if (!vtx_is_drawing)
-        return;
-    GX_Position3f32(vert.pos.x, vert.pos.y, vert.pos.z);
-    GX_Color3f32(light, light, light);
-    GX_TexCoord2u8(vert.x_uv, vert.y_uv);
-}
-
-int DrawTopSplit(vertex_property_t p0, vertex_property_t p1, vertex_property_t p2, vertex_property_t p3, float light)
+int DrawHorizontalQuad(vertex_property_t p0, vertex_property_t p1, vertex_property_t p2, vertex_property_t p3, float light)
 {
     static std::vector<vertex_property_t> vertices(4);
-    vertices[0] = p0;
-    vertices[1] = p1;
-    vertices[2] = p2;
-    vertices[3] = p3;
+
+    (vertices[0] = p0).index = 0;
+    (vertices[1] = p1).index = 1;
+    (vertices[2] = p2).index = 2;
+    (vertices[3] = p3).index = 3;
     vertex_property_t min_vertex = *std::min_element(vertices.begin(), vertices.end(), CompareVertices);
     uint8_t curr = min_vertex.index;
     for (int i = 0; i < 3; i++)
     {
-        GX_Vertex(vertices[curr], light);
+        GX_VertexLit(vertices[curr], light);
         curr = (curr + 1) & 3;
     }
     curr = (min_vertex.index + 2) & 3;
     for (int i = 0; i < 3; i++)
     {
-        GX_Vertex(vertices[curr], light);
+        GX_VertexLit(vertices[curr], light);
         curr = (curr + 1) & 3;
     }
     return 2;
 }
 
-int DrawSideSplit(vertex_property_t p0, vertex_property_t p1, vertex_property_t p2, vertex_property_t p3, float light)
+int DrawVerticalQuad(vertex_property_t p0, vertex_property_t p1, vertex_property_t p2, vertex_property_t p3, float light)
 {
     static std::vector<vertex_property_t> vertices(4);
     vertices[0] = p0;
@@ -764,7 +563,7 @@ int DrawSideSplit(vertex_property_t p0, vertex_property_t p1, vertex_property_t 
     {
         for (int i = 0; i < 3; i++)
         {
-            GX_Vertex(vertices[curr], light);
+            GX_VertexLit(vertices[curr], light);
             curr = (curr + 1) & 3;
         }
         faceCount++;
@@ -774,7 +573,7 @@ int DrawSideSplit(vertex_property_t p0, vertex_property_t p1, vertex_property_t 
     {
         for (int i = 0; i < 3; i++)
         {
-            GX_Vertex(vertices[curr], light);
+            GX_VertexLit(vertices[curr], light);
             curr = (curr + 1) & 3;
         }
         faceCount++;
@@ -788,13 +587,29 @@ void get_neighbors(vec3i pos, block_t **neighbors)
         neighbors[x] = get_block_at(pos + face_offsets[x]);
 }
 
+int chunk_t::render_block(block_t *block, vec3i pos, bool transparent)
+{
+    if (!block->get_visibility() || is_fluid(block->get_blockid()))
+        return 0;
+    vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
+    vec3f vertex_pos(local_pos.x, local_pos.y, local_pos.z);
+    uint32_t texture_index = 0;
+    int vertexCount = 0;
+    for (uint8_t face = 0; face < 6; face++)
+    {
+        if (block->get_opacity(face) && transparent == is_face_transparent(texture_index = get_face_texture_index(block, face)))
+            vertexCount += render_face(pos, face, texture_index);
+    }
+    return vertexCount;
+}
+
 int chunk_t::render_fluid(block_t *block, vec3i pos)
 {
     BlockID block_id = block->get_blockid();
 
     int faceCount = 0;
     vec3i local_pos = {pos.x & 0xF, pos.y & 0xF, pos.z & 0xF};
-    uint8_t fluid_level = get_fluid_meta_level(block);
+    // uint8_t fluid_level = get_fluid_meta_level(block);
 
     // Used to check block types around the fluid
     block_t *neighbors[6];
@@ -840,40 +655,42 @@ int chunk_t::render_fluid(block_t *block, vec3i pos)
     const uint8_t texture_offsets[5] = {
         205, 206, 207, 222, 223};
     uint8_t texture_offset = texture_offsets[0];
-    uint8_t count = 0;
-    uint8_t bitmask = 0;
+    /*
+        uint8_t count = 0;
+        uint8_t bitmask = 0;
 
-    for (int i = 0, j = 0; i < 6; i++)
-    {
-        if (i == 2 || i == 3)
-            continue;
-        if (get_fluid_meta_level(neighbors[i]) < fluid_level)
+        for (int i = 0, j = 0; i < 6; i++)
         {
-            bitmask |= (1 << j);
-            count++;
-            switch (count)
+            if (i == 2 || i == 3)
+                continue;
+            if (get_fluid_meta_level(neighbors[i]) < fluid_level)
             {
-            case 1:
-                texture_offset = texture_offsets[1 + (j >> 1)];
-                break;
-            case 2:
-                texture_offset = texture_offsets[1 + (((!(bitmask & 3)) != (!(bitmask & 12))) << 1)];
-                break;
-            case 3:
-                texture_offset = texture_offsets[1 + ((!(bitmask & 1)) != (!(bitmask & 2)))];
-                break;
-            case 4:
-                texture_offset = texture_offsets[0];
-                break;
+                bitmask |= (1 << j);
+                count++;
+                switch (count)
+                {
+                case 1:
+                    texture_offset = texture_offsets[1 + (j >> 1)];
+                    break;
+                case 2:
+                    texture_offset = texture_offsets[1 + (((!(bitmask & 3)) != (!(bitmask & 12))) << 1)];
+                    break;
+                case 3:
+                    texture_offset = texture_offsets[1 + ((!(bitmask & 1)) != (!(bitmask & 2)))];
+                    break;
+                case 4:
+                    texture_offset = texture_offsets[0];
+                    break;
 
-            default:
-                break;
+                default:
+                    break;
+                }
             }
+            j++;
         }
-        j++;
-    }
-    uint8_t texture_start_x = TEXTURE_X(texture_offset) * UV_SCALE;
-    uint8_t texture_start_y = TEXTURE_Y(texture_offset) * UV_SCALE;
+    */
+    uint8_t texture_start_x = TEXTURE_X(texture_offset);
+    uint8_t texture_start_y = TEXTURE_Y(texture_offset);
     uint8_t texture_end_x = texture_start_x + UV_SCALE;
     uint8_t texture_end_y = texture_start_y + UV_SCALE;
 
@@ -884,7 +701,7 @@ int chunk_t::render_fluid(block_t *block, vec3i pos)
         {(local_pos + vec3f{+.5f, -.5f, -.5f}), texture_end_x, texture_end_y},
     };
     if (!is_same_fluid(block_id, neighbor_ids[FACE_NY]))
-        faceCount += DrawTopSplit(bottomPlaneCoords[0], bottomPlaneCoords[1], bottomPlaneCoords[2], bottomPlaneCoords[3], light);
+        faceCount += DrawHorizontalQuad(bottomPlaneCoords[0], bottomPlaneCoords[1], bottomPlaneCoords[2], bottomPlaneCoords[3], light);
 
     vertex_property_t topPlaneCoords[4] = {
         {(local_pos + vec3f{+.5f, -.5f + corner_tops[3], -.5f}), texture_end_x, texture_end_y},
@@ -893,15 +710,15 @@ int chunk_t::render_fluid(block_t *block, vec3i pos)
         {(local_pos + vec3f{-.5f, -.5f + corner_tops[0], -.5f}), texture_start_x, texture_end_y},
     };
     if (!is_same_fluid(block_id, neighbor_ids[FACE_PY]))
-        faceCount += DrawTopSplit(topPlaneCoords[0], topPlaneCoords[1], topPlaneCoords[2], topPlaneCoords[3], light);
+        faceCount += DrawHorizontalQuad(topPlaneCoords[0], topPlaneCoords[1], topPlaneCoords[2], topPlaneCoords[3], light);
 
     texture_offset = basefluid(block_id) == BlockID::water ? WATER_SIDE : LAVA_SIDE;
 
     vertex_property_t sideCoords[4] = {0};
 
-    texture_start_x = TEXTURE_X(texture_offset) * UV_SCALE;
+    texture_start_x = TEXTURE_X(texture_offset);
     texture_end_x = texture_start_x + UV_SCALE;
-    texture_start_y = TEXTURE_Y(texture_offset) * UV_SCALE;
+    texture_start_y = TEXTURE_Y(texture_offset);
 
     sideCoords[0].x_uv = sideCoords[1].x_uv = texture_start_x;
     sideCoords[2].x_uv = sideCoords[3].x_uv = texture_end_x;
@@ -916,8 +733,8 @@ int chunk_t::render_fluid(block_t *block, vec3i pos)
     sideCoords[2].y_uv = texture_start_y + corner_max[0];
     sideCoords[1].y_uv = texture_start_y + corner_max[3];
     sideCoords[0].y_uv = texture_start_y + corner_min[3];
-    if (!is_same_fluid(block_id, neighbor_ids[FACE_NZ]))
-        faceCount += DrawSideSplit(sideCoords[0], sideCoords[1], sideCoords[2], sideCoords[3], facelight * 0.9f);
+    if (neighbors[FACE_NZ] && !is_same_fluid(block_id, neighbor_ids[FACE_NZ]))
+        faceCount += DrawVerticalQuad(sideCoords[0], sideCoords[1], sideCoords[2], sideCoords[3], facelight * 0.9f);
 
     facelight = 0.05f;
     if (neighbors[FACE_PZ])
@@ -930,8 +747,8 @@ int chunk_t::render_fluid(block_t *block, vec3i pos)
     sideCoords[2].y_uv = texture_start_y + corner_max[2];
     sideCoords[1].y_uv = texture_start_y + corner_max[1];
     sideCoords[0].y_uv = texture_start_y + corner_min[1];
-    if (!is_same_fluid(block_id, neighbor_ids[FACE_PZ]))
-        faceCount += DrawSideSplit(sideCoords[0], sideCoords[1], sideCoords[2], sideCoords[3], facelight * 0.9f);
+    if (neighbors[FACE_PZ] && !is_same_fluid(block_id, neighbor_ids[FACE_PZ]))
+        faceCount += DrawVerticalQuad(sideCoords[0], sideCoords[1], sideCoords[2], sideCoords[3], facelight * 0.9f);
 
     facelight = 0.05f;
     if (neighbors[FACE_NX])
@@ -944,8 +761,8 @@ int chunk_t::render_fluid(block_t *block, vec3i pos)
     sideCoords[2].y_uv = texture_start_y + corner_max[1];
     sideCoords[1].y_uv = texture_start_y + corner_max[0];
     sideCoords[0].y_uv = texture_start_y + corner_min[0];
-    if (!is_same_fluid(block_id, neighbor_ids[FACE_NX]))
-        faceCount += DrawSideSplit(sideCoords[0], sideCoords[1], sideCoords[2], sideCoords[3], facelight * 0.85f);
+    if (neighbors[FACE_NX] && !is_same_fluid(block_id, neighbor_ids[FACE_NX]))
+        faceCount += DrawVerticalQuad(sideCoords[0], sideCoords[1], sideCoords[2], sideCoords[3], facelight * 0.85f);
 
     facelight = 0.05f;
     if (neighbors[FACE_PX])
@@ -958,8 +775,8 @@ int chunk_t::render_fluid(block_t *block, vec3i pos)
     sideCoords[2].y_uv = texture_start_y + corner_max[3];
     sideCoords[1].y_uv = texture_start_y + corner_max[2];
     sideCoords[0].y_uv = texture_start_y + corner_min[2];
-    if (!is_same_fluid(block_id, neighbor_ids[FACE_PX]))
-        faceCount += DrawSideSplit(sideCoords[0], sideCoords[1], sideCoords[2], sideCoords[3], facelight * 0.85f);
+    if (neighbors[FACE_PX] && !is_same_fluid(block_id, neighbor_ids[FACE_PX]))
+        faceCount += DrawVerticalQuad(sideCoords[0], sideCoords[1], sideCoords[2], sideCoords[3], facelight * 0.85f);
     return faceCount * 3;
 }
 

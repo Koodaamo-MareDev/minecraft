@@ -4,10 +4,16 @@
 #define OPTIMIZE_UVS
 
 #ifdef OPTIMIZE_UVS
-#define TEXTURE_X(x) (x & 15)
-#define TEXTURE_Y(y) ((y >> 4) & 15)
 #define TexCoord GX_TexCoord2u8
-#define UV_SCALE (uint8_t(8))
+#define UV_SCALE (8)
+#define TEXTURE_X(x) (UV_SCALE * (x & 15))
+#define TEXTURE_Y(y) (UV_SCALE * ((y >> 4) & 15))
+
+#define TEXTURE_NX(x) (TEXTURE_X(x))
+#define TEXTURE_NY(y) (TEXTURE_Y(y))
+#define TEXTURE_PX(x) (TEXTURE_X(x) + UV_SCALE)
+#define TEXTURE_PY(y) (TEXTURE_Y(y) + UV_SCALE)
+
 #define TEXTURE_COUNT (UV_SCALE << 4)
 #define VERTEX_ATTR_LENGTH 17
 #else

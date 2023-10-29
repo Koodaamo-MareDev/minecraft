@@ -12,6 +12,9 @@ public:
     vec3i operator-(vec3i const& a) const;
     vec3f operator+(vec3f const& a) const;
     vec3f operator-(vec3f const& a) const;
+    vec3i(int x, int y, int z) : x(x), y(y), z(z) {}
+    vec3i(int xyz) : x(xyz), y(xyz), z(xyz) {}
+    vec3i() : x(0), y(0), z(0) {}
 
 private:
     // Member variables
