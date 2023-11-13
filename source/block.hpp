@@ -63,11 +63,6 @@ public:
     {
         this->light = (this->light & 0xF0) | value;
     }
-
-    void set_blockid(BlockID value)
-    {
-        this->id = uint16_t(value);
-    }
+    void set_blockid(BlockID value);
 };
-
 #endif

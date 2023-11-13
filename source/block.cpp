@@ -22,3 +22,8 @@ void block_t::set_opacity(uint8_t face, uint8_t flag)
     else
         this->visibility_flags &= ~(1 << face);
 }
+void block_t::set_blockid(BlockID value)
+{
+    this->id = uint16_t(value);
+    this->set_visibility(value != BlockID::air && !is_fluid(value));
+}

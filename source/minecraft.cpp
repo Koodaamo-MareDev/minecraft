@@ -78,6 +78,12 @@ void WiimotePowerPressed(s32 chan)
     HWButton = SYS_POWEROFF;
 }
 
+s8 has_retraced = 0;
+void RenderDone(u32 enterCount)
+{
+    has_retraced = 1;
+}
+
 void AlphaBlend(unsigned char *src, unsigned char *dst, int width, int height, int row)
 {
     int index = 0;
@@ -210,7 +216,7 @@ int main(int argc, char **argv)
     frameBuffer[1] = MEM_K0_TO_K1(SYS_AllocateFramebuffer(rmode));
     // dstBuffer[0] = SYS_AllocateFramebuffer(rmode);
     // dstBuffer[1] = SYS_AllocateFramebuffer(rmode);
-
+    SYS_SetEuRGB60(TRUE);
     CON_Init(frameBuffer[0], 20, 20, rmode->fbWidth, rmode->xfbHeight, rmode->fbWidth * VI_DISPLAY_PIX_SZ);
     // configure video
     VIDEO_Configure(rmode);
@@ -329,6 +335,7 @@ int main(int argc, char **argv)
     player_pos.x = 0;
     player_pos.y = -1000;
     player_pos.z = 0;
+    VIDEO_SetPostRetraceCallback(&RenderDone);
     while (!isExiting)
     {
         if (HWButton != -1)
@@ -570,27 +577,35 @@ void Render(Mtx view, guVector chunkPos, void *buffer, u32 length)
 
 inline void RecalcSectionWater(chunk_t *chunk, int section)
 {
+    static std::vector<std::vector<vec3i>> fluid_levels(8);
+
     int chunkX = (chunk->x * 16);
     int chunkZ = (chunk->z * 16);
     int sectionY = (section * 16);
-    vec3i pos = vec3i(chunkX, sectionY, chunkZ);
-    //for (int l = 8; l >= 0; l--)
-    //for (int l = 0; l <= 8; l++)
+    vec3i current_pos = vec3i(chunkX, sectionY, chunkZ);
+    current_pos.x = chunkX;
+    for (int _x = 0; _x < 16; _x++, current_pos.x++)
     {
-        pos.x = chunkX;
-        for (int _x = 0; _x < 16; _x++, pos.x++)
+        current_pos.z = chunkZ;
+        for (int _z = 0; _z < 16; _z++, current_pos.z++)
         {
-            pos.z = chunkZ;
-            for (int _z = 0; _z < 16; _z++, pos.z++)
+            current_pos.y = sectionY;
+            for (int _y = 0; _y < 16; _y++, current_pos.y++)
             {
-                pos.y = sectionY;
-                for (int _y = 0; _y < 16; _y++, pos.y++)
-                {
-                    block_t *block = chunk->get_block(_x, pos.y, _z);
-                    if (block && is_fluid(block->get_blockid()) /*&& get_fluid_meta_level(block) == l*/)
-                        update_fluid(block, pos);
-                }
+                block_t *block = chunk->get_block(_x, current_pos.y, _z);
+                if (block && (block->meta & (FLUID_UPDATE_LATER_FLAG | FLUID_UPDATE_REQUIRED_FLAG)))
+                    fluid_levels[get_fluid_meta_level(block)].push_back(current_pos);
             }
+        }
+    }
+    for (int i = fluid_levels.size() - 1; i >= 0; i--)
+    //for (size_t i = 0; i < fluid_levels.size(); i++)
+    {
+        std::vector<vec3i> positions = fluid_levels[i];
+        for (vec3i pos : positions)
+        {
+            block_t *block = chunk->get_block(pos.x, pos.y, pos.z);
+            update_fluid(block, pos);
         }
     }
 }
@@ -628,15 +643,14 @@ bool DrawScene(Mtx view, bool transparency)
             if (editable_block)
             {
                 editable_block->set_blockid(target_blockid);
-                editable_block->set_visibility(target_blockid != BlockID::air && target_blockid != BlockID::flowing_water && target_blockid != BlockID::water);
                 editable_block->meta = 0;
                 update_block_at(rc_block);
                 block_t *neighbors[6];
                 get_neighbors(editable_pos, neighbors);
                 for (int i = 0; i < 6; i++)
                 {
-                    if (neighbors[i] && is_fluid(neighbors[i]->get_blockid()))
-                        neighbors[i]->meta |= FLUID_UPDATE_REQUIRED_FLAG;
+                    if (neighbors[i] && is_fluid(neighbors[i]->get_blockid()) && !(neighbors[i]->meta & (FLUID_UPDATE_LATER_FLAG | FLUID_UPDATE_REQUIRED_FLAG)))
+                        neighbors[i]->meta |= FLUID_UPDATE_LATER_FLAG;
                 }
             }
         }
@@ -676,13 +690,12 @@ bool DrawScene(Mtx view, bool transparency)
                 }
                 continue;
             }
-            bool visible = false;
             for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
             {
                 chunkvbo_t &vbo = chunk->vbos[j];
                 chunkPos.y = (j * 16);
                 distance = fabs(chunkPos.y - player_pos.y);
-                visible |= vbo.visible = (distance <= 40);
+                vbo.visible = (distance <= 40);
                 if (vbo.visible && transparency && frameCounter % 12 == 0)
                     RecalcSectionWater(chunk, j);
             }
@@ -693,8 +706,6 @@ bool DrawScene(Mtx view, bool transparency)
     int chunk_update_count = 0;
     for (std::list<chunk_t *>::iterator it = chunks.begin(); it != chunks.end(); it++)
     {
-        if (chunk_update_count > 32)
-            break;
         chunk_t *chunk = *it;
         if (!chunk)
             continue;

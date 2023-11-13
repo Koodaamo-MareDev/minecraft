@@ -72,6 +72,7 @@ std::list<chunk_t *> &get_chunks();
 void init_chunks();
 void deinit_chunks();
 void print_chunk_status();
+bool has_pending_chunks();
 BlockID get_block_id_at(vec3i position, BlockID default_id = BlockID::air);
 block_t *get_block_at(vec3i vec);
 chunk_t *get_chunk_from_pos(int posX, int posZ, bool load);

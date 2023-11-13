@@ -22,7 +22,7 @@ int get_block_opacity(BlockID blockid)
 
 bool is_solid(BlockID block_id)
 {
-    return block_id != BlockID::air && !is_fluid(block_id);
+    return block_id != BlockID::air && !is_fluid(block_id) && !is_face_transparent(get_default_texture_index(block_id));
 }
 
 bool is_face_transparent(int texture_index)
@@ -30,37 +30,14 @@ bool is_face_transparent(int texture_index)
     return blockmap_alpha[texture_index & 0xFF] == 0;
 }
 
-uint32_t get_face_texture_index(block_t *block, int face)
+uint32_t get_default_texture_index(BlockID blockid)
 {
-    if (!block)
-        return 0;
-    const int directionmap[] = {
-        FACE_NX,
-        FACE_PX,
-        FACE_NZ,
-        FACE_PZ};
-    BlockID blockid = block->get_blockid();
-    // Have to handle differently for different blocks, e.g. grass, logs, crafting table
-    int default_tex_ind = block->id & 0xFF;
     switch (blockid)
     {
     case BlockID::stone:
         return 0;
     case BlockID::grass:
-    {
-        switch (face)
-        {
-        case FACE_NX:
-        case FACE_PX:
-        case FACE_NZ:
-        case FACE_PZ:
-            return 3;
-        case FACE_NY:
-            return 2;
-        case FACE_PY:
-            return 1;
-        }
-    }
+        return 3;
     case BlockID::dirt:
         return 2;
     case BlockID::cobblestone:
@@ -89,16 +66,7 @@ uint32_t get_face_texture_index(block_t *block, int face)
     case BlockID::coal_ore:
         return 34;
     case BlockID::wood:
-    { // log
-        switch (face)
-        {
-        case FACE_NY:
-        case FACE_PY:
-            return 21;
-        default:
-            return 20;
-        }
-    }
+        return 20;
     case BlockID::leaves:
         return 52;
     case BlockID::sponge:
@@ -110,14 +78,7 @@ uint32_t get_face_texture_index(block_t *block, int face)
     case BlockID::lapis_block:
         return 144;
     case BlockID::dispenser:
-    {
-        int block_direction = (block->meta) & 0x03;
-        if (face == FACE_NY || face == FACE_PY)
-            return 62;
-        if (face == directionmap[block_direction])
-            return 46;
         return 45;
-    }
     case BlockID::sandstone:
         return 176;
     case BlockID::note_block:
@@ -129,16 +90,78 @@ uint32_t get_face_texture_index(block_t *block, int face)
     case BlockID::detector_rail:
         return 179;
     default:
-        return default_tex_ind;
+        return int(blockid) & 0xFF;
+    }
+}
+
+uint32_t get_face_texture_index(block_t *block, int face)
+{
+    if (!block)
+        return 0;
+    const int directionmap[] = {
+        FACE_NX,
+        FACE_PX,
+        FACE_NZ,
+        FACE_PZ};
+    BlockID blockid = block->get_blockid();
+    // Have to handle differently for different blocks, e.g. grass, logs, crafting table
+    switch (blockid)
+    {
+    case BlockID::stone:
+        return 0;
+    case BlockID::grass:
+    {
+        switch (face)
+        {
+        case FACE_NX:
+        case FACE_PX:
+        case FACE_NZ:
+        case FACE_PZ:
+            return 3;
+        case FACE_NY:
+            return 2;
+        case FACE_PY:
+            return 1;
+        }
+    }
+    case BlockID::wood:
+    { // log
+        switch (face)
+        {
+        case FACE_NY:
+        case FACE_PY:
+            return 21;
+        default:
+            return 20;
+        }
+    }
+    case BlockID::dispenser:
+    {
+        int block_direction = (block->meta) & 0x03;
+        if (face == FACE_NY || face == FACE_PY)
+            return 62;
+        if (face == directionmap[block_direction])
+            return 46;
+        return 45;
+    }
+    default:
+        return get_default_texture_index(blockid);
     }
 }
 
 void update_fluid(block_t *block, vec3i pos)
 {
     BlockID block_id = block->get_blockid();
+
+    if ((block->meta & FLUID_UPDATE_LATER_FLAG))
+    {
+        block->meta &= ~FLUID_UPDATE_LATER_FLAG;
+        block->meta |= FLUID_UPDATE_REQUIRED_FLAG;
+        return;
+    }
+
     if (!(block->meta & FLUID_UPDATE_REQUIRED_FLAG))
         return;
-
     block->meta &= ~FLUID_UPDATE_REQUIRED_FLAG;
     if (!is_fluid(block_id))
         return;
@@ -154,18 +177,17 @@ void update_fluid(block_t *block, vec3i pos)
     block_t *pz = get_block_at(pos + face_offsets[FACE_PZ]);
     block_t *surroundings[6] = {ny, nx, px, nz, pz, py};
     int surrounding_dirs[6] = {FACE_NY, FACE_NX, FACE_PX, FACE_NZ, FACE_PZ, FACE_PY};
-
-    if (is_flowing_fluid(block_id))
+    if (!is_still_fluid(block_id))
     {
         uint8_t surrounding_sources = 0;
-        uint8_t min_surrounding_level = 7;
-        for (int i = 1; i < 6; i++) // Skip negative y
+        uint8_t min_surrounding_level = 8;
+        for (int i = 1; i < 5; i++) // Skip negative y
         {
             block_t *surrounding = surroundings[i];
             if (surrounding)
             {
                 BlockID surround_id = surrounding->get_blockid();
-                if (surrounding_dirs[i] != FACE_PY && is_still_fluid(surround_id))
+                if (is_still_fluid(surround_id))
                 {
                     surrounding_sources++;
                 }
@@ -175,6 +197,9 @@ void update_fluid(block_t *block, vec3i pos)
                 }
             }
         }
+        BlockID above_id = py ? py->get_blockid() : BlockID::air;
+        if (is_same_fluid(block_id, above_id))
+            min_surrounding_level = 0;
         level = min_surrounding_level + 1;
 
         if (surrounding_sources >= 2)
@@ -184,14 +209,14 @@ void update_fluid(block_t *block, vec3i pos)
             if ((!is_fluid_overridable(ny_blockid) && !is_fluid(ny_blockid)))
             {
                 block->set_blockid(BlockID::water);
-                block->meta = 0;
+                block->meta &= ~0xF;
             }
         }
         // Level 8 -> air
         else if (level >= 8)
         {
             block->set_blockid(BlockID::air);
-            block->meta = 0;
+            block->meta &= ~0xF;
         }
     }
     level = get_fluid_meta_level(block);
@@ -204,7 +229,7 @@ void update_fluid(block_t *block, vec3i pos)
             if (surrounding)
             {
                 BlockID surround_id = surrounding->get_blockid();
-                vec3i surrounding_pos = pos + face_offsets[surrounding_dirs[i]];
+                vec3i surrounding_offset = face_offsets[surrounding_dirs[i]];
                 if (is_fluid_overridable(surround_id))
                 {
                     int surrounding_level = get_fluid_meta_level(surrounding);
@@ -212,30 +237,36 @@ void update_fluid(block_t *block, vec3i pos)
                     {
                         if (surround_id != flowfluid(block_id) || surrounding_level != 0)
                         {
-                            surrounding->meta |= FLUID_UPDATE_REQUIRED_FLAG;
-                            update_light(lightupdate_t(surrounding_pos, surrounding->get_blocklight(), surrounding->get_skylight()));
+                            surrounding->meta |= FLUID_UPDATE_LATER_FLAG; // FLUID_UPDATE_REQUIRED_FLAG * (2 - (std::signbit(surrounding_offset.x) | std::signbit(surrounding_offset.z)));
+                            surrounding->set_blockid(flowfluid(block_id));
+                            set_fluid_level(surrounding, 0);
+                            update_light(lightupdate_t(pos + surrounding_offset, surrounding->get_blocklight(), surrounding->get_skylight()));
+                            break;
                         }
-                        surrounding->set_blockid(flowfluid(surround_id));
-                        set_fluid_level(surrounding, 0);
-                        break;
                     }
                     else
                     {
                         if (surround_id != flowfluid(block_id) || surrounding_level > level + 1)
                         {
-                            surrounding->meta |= FLUID_UPDATE_REQUIRED_FLAG;
-                            update_light(lightupdate_t(surrounding_pos, surrounding->get_blocklight(), surrounding->get_skylight()));
-                            // get_chunk_from_pos(surrounding_pos.x, surrounding_pos.z, false)->vbos[surrounding_pos.y / 16].dirty = surrounding->get_blockid() != flowfluid(surround_id);
+                            surrounding->meta |= FLUID_UPDATE_LATER_FLAG; // FLUID_UPDATE_REQUIRED_FLAG * (2 - (std::signbit(surrounding_offset.x) | std::signbit(surrounding_offset.z)));
+                            surrounding->set_blockid(flowfluid(block_id));
+                            set_fluid_level(surrounding, level + 1);
+                            update_light(lightupdate_t(pos + surrounding_offset, surrounding->get_blocklight(), surrounding->get_skylight()));
                         }
-                        surrounding->set_blockid(flowfluid(surround_id));
-                        set_fluid_level(surrounding, level + 1);
                     }
                 }
             }
         }
     }
-    if (level != old_level || block->get_blockid() != block_id)
+    if (block->get_blockid() != block_id)
+    {
         update_light(lightupdate_t(pos, block->get_blocklight(), block->get_skylight()));
+    }
+    else if (level != old_level)
+    {
+        set_fluid_level(block, level);
+        get_chunk_from_pos(pos.x, pos.z, false)->vbos[pos.y / 16].dirty = true;
+    }
 }
 
 void set_fluid_level(block_t *block, uint8_t level)

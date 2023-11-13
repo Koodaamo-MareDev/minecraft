@@ -39,6 +39,11 @@ void *__chunk_generator_init_internal(void *);
 std::list<chunk_t *> chunks;
 std::list<chunk_t *> pending_chunks;
 
+bool has_pending_chunks()
+{
+    return pending_chunks.size() > 0;
+}
+
 std::list<chunk_t *> &get_chunks()
 {
     return chunks;
@@ -101,7 +106,6 @@ void generate_chunk()
             return;
         LWP_YieldThread();
     }
-    LWP_YieldThread();
     chunk_t *chunk = pending_chunks.front();
     int x_offset = (chunk->x * 16);
     int z_offset = (chunk->z * 16);
@@ -155,7 +159,7 @@ void generate_chunk()
                 }
             }
         }
-        //LWP_YieldThread();
+        // LWP_YieldThread();
     }
     chunk->valid = true;
     LWP_MutexLock(__chunks_mutex);
@@ -168,10 +172,10 @@ void generate_chunk()
         chunk_t *chunkZ = get_chunk(chunk->x, chunk->z + i, false);
         if (chunkX)
             for (int vbo_y = 0; vbo_y < 16; vbo_y++)
-                chunkX->vbos[vbo_y].dirty |= chunkX->vbos[vbo_y].visible;
+                chunkX->vbos[vbo_y].dirty |= true;
         if (chunkZ)
             for (int vbo_y = 0; vbo_y < 16; vbo_y++)
-                chunkZ->vbos[vbo_y].dirty |= chunkZ->vbos[vbo_y].visible;
+                chunkZ->vbos[vbo_y].dirty |= true;
     }
 }
 

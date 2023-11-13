@@ -47,7 +47,15 @@
         "typeinfo": "cpp",
         "cstring": "cpp",
         "optional": "cpp",
-        "list": "cpp"
+        "list": "cpp",
+        "condition_variable": "cpp",
+        "ctime": "cpp",
+        "ratio": "cpp",
+        "mutex": "cpp",
+        "semaphore": "cpp",
+        "shared_mutex": "cpp",
+        "stop_token": "cpp",
+        "thread": "cpp"
     },
     "[javascript]": {
         "editor.maxTokenizationLineLength": 25000

@@ -61,13 +61,14 @@ void light_engine_update()
 
 void light_engine_loop()
 {
+    int updates = 0;
     while (pending_light_updates.size() > 0 && __light_engine_init_done)
     {
         __light_engine_busy = true;
-        //LWP_MutexLock(__light_update_mutex);
+        LWP_MutexLock(__light_update_mutex);
         lightupdate_t update = pending_light_updates.front();
         pending_light_updates.pop_front();
-        //LWP_MutexUnlock(__light_update_mutex);
+        LWP_MutexUnlock(__light_update_mutex);
         chunk_t *chunk = get_chunk_from_pos(update.pos.x, update.pos.z, false);
         if (chunk)
         {
@@ -77,6 +78,8 @@ void light_engine_loop()
             __update_light(update.pos);
             --chunk->light_updates;
         }
+        if (++updates % 1000 == 0)
+            LWP_YieldThread();
     }
     __light_engine_busy = false;
 }
@@ -183,7 +186,7 @@ void __update_light(vec3i coords)
                 if (neighbors[i])
                     light_updates.push_back(pos + face_offsets[i]);
             }
+            chunk->vbos[pos.y / 16].dirty = true;
         }
-        chunk->vbos[pos.y / 16].dirty = true;
     }
 }
