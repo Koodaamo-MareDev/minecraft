@@ -35,3 +35,6 @@ build/
 *.app
 *.dol
 *.elf
+
+# Others
+.vscode/settings.json

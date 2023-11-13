@@ -15,25 +15,59 @@
 class block_t
 {
 public:
-    uint8_t id = 0;
+    uint16_t id = 0;
     uint8_t light = 0;
     uint8_t visibility_flags = 0;
     uint32_t meta = 0;
-    
-    uint8_t get_visibility();
-    uint8_t get_opacity(uint8_t face);
-    uint8_t get_skylight();
-    uint8_t get_blocklight();
-    uint8_t get_castlight();
-    
-    BlockID get_blockid();
 
-    void set_visibility(uint8_t flag);
     void set_opacity(uint8_t face, uint8_t flag);
-    void set_skylight(uint8_t value);
-    void set_blocklight(uint8_t value);
-    void set_blockid(BlockID value);
-    
+    uint8_t get_cast_skylight();
+    uint8_t get_cast_blocklight();
+
+    BlockID get_blockid()
+    {
+        return BlockID(this->id);
+    }
+
+    void set_visibility(uint8_t flag)
+    {
+        this->set_opacity(6, flag);
+    }
+
+    uint8_t get_visibility()
+    {
+        return this->get_opacity(6);
+    }
+
+    uint8_t get_opacity(uint8_t face)
+    {
+        return (this->visibility_flags & (1 << face));
+    }
+
+    uint8_t get_skylight()
+    {
+        return (this->light >> 4) & 0xF;
+    }
+
+    uint8_t get_blocklight()
+    {
+        return this->light & 0xF;
+    }
+
+    void set_skylight(uint8_t value)
+    {
+        this->light = (this->light & 0xF) | (value << 4);
+    }
+
+    void set_blocklight(uint8_t value)
+    {
+        this->light = (this->light & 0xF0) | value;
+    }
+
+    void set_blockid(BlockID value)
+    {
+        this->id = uint16_t(value);
+    }
 };
 
 #endif

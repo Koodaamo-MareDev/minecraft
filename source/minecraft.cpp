@@ -37,10 +37,9 @@ bool debug_spritesheet = false;
 
 f32 xrot = -22.5f;
 f32 yrot = 0.0f;
-guVector pos = {0.F, 80.0F, 0.F};
+guVector player_pos = {0.F, 80.0F, 0.F};
 void *frameBuffer[2] = {NULL, NULL};
 static GXRModeObj *rmode = NULL;
-
 void *outline = nullptr;
 u32 outline_len = 0;
 
@@ -63,9 +62,20 @@ guVector cam = {0.0F, 0.0F, 0.0F},
          look = {0.0F, 0.0F, -1.0F};
 //---------------------------------------------------------------------------------
 bool isExiting = false;
-void PowerOffCallback()
+s8 HWButton = -1;
+void WiiResetPressed(u32, void *)
 {
-    isExiting = true;
+    HWButton = SYS_RETURNTOMENU;
+}
+
+void WiiPowerPressed()
+{
+    HWButton = SYS_POWEROFF;
+}
+
+void WiimotePowerPressed(s32 chan)
+{
+    HWButton = SYS_POWEROFF;
 }
 
 void AlphaBlend(unsigned char *src, unsigned char *dst, int width, int height, int row)
@@ -188,7 +198,9 @@ int main(int argc, char **argv)
     VIDEO_Init();
     WPAD_Init();
     rmode = VIDEO_GetPreferredMode(NULL);
-    SYS_SetPowerCallback(PowerOffCallback);
+    SYS_SetPowerCallback(WiiPowerPressed);
+    SYS_SetResetCallback(WiiResetPressed);
+    WPAD_SetPowerButtonCallback(WiimotePowerPressed);
     // allocate the fifo buffer
     gpfifo = memalign(32, DEFAULT_FIFO_SIZE);
     memset(gpfifo, 0, DEFAULT_FIFO_SIZE);
@@ -314,11 +326,13 @@ int main(int argc, char **argv)
     GX_SetFog(GX_FOG_LIN, 8, 22, 0.1F, 300.0F, background);
     GX_SetZCompLoc(GX_FALSE);
     time_reset();
-    pos.x = 0;
-    pos.y = -1000;
-    pos.z = 0;
+    player_pos.x = 0;
+    player_pos.y = -1000;
+    player_pos.z = 0;
     while (!isExiting)
     {
+        if (HWButton != -1)
+            break;
         if (fb)
         {
             water_still_anim.update();
@@ -360,7 +374,7 @@ int main(int argc, char **argv)
         VIDEO_WaitVSync();
         // if (!frame_skip)
         fb ^= 1;
-        float target = pos.y >= 64. ? 1 : (pos.y <= 63. ? 0 : std::fmod(pos.y, 1));
+        float target = player_pos.y >= 64. ? 1 : (player_pos.y <= 63. ? 0 : std::fmod(player_pos.y, 1));
         target = target < 0.1f ? 0.1f : target;
         current_lerpvalue = lerp(current_lerpvalue, target, 0.05f);
         background.r = u8(current_lerpvalue * default_background.r);
@@ -368,16 +382,16 @@ int main(int argc, char **argv)
         background.b = u8(current_lerpvalue * default_background.b);
         GX_SetCopyClear(background, 0x00FFFFFF);
         GX_SetFog(GX_FOG_LIN, 8, 22, 0.1F, 300.0F, background);
-        if (pos.y < -999)
-            pos.y = skycast(pos.x, pos.z) + 2;
+        if (player_pos.y < -999)
+            player_pos.y = skycast(player_pos.x, player_pos.z) + 2;
     }
     light_engine_deinit();
+    deinit_chunks();
     printf("Exiting...");
-    VIDEO_Flush();
-    VIDEO_WaitVSync();
-    WII_ReturnToMenu();
-    //  while (1)
-    //      ;
+    if (HWButton != -1)
+    {
+        SYS_ResetSystem(HWButton, 0, 0);
+    }
     return 0;
 }
 
@@ -407,9 +421,9 @@ void GetInput()
         }
 
         if (wiimote1_held & WPAD_CLASSIC_BUTTON_UP)
-            pos.y += 0.35f;
+            player_pos.y += 0.35f;
         if (wiimote1_held & WPAD_CLASSIC_BUTTON_DOWN)
-            pos.y -= 0.35f;
+            player_pos.y -= 0.35f;
 
         if (!((wiimote1_held & WPAD_CLASSIC_BUTTON_FULL_L) || (wiimote1_held & WPAD_CLASSIC_BUTTON_FULL_R)))
             shoulder_btn_frame_counter = -1;
@@ -433,13 +447,13 @@ void GetInput()
         x -= expansion.classic.ljs.center.x;
         if (abs(x) > CLASSIC_CONTROLLER_THRESHOLD)
         {
-            pos.x += (float(x) / (expansion.classic.ljs.max.y - expansion.classic.ljs.min.y)) * sin(DegToRad(yrot + 90)) * 0.35f;
-            pos.z += (float(x) / (expansion.classic.ljs.max.y - expansion.classic.ljs.min.y)) * cos(DegToRad(yrot + 90)) * 0.35f;
+            player_pos.x += (float(x) / (expansion.classic.ljs.max.y - expansion.classic.ljs.min.y)) * sin(DegToRad(yrot + 90)) * 0.35f;
+            player_pos.z += (float(x) / (expansion.classic.ljs.max.y - expansion.classic.ljs.min.y)) * cos(DegToRad(yrot + 90)) * 0.35f;
         }
         if (abs(y) > CLASSIC_CONTROLLER_THRESHOLD)
         {
-            pos.x -= (float(y) / (expansion.classic.ljs.max.y - expansion.classic.ljs.min.y)) * sin(DegToRad(yrot));
-            pos.z -= (float(y) / (expansion.classic.ljs.max.y - expansion.classic.ljs.min.y)) * cos(DegToRad(yrot));
+            player_pos.x -= (float(y) / (expansion.classic.ljs.max.y - expansion.classic.ljs.min.y)) * sin(DegToRad(yrot));
+            player_pos.z -= (float(y) / (expansion.classic.ljs.max.y - expansion.classic.ljs.min.y)) * cos(DegToRad(yrot));
         }
     }
     if (yrot > 360.f)
@@ -523,7 +537,7 @@ void Transform(Mtx view, guVector chunkPos)
 
     // Position the chunks on the screen
     guMtxTrans(offset, -chunkPos.x, -chunkPos.y, -chunkPos.z);
-    guMtxTrans(posmtx, pos.x, pos.y, pos.z);
+    guMtxTrans(posmtx, player_pos.x, player_pos.y, player_pos.z);
 
     // Rotate view
     axis.x = 1;
@@ -554,52 +568,36 @@ void Render(Mtx view, guVector chunkPos, void *buffer, u32 length)
     GX_CallDispList(ALIGNPTR(buffer), length); // Draw the box
 }
 
-bool WaterLevelComparer(const block_t *&a, const block_t *&b)
+inline void RecalcSectionWater(chunk_t *chunk, int section)
 {
-    return (a->meta & 0x7) < (b->meta & 0x7);
-}
-
-void RecalcSectionWater(chunk_t *chunk, int section)
-{
-    static std::vector<std::vector<vec3i>> water_levels(9);
-    int y_off = (section * 16);
-    int x_off = (chunk->x * 16);
-    int z_off = (chunk->z * 16);
-
-    for (size_t i = 0; i < water_levels.size(); i++)
-        water_levels[i].clear();
-
-    for (int _x = 0; _x < 16; _x++)
+    int chunkX = (chunk->x * 16);
+    int chunkZ = (chunk->z * 16);
+    int sectionY = (section * 16);
+    vec3i pos = vec3i(chunkX, sectionY, chunkZ);
+    //for (int l = 8; l >= 0; l--)
+    //for (int l = 0; l <= 8; l++)
     {
-        for (int _z = 0; _z < 16; _z++)
+        pos.x = chunkX;
+        for (int _x = 0; _x < 16; _x++, pos.x++)
         {
-            for (int _y = 0; _y < 16; _y++)
+            pos.z = chunkZ;
+            for (int _z = 0; _z < 16; _z++, pos.z++)
             {
-                vec3i pos = vec3i{_x + x_off, _y + y_off, _z + z_off};
-                block_t *block = get_block_at(pos);
-                if (block)
+                pos.y = sectionY;
+                for (int _y = 0; _y < 16; _y++, pos.y++)
                 {
-                    BlockID block_id = block->get_blockid();
-                    if (is_fluid(block_id))
-                        water_levels[get_fluid_meta_level(block)].push_back(pos);
+                    block_t *block = chunk->get_block(_x, pos.y, _z);
+                    if (block && is_fluid(block->get_blockid()) /*&& get_fluid_meta_level(block) == l*/)
+                        update_fluid(block, pos);
                 }
             }
-        }
-    }
-    for (size_t l = 0; l < water_levels.size(); l++)
-    {
-        std::vector<vec3i> &levels = water_levels[water_levels.size() - 1 - l];
-        for (size_t b = 0; b < levels.size(); b++)
-        {
-            vec3i pos = levels[b];
-            block_t *block = get_block_at(pos);
-            update_fluid(block, pos);
         }
     }
 }
 bool DrawScene(Mtx view, bool transparency)
 {
-
+    // if (transparency)
+    //     print_chunk_status();
     guVector chunkPos;
     guVector relative = guVector();
     relative.x = 0;
@@ -612,7 +610,7 @@ bool DrawScene(Mtx view, bool transparency)
     vec3i rc_block_face;
     bool draw_block_outline = false;
     bool facing_block = false;
-    if (raycast(vec3d{pos.x - .5, pos.y - .5, pos.z - .5}, vec3d{relative.x, relative.y, relative.z}, 4, &rc_block, &rc_block_face))
+    if (raycast(vec3d{player_pos.x - .5, player_pos.y - .5, player_pos.z - .5}, vec3d{relative.x, relative.y, relative.z}, 4, &rc_block, &rc_block_face))
     {
         draw_block_outline = facing_block = true;
     }
@@ -650,11 +648,7 @@ bool DrawScene(Mtx view, bool transparency)
         chunk_t *chunk = *it;
         if (chunk && chunk->valid)
         {
-            for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
-            {
-                chunk->vbos[j].visible = false;
-            }
-            float distance = std::max(fabs((chunk->x * 16) - pos.x), fabs((chunk->z * 16) - pos.z));
+            float distance = std::max(fabs((chunk->x * 16) - player_pos.x), fabs((chunk->z * 16) - player_pos.z));
             if (distance > 56)
             {
                 chunk->valid = false;
@@ -687,36 +681,38 @@ bool DrawScene(Mtx view, bool transparency)
             {
                 chunkvbo_t &vbo = chunk->vbos[j];
                 chunkPos.y = (j * 16);
-                distance = fabs(chunkPos.y - pos.y);
-                if (!(vbo.visible = (distance <= 40)))
-                    continue;
-                visible = true;
-                if (transparency && frameCounter % 12 == 0)
+                distance = fabs(chunkPos.y - player_pos.y);
+                visible |= vbo.visible = (distance <= 40);
+                if (vbo.visible && transparency && frameCounter % 12 == 0)
                     RecalcSectionWater(chunk, j);
             }
-            if (visible)
-                chunk->light_up();
+            chunk->light_up();
         }
     }
-    if (transparency)
-        light_engine_update();
+
+    int chunk_update_count = 0;
     for (std::list<chunk_t *>::iterator it = chunks.begin(); it != chunks.end(); it++)
     {
+        if (chunk_update_count > 32)
+            break;
         chunk_t *chunk = *it;
-        if (chunk && chunk->valid)
+        if (!chunk)
+            continue;
+        if (chunk && chunk->valid && !chunk->light_updates)
         {
+            bool chunk_updated = false;
             for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
             {
                 chunkvbo_t &vbo = chunk->vbos[j];
                 if (!vbo.visible)
                     continue;
-                if (vbo.dirty && !light_engine_busy())
+                if (vbo.dirty)
                 {
                     vbo.dirty = false;
                     chunk->recalculate_section(j);
                     chunk->build_vbo(j, false);
                     chunk->build_vbo(j, true);
-                    chunk->lit_state = 2;
+                    chunk_updated = true;
                 }
                 if (vbo.solid_buffer != vbo.cached_solid_buffer)
                 {
@@ -737,7 +733,11 @@ bool DrawScene(Mtx view, bool transparency)
                     vbo.cached_transparent_buffer_length = vbo.transparent_buffer_length;
                 }
             }
+            chunk_update_count += chunk_updated;
+            chunk->lit_state = 2;
         }
+        if (!light_engine_busy() && chunk->lit_state)
+            chunk->light_updates = 0;
     }
     for (std::list<chunk_t *>::iterator it = chunks.begin(); it != chunks.end(); it++)
     {
@@ -781,18 +781,18 @@ bool DrawScene(Mtx view, bool transparency)
         else
             ++it;
     }
-    for (int x = pos.x - 32; x < pos.x + 32; x += 16)
+    for (int x = player_pos.x - 32; x < player_pos.x + 32; x += 16)
     {
         if (chunks.size() >= CHUNK_COUNT)
             break;
-        for (int z = pos.z - 32; z < pos.z + 32; z += 16)
+        for (int z = player_pos.z - 32; z < player_pos.z + 32; z += 16)
         {
             if (chunks.size() >= CHUNK_COUNT)
                 break;
             get_chunk_from_pos(x, z, true);
         }
     }
-    if (transparency && outline && draw_block_outline)
+    if (!transparency && outline && draw_block_outline)
     {
         GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
         guVector outlinePos = guVector();

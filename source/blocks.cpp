@@ -2,6 +2,7 @@
 #include "blockmap_alpha.h"
 #include "vec3i.hpp"
 #include "chunk_new.hpp"
+#include "light.hpp"
 #include <cmath>
 int get_block_opacity(BlockID blockid)
 {
@@ -132,17 +133,18 @@ uint32_t get_face_texture_index(block_t *block, int face)
     }
 }
 
-bool update_fluid(block_t *block, vec3i pos)
+void update_fluid(block_t *block, vec3i pos)
 {
     BlockID block_id = block->get_blockid();
-    if (!is_fluid(block_id))
-        return false;
-    chunk_t *chunk = get_chunk_from_pos(pos.x, pos.z, false);
     if (!(block->meta & FLUID_UPDATE_REQUIRED_FLAG))
-        return false;
-    uint8_t old_level = get_fluid_meta_level(block);
-    uint8_t level = old_level;
+        return;
 
+    block->meta &= ~FLUID_UPDATE_REQUIRED_FLAG;
+    if (!is_fluid(block_id))
+        return;
+
+    uint8_t old_level = get_fluid_meta_level(block);
+    uint8_t level = 0;
     // All directions except +Y because of gravity.
     block_t *nx = get_block_at(pos + face_offsets[FACE_NX]);
     block_t *px = get_block_at(pos + face_offsets[FACE_PX]);
@@ -153,9 +155,10 @@ bool update_fluid(block_t *block, vec3i pos)
     block_t *surroundings[6] = {ny, nx, px, nz, pz, py};
     int surrounding_dirs[6] = {FACE_NY, FACE_NX, FACE_PX, FACE_NZ, FACE_PZ, FACE_PY};
 
-    uint8_t surrounding_sources = 0;
-    if (!is_still_fluid(block_id))
+    if (is_flowing_fluid(block_id))
     {
+        uint8_t surrounding_sources = 0;
+        uint8_t min_surrounding_level = 7;
         for (int i = 1; i < 6; i++) // Skip negative y
         {
             block_t *surrounding = surroundings[i];
@@ -166,101 +169,73 @@ bool update_fluid(block_t *block, vec3i pos)
                 {
                     surrounding_sources++;
                 }
-                if (is_fluid(surround_id))
+                if (is_same_fluid(surround_id, block_id))
                 {
-                    if (surrounding_dirs[i] == FACE_PY)
-                    {
-                        level = 0;
-                    }
-                    uint8_t surrounding_level = get_fluid_meta_level(surrounding);
-                    level = std::min(++surrounding_level, level);
+                    min_surrounding_level = std::min(get_fluid_meta_level(surrounding), min_surrounding_level);
                 }
             }
         }
-        // When dealing with 0-3, "& 2" is the cheaper version of ">= 2"
+        level = min_surrounding_level + 1;
+
         if (surrounding_sources >= 2)
         {
             BlockID ny_blockid = ny ? ny->get_blockid() : BlockID::air;
             // Convert to source only if the fluid cannot flow downwards.
             if ((!is_fluid_overridable(ny_blockid) && !is_fluid(ny_blockid)))
             {
-                level = 0;
                 block->set_blockid(BlockID::water);
                 block->meta = 0;
             }
-            else
-            {
-                level = 1;
-                block->set_blockid(BlockID::flowing_water);
-                set_fluid_level(block, level);
-            }
         }
-        else
+        // Level 8 -> air
+        else if (level >= 8)
         {
-            // Level 0 -> air
-            if (level >= 8)
-            {
-                block->set_blockid(BlockID::air);
-                block->meta = 0;
-            }
-            // Level 1-6 -> flow
-            else
-            {
-                block->set_blockid(BlockID::flowing_water);
-                set_fluid_level(block, level);
-            }
+            block->set_blockid(BlockID::air);
+            block->meta = 0;
         }
     }
-
+    level = get_fluid_meta_level(block);
     // Fluid spread:
-    if (level != old_level || block->get_blockid() != block_id)
-        if (level < 7)
+    if (level < 7)
+    {
+        for (int i = 0; i < 5; i++)
         {
-            for (int i = 0; i < 5; i++)
+            block_t *surrounding = surroundings[i];
+            if (surrounding)
             {
-                block_t *surrounding = surroundings[i];
-                if (surrounding)
+                BlockID surround_id = surrounding->get_blockid();
+                vec3i surrounding_pos = pos + face_offsets[surrounding_dirs[i]];
+                if (is_fluid_overridable(surround_id))
                 {
-                    BlockID surround_id = surrounding->get_blockid();
-                    vec3i surrounding_pos = pos + face_offsets[surrounding_dirs[i]];
-                    chunk_t *surrounding_chunk = get_chunk_from_pos(surrounding_pos.x, surrounding_pos.z, false);
-                    if (is_fluid_overridable(surround_id))
+                    int surrounding_level = get_fluid_meta_level(surrounding);
+                    if (surrounding_dirs[i] == FACE_NY)
                     {
-                        if (surrounding_dirs[i] == FACE_NY)
+                        if (surround_id != flowfluid(block_id) || surrounding_level != 0)
                         {
-                            if (surround_id != BlockID::flowing_water || get_fluid_meta_level(surrounding) != 0)
-                            {
-                                surrounding->meta |= FLUID_UPDATE_REQUIRED_FLAG;
-                                vec3i surrounding_pos = pos + face_offsets[surrounding_dirs[i]];
-                                chunk_t *surrounding_chunk = get_chunk_from_pos(surrounding_pos.x, surrounding_pos.z, false);
-                                if (surrounding_chunk)
-                                    surrounding_chunk->vbos[surrounding_pos.y / 16].dirty = true;
-                            }
-                            surrounding->set_blockid(BlockID::flowing_water);
-                            set_fluid_level(surrounding, 0);
-                            break;
+                            surrounding->meta |= FLUID_UPDATE_REQUIRED_FLAG;
+                            update_light(lightupdate_t(surrounding_pos, surrounding->get_blocklight(), surrounding->get_skylight()));
                         }
-                        else
+                        surrounding->set_blockid(flowfluid(surround_id));
+                        set_fluid_level(surrounding, 0);
+                        break;
+                    }
+                    else
+                    {
+                        if (surround_id != flowfluid(block_id) || surrounding_level > level + 1)
                         {
-                            if (surround_id != BlockID::flowing_water || get_fluid_meta_level(surrounding) != level + 1)
-                            {
-                                surrounding->meta |= FLUID_UPDATE_REQUIRED_FLAG;
-                                if (surrounding_chunk)
-                                    surrounding_chunk->vbos[surrounding_pos.y / 16].dirty = true;
-                            }
-                            surrounding->set_blockid(BlockID::flowing_water);
-                            set_fluid_level(surrounding, level + 1);
+                            surrounding->meta |= FLUID_UPDATE_REQUIRED_FLAG;
+                            update_light(lightupdate_t(surrounding_pos, surrounding->get_blocklight(), surrounding->get_skylight()));
+                            // get_chunk_from_pos(surrounding_pos.x, surrounding_pos.z, false)->vbos[surrounding_pos.y / 16].dirty = surrounding->get_blockid() != flowfluid(surround_id);
                         }
+                        surrounding->set_blockid(flowfluid(surround_id));
+                        set_fluid_level(surrounding, level + 1);
                     }
                 }
             }
         }
-
-    block->meta &= ~FLUID_UPDATE_REQUIRED_FLAG;
-
+    }
     if (level != old_level || block->get_blockid() != block_id)
-        return (chunk->vbos[pos.y / 16].dirty = true);
-    return false;
+        update_light(lightupdate_t(pos, block->get_blocklight(), block->get_skylight()));
 }
 
 void set_fluid_level(block_t *block, uint8_t level)
@@ -344,36 +319,6 @@ uint8_t get_fluid_visual_level(vec3i pos, BlockID block_id)
 {
     return FLOAT_TO_FLUIDMETA(get_fluid_height(pos, block_id));
 }
-
-bool is_flowing_fluid(BlockID id)
-{
-    return id == BlockID::flowing_water || id == BlockID::flowing_lava;
-}
-
-bool is_still_fluid(BlockID id)
-{
-    return id == BlockID::water || id == BlockID::lava;
-}
-
-bool is_fluid(BlockID id)
-{
-    return id == BlockID::water || id == BlockID::flowing_water || id == BlockID::lava || id == BlockID::flowing_lava;
-}
-
-BlockID basefluid(BlockID id)
-{
-    if (id == BlockID::flowing_water || id == BlockID::water)
-        return BlockID::water;
-    if (id == BlockID::flowing_lava || id == BlockID::lava)
-        return BlockID::lava;
-    return BlockID::air;
-}
-
-bool is_same_fluid(BlockID id, BlockID other)
-{
-    return is_fluid(id) && is_fluid(other) && basefluid(id) == basefluid(other);
-}
-
 bool is_fluid_overridable(BlockID id)
 {
     switch (id)

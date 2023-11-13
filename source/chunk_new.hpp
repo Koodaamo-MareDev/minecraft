@@ -7,7 +7,7 @@
 #include <ogc/gu.h>
 #include <cstddef>
 #include <list>
-#define RENDER_DISTANCE 7
+#define RENDER_DISTANCE 6
 #define CHUNK_COUNT (RENDER_DISTANCE * RENDER_DISTANCE)
 #define VERTICAL_SECTION_COUNT 16
 
@@ -40,11 +40,11 @@ public:
     int x = 0;
     int z = 0;
     uint8_t lit_state = 0;
+    uint32_t light_updates = 0;
     block_t blockstates[16 * 16 * 256] = {0};
+    uint8_t height_map[16 * 16] = {0};
     chunkvbo_t vbos[VERTICAL_SECTION_COUNT];
-    block_t* get_block(int x, int y, int z);
-    void update_blockI(int index);
-    void update_block(vec3i local_pos);
+    block_t *get_block(int x, int y, int z);
     void recalculate();
     void light_up();
     void recalculate_section(int section);
@@ -68,13 +68,16 @@ private:
 // 3 = -x, +z
 extern const vec3i face_offsets[];
 
-std::list<chunk_t*>& get_chunks();
+std::list<chunk_t *> &get_chunks();
 void init_chunks();
+void deinit_chunks();
+void print_chunk_status();
 BlockID get_block_id_at(vec3i position, BlockID default_id = BlockID::air);
 block_t *get_block_at(vec3i vec);
-chunk_t *get_chunk_from_pos(int chunkX, int chunkZ, bool load);
+chunk_t *get_chunk_from_pos(int posX, int posZ, bool load);
 chunk_t *get_chunk(int chunkX, int chunkZ, bool load);
-void generate_chunk(int chunk_x, int chunk_z);
+void add_chunk(int chunk_x, int chunk_z);
+void generate_chunk();
 void *get_aligned_pointer_32(void *ptr);
 void get_neighbors(vec3i pos, block_t **neighbors);
 void update_block_at(vec3i pos);

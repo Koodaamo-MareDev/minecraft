@@ -10,7 +10,7 @@ float get_face_light(vec3i pos, uint8_t face)
     block_t *other_block = get_block_at(other);
     float facelight = 0.05f;
     if (other_block)
-        facelight = std::min(1.0f, other_block->get_blocklight() / 15.0f + 0.05f);
+        facelight = std::min(1.0f, other_block->get_skylight() / 15.0f + 0.05f);
     switch (face)
     {
     case 0:

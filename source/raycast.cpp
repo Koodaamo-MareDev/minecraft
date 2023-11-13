@@ -43,6 +43,8 @@ int skycast(int x, int z)
     int y = 255;
     while (y > 0 && (block = get_block_at(vec3i{x, y, z})) && !get_block_opacity(block->get_blockid()))
         y--;
+    if (!block)
+        return -9999;
     return y;
 }
 bool raycast(
@@ -106,8 +108,8 @@ bool raycast(
     // Rescale from units of 1 cube-edge to units of 'direction' so we can
     // compare with 't'.
     float radius = dst / std::sqrt(dx * dx + dy * dy + dz * dz);
-    //float radius = dst;
-    // Deal with world bounds or their absence.
+    // float radius = dst;
+    //  Deal with world bounds or their absence.
     vec3i maxvec = vec3i{int(origin.x) + 10, int(origin.y) + 10, int(origin.z) + 10};
     vec3i minvec = vec3i{int(origin.x) - 10, int(origin.y) - 10, int(origin.z) - 10};
 
