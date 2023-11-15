@@ -607,6 +607,7 @@ inline void RecalcSectionWater(chunk_t *chunk, int section)
             block_t *block = chunk->get_block(pos.x, pos.y, pos.z);
             update_fluid(block, pos);
         }
+        fluid_levels[i].clear();
     }
 }
 bool DrawScene(Mtx view, bool transparency)
