@@ -378,7 +378,6 @@ void chunk_t::rebuild_vbo(int section, bool transparent)
 }
 int chunk_t::build_vbo(int section, bool transparent)
 {
-    uint64_t time_start = time_get();
     int chunkX = this->x * 16;
     int chunkY = section * 16;
     int chunkZ = this->z * 16;
@@ -400,6 +399,7 @@ int chunk_t::build_vbo(int section, bool transparent)
             this->vbos[section].solid_buffer = nullptr;
             this->vbos[section].solid_buffer_length = 0;
         }
+        LWP_MutexUnlock(__chunks_mutex);
         return (0);
     }
 
@@ -475,9 +475,6 @@ int chunk_t::build_vbo(int section, bool transparent)
         this->vbos[section].solid_buffer = displist_vbo;
         this->vbos[section].solid_buffer_length = preciseMemory;
     }
-    uint64_t taken_time = time_diff_us(time_start, time_get());
-    if (taken_time >= 1000) // 1ms
-        printf("Took %llus\n", taken_time);
     return (0);
 }
 
