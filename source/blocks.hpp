@@ -7,7 +7,6 @@
 #include "vec3i.hpp"
 
 #define FLUID_UPDATE_REQUIRED_FLAG 0x10
-#define FLUID_UPDATE_LATER_FLAG 0x20
 #define FLOAT_TO_FLUIDMETA(A) (int(roundf((A)*8)))
 
 int get_block_opacity(BlockID blockid);

@@ -385,6 +385,7 @@ int chunk_t::build_vbo(int section, bool transparent)
     this->vbos[section].x = chunkX;
     this->vbos[section].y = chunkY;
     this->vbos[section].z = chunkZ;
+    LWP_MutexLock(__chunks_mutex);
     int quadVertexCount = pre_render_block_mesh(section, transparent);
     int triaVertexCount = pre_render_fluid_mesh(section, transparent);
     if (!quadVertexCount && !triaVertexCount)
@@ -421,6 +422,7 @@ int chunk_t::build_vbo(int section, bool transparent)
     if (displist_vbo == nullptr)
     {
         printf("Failed to allocate %d bytes for section %d VBO at (%d, %d)\n", estimatedMemory, section, this->x, this->z);
+        LWP_MutexUnlock(__chunks_mutex);
         return (1);
     }
     DCInvalidateRange(ALIGNPTR(displist_vbo), estimatedMemory);
@@ -447,6 +449,7 @@ int chunk_t::build_vbo(int section, bool transparent)
     }
     // GX_EndDispList() returns the size of the display list, so store that value and use it with GX_CallDispList().
     int preciseMemory = GX_EndDispList();
+    LWP_MutexUnlock(__chunks_mutex);
     if (!preciseMemory)
     {
         printf("Failed to create display list for section %d at (%d, %d)\n", section, this->x, this->z);

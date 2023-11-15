@@ -152,14 +152,6 @@ uint32_t get_face_texture_index(block_t *block, int face)
 void update_fluid(block_t *block, vec3i pos)
 {
     BlockID block_id = block->get_blockid();
-
-    if ((block->meta & FLUID_UPDATE_LATER_FLAG))
-    {
-        block->meta &= ~FLUID_UPDATE_LATER_FLAG;
-        block->meta |= FLUID_UPDATE_REQUIRED_FLAG;
-        return;
-    }
-
     if (!(block->meta & FLUID_UPDATE_REQUIRED_FLAG))
         return;
     block->meta &= ~FLUID_UPDATE_REQUIRED_FLAG;
@@ -180,7 +172,7 @@ void update_fluid(block_t *block, vec3i pos)
     if (!is_still_fluid(block_id))
     {
         uint8_t surrounding_sources = 0;
-        uint8_t min_surrounding_level = 8;
+        uint8_t min_surrounding_level = 7;
         for (int i = 1; i < 5; i++) // Skip negative y
         {
             block_t *surrounding = surroundings[i];
@@ -220,7 +212,8 @@ void update_fluid(block_t *block, vec3i pos)
         }
     }
     level = get_fluid_meta_level(block);
-    // Fluid spread:
+    //  Fluid spread:
+    bool spread_success = false;
     if (level < 7)
     {
         for (int i = 0; i < 5; i++)
@@ -237,21 +230,23 @@ void update_fluid(block_t *block, vec3i pos)
                     {
                         if (surround_id != flowfluid(block_id) || surrounding_level != 0)
                         {
-                            surrounding->meta |= FLUID_UPDATE_LATER_FLAG; // FLUID_UPDATE_REQUIRED_FLAG * (2 - (std::signbit(surrounding_offset.x) | std::signbit(surrounding_offset.z)));
+                            surrounding->meta |= FLUID_UPDATE_REQUIRED_FLAG; // FLUID_UPDATE_REQUIRED_FLAG * (2 - (std::signbit(surrounding_offset.x) | std::signbit(surrounding_offset.z)));
                             surrounding->set_blockid(flowfluid(block_id));
                             set_fluid_level(surrounding, 0);
                             update_light(lightupdate_t(pos + surrounding_offset, surrounding->get_blocklight(), surrounding->get_skylight()));
-                            break;
+                            spread_success = true;
                         }
+                        break;
                     }
                     else
                     {
                         if (surround_id != flowfluid(block_id) || surrounding_level > level + 1)
                         {
-                            surrounding->meta |= FLUID_UPDATE_LATER_FLAG; // FLUID_UPDATE_REQUIRED_FLAG * (2 - (std::signbit(surrounding_offset.x) | std::signbit(surrounding_offset.z)));
+                            surrounding->meta |= FLUID_UPDATE_REQUIRED_FLAG; // FLUID_UPDATE_REQUIRED_FLAG * (2 - (std::signbit(surrounding_offset.x) | std::signbit(surrounding_offset.z)));
                             surrounding->set_blockid(flowfluid(block_id));
                             set_fluid_level(surrounding, level + 1);
                             update_light(lightupdate_t(pos + surrounding_offset, surrounding->get_blocklight(), surrounding->get_skylight()));
+                            spread_success = true;
                         }
                     }
                 }
@@ -265,8 +260,16 @@ void update_fluid(block_t *block, vec3i pos)
     else if (level != old_level)
     {
         set_fluid_level(block, level);
-        get_chunk_from_pos(pos.x, pos.z, false)->vbos[pos.y / 16].dirty = true;
+        spread_success = true;
     }
+    if (spread_success)
+        for (int x = -1; x <= 1; x++)
+            for (int z = -1; z <= 1; z++)
+            {
+                chunk_t *chunk = get_chunk_from_pos(pos.x + x, pos.z + z, false);
+                if (chunk)
+                    chunk->vbos[pos.y / 16].dirty = true;
+            }
 }
 
 void set_fluid_level(block_t *block, uint8_t level)

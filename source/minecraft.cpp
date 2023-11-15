@@ -593,13 +593,13 @@ inline void RecalcSectionWater(chunk_t *chunk, int section)
             for (int _y = 0; _y < 16; _y++, current_pos.y++)
             {
                 block_t *block = chunk->get_block(_x, current_pos.y, _z);
-                if (block && (block->meta & (FLUID_UPDATE_LATER_FLAG | FLUID_UPDATE_REQUIRED_FLAG)))
+                if (block && (block->meta & FLUID_UPDATE_REQUIRED_FLAG))
                     fluid_levels[get_fluid_meta_level(block)].push_back(current_pos);
             }
         }
     }
-    for (int i = fluid_levels.size() - 1; i >= 0; i--)
-    //for (size_t i = 0; i < fluid_levels.size(); i++)
+    // for (int i = fluid_levels.size() - 1; i >= 0; i--)
+    for (size_t i = 0; i < fluid_levels.size(); i++)
     {
         std::vector<vec3i> positions = fluid_levels[i];
         for (vec3i pos : positions)
@@ -649,8 +649,8 @@ bool DrawScene(Mtx view, bool transparency)
                 get_neighbors(editable_pos, neighbors);
                 for (int i = 0; i < 6; i++)
                 {
-                    if (neighbors[i] && is_fluid(neighbors[i]->get_blockid()) && !(neighbors[i]->meta & (FLUID_UPDATE_LATER_FLAG | FLUID_UPDATE_REQUIRED_FLAG)))
-                        neighbors[i]->meta |= FLUID_UPDATE_LATER_FLAG;
+                    if (neighbors[i] && is_fluid(neighbors[i]->get_blockid()))
+                        neighbors[i]->meta |= FLUID_UPDATE_REQUIRED_FLAG;
                 }
             }
         }
