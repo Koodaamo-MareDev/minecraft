@@ -27,7 +27,7 @@
 #define DEFAULT_FIFO_SIZE (256 * 1024)
 #define CLASSIC_CONTROLLER_THRESHOLD 4
 #define MAX_PARTICLES 100
-#define LOOKAROUND_SENSITIVITY 5;
+#define LOOKAROUND_SENSITIVITY 20
 
 float lerp(float a, float b, float f)
 {
