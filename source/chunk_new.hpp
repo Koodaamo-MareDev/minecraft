@@ -6,9 +6,12 @@
 #include "block.hpp"
 #include <ogc/gu.h>
 #include <cstddef>
-#include <list>
-#define RENDER_DISTANCE 6
-#define CHUNK_COUNT (RENDER_DISTANCE * RENDER_DISTANCE)
+#include <vector>
+#include <deque>
+#define SIMULATION_DISTANCE 2
+#define RENDER_DISTANCE 3
+#define CHUNK_COUNT ((RENDER_DISTANCE) * (RENDER_DISTANCE + 1) * 4)
+#define GENERATION_DISTANCE ((RENDER_DISTANCE - 1) * 16)
 #define VERTICAL_SECTION_COUNT 16
 
 #define VBO_SOLID 1
@@ -39,6 +42,8 @@ public:
     bool valid = false;
     int x = 0;
     int z = 0;
+    uint32_t chunk_seed_x;
+    uint32_t chunk_seed_z;
     uint8_t lit_state = 0;
     uint32_t light_updates = 0;
     block_t blockstates[16 * 16 * 256] = {0};
@@ -59,6 +64,10 @@ public:
     int pre_render_block_mesh(int section, bool transparent);
     int render_block_mesh(int section, bool transparent, int vertexCount);
     int render_block(block_t *block, vec3i pos, bool transparent);
+    uint32_t size();
+    chunk_t()
+    {
+    }
 
 private:
 };
@@ -68,15 +77,17 @@ private:
 // 3 = -x, +z
 extern const vec3i face_offsets[];
 
-std::list<chunk_t *> &get_chunks();
+void lock_chunks();
+void unlock_chunks();
+std::deque<chunk_t *> &get_chunks();
 void init_chunks();
 void deinit_chunks();
 void print_chunk_status();
 bool has_pending_chunks();
 BlockID get_block_id_at(vec3i position, BlockID default_id = BlockID::air);
 block_t *get_block_at(vec3i vec);
-chunk_t *get_chunk_from_pos(int posX, int posZ, bool load);
-chunk_t *get_chunk(int chunkX, int chunkZ, bool load);
+chunk_t *get_chunk_from_pos(int posX, int posZ, bool load, bool write_cache = true);
+chunk_t *get_chunk(int chunkX, int chunkZ, bool load, bool write_cache = true);
 void add_chunk(int chunk_x, int chunk_z);
 void generate_chunk();
 void *get_aligned_pointer_32(void *ptr);

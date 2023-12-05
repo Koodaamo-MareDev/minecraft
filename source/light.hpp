@@ -20,8 +20,6 @@ void light_engine_init();
 void light_engine_deinit();
 void light_engine_loop();
 void light_engine_update();
-
-void cast_skylight(int x, int z);
 void update_light(lightupdate_t lu);
 
 #endif

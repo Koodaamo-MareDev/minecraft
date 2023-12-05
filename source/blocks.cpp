@@ -11,6 +11,7 @@ int get_block_opacity(BlockID blockid)
     case BlockID::air:
     case BlockID::glass:
     case BlockID::leaves:
+    case BlockID::glowstone:
         return 0;
     case BlockID::water:
     case BlockID::flowing_water:
@@ -28,6 +29,19 @@ bool is_solid(BlockID block_id)
 bool is_face_transparent(int texture_index)
 {
     return blockmap_alpha[texture_index & 0xFF] == 0;
+}
+
+uint8_t get_block_luminance(BlockID block_id)
+{
+    switch (block_id)
+    {
+    case BlockID::glowstone:
+        return 15;
+
+    default:
+        return 0;
+    }
+    return 0;
 }
 
 uint32_t get_default_texture_index(BlockID blockid)
@@ -89,6 +103,12 @@ uint32_t get_default_texture_index(BlockID blockid)
         return 163;
     case BlockID::detector_rail:
         return 179;
+    case BlockID::netherrack:
+        return 103;
+    case BlockID::soul_sand:
+        return 104;
+    case BlockID::glowstone:
+        return 105;
     default:
         return int(blockid) & 0xFF;
     }
@@ -151,10 +171,10 @@ uint32_t get_face_texture_index(block_t *block, int face)
 
 void update_fluid(block_t *block, vec3i pos)
 {
-    BlockID block_id = block->get_blockid();
     if (!(block->meta & FLUID_UPDATE_REQUIRED_FLAG))
         return;
     block->meta &= ~FLUID_UPDATE_REQUIRED_FLAG;
+    BlockID block_id = block->get_blockid();
     if (!is_fluid(block_id))
         return;
 
@@ -169,7 +189,7 @@ void update_fluid(block_t *block, vec3i pos)
     block_t *pz = get_block_at(pos + face_offsets[FACE_PZ]);
     block_t *surroundings[6] = {ny, nx, px, nz, pz, py};
     int surrounding_dirs[6] = {FACE_NY, FACE_NX, FACE_PX, FACE_NZ, FACE_PZ, FACE_PY};
-    if (!is_still_fluid(block_id))
+    if (is_flowing_fluid(block_id))
     {
         uint8_t surrounding_sources = 0;
         uint8_t min_surrounding_level = 7;
@@ -210,10 +230,11 @@ void update_fluid(block_t *block, vec3i pos)
             block->set_blockid(BlockID::air);
             block->meta &= ~0xF;
         }
+        else
+            set_fluid_level(block, level);
     }
     level = get_fluid_meta_level(block);
     //  Fluid spread:
-    bool spread_success = false;
     if (level < 7)
     {
         for (int i = 0; i < 5; i++)
@@ -234,7 +255,6 @@ void update_fluid(block_t *block, vec3i pos)
                             surrounding->set_blockid(flowfluid(block_id));
                             set_fluid_level(surrounding, 0);
                             update_light(lightupdate_t(pos + surrounding_offset, surrounding->get_blocklight(), surrounding->get_skylight()));
-                            spread_success = true;
                         }
                         break;
                     }
@@ -246,29 +266,48 @@ void update_fluid(block_t *block, vec3i pos)
                             surrounding->set_blockid(flowfluid(block_id));
                             set_fluid_level(surrounding, level + 1);
                             update_light(lightupdate_t(pos + surrounding_offset, surrounding->get_blocklight(), surrounding->get_skylight()));
-                            spread_success = true;
                         }
                     }
                 }
             }
         }
     }
+    bool changed = false;
     if (block->get_blockid() != block_id)
     {
+        changed = true;
         update_light(lightupdate_t(pos, block->get_blocklight(), block->get_skylight()));
     }
-    else if (level != old_level)
+    if (level != old_level && is_flowing_fluid(block->get_blockid()))
     {
+        changed = true;
         set_fluid_level(block, level);
-        spread_success = true;
     }
-    if (spread_success)
-        for (int x = -1; x <= 1; x++)
+    if (changed)
+    {
+        for (int i = 0; i < 5; i++)
+        {
+            vec3i offset_pos = pos + face_offsets[surrounding_dirs[i]];
+            chunk_t *chunk = get_chunk_from_pos(offset_pos.x, offset_pos.z, false, false);
+            if (chunk)
+                chunk->vbos[pos.y / 16].dirty = true;
+            block_t *other = chunk->get_block(offset_pos.x, offset_pos.y, offset_pos.z);
+            if (other)
+                other->meta |= FLUID_UPDATE_REQUIRED_FLAG;
+        }
+    }
+    for (int x = -1; x <= 1; x++)
+        for (int y = -1; y <= 1; y++)
             for (int z = -1; z <= 1; z++)
             {
-                chunk_t *chunk = get_chunk_from_pos(pos.x + x, pos.z + z, false);
-                if (chunk)
-                    chunk->vbos[pos.y / 16].dirty = true;
+                vec3i offset_pos = pos + vec3i(x, y, z);
+                chunk_t *chunk = get_chunk_from_pos(offset_pos.x, offset_pos.z, false, false);
+                /*if (chunk && offset_pos.y >= 0 && offset_pos.y <= 255)
+                    chunk->vbos[offset_pos.y / 16].dirty = true;*/
+
+                block_t *other = chunk->get_block(offset_pos.x, offset_pos.y, offset_pos.z);
+                if (other)
+                    update_light(lightupdate_t(offset_pos, other->get_blocklight(), other->get_skylight()));
             }
 }
 

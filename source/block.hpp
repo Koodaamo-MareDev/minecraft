@@ -15,10 +15,10 @@
 class block_t
 {
 public:
-    uint16_t id = 0;
+    uint8_t id = 0;
     uint8_t light = 0;
     uint8_t visibility_flags = 0;
-    uint32_t meta = 0;
+    uint8_t meta = 0;
 
     void set_opacity(uint8_t face, uint8_t flag);
     uint8_t get_cast_skylight();

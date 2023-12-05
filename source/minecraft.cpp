@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <wiiuse/wpad.h>
 #include <ogc/lwp_watchdog.h>
+#include "threadhandler.hpp"
 #include "chunk_new.hpp"
 #include "block.hpp"
 #include "blocks.hpp"
@@ -15,6 +16,9 @@
 #include "blockmap.h"
 #include "water_still_tpl.h"
 #include "water_still.h"
+#include "light_day_rgba.h"
+#include "light_night_rgba.h"
+#include "brightness_values.h"
 #include "vec3i.hpp"
 #include "vec3d.hpp"
 #include "timers.hpp"
@@ -24,17 +28,18 @@
 #include "light.hpp"
 #include "texanim.hpp"
 #include "base3d.hpp"
-#define DEFAULT_FIFO_SIZE (256 * 1024)
+#define DEFAULT_FIFO_SIZE (1024 * 1024)
 #define CLASSIC_CONTROLLER_THRESHOLD 4
 #define MAX_PARTICLES 100
-#define LOOKAROUND_SENSITIVITY 20
+#define LOOKAROUND_SENSITIVITY 360
+#define MOVEMENT_SPEED 10
 
 float lerp(float a, float b, float f)
 {
     return a * (1.0 - f) + (b * f);
 }
 bool debug_spritesheet = false;
-
+lwp_t main_thread;
 f32 xrot = -22.5f;
 f32 yrot = 0.0f;
 guVector player_pos = {0.F, 80.0F, 0.F};
@@ -47,6 +52,10 @@ int dropFrames = 0;
 
 int frameCounter = 0;
 int tickCounter = 0;
+float deltaTime = 0.0f;
+float partialTicks = 0.0f;
+
+uint32_t total_chunks_size = 0;
 
 int shoulder_btn_frame_counter = 0;
 float prev_left_shoulder = 0;
@@ -81,9 +90,27 @@ void WiimotePowerPressed(s32 chan)
 s8 has_retraced = 0;
 void RenderDone(u32 enterCount)
 {
+    // LWP_ResumeThread(main_thread);
     has_retraced = 1;
 }
+uint8_t light_map[1024] ATTRIBUTE_ALIGN(32) = {0};
 
+GXColor ColorBlend(GXColor color0, GXColor color1, float factor)
+{
+    float inv_factor = 1.0f - factor;
+    return GXColor{uint8_t((color0.r * inv_factor) + (color1.r * factor)),
+                   uint8_t((color0.g * inv_factor) + (color1.g * factor)),
+                   uint8_t((color0.b * inv_factor) + (color1.b * factor)),
+                   uint8_t((color0.a * inv_factor) + (color1.a * factor))};
+}
+void LightMapBlend(const uint8_t *src0, const uint8_t *src1, uint8_t *dst, uint8_t factor)
+{
+    uint8_t inv_factor = 255 - factor;
+    for (int i = 0; i < 1024; i++)
+    {
+        *(dst++) = ((*(src0++) * int(inv_factor)) + ((*(src1++) * int(factor)))) / 255;
+    }
+}
 void AlphaBlend(unsigned char *src, unsigned char *dst, int width, int height, int row)
 {
     int index = 0;
@@ -116,7 +143,7 @@ void AlphaBlend(unsigned char *src, unsigned char *dst, int width, int height, i
 
 void PrepareOutline()
 {
-    size_t len = (VERTEX_ATTR_LENGTH * 24) + 3 + 32;
+    size_t len = (VERTEX_ATTR_LENGTH_DIRECTCOLOR * 24) + 3 + 32;
     if ((len & 31) != 0)
     {
         len += 32;
@@ -185,21 +212,23 @@ void ExtractTPLInfo(texanim_t &anim, bool dst, TPLFile *tpl, int index = 0)
 
 int main(int argc, char **argv)
 {
-
     u32 fb = 0;
     f32 yscale;
     u32 xfbHeight;
     Mtx view; // view and perspective matrices
     Mtx44 perspective;
     void *gpfifo = NULL;
-    GXColor default_background = {0x8D, 0xBB, 0xFF, 0x00};
-    GXColor background = default_background;
+    GXColor day_background = {0x8D, 0xBB, 0xFF, 0xFF};
+    GXColor night_background = {0x03, 0x03, 0x04, 0xFF};
+    GXColor target_background = day_background;
+    GXColor background = day_background;
     float current_lerpvalue = 1.f;
 
     TPLFile blockmapTPL;
     TPLFile water_stillTPL;
     GXTexObj texture;
     GXTexObj water_still_texture;
+    threadqueue_init();
 
     VIDEO_Init();
     WPAD_Init();
@@ -227,7 +256,6 @@ int main(int argc, char **argv)
     if (rmode->viTVMode & VI_NON_INTERLACE)
         VIDEO_WaitVSync();
     fb ^= 1;
-
     // init the flipper
     GX_Init(gpfifo, DEFAULT_FIFO_SIZE);
 
@@ -265,20 +293,18 @@ int main(int argc, char **argv)
     // bits for non float data.
     GX_ClearVtxDesc();
     GX_SetVtxDesc(GX_VA_POS, GX_DIRECT);
-    GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
+    GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
+    GX_SetVtxDesc(GX_VA_CLR1, GX_INDEX8);
     GX_SetVtxDesc(GX_VA_TEX0, GX_DIRECT);
-
-    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_F32, 0);
-    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_CLR0, GX_CLR_RGB, GX_RGB8, 0);
-#ifdef OPTIMIZE_UVS
-    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_TEX0, GX_TEX_ST, GX_U8, GX_ITS_128);
-#else
-    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_TEX0, GX_TEX_ST, GX_F32, 0);
-#endif
+    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, BASE3D_POS_FRAC_BITS);
+    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_CLR0, GX_CLR_RGBA, GX_RGBA8, 0);
+    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_CLR1, GX_CLR_RGBA, GX_RGBA8, 0);
+    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_TEX0, GX_TEX_ST, GX_U16, BASE3D_UV_FRAC_BITS);
     // set number of rasterized color channels
     GX_SetNumChans(1);
     GX_SetChanCtrl(GX_COLOR0A0, GX_DISABLE, GX_SRC_REG, GX_SRC_VTX, GX_LIGHTNULL, GX_DF_NONE, GX_AF_NONE);
-    // set number of textures to generate
+    // GX_SetChanCtrl(GX_COLOR1A1, GX_DISABLE, GX_SRC_REG, GX_SRC_VTX, GX_LIGHTNULL, GX_DF_NONE, GX_AF_NONE);
+    //  set number of textures to generate
     GX_SetNumTexGens(1);
 
     GX_InvVtxCache();
@@ -328,18 +354,35 @@ int main(int argc, char **argv)
     printf("Initialized chunks.\n");
     VIDEO_Flush();
     VIDEO_WaitVSync();
+    GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
     PrepareOutline();
-    GX_SetFog(GX_FOG_LIN, 8, 22, 0.1F, 300.0F, background);
     GX_SetZCompLoc(GX_FALSE);
-    time_reset();
     player_pos.x = 0;
     player_pos.y = -1000;
     player_pos.z = 0;
     VIDEO_SetPostRetraceCallback(&RenderDone);
+    main_thread = LWP_GetSelf();
+    // GX_SetArray(GX_VA_CLR1, brightness_values, 4 * sizeof(u8));
     while (!isExiting)
     {
+        u64 frame_start = time_get();
+        float light_time_value = (1 + std::clamp(std::sin((frameCounter / 3 - 12000) * (M_PI / 24000)) * 8.0, 0.0, 1.0)) / 2.0f;
         if (HWButton != -1)
             break;
+        LightMapBlend(light_day_rgba, light_night_rgba, light_map, uint8_t(light_time_value * 255));
+        GX_SetArray(GX_VA_CLR0, light_map, 4 * sizeof(u8));
+        target_background = ColorBlend(day_background, night_background, std::clamp(light_time_value, 0.0f, 1.0f));
+        float target = std::pow(std::clamp((player_pos.y) * 0.03125f, 0.0f, 1.0f), 2.0f);
+        current_lerpvalue = target; // lerp(current_lerpvalue, target, 0.05f);
+        background.r = u8(current_lerpvalue * target_background.r);
+        background.g = u8(current_lerpvalue * target_background.g);
+        background.b = u8(current_lerpvalue * target_background.b);
+        GX_SetCopyClear(background, 0x00FFFFFF);
+        GX_SetFog(GX_FOG_PERSP_EXP2, RENDER_DISTANCE * 0.67f * 16 - 16, RENDER_DISTANCE * 0.67f * 16 - 8, 0.1F, 300.0F, background);
+        if (player_pos.y < -999)
+            player_pos.y = skycast(player_pos.x, player_pos.z) + 2;
+
+        // GX_InvVtxCache();
         if (fb)
         {
             water_still_anim.update();
@@ -377,24 +420,26 @@ int main(int argc, char **argv)
         //  VIDEO_SetNextFramebuffer(dstBuffer[fb]);
         VIDEO_SetNextFramebuffer(frameBuffer[fb]);
         VIDEO_Flush();
-        frameCounter++;
+        threadqueue_broadcast();
         VIDEO_WaitVSync();
-        // if (!frame_skip)
+        frameCounter++;
+        deltaTime = time_diff_s(frame_start, time_get());
+        partialTicks += deltaTime * 20;
+        if (partialTicks >= 1.0f)
+            tickCounter += int(partialTicks);
+        partialTicks -= int(partialTicks);
+        //  if (!frame_skip)
         fb ^= 1;
-        float target = player_pos.y >= 64. ? 1 : (player_pos.y <= 63. ? 0 : std::fmod(player_pos.y, 1));
-        target = target < 0.1f ? 0.1f : target;
-        current_lerpvalue = lerp(current_lerpvalue, target, 0.05f);
-        background.r = u8(current_lerpvalue * default_background.r);
-        background.g = u8(current_lerpvalue * default_background.g);
-        background.b = u8(current_lerpvalue * default_background.b);
-        GX_SetCopyClear(background, 0x00FFFFFF);
-        GX_SetFog(GX_FOG_LIN, 8, 22, 0.1F, 300.0F, background);
-        if (player_pos.y < -999)
-            player_pos.y = skycast(player_pos.x, player_pos.z) + 2;
     }
+    printf("De-initializing light engine...\n");
     light_engine_deinit();
+    printf("Notifying threads...\n");
+    threadqueue_broadcast();
+    printf("De-initializing chunk engine...\n");
     deinit_chunks();
     printf("Exiting...");
+    VIDEO_Flush();
+    VIDEO_WaitVSync();
     if (HWButton != -1)
     {
         SYS_ResetSystem(HWButton, 0, 0);
@@ -409,6 +454,10 @@ void GetInput()
     u32 wiimote1_held = WPAD_ButtonsHeld(0);
     if ((wiimote1_down & (WPAD_BUTTON_HOME | WPAD_CLASSIC_BUTTON_HOME)))
         isExiting = true;
+    if((wiimote1_down & WPAD_BUTTON_1))
+    {
+        printf("PRIM_CHUNK_MEMORY: %d B\n", total_chunks_size);
+    }
 
     expansion_t expansion;
     WPAD_Expansion(0, &expansion);
@@ -418,19 +467,19 @@ void GetInput()
         int y = expansion.classic.rjs.pos.y;
         y -= expansion.classic.rjs.center.y;
         x -= expansion.classic.rjs.center.x;
-        if (abs(x) > CLASSIC_CONTROLLER_THRESHOLD)
+        if (std::abs(x) > CLASSIC_CONTROLLER_THRESHOLD)
         {
-            yrot -= (float(x) / (expansion.classic.rjs.max.x - expansion.classic.rjs.min.x)) * LOOKAROUND_SENSITIVITY;
+            yrot -= (float(x) / (expansion.classic.rjs.max.x - expansion.classic.rjs.min.x)) * LOOKAROUND_SENSITIVITY * deltaTime;
         }
-        if (abs(y) > CLASSIC_CONTROLLER_THRESHOLD)
+        if (std::abs(y) > CLASSIC_CONTROLLER_THRESHOLD)
         {
-            xrot += (float(y) / (expansion.classic.rjs.max.y - expansion.classic.rjs.min.y)) * LOOKAROUND_SENSITIVITY;
+            xrot += (float(y) / (expansion.classic.rjs.max.y - expansion.classic.rjs.min.y)) * LOOKAROUND_SENSITIVITY * deltaTime;
         }
 
         if (wiimote1_held & WPAD_CLASSIC_BUTTON_UP)
-            player_pos.y += 0.35f;
+            player_pos.y += MOVEMENT_SPEED * deltaTime;
         if (wiimote1_held & WPAD_CLASSIC_BUTTON_DOWN)
-            player_pos.y -= 0.35f;
+            player_pos.y -= MOVEMENT_SPEED * deltaTime;
 
         if (!((wiimote1_held & WPAD_CLASSIC_BUTTON_FULL_L) || (wiimote1_held & WPAD_CLASSIC_BUTTON_FULL_R)))
             shoulder_btn_frame_counter = -1;
@@ -452,15 +501,15 @@ void GetInput()
         y = expansion.classic.ljs.pos.y;
         y -= expansion.classic.ljs.center.y;
         x -= expansion.classic.ljs.center.x;
-        if (abs(x) > CLASSIC_CONTROLLER_THRESHOLD)
+        if (std::abs(x) > CLASSIC_CONTROLLER_THRESHOLD)
         {
-            player_pos.x += (float(x) / (expansion.classic.ljs.max.y - expansion.classic.ljs.min.y)) * sin(DegToRad(yrot + 90)) * 0.35f;
-            player_pos.z += (float(x) / (expansion.classic.ljs.max.y - expansion.classic.ljs.min.y)) * cos(DegToRad(yrot + 90)) * 0.35f;
+            player_pos.x += (float(x) / (expansion.classic.ljs.max.y - expansion.classic.ljs.min.y)) * sin(DegToRad(yrot + 90)) * MOVEMENT_SPEED * deltaTime;
+            player_pos.z += (float(x) / (expansion.classic.ljs.max.y - expansion.classic.ljs.min.y)) * cos(DegToRad(yrot + 90)) * MOVEMENT_SPEED * deltaTime;
         }
-        if (abs(y) > CLASSIC_CONTROLLER_THRESHOLD)
+        if (std::abs(y) > CLASSIC_CONTROLLER_THRESHOLD)
         {
-            player_pos.x -= (float(y) / (expansion.classic.ljs.max.y - expansion.classic.ljs.min.y)) * sin(DegToRad(yrot));
-            player_pos.z -= (float(y) / (expansion.classic.ljs.max.y - expansion.classic.ljs.min.y)) * cos(DegToRad(yrot));
+            player_pos.x -= (float(y) / (expansion.classic.ljs.max.y - expansion.classic.ljs.min.y)) * sin(DegToRad(yrot)) * MOVEMENT_SPEED * deltaTime;
+            player_pos.z -= (float(y) / (expansion.classic.ljs.max.y - expansion.classic.ljs.min.y)) * cos(DegToRad(yrot)) * MOVEMENT_SPEED * deltaTime;
         }
     }
     if (yrot > 360.f)
@@ -524,6 +573,45 @@ guVector AnglesToVector(float x, float y, float distance, guVector vec = guVecto
     return vec;
 }
 
+void GetLookMtx(Mtx &mtx)
+{
+    guVector axis; // Axis to rotate on
+    Mtx rotx;
+    Mtx roty;
+    // Rotate by view
+    axis.x = 1;
+    axis.y = 0;
+    axis.z = 0;
+    guMtxRotAxisDeg(rotx, &axis, xrot);
+    axis.x = 0;
+    axis.y = 1;
+    axis.z = 0;
+    guMtxRotAxisDeg(roty, &axis, yrot);
+    guMtxConcat(roty, rotx, mtx);
+}
+
+// TODO: Finish fake lighting
+void UpdateLightDir()
+{
+    static GXLightObj lights[2];
+    Mtx look_mtx;
+    guVector dir{1, -2, 3};
+    guVector look_dir;
+
+    GetLookMtx(look_mtx);
+
+    for (int i = 0; i < 2; i++)
+    {
+        dir.x -= 2 * i;
+        dir.z -= 2 * i;
+        guVecMultiply(look_mtx, &dir, &look_dir);
+        GX_InitLightDirv(&lights[i], &dir);
+        // GX_InitLightAttnA(...);
+        GX_InitLightColor(&lights[i], GXColor{255, 255, 255, 255});
+        GX_LoadLightObj(&lights[i], 1 << i);
+    }
+}
+
 void Transform(Mtx view, guVector chunkPos)
 {
     Mtx model, modelview;
@@ -577,7 +665,7 @@ void Render(Mtx view, guVector chunkPos, void *buffer, u32 length)
 
 inline void RecalcSectionWater(chunk_t *chunk, int section)
 {
-    static std::vector<std::vector<vec3i>> fluid_levels(8);
+    static std::vector<std::vector<vec3i>> fluid_levels(9);
 
     int chunkX = (chunk->x * 16);
     int chunkZ = (chunk->z * 16);
@@ -601,13 +689,13 @@ inline void RecalcSectionWater(chunk_t *chunk, int section)
     // for (int i = fluid_levels.size() - 1; i >= 0; i--)
     for (size_t i = 0; i < fluid_levels.size(); i++)
     {
-        std::vector<vec3i> positions = fluid_levels[i];
+        std::vector<vec3i> &positions = fluid_levels[i];
         for (vec3i pos : positions)
         {
             block_t *block = chunk->get_block(pos.x, pos.y, pos.z);
             update_fluid(block, pos);
         }
-        fluid_levels[i].clear();
+        positions.clear();
     }
 }
 bool DrawScene(Mtx view, bool transparency)
@@ -620,7 +708,7 @@ bool DrawScene(Mtx view, bool transparency)
     relative.y = 0;
     relative.z = 0;
     relative = AnglesToVector(xrot, yrot, -1);
-    std::list<chunk_t *> &chunks = get_chunks();
+    std::deque<chunk_t *> &chunks = get_chunks();
 
     vec3i rc_block;
     vec3i rc_block_face;
@@ -632,7 +720,7 @@ bool DrawScene(Mtx view, bool transparency)
     }
     if (facing_block)
     {
-        BlockID target_blockid = destroy_block ? BlockID::air : BlockID::leaves;
+        BlockID target_blockid = destroy_block ? BlockID::air : BlockID::glowstone;
         if (destroy_block || place_block)
         {
             vec3i editable_pos = destroy_block ? (rc_block) : (rc_block + rc_block_face);
@@ -658,13 +746,12 @@ bool DrawScene(Mtx view, bool transparency)
     }
     place_block = false;
     destroy_block = false;
-    for (std::list<chunk_t *>::iterator it = chunks.begin(); it != chunks.end(); it++)
+    for (chunk_t *&chunk : chunks)
     {
-        chunk_t *chunk = *it;
         if (chunk && chunk->valid)
         {
-            float distance = std::max(fabs((chunk->x * 16) - player_pos.x), fabs((chunk->z * 16) - player_pos.z));
-            if (distance > 56)
+            float distance = std::max(std::abs((chunk->x * 16) - player_pos.x), std::abs((chunk->z * 16) - player_pos.z));
+            if (distance > RENDER_DISTANCE * 16)
             {
                 chunk->valid = false;
                 for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
@@ -695,22 +782,20 @@ bool DrawScene(Mtx view, bool transparency)
             {
                 chunkvbo_t &vbo = chunk->vbos[j];
                 chunkPos.y = (j * 16);
-                distance = fabs(chunkPos.y - player_pos.y);
-                vbo.visible = (distance <= 40);
-                if (vbo.visible && transparency && frameCounter % 12 == 0)
+                distance = std::abs(chunkPos.y - player_pos.y);
+                vbo.visible = (distance <= RENDER_DISTANCE * 16);
+                if (transparency && vbo.visible && tickCounter % 4 == 0)
                     RecalcSectionWater(chunk, j);
             }
             chunk->light_up();
         }
     }
-
     int chunk_update_count = 0;
-    for (std::list<chunk_t *>::iterator it = chunks.begin(); it != chunks.end(); it++)
+    for (chunk_t *&chunk : chunks)
     {
-        chunk_t *chunk = *it;
-        if (!chunk)
+        if (!chunk || chunk_update_count >= 1)
             continue;
-        if (chunk && chunk->valid && !chunk->light_updates)
+        if (chunk->valid && !chunk->light_updates)
         {
             bool chunk_updated = false;
             for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
@@ -718,7 +803,7 @@ bool DrawScene(Mtx view, bool transparency)
                 chunkvbo_t &vbo = chunk->vbos[j];
                 if (!vbo.visible)
                     continue;
-                if (vbo.dirty)
+                if (vbo.dirty && !chunk->light_updates)
                 {
                     vbo.dirty = false;
                     chunk->recalculate_section(j);
@@ -748,12 +833,12 @@ bool DrawScene(Mtx view, bool transparency)
             chunk_update_count += chunk_updated;
             chunk->lit_state = 2;
         }
-        if (!light_engine_busy() && chunk->lit_state)
-            chunk->light_updates = 0;
     }
-    for (std::list<chunk_t *>::iterator it = chunks.begin(); it != chunks.end(); it++)
+    GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
+    total_chunks_size = 0;
+    for (chunk_t *&chunk : chunks)
     {
-        chunk_t *chunk = *it;
+        total_chunks_size += chunk ? chunk->size() : 0;
         if (chunk && chunk->valid && chunk->lit_state == 2)
         {
             for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
@@ -781,29 +866,36 @@ bool DrawScene(Mtx view, bool transparency)
             }
         }
     }
-    for (std::list<chunk_t *>::iterator it = chunks.begin(); it != chunks.end();)
+    if (!transparency)
     {
-        chunk_t *&chunk = *it;
-        if (chunk && !chunk->valid)
-        {
-            delete chunk;
-            chunk = nullptr;
-            it = chunks.erase(it);
-        }
-        else
-            ++it;
+        if (!light_engine_busy())
+            for (int x = player_pos.x - GENERATION_DISTANCE; x < player_pos.x + GENERATION_DISTANCE; x += 8)
+            {
+                if (chunks.size() >= CHUNK_COUNT || has_pending_chunks())
+                    break;
+                int distance = std::abs(x - int(player_pos.x));
+                if (distance > GENERATION_DISTANCE)
+                    break;
+                for (int z = player_pos.z - GENERATION_DISTANCE; z < player_pos.z + GENERATION_DISTANCE; z += 8)
+                {
+                    if (chunks.size() >= CHUNK_COUNT || has_pending_chunks())
+                        break;
+                    distance = std::abs(z - int(player_pos.z));
+                    if (distance > GENERATION_DISTANCE)
+                        break;
+                    get_chunk_from_pos(x, z, true, false);
+                    threadqueue_broadcast();
+                }
+            }
+        lock_chunks();
+        chunks.erase(
+            std::remove_if(chunks.begin(), chunks.end(),
+                           [](chunk_t *&c)
+                           {if(!c) return true; if(!c->valid) {delete c; c = nullptr; return true;} return false; }),
+            chunks.end());
+        unlock_chunks();
     }
-    for (int x = player_pos.x - 32; x < player_pos.x + 32; x += 16)
-    {
-        if (chunks.size() >= CHUNK_COUNT)
-            break;
-        for (int z = player_pos.z - 32; z < player_pos.z + 32; z += 16)
-        {
-            if (chunks.size() >= CHUNK_COUNT)
-                break;
-            get_chunk_from_pos(x, z, true);
-        }
-    }
+    GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
     if (!transparency && outline && draw_block_outline)
     {
         GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);

@@ -6,12 +6,14 @@
 #include "blocks.hpp"
 #include "timers.hpp"
 #include "light.hpp"
-#include "opensimplexnoise/open-simplex-noise.h"
+#include "fastnoise/fastnoiselite.h"
 #include "base3d.hpp"
 #include "render.hpp"
 #include "raycast.hpp"
-#include <list>
+#include "threadhandler.hpp"
+#include <map>
 #include <vector>
+#include <deque>
 #include <algorithm>
 #include <gccore.h>
 #include <string.h>
@@ -30,39 +32,57 @@ void *get_aligned_pointer_32(void *ptr)
 {
     return (void *)((u64(ptr) + 0x1F) & (~0x1F));
 }
-osn_context *ctx;
-static mutex_t __chunks_mutex;
-static lwp_t __chunk_generator_thread_handle = (lwp_t)NULL;
-static bool __chunk_generator_init_done = false;
+extern guVector player_pos;
+int heightmap_seed = 0, cavegen_seed = 0;
+FastNoiseLite noise;
+FastNoiseLite cave_noise;
+mutex_t __chunks_mutex;
+lwp_t __chunk_generator_thread_handle = (lwp_t)NULL;
+bool __chunk_generator_init_done = false;
 void *__chunk_generator_init_internal(void *);
 
-std::list<chunk_t *> chunks;
-std::list<chunk_t *> pending_chunks;
+void lock_chunks()
+{
+    LWP_MutexLock(__chunks_mutex);
+}
+void unlock_chunks()
+{
+    LWP_MutexUnlock(__chunks_mutex);
+}
+
+std::deque<chunk_t *> chunks;
+std::deque<chunk_t *> pending_chunks;
 
 bool has_pending_chunks()
 {
     return pending_chunks.size() > 0;
 }
 
-std::list<chunk_t *> &get_chunks()
+std::deque<chunk_t *> &get_chunks()
 {
     return chunks;
 }
-chunk_t *get_chunk_from_pos(int x, int z, bool load)
+chunk_t *get_chunk_from_pos(int x, int z, bool load, bool write_cache)
 {
     x -= 15 * (x < 0);
     z -= 15 * (z < 0);
-    return get_chunk(x / 16, z / 16, load);
+    return get_chunk(x / 16, z / 16, load, write_cache);
 }
 
-chunk_t *get_chunk(int chunkX, int chunkZ, bool load)
+std::map<lwp_t, chunk_t *> chunk_cache;
+chunk_t *get_chunk(int chunkX, int chunkZ, bool load, bool write_cache)
 {
-    LWP_MutexLock(__chunks_mutex);
+    lwp_t active_thread = LWP_GetSelf();
+    if (chunk_cache.find(active_thread) != chunk_cache.end())
+    {
+        chunk_t *&cached_chunk = chunk_cache[active_thread];
+        if (cached_chunk && cached_chunk->x == chunkX && cached_chunk->z == chunkZ)
+            return cached_chunk;
+    }
     chunk_t *retval = nullptr;
     // Chunk lookup based on x and z position
-    for (std::list<chunk_t *>::iterator it = chunks.begin(); it != chunks.end(); it++)
+    for (chunk_t *&chunk : chunks)
     {
-        chunk_t *chunk = *it;
         if (chunk && chunk->valid)
             if (chunk->x == chunkX && chunk->z == chunkZ)
             {
@@ -70,12 +90,13 @@ chunk_t *get_chunk(int chunkX, int chunkZ, bool load)
                 break;
             }
     }
-    LWP_MutexUnlock(__chunks_mutex);
     if (!retval && load)
     {
         if (chunks.size() < CHUNK_COUNT)
             add_chunk(chunkX, chunkZ);
     }
+    if (write_cache && retval)
+        chunk_cache[active_thread] = retval;
     return retval;
 }
 
@@ -83,100 +104,139 @@ void add_chunk(int chunk_x, int chunk_z)
 {
     if (pending_chunks.size() >= RENDER_DISTANCE)
         return;
-    for (std::list<chunk_t *>::iterator it = pending_chunks.begin(); it != pending_chunks.end(); it++)
+
+    lock_chunks();
+    for (chunk_t *&m_chunk : pending_chunks)
     {
-        chunk_t *m_chunk = *it;
         if (m_chunk && m_chunk->x == chunk_x && m_chunk->z == chunk_z)
         {
+            unlock_chunks();
+            return;
+        }
+    }
+
+    for (chunk_t *&m_chunk : chunks)
+    {
+        if (m_chunk && m_chunk->x == chunk_x && m_chunk->z == chunk_z)
+        {
+            unlock_chunks();
             return;
         }
     }
     chunk_t *chunk = new chunk_t;
-    chunk->x = chunk_x;
-    chunk->z = chunk_z;
-    // LWP_SuspendThread(__chunk_generator_thread_handle);
-    pending_chunks.push_back(chunk);
-    // LWP_ResumeThread(__chunk_generator_thread_handle);
+    if (chunk)
+    {
+        chunk->x = chunk_x;
+        chunk->z = chunk_z;
+        pending_chunks.push_back(chunk);
+    }
+    unlock_chunks();
 }
+
+bool in_range(int x, int min, int max)
+{
+    return std::clamp(x, min, max) == x;
+}
+
 void generate_chunk()
 {
+    static uint8_t height_map[256];
     while (pending_chunks.size() == 0)
     {
         if (!__chunk_generator_init_done)
             return;
-        LWP_YieldThread();
+        threadqueue_sleep();
     }
-    chunk_t *chunk = pending_chunks.front();
+    if (!__chunk_generator_init_done)
+        return;
+
+    chunk_t *chunk = pending_chunks.back();
+    if (!chunk)
+        return;
     int x_offset = (chunk->x * 16);
     int z_offset = (chunk->z * 16);
-    double scale = 32;
-    double intensity = 2.5;
-    for (int x = 0, noise_x = x_offset; x < 16; x++, noise_x++)
+    for (int x = 0, index = 0; x < 16; x++)
+        for (int z = 0; z < 16; z++)
+            height_map[index++] = std::clamp(uint32_t(64 + noise.GetNoise(double(x + x_offset), double(z + z_offset)) * 16), 0U, 255U);
+    uint8_t max_height = *height_map;
+    for (int i = 1; i < 256; i++)
     {
-        for (int z = 0, noise_z = z_offset; z < 16; z++, noise_z++)
+        max_height = std::max(height_map[i], max_height);
+    }
+    for (int x = 0, index = 0; x < 16; x++)
+    {
+        for (int z = 0; z < 16; z++)
         {
-            double value = open_simplex_noise2(ctx, (double)noise_x / scale, (double)noise_z / scale);
-            value *= value * value;
-            value *= intensity * 16 * 3;
-            value += 64;
+            int value = height_map[index++];
+
             for (int y = 0; y < 256; y++)
             {
+                BlockID id = BlockID::air;
+                // Coat with grass
+                if (y == value)
+                    id = BlockID::grass;
+                // Add some dirt
+                else if (in_range(y, value - 2, value - 1))
+                    id = BlockID::dirt;
+                // Place water
+                else if (value < 63 && in_range(y, value + 1, 63))
+                    id = BlockID::water;
+                // Place stone
+                else if (in_range(y, 5, value - 3))
+                    id = BlockID::stone;
+                // Randomize bedrock
+                else if (in_range(y, 1, 4))
+                    id = (rand() & 1) ? BlockID::bedrock : BlockID::stone;
+                // Bottom layer is bedrock
+                else if (!y)
+                    id = BlockID::bedrock;
                 block_t *block = chunk->get_block(x, y, z);
-                block->visibility_flags = 0x00;
-                block->light = 0x00;
-                double carve = open_simplex_noise3(ctx, (double)noise_x / (scale * 0.25) + 0.5, (double)y / (scale * 0.25) + 0.5, noise_z / (scale * 0.25) + 0.5);
-                double thresh = y / 256.;
-                thresh *= thresh * thresh;
-                thresh *= 4;
-                thresh = std::max(.4, thresh);
-                if (value > 64 && carve > 0.55)
-                {
-                    block->set_blockid(BlockID::air);
-                }
-                else if (y < value)
-                {
-                    if (y < value - 4 && carve > thresh)
-                    {
-                        block->set_blockid(BlockID::air);
-                    }
-                    else
-                    {
-                        BlockID blockid = (y < value - 1) ? BlockID::dirt : BlockID::grass;
-                        blockid = (y < value - 3) ? BlockID::stone : blockid;
-                        block->visibility_flags = 0x7F;
-                        block->set_blockid(blockid);
-                    }
-                }
-                else
-                {
-                    if (y > 64)
-                        block->set_blockid(BlockID::air);
-                    else
-                    {
-                        block->visibility_flags = 0x7F;
-                        block->set_blockid(BlockID::water);
-                    }
-                }
+                block->light = 0;
+                block->set_blockid(id);
             }
         }
-        // LWP_YieldThread();
     }
+    // Carve caves
+    for (int x = 0, index = 0; x < 16; x++)
+        for (int z = 0; z < 16; z++)
+        {
+            uint8_t height = height_map[index++];
+            for (int y = height; y >= 5; y--)
+            {
+                float noise_value = (cave_noise.GetNoise(double(x + x_offset), double(y), double(z + z_offset)));
+                if (noise_value < -.5f && (height > 63 || abs(height - y) > 2))
+                    chunk->get_block(x, y, z)->set_blockid(BlockID::air);
+            }
+            threadqueue_yield();
+        }
+
+    if (!__chunk_generator_init_done)
+    {
+        delete chunk;
+        return;
+    }
+
     chunk->valid = true;
-    LWP_MutexLock(__chunks_mutex);
+    lock_chunks();
     chunks.push_back(chunk);
-    LWP_MutexUnlock(__chunks_mutex);
-    pending_chunks.remove(chunk);
+    pending_chunks.erase(
+        std::remove_if(pending_chunks.begin(), pending_chunks.end(),
+                       [](chunk_t *&c)
+                       { return !c || c->valid; }),
+        pending_chunks.end());
+    unlock_chunks();
     for (int i = -1; i <= 1; i += 2)
     {
-        chunk_t *chunkX = get_chunk(chunk->x + i, chunk->z, false);
-        chunk_t *chunkZ = get_chunk(chunk->x, chunk->z + i, false);
+        chunk_t *chunkX = get_chunk(chunk->x + i, chunk->z, false, false);
+        chunk_t *chunkZ = get_chunk(chunk->x, chunk->z + i, false, false);
         if (chunkX)
             for (int vbo_y = 0; vbo_y < 16; vbo_y++)
-                chunkX->vbos[vbo_y].dirty |= true;
+                chunkX->vbos[vbo_y].dirty = true;
         if (chunkZ)
             for (int vbo_y = 0; vbo_y < 16; vbo_y++)
-                chunkZ->vbos[vbo_y].dirty |= true;
+                chunkZ->vbos[vbo_y].dirty = true;
     }
+    // printf("Generated chunk %d, %d", chunk->x, chunk->z);
 }
 
 void print_chunk_status()
@@ -189,8 +249,8 @@ void deinit_chunks()
     if (!__chunk_generator_init_done)
         return;
     __chunk_generator_init_done = false;
+    pending_chunks.clear();
     LWP_MutexDestroy(__chunks_mutex);
-    LWP_JoinThread(__chunk_generator_thread_handle, NULL);
 }
 
 // create chunk
@@ -210,12 +270,21 @@ void init_chunks()
 
 void *__chunk_generator_init_internal(void *)
 {
-    open_simplex_noise(rand() & 32767, &ctx);
+    noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
+    noise.SetFrequency(1 / 64.0f);
+    noise.SetSeed(heightmap_seed = rand());
+    noise.SetFractalType(FastNoiseLite::FractalType_FBm);
+
+    cave_noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2S);
+    cave_noise.SetFrequency(1 / 32.0f);
+    cave_noise.SetSeed(cavegen_seed = rand());
+    cave_noise.SetFractalType(FastNoiseLite::FractalType_FBm);
     while (__chunk_generator_init_done)
     {
         generate_chunk();
+        threadqueue_sleep();
     }
-    open_simplex_noise_free(ctx);
+    chunks.clear();
     return NULL;
 }
 
@@ -230,7 +299,7 @@ block_t *get_block_at(vec3i position)
 {
     if (position.y < 0 || position.y > 255)
         return nullptr;
-    chunk_t *chunk = get_chunk_from_pos(position.x, position.z, false);
+    chunk_t *chunk = get_chunk_from_pos(position.x, position.z, false, false);
     if (!chunk)
         return nullptr;
     position.x &= 0x0F;
@@ -241,7 +310,7 @@ block_t *get_block_at(vec3i position)
 
 block_t *chunk_t::get_block(int x, int y, int z)
 {
-    return this->blockstates + ((x & 0xF) | ((y & 0xFF) << 4) | ((z & 0xF) << 12));
+    return &this->blockstates[(x & 0xF) | ((y & 0xFF) << 4) | ((z & 0xF) << 12)];
 }
 
 void chunk_t::recalculate()
@@ -256,14 +325,14 @@ void update_block_at(vec3i pos)
 {
     if (pos.y > 255 || pos.y < 0)
         return;
-    chunk_t *chunk = get_chunk_from_pos(pos.x, pos.z, false);
+    chunk_t *chunk = get_chunk_from_pos(pos.x, pos.z, false, false);
     if (!chunk)
         return;
     block_t *block = chunk->get_block(pos.x, pos.y, pos.z);
     if (!block)
         return;
     bool transparent = !get_block_opacity(block->get_blockid());
-    update_light(lightupdate_t(pos, block->get_blocklight(), 15 * transparent * (pos.y > chunk->height_map[(pos.x & 15) * 16 + (pos.z & 15)])));
+    update_light(lightupdate_t(pos, 15 * (block->get_blockid() == BlockID::glowstone), 15 * transparent * (pos.y > chunk->height_map[(pos.x & 15) * 16 + (pos.z & 15)])));
 }
 
 void chunk_t::light_up()
@@ -276,7 +345,13 @@ void chunk_t::light_up()
         {
             for (int z = 0; z < 16; z++)
             {
-                cast_skylight(chunkX + x, chunkZ + z);
+                int end_y = skycast(x, z, this);
+                if (end_y >= 255 || end_y <= 0)
+                    return;
+                this->height_map[(x << 4) | z] = end_y + 1;
+                for (int y = 255; y > end_y; y--)
+                    this->get_block(x, y, z)->set_skylight(15);
+                update_light(lightupdate_t(vec3i(chunkX + x, end_y, chunkZ + z), this->get_block(x, end_y, z)->get_blocklight(), 14));
             }
         }
         lit_state = 1;
@@ -384,7 +459,6 @@ int chunk_t::build_vbo(int section, bool transparent)
     this->vbos[section].x = chunkX;
     this->vbos[section].y = chunkY;
     this->vbos[section].z = chunkZ;
-    LWP_MutexLock(__chunks_mutex);
     int quadVertexCount = pre_render_block_mesh(section, transparent);
     int triaVertexCount = pre_render_fluid_mesh(section, transparent);
     if (!quadVertexCount && !triaVertexCount)
@@ -399,7 +473,6 @@ int chunk_t::build_vbo(int section, bool transparent)
             this->vbos[section].solid_buffer = nullptr;
             this->vbos[section].solid_buffer_length = 0;
         }
-        LWP_MutexUnlock(__chunks_mutex);
         return (0);
     }
 
@@ -410,19 +483,13 @@ int chunk_t::build_vbo(int section, bool transparent)
     if (triaVertexCount)
         estimatedMemory += 3;
     estimatedMemory += 32;
-    if ((estimatedMemory & 31) != 0)
-    {
-        estimatedMemory += 32;
-        estimatedMemory &= ~31;
-    }
-    // Round down to nearest 32
-    // estimatedMemory &= ~31;
+    estimatedMemory = (estimatedMemory + 31) & ~31;
+
     void *displist_vbo = memalign(32, estimatedMemory); // 32 bytes for alignment
 
     if (displist_vbo == nullptr)
     {
         printf("Failed to allocate %d bytes for section %d VBO at (%d, %d)\n", estimatedMemory, section, this->x, this->z);
-        LWP_MutexUnlock(__chunks_mutex);
         return (1);
     }
     DCInvalidateRange(ALIGNPTR(displist_vbo), estimatedMemory);
@@ -449,7 +516,6 @@ int chunk_t::build_vbo(int section, bool transparent)
     }
     // GX_EndDispList() returns the size of the display list, so store that value and use it with GX_CallDispList().
     int preciseMemory = GX_EndDispList();
-    LWP_MutexUnlock(__chunks_mutex);
     if (!preciseMemory)
     {
         printf("Failed to create display list for section %d at (%d, %d)\n", section, this->x, this->z);
@@ -578,7 +644,7 @@ bool CompareVertices(const vertex_property_t &a, const vertex_property_t &b)
     return a.pos.y < b.pos.y;
 }
 
-int DrawHorizontalQuad(vertex_property_t p0, vertex_property_t p1, vertex_property_t p2, vertex_property_t p3, float light)
+int DrawHorizontalQuad(vertex_property_t p0, vertex_property_t p1, vertex_property_t p2, vertex_property_t p3, uint8_t light)
 {
     static std::vector<vertex_property_t> vertices(4);
 
@@ -602,7 +668,7 @@ int DrawHorizontalQuad(vertex_property_t p0, vertex_property_t p1, vertex_proper
     return 2;
 }
 
-int DrawVerticalQuad(vertex_property_t p0, vertex_property_t p1, vertex_property_t p2, vertex_property_t p3, float light)
+int DrawVerticalQuad(vertex_property_t p0, vertex_property_t p1, vertex_property_t p2, vertex_property_t p3, uint8_t light)
 {
     static std::vector<vertex_property_t> vertices(4);
     vertices[0] = p0;
@@ -635,8 +701,25 @@ int DrawVerticalQuad(vertex_property_t p0, vertex_property_t p1, vertex_property
 
 void get_neighbors(vec3i pos, block_t **neighbors)
 {
-    for (int x = 0; x < 6; x++)
-        neighbors[x] = get_block_at(pos + face_offsets[x]);
+    int x = (pos.x & 15);
+    int z = (pos.x & 15);
+    if (!((x + 1) & 17) && !((z + 1) & 17))
+    {
+        chunk_t *chunk = get_chunk_from_pos(pos.x, pos.z, false);
+        if (!chunk)
+            return;
+
+        for (int x = 0; x < 6; x++)
+        {
+            vec3i neighbor_pos = pos + face_offsets[x];
+            neighbors[x] = chunk->get_block(neighbor_pos.x, neighbor_pos.y, neighbor_pos.z);
+        }
+    }
+    else
+    {
+        for (int x = 0; x < 6; x++)
+            neighbors[x] = get_block_at(pos + face_offsets[x]);
+    }
 }
 
 int chunk_t::render_block(block_t *block, vec3i pos, bool transparent)
@@ -691,11 +774,11 @@ int chunk_t::render_fluid(block_t *block, vec3i pos)
     {
         corner_max[i] = get_fluid_visual_level(pos + corner_offsets[i], block_id);
         corner_min[i] = 0;
-        corner_tops[i] = float(corner_max[i]) / 8.0f;
+        corner_tops[i] = float(corner_max[i]) * 0.125f;
         corner_bottoms[i] = 0.0f;
     }
 
-    float light = std::min(1.0f, float(block->get_skylight()) / 15.0f + 0.05f);
+    uint8_t light = block->light;
 
     // TEXTURE HANDLING: Check surrounding water levels > this:
     // If surrounded by 1, the water texture is flowing to the opposite direction
@@ -753,7 +836,7 @@ int chunk_t::render_fluid(block_t *block, vec3i pos)
         {(local_pos + vec3f{+.5f, -.5f, -.5f}), texture_end_x, texture_end_y},
     };
     if (!is_same_fluid(block_id, neighbor_ids[FACE_NY]) && !is_solid(neighbor_ids[FACE_NY]))
-        faceCount += DrawHorizontalQuad(bottomPlaneCoords[0], bottomPlaneCoords[1], bottomPlaneCoords[2], bottomPlaneCoords[3], light);
+        faceCount += DrawHorizontalQuad(bottomPlaneCoords[0], bottomPlaneCoords[1], bottomPlaneCoords[2], bottomPlaneCoords[3], neighbors[FACE_NY] ? neighbors[FACE_NY]->light : light);
 
     vertex_property_t topPlaneCoords[4] = {
         {(local_pos + vec3f{+.5f, -.5f + corner_tops[3], -.5f}), texture_end_x, texture_end_y},
@@ -762,7 +845,7 @@ int chunk_t::render_fluid(block_t *block, vec3i pos)
         {(local_pos + vec3f{-.5f, -.5f + corner_tops[0], -.5f}), texture_start_x, texture_end_y},
     };
     if (!is_same_fluid(block_id, neighbor_ids[FACE_PY]))
-        faceCount += DrawHorizontalQuad(topPlaneCoords[0], topPlaneCoords[1], topPlaneCoords[2], topPlaneCoords[3], light);
+        faceCount += DrawHorizontalQuad(topPlaneCoords[0], topPlaneCoords[1], topPlaneCoords[2], topPlaneCoords[3], neighbors[FACE_PY] ? neighbors[FACE_PY]->light : light);
 
     texture_offset = basefluid(block_id) == BlockID::water ? WATER_SIDE : LAVA_SIDE;
 
@@ -774,9 +857,6 @@ int chunk_t::render_fluid(block_t *block, vec3i pos)
 
     sideCoords[0].x_uv = sideCoords[1].x_uv = texture_start_x;
     sideCoords[2].x_uv = sideCoords[3].x_uv = texture_end_x;
-    float facelight = 0.05f;
-    if (neighbors[FACE_NZ])
-        facelight = std::min(1.0f, neighbors[FACE_NZ]->get_skylight() / 15.0f + 0.05f);
     sideCoords[3].pos = local_pos + vec3f{-.5f, -.5f + corner_bottoms[0], -.5f};
     sideCoords[2].pos = local_pos + vec3f{-.5f, -.5f + corner_tops[0], -.5f};
     sideCoords[1].pos = local_pos + vec3f{+.5f, -.5f + corner_tops[3], -.5f};
@@ -786,11 +866,8 @@ int chunk_t::render_fluid(block_t *block, vec3i pos)
     sideCoords[1].y_uv = texture_start_y + corner_max[3];
     sideCoords[0].y_uv = texture_start_y + corner_min[3];
     if (neighbors[FACE_NZ] && !is_same_fluid(block_id, neighbor_ids[FACE_NZ]) && !is_solid(neighbor_ids[FACE_NZ]))
-        faceCount += DrawVerticalQuad(sideCoords[0], sideCoords[1], sideCoords[2], sideCoords[3], facelight * 0.9f);
+        faceCount += DrawVerticalQuad(sideCoords[0], sideCoords[1], sideCoords[2], sideCoords[3], neighbors[FACE_NZ]->light);
 
-    facelight = 0.05f;
-    if (neighbors[FACE_PZ])
-        facelight = std::min(1.0f, neighbors[FACE_PZ]->get_skylight() / 15.0f + 0.05f);
     sideCoords[3].pos = local_pos + vec3f{+.5f, -.5f + corner_bottoms[2], +.5f};
     sideCoords[2].pos = local_pos + vec3f{+.5f, -.5f + corner_tops[2], +.5f};
     sideCoords[1].pos = local_pos + vec3f{-.5f, -.5f + corner_tops[1], +.5f};
@@ -800,11 +877,8 @@ int chunk_t::render_fluid(block_t *block, vec3i pos)
     sideCoords[1].y_uv = texture_start_y + corner_max[1];
     sideCoords[0].y_uv = texture_start_y + corner_min[1];
     if (neighbors[FACE_PZ] && !is_same_fluid(block_id, neighbor_ids[FACE_PZ]) && !is_solid(neighbor_ids[FACE_PZ]))
-        faceCount += DrawVerticalQuad(sideCoords[0], sideCoords[1], sideCoords[2], sideCoords[3], facelight * 0.9f);
+        faceCount += DrawVerticalQuad(sideCoords[0], sideCoords[1], sideCoords[2], sideCoords[3], neighbors[FACE_PZ]->light);
 
-    facelight = 0.05f;
-    if (neighbors[FACE_NX])
-        facelight = std::min(1.0f, neighbors[FACE_NX]->get_skylight() / 15.0f + 0.05f);
     sideCoords[3].pos = local_pos + vec3f{-.5f, -.5f + corner_bottoms[1], +.5f};
     sideCoords[2].pos = local_pos + vec3f{-.5f, -.5f + corner_tops[1], +.5f};
     sideCoords[1].pos = local_pos + vec3f{-.5f, -.5f + corner_tops[0], -.5f};
@@ -814,11 +888,8 @@ int chunk_t::render_fluid(block_t *block, vec3i pos)
     sideCoords[1].y_uv = texture_start_y + corner_max[0];
     sideCoords[0].y_uv = texture_start_y + corner_min[0];
     if (neighbors[FACE_NX] && !is_same_fluid(block_id, neighbor_ids[FACE_NX]) && !is_solid(neighbor_ids[FACE_NX]))
-        faceCount += DrawVerticalQuad(sideCoords[0], sideCoords[1], sideCoords[2], sideCoords[3], facelight * 0.85f);
+        faceCount += DrawVerticalQuad(sideCoords[0], sideCoords[1], sideCoords[2], sideCoords[3], neighbors[FACE_NX]->light);
 
-    facelight = 0.05f;
-    if (neighbors[FACE_PX])
-        facelight = std::min(1.0f, neighbors[FACE_PX]->get_skylight() / 15.0f + 0.05f);
     sideCoords[3].pos = local_pos + vec3f{+.5f, -.5f + corner_bottoms[3], -.5f};
     sideCoords[2].pos = local_pos + vec3f{+.5f, -.5f + corner_tops[3], -.5f};
     sideCoords[1].pos = local_pos + vec3f{+.5f, -.5f + corner_tops[2], +.5f};
@@ -828,7 +899,7 @@ int chunk_t::render_fluid(block_t *block, vec3i pos)
     sideCoords[1].y_uv = texture_start_y + corner_max[2];
     sideCoords[0].y_uv = texture_start_y + corner_min[2];
     if (neighbors[FACE_PX] && !is_same_fluid(block_id, neighbor_ids[FACE_PX]) && !is_solid(neighbor_ids[FACE_PX]))
-        faceCount += DrawVerticalQuad(sideCoords[0], sideCoords[1], sideCoords[2], sideCoords[3], facelight * 0.85f);
+        faceCount += DrawVerticalQuad(sideCoords[0], sideCoords[1], sideCoords[2], sideCoords[3], neighbors[FACE_PX]->light);
     return faceCount * 3;
 }
 
@@ -836,6 +907,14 @@ void chunk_t::prepare_render()
 {
     this->recalculate();
     this->build_all_vbos();
+}
+
+uint32_t chunk_t::size()
+{
+    uint32_t base_size = sizeof(chunk_t);
+    for (int i = 0; i < VERTICAL_SECTION_COUNT; i++)
+        base_size += this->vbos[i].cached_solid_buffer_length + this->vbos[i].cached_transparent_buffer_length + sizeof(chunkvbo_t);
+    return base_size;
 }
 
 // destroy chunk

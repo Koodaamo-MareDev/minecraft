@@ -18,10 +18,9 @@ include $(DEVKITPPC)/wii_rules
 #---------------------------------------------------------------------------------
 TARGET		:=	$(notdir $(CURDIR))
 BUILD		:=	build
-SOURCES		:=	source source/opensimplexnoise source/ported
+SOURCES		:=	source source/opensimplexnoise source/ported source/improvednoise source/fastnoise
 DATA		:=
 TEXTURES	:=	textures
-ALPHAMAPS	:=	textures
 INCLUDES	:=	source/ported
 
 #---------------------------------------------------------------------------------
@@ -62,8 +61,10 @@ export DEPSDIR	:=	$(CURDIR)/$(BUILD)
 #---------------------------------------------------------------------------------
 # automatically build a list of object files for our project
 #---------------------------------------------------------------------------------
-ALPHAMAPSRC	:=	$(foreach dir,$(TEXTURES),$(notdir $(wildcard $(dir)/*.png)))
+ALPHAMAPSRC	:=	blockmap.png
 ALPHAMAPFILES	:=	$(ALPHAMAPSRC:.png=_alpha.h)
+LIGHTMAPSRC	:=	light_day.png light_night.png
+LIGHTMAPFILES	:=	$(LIGHTMAPSRC:.png=_rgba.h)
 CFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
 CPPFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
 sFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
@@ -83,9 +84,9 @@ endif
 
 export OFILES_BIN	:=	$(addsuffix .o,$(BINFILES)) $(addsuffix .o,$(TPLFILES))
 export OFILES_SOURCES := $(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(sFILES:.s=.o) $(SFILES:.S=.o)
-export OFILES := $(OFILES_BIN) $(OFILES_SOURCES) $(addsuffix _alpha.c,$(basename $(ALPHAMAPSRC)))
+export OFILES := $(OFILES_BIN) $(OFILES_SOURCES) $(addsuffix _alpha.c,$(basename $(ALPHAMAPSRC))) $(addsuffix _rgba.c,$(basename $(LIGHTMAPSRC))) brightness_values.c
 
-export HFILES := $(addsuffix .h,$(subst .,_,$(BINFILES))) $(addsuffix .h,$(subst .,_,$(TPLFILES))) $(addsuffix .h,$(basename $(ALPHAMAPFILES)))
+export HFILES := $(addsuffix .h,$(subst .,_,$(BINFILES))) $(addsuffix .h,$(subst .,_,$(TPLFILES))) $(ALPHAMAPFILES) $(LIGHTMAPFILES) brightness_values.h
 
 #---------------------------------------------------------------------------------
 # build a list of include paths
@@ -131,6 +132,12 @@ $(OFILES_SOURCES) : $(HFILES)
 	@echo $(notdir $<)
 	@python ../extract_alpha.py $<
 
+%_rgba.h %_rgba.c : %.png
+	@echo $(notdir $<)
+	@python ../extract_rgba.py $<
+brightness_values.h brightness_values.c :
+	@echo brightness_values.h
+	@python ../gen_brightness.py
 #---------------------------------------------------------------------------------
 # This rule links in binary data with the .bin extension
 #---------------------------------------------------------------------------------

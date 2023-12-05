@@ -1,5 +1,4 @@
 #include "base3d.hpp"
-
 bool base3d_is_drawing = false;
 
 #ifdef __wii__
@@ -28,19 +27,21 @@ void GX_Vertex(vertex_property_t vert)
     ++__group_vtxcount;
     if (!base3d_is_drawing)
         return;
-    GX_Position3f32(vert.pos.x, vert.pos.y, vert.pos.z);
-    GX_Color3u8(vert.color_r, vert.color_g, vert.color_b);
-    GX_TexCoord2u8(vert.x_uv, vert.y_uv);
+    GX_Position3s16(BASE3D_POS_FRAC * vert.pos.x, BASE3D_POS_FRAC * vert.pos.y, BASE3D_POS_FRAC * vert.pos.z);
+    GX_Color4u8(vert.color_r, vert.color_g, vert.color_b, vert.color_a);
+    GX_Color1x8(255);
+    GX_TexCoord2u16(vert.x_uv, vert.y_uv);
 }
 
-void GX_VertexLit(vertex_property_t vert, float light)
+void GX_VertexLit(vertex_property_t vert, uint8_t light, uint8_t brightness)
 {
     ++__group_vtxcount;
     if (!base3d_is_drawing)
         return;
-    GX_Position3f32(vert.pos.x, vert.pos.y, vert.pos.z);
-    GX_Color3f32(light, light, light);
-    GX_TexCoord2u8(vert.x_uv, vert.y_uv);
+    GX_Position3s16(BASE3D_POS_FRAC * vert.pos.x, BASE3D_POS_FRAC * vert.pos.y, BASE3D_POS_FRAC * vert.pos.z);
+    GX_Color1x8(light);
+    GX_Color1x8(brightness);
+    GX_TexCoord2u16(vert.x_uv, vert.y_uv);
 }
 #else // TODO: Add PC alternatives here.
 

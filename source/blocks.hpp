@@ -13,6 +13,8 @@ int get_block_opacity(BlockID blockid);
 
 bool is_face_transparent(int texture_index);
 
+uint8_t get_block_luminance(BlockID block_id);
+
 uint32_t get_default_texture_index(BlockID blockid);
 uint32_t get_face_texture_index(block_t *block, int face);
 

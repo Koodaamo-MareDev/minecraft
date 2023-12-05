@@ -55,7 +55,10 @@
         "semaphore": "cpp",
         "shared_mutex": "cpp",
         "stop_token": "cpp",
-        "thread": "cpp"
+        "thread": "cpp",
+        "cinttypes": "cpp",
+        "queue": "cpp",
+        "map": "cpp"
     },
     "[javascript]": {
         "editor.maxTokenizationLineLength": 25000
