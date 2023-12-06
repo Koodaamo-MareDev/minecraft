@@ -656,13 +656,13 @@ int DrawHorizontalQuad(vertex_property_t p0, vertex_property_t p1, vertex_proper
     uint8_t curr = min_vertex.index;
     for (int i = 0; i < 3; i++)
     {
-        GX_VertexLit(vertices[curr], light);
+        GX_VertexLit(vertices[curr], light, 255);
         curr = (curr + 1) & 3;
     }
     curr = (min_vertex.index + 2) & 3;
     for (int i = 0; i < 3; i++)
     {
-        GX_VertexLit(vertices[curr], light);
+        GX_VertexLit(vertices[curr], light, 255);
         curr = (curr + 1) & 3;
     }
     return 2;
@@ -681,7 +681,7 @@ int DrawVerticalQuad(vertex_property_t p0, vertex_property_t p1, vertex_property
     {
         for (int i = 0; i < 3; i++)
         {
-            GX_VertexLit(vertices[curr], light);
+            GX_VertexLit(vertices[curr], light, 255);
             curr = (curr + 1) & 3;
         }
         faceCount++;
@@ -691,7 +691,7 @@ int DrawVerticalQuad(vertex_property_t p0, vertex_property_t p1, vertex_property
     {
         for (int i = 0; i < 3; i++)
         {
-            GX_VertexLit(vertices[curr], light);
+            GX_VertexLit(vertices[curr], light, 255);
             curr = (curr + 1) & 3;
         }
         faceCount++;

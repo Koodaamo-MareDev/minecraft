@@ -64,6 +64,7 @@ bool destroy_block = false;
 bool place_block = false;
 
 bool DrawScene(Mtx view, bool transparency);
+void PrepareTEV();
 void PrepareTexture(GXTexObj texture);
 void GetInput();
 guVector cam = {0.0F, 0.0F, 0.0F},
@@ -301,9 +302,9 @@ int main(int argc, char **argv)
     GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_CLR1, GX_CLR_RGBA, GX_RGBA8, 0);
     GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_TEX0, GX_TEX_ST, GX_U16, BASE3D_UV_FRAC_BITS);
     // set number of rasterized color channels
-    GX_SetNumChans(1);
+    GX_SetNumChans(2);
     GX_SetChanCtrl(GX_COLOR0A0, GX_DISABLE, GX_SRC_REG, GX_SRC_VTX, GX_LIGHTNULL, GX_DF_NONE, GX_AF_NONE);
-    // GX_SetChanCtrl(GX_COLOR1A1, GX_DISABLE, GX_SRC_REG, GX_SRC_VTX, GX_LIGHTNULL, GX_DF_NONE, GX_AF_NONE);
+    GX_SetChanCtrl(GX_COLOR1A1, GX_DISABLE, GX_SRC_REG, GX_SRC_VTX, GX_LIGHTNULL, GX_DF_NONE, GX_AF_NONE);
     //  set number of textures to generate
     GX_SetNumTexGens(1);
 
@@ -362,11 +363,12 @@ int main(int argc, char **argv)
     player_pos.z = 0;
     VIDEO_SetPostRetraceCallback(&RenderDone);
     main_thread = LWP_GetSelf();
-    // GX_SetArray(GX_VA_CLR1, brightness_values, 4 * sizeof(u8));
+    GX_SetArray(GX_VA_CLR1, brightness_values, 4 * sizeof(u8));
+    PrepareTEV();
     while (!isExiting)
     {
         u64 frame_start = time_get();
-        float light_time_value = (1 + std::clamp(std::sin((frameCounter / 3 - 12000) * (M_PI / 24000)) * 8.0, 0.0, 1.0)) / 2.0f;
+        float light_time_value = (1 + std::clamp(std::sin((tickCounter - 12000) * (M_PI / 24000)) * 8.0, -1.0, 1.0)) / 2.0f;
         if (HWButton != -1)
             break;
         LightMapBlend(light_day_rgba, light_night_rgba, light_map, uint8_t(light_time_value * 255));
@@ -454,7 +456,7 @@ void GetInput()
     u32 wiimote1_held = WPAD_ButtonsHeld(0);
     if ((wiimote1_down & (WPAD_BUTTON_HOME | WPAD_CLASSIC_BUTTON_HOME)))
         isExiting = true;
-    if((wiimote1_down & WPAD_BUTTON_1))
+    if ((wiimote1_down & WPAD_BUTTON_1))
     {
         printf("PRIM_CHUNK_MEMORY: %d B\n", total_chunks_size);
     }
@@ -917,17 +919,19 @@ bool DrawScene(Mtx view, bool transparency)
     }
     return true;
 }
+void PrepareTEV()
+{
+    GX_SetNumTevStages(2);
+
+    GX_SetTexCoordGen(GX_TEXCOORD0, GX_TG_MTX2x4, GX_TG_TEX0, GX_IDENTITY);
+    GX_SetTevOrder(GX_TEVSTAGE0, GX_TEXCOORDNULL, GX_TEXMAP_NULL, GX_COLOR1A1);
+    GX_SetTevOp(GX_TEVSTAGE0, GX_MODULATE);
+
+    GX_SetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+    GX_SetTevOp(GX_TEVSTAGE1, GX_MODULATE);
+}
+
 void PrepareTexture(GXTexObj texture)
 {
-    // setup texture coordinate generation
-    // args: texcoord slot 0-7, matrix type, source to generate texture coordinates from, matrix to use
-    GX_SetTexCoordGen(GX_TEXCOORD0, GX_TG_MTX2x4, GX_TG_TEX0, GX_IDENTITY);
-
-    // Set up TEV to paint the textures properly.
-
-    GX_SetTevOp(GX_TEVSTAGE0, GX_MODULATE);
-    GX_SetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
-
-    // Load up the textures (just one this time).
     GX_LoadTexObj(&texture, GX_TEXMAP0);
 }

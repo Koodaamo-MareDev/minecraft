@@ -1,7 +1,7 @@
 from PIL import Image
 try:
     output = 'unsigned char brightness_values[] = {\n'
-    for b in range(255):
+    for b in range(256):
         output += f"{b},{b},{b},255,"
     output += '\n};\n'
     with open('brightness_values.c', 'w') as f:

@@ -30,6 +30,6 @@ void GX_BeginGroup(uint8_t primitive, uint16_t vtxcount = 0);
 uint16_t GX_EndGroup();
 
 void GX_Vertex(vertex_property_t vert);
-void GX_VertexLit(vertex_property_t vert, uint8_t light, uint8_t brightness = 255);
+void GX_VertexLit(vertex_property_t vert, uint8_t light, uint8_t brightness);
 
 #endif
