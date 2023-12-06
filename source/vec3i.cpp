@@ -20,3 +20,16 @@ vec3f vec3i::operator+(vec3f const& a) const {
 vec3f vec3i::operator-(vec3f const& a) const {
     return vec3f{x - a.x, y - a.y, z - a.z};
 }
+
+
+bool vec3u::operator==(vec3u const& a) const {
+    return x == a.x && y == a.y && z == a.z;
+}
+
+vec3u vec3u::operator+(vec3u const& a) const {
+    return vec3u{x + a.x, y + a.y, z + a.z};
+}
+
+vec3u vec3u::operator-(vec3u const& a) const {
+    return vec3u{x - a.x, y - a.y, z - a.z};
+}

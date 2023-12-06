@@ -220,7 +220,7 @@ void update_fluid(block_t *block, vec3i pos)
             // Convert to source only if the fluid cannot flow downwards.
             if ((!is_fluid_overridable(ny_blockid) && !is_fluid(ny_blockid)))
             {
-                block->set_blockid(BlockID::water);
+                block->set_blockid(basefluid(block_id));
                 block->meta &= ~0xF;
             }
         }

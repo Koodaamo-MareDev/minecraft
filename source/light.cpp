@@ -47,7 +47,7 @@ void light_engine_init()
                      __light_engine_init_internal,  /* code */
                      NULL,                          /* arg pointer for thread */
                      NULL,                          /* stack base */
-                     64 * 1024,                    /* stack size */
+                     64 * 1024,                     /* stack size */
                      50 /* thread priority */);
 }
 
@@ -172,15 +172,18 @@ void __update_light(vec3i coords)
 
         block_t *neighbors[6];
         get_neighbors(pos, neighbors);
-
-        if (!new_blocklight)
+        int opacity = get_block_opacity(block->get_blockid());
+        if (opacity != 15)
+        {
+            opacity = std::max(opacity, 1);
             for (int i = 0; i < 6; i++)
             {
                 if (!neighbors[i])
                     continue;
-                new_skylight = std::max(int(neighbors[i]->get_cast_skylight()), new_skylight);
-                new_blocklight = std::max(int(neighbors[i]->get_cast_blocklight()), new_blocklight);
+                new_skylight = std::max(std::max(int(neighbors[i]->get_skylight()) - opacity, 0), new_skylight);
+                new_blocklight = std::max(std::max(int(neighbors[i]->get_blocklight()) - opacity, 0), new_blocklight);
             }
+        }
 
         int new_light = (new_skylight << 4) | new_blocklight;
 

@@ -701,6 +701,7 @@ int DrawVerticalQuad(vertex_property_t p0, vertex_property_t p1, vertex_property
 
 void get_neighbors(vec3i pos, block_t **neighbors)
 {
+    /*
     int x = (pos.x & 15);
     int z = (pos.x & 15);
     if (!((x + 1) & 17) && !((z + 1) & 17))
@@ -715,7 +716,7 @@ void get_neighbors(vec3i pos, block_t **neighbors)
             neighbors[x] = chunk->get_block(neighbor_pos.x, neighbor_pos.y, neighbor_pos.z);
         }
     }
-    else
+    else*/
     {
         for (int x = 0; x < 6; x++)
             neighbors[x] = get_block_at(pos + face_offsets[x]);
