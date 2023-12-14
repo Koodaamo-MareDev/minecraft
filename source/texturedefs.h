@@ -16,7 +16,7 @@
 
 #define TEXTURE_COUNT (UV_SCALE << 4)
 #define VERTEX_ATTR_LENGTH (3 * sizeof(int16_t) + 1 * sizeof(uint8_t) + 1 * sizeof(uint8_t) + 2 * sizeof(uint16_t))
-#define VERTEX_ATTR_LENGTH_DIRECTCOLOR (3 * sizeof(int16_t) + 4 * sizeof(uint8_t) + 1 * sizeof(uint8_t) + 2 * sizeof(uint16_t))
+#define VERTEX_ATTR_LENGTH_DIRECTCOLOR (3 * sizeof(int16_t) + 1 * sizeof(uint8_t) + 4 * sizeof(uint8_t) + 2 * sizeof(uint16_t))
 #else
 #define TEXTURES_PER_UNIT 16
 #define UV_POSTSCALE 1.0f

@@ -16,6 +16,8 @@
 #include "blockmap.h"
 #include "water_still_tpl.h"
 #include "water_still.h"
+#include "white_tpl.h"
+#include "white.h"
 #include "light_day_rgba.h"
 #include "light_night_rgba.h"
 #include "brightness_values.h"
@@ -63,6 +65,7 @@ float prev_right_shoulder = 0;
 bool destroy_block = false;
 bool place_block = false;
 
+void UpdateLightDir();
 bool DrawScene(Mtx view, bool transparency);
 void PrepareTEV();
 void PrepareTexture(GXTexObj texture);
@@ -227,8 +230,10 @@ int main(int argc, char **argv)
 
     TPLFile blockmapTPL;
     TPLFile water_stillTPL;
+    TPLFile whiteTPL;
     GXTexObj texture;
     GXTexObj water_still_texture;
+    GXTexObj white_texture;
     threadqueue_init();
 
     VIDEO_Init();
@@ -246,7 +251,6 @@ int main(int argc, char **argv)
     frameBuffer[1] = MEM_K0_TO_K1(SYS_AllocateFramebuffer(rmode));
     // dstBuffer[0] = SYS_AllocateFramebuffer(rmode);
     // dstBuffer[1] = SYS_AllocateFramebuffer(rmode);
-    SYS_SetEuRGB60(TRUE);
     CON_Init(frameBuffer[0], 20, 20, rmode->fbWidth, rmode->xfbHeight, rmode->fbWidth * VI_DISPLAY_PIX_SZ);
     // configure video
     VIDEO_Configure(rmode);
@@ -294,17 +298,18 @@ int main(int argc, char **argv)
     // bits for non float data.
     GX_ClearVtxDesc();
     GX_SetVtxDesc(GX_VA_POS, GX_DIRECT);
+    GX_SetVtxDesc(GX_VA_NRM, GX_INDEX8);
     GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
-    GX_SetVtxDesc(GX_VA_CLR1, GX_INDEX8);
     GX_SetVtxDesc(GX_VA_TEX0, GX_DIRECT);
     GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, BASE3D_POS_FRAC_BITS);
+    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_NRM, GX_NRM_XYZ, GX_S8, BASE3D_NRM_FRAC_BITS);
     GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_CLR0, GX_CLR_RGBA, GX_RGBA8, 0);
-    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_CLR1, GX_CLR_RGBA, GX_RGBA8, 0);
     GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_TEX0, GX_TEX_ST, GX_U16, BASE3D_UV_FRAC_BITS);
     // set number of rasterized color channels
-    GX_SetNumChans(2);
-    GX_SetChanCtrl(GX_COLOR0A0, GX_DISABLE, GX_SRC_REG, GX_SRC_VTX, GX_LIGHTNULL, GX_DF_NONE, GX_AF_NONE);
-    GX_SetChanCtrl(GX_COLOR1A1, GX_DISABLE, GX_SRC_REG, GX_SRC_VTX, GX_LIGHTNULL, GX_DF_NONE, GX_AF_NONE);
+    GX_SetNumChans(1);
+    GX_SetChanCtrl(GX_COLOR0, GX_ENABLE, GX_SRC_REG, GX_SRC_VTX, GX_LIGHT0 | GX_LIGHT1 | GX_LIGHT2, GX_DF_CLAMP, GX_AF_SPOT);
+    GX_SetChanAmbColor(GX_COLOR0, GXColor{127, 127, 127, 255});
+    GX_SetChanMatColor(GX_COLOR0, GXColor{255, 255, 255, 255});
     //  set number of textures to generate
     GX_SetNumTexGens(1);
 
@@ -319,6 +324,11 @@ int main(int argc, char **argv)
     TPL_OpenTPLFromMemory(&blockmapTPL, (void *)blockmap_tpl, blockmap_tpl_size);
     TPL_GetTexture(&blockmapTPL, blockmap, &texture);
     GX_InitTexObjFilterMode(&texture, GX_NEAR, GX_NEAR);
+
+    // Terrain texture
+    TPL_OpenTPLFromMemory(&whiteTPL, (void *)white_tpl, white_tpl_size);
+    TPL_GetTexture(&whiteTPL, blockmap, &white_texture);
+    GX_InitTexObjFilterMode(&white_texture, GX_NEAR, GX_NEAR);
 
     uint32_t texture_buflen = GX_GetTexBufferSize(GX_GetTexObjWidth(&texture), GX_GetTexObjHeight(&texture), GX_GetTexObjFmt(&texture), GX_FALSE, GX_FALSE);
     void *texture_ptr = MEM_PHYSICAL_TO_K1(GX_GetTexObjData(&texture));
@@ -363,7 +373,7 @@ int main(int argc, char **argv)
     player_pos.z = 0;
     VIDEO_SetPostRetraceCallback(&RenderDone);
     main_thread = LWP_GetSelf();
-    GX_SetArray(GX_VA_CLR1, brightness_values, 4 * sizeof(u8));
+    GX_SetArray(GX_VA_NRM, face_normals, sizeof(int8_t));
     PrepareTEV();
     while (!isExiting)
     {
@@ -383,7 +393,7 @@ int main(int argc, char **argv)
         GX_SetFog(GX_FOG_PERSP_EXP2, RENDER_DISTANCE * 0.67f * 16 - 16, RENDER_DISTANCE * 0.67f * 16 - 8, 0.1F, 300.0F, background);
         if (player_pos.y < -999)
             player_pos.y = skycast(player_pos.x, player_pos.z) + 2;
-
+        UpdateLightDir();
         // GX_InvVtxCache();
         if (fb)
         {
@@ -391,6 +401,7 @@ int main(int argc, char **argv)
             DCFlushRange(texture_ptr, texture_buflen);
             GX_InvalidateTexAll();
             PrepareTexture(texture);
+            GX_LoadTexObj(&white_texture, GX_TEXMAP1);
         }
         GetInput();
         // u64 frame_start = time_get();
@@ -589,27 +600,40 @@ void GetLookMtx(Mtx &mtx)
     axis.y = 1;
     axis.z = 0;
     guMtxRotAxisDeg(roty, &axis, yrot);
-    guMtxConcat(roty, rotx, mtx);
+    guMtxConcat(rotx, roty, mtx);
 }
 
 // TODO: Finish fake lighting
 void UpdateLightDir()
 {
-    static GXLightObj lights[2];
-    Mtx look_mtx;
-    guVector dir{1, -2, 3};
-    guVector look_dir;
+    GXLightObj lights[3];
+    guVector dir{0.25, 0, .75};
+    guVecNormalize(&dir);
 
-    GetLookMtx(look_mtx);
+    guVector look_dir = dir;
 
-    for (int i = 0; i < 2; i++)
+    for (int i = 0; i < 3; i++)
     {
-        dir.x -= 2 * i;
-        dir.z -= 2 * i;
-        guVecMultiply(look_mtx, &dir, &look_dir);
-        GX_InitLightDirv(&lights[i], &dir);
-        // GX_InitLightAttnA(...);
-        GX_InitLightColor(&lights[i], GXColor{255, 255, 255, 255});
+        if (i == 0)
+        {
+            look_dir.x = 0;
+            look_dir.y = 1;
+            look_dir.z = 0;
+        }
+        else if (i == 2)
+        {
+            look_dir.x = -dir.z / 2;
+            look_dir.y = 0;
+            look_dir.z = -dir.x;
+        }
+        else
+            look_dir = dir;
+        uint8_t intensity = uint8_t(255 - (i << 6));
+        GX_InitLightPos(&lights[i], look_dir.x * -1024, look_dir.y * -1024, look_dir.z * -1024);
+        GX_InitLightColor(&lights[i], GXColor{intensity, intensity, intensity, 255});
+        GX_InitLightAttnA(&lights[i], 1, 1, 1);
+        GX_InitLightDistAttn(&lights[i], 1.0, 1.0, GX_DA_OFF);
+        GX_InitLightDir(&lights[i], look_dir.x, look_dir.y, look_dir.z);
         GX_LoadLightObj(&lights[i], 1 << i);
     }
 }
@@ -921,14 +945,10 @@ bool DrawScene(Mtx view, bool transparency)
 }
 void PrepareTEV()
 {
-    GX_SetNumTevStages(2);
-
+    GX_SetNumTevStages(1);
     GX_SetTexCoordGen(GX_TEXCOORD0, GX_TG_MTX2x4, GX_TG_TEX0, GX_IDENTITY);
-    GX_SetTevOrder(GX_TEVSTAGE0, GX_TEXCOORDNULL, GX_TEXMAP_NULL, GX_COLOR1A1);
+    GX_SetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
     GX_SetTevOp(GX_TEVSTAGE0, GX_MODULATE);
-
-    GX_SetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
-    GX_SetTevOp(GX_TEVSTAGE1, GX_MODULATE);
 }
 
 void PrepareTexture(GXTexObj texture)
