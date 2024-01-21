@@ -49,7 +49,13 @@ public:
     block_t blockstates[16 * 16 * 256] = {0};
     uint8_t height_map[16 * 16] = {0};
     chunkvbo_t vbos[VERTICAL_SECTION_COUNT];
-    block_t *get_block(int x, int y, int z);
+
+    block_t *get_block(int x, int y, int z)
+    {
+        return &this->blockstates[(x & 0xF) | ((y & 0xFF) << 4) | ((z & 0xF) << 12)];
+    }
+
+    void update_height_map(vec3i pos);
     void recalculate();
     void light_up();
     void recalculate_section(int section);

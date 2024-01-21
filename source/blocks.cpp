@@ -4,7 +4,7 @@
 #include "chunk_new.hpp"
 #include "light.hpp"
 #include <cmath>
-int get_block_opacity(BlockID blockid)
+int8_t get_block_opacity(BlockID blockid)
 {
     switch (blockid)
     {
@@ -21,14 +21,15 @@ int get_block_opacity(BlockID blockid)
     }
 }
 
+
+bool is_face_transparent(uint8_t texture_index)
+{
+    return blockmap_alpha[texture_index] == 0;
+}
+
 bool is_solid(BlockID block_id)
 {
     return block_id != BlockID::air && !is_fluid(block_id) && !is_face_transparent(get_default_texture_index(block_id));
-}
-
-bool is_face_transparent(int texture_index)
-{
-    return blockmap_alpha[texture_index & 0xFF] == 0;
 }
 
 uint8_t get_block_luminance(BlockID block_id)
@@ -41,7 +42,6 @@ uint8_t get_block_luminance(BlockID block_id)
     default:
         return 0;
     }
-    return 0;
 }
 
 uint32_t get_default_texture_index(BlockID blockid)
@@ -254,7 +254,7 @@ void update_fluid(block_t *block, vec3i pos)
                             surrounding->meta |= FLUID_UPDATE_REQUIRED_FLAG; // FLUID_UPDATE_REQUIRED_FLAG * (2 - (std::signbit(surrounding_offset.x) | std::signbit(surrounding_offset.z)));
                             surrounding->set_blockid(flowfluid(block_id));
                             set_fluid_level(surrounding, 0);
-                            update_light(lightupdate_t(pos + surrounding_offset, surrounding->get_blocklight(), surrounding->get_skylight()));
+                            update_light(pos + surrounding_offset);
                         }
                         break;
                     }
@@ -265,7 +265,7 @@ void update_fluid(block_t *block, vec3i pos)
                             surrounding->meta |= FLUID_UPDATE_REQUIRED_FLAG; // FLUID_UPDATE_REQUIRED_FLAG * (2 - (std::signbit(surrounding_offset.x) | std::signbit(surrounding_offset.z)));
                             surrounding->set_blockid(flowfluid(block_id));
                             set_fluid_level(surrounding, level + 1);
-                            update_light(lightupdate_t(pos + surrounding_offset, surrounding->get_blocklight(), surrounding->get_skylight()));
+                            update_light(pos + surrounding_offset);
                         }
                     }
                 }
@@ -276,7 +276,7 @@ void update_fluid(block_t *block, vec3i pos)
     if (block->get_blockid() != block_id)
     {
         changed = true;
-        update_light(lightupdate_t(pos, block->get_blocklight(), block->get_skylight()));
+        update_light(pos);
     }
     if (level != old_level && is_flowing_fluid(block->get_blockid()))
     {
@@ -307,7 +307,7 @@ void update_fluid(block_t *block, vec3i pos)
 
                 block_t *other = chunk->get_block(offset_pos.x, offset_pos.y, offset_pos.z);
                 if (other)
-                    update_light(lightupdate_t(offset_pos, other->get_blocklight(), other->get_skylight()));
+                    update_light(offset_pos);
             }
 }
 

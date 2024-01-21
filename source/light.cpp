@@ -9,14 +9,14 @@
 #include <sys/unistd.h>
 #include <gccore.h>
 #include <deque>
-#include <map>
+#include <algorithm>
 #include <list>
 #include <cstdio>
 lwp_t __light_engine_thread_handle = (lwp_t)NULL;
 mutex_t __light_update_mutex = (mutex_t)NULL;
 bool __light_engine_init_done = false;
 bool __light_engine_busy = false;
-std::list<lightupdate_t> pending_light_updates;
+std::list<vec3i> pending_light_updates;
 void __update_light(vec3i coords);
 void *__light_engine_init_internal(void *);
 
@@ -27,14 +27,6 @@ void light_lock()
 void light_unlock()
 {
     LWP_MutexUnlock(__light_update_mutex);
-}
-
-bool operator<(lightupdate_t const &posA, lightupdate_t const &posB)
-{
-    vec3i target(player_pos.x, player_pos.y, player_pos.z);
-    vec3i diffA = posA.pos - target;
-    vec3i diffB = posB.pos - target;
-    return (diffA.x * diffA.x + diffA.y * diffA.y + diffA.z * diffA.z) < (diffB.x * diffB.x + diffB.y * diffB.y + diffB.z * diffB.z);
 }
 
 void light_engine_init()
@@ -77,16 +69,13 @@ void light_engine_loop()
     {
         __light_engine_busy = true;
         light_lock();
-        lightupdate_t update = pending_light_updates.front();
+        vec3i pos = pending_light_updates.front();
         pending_light_updates.pop_front();
         light_unlock();
-        chunk_t *chunk = get_chunk_from_pos(update.pos.x, update.pos.z, false);
+        chunk_t *chunk = get_chunk_from_pos(pos.x, pos.z, false);
         if (chunk)
         {
-            block_t *block = chunk->get_block(update.pos.x, update.pos.y, update.pos.z);
-            block->set_blocklight(update.block);
-            block->set_skylight(update.sky);
-            __update_light(update.pos);
+            __update_light(pos);
             --chunk->light_updates;
         }
         if (++updates % 1000 == 0)
@@ -105,28 +94,27 @@ void light_engine_deinit()
     }
 }
 
-void update_light(lightupdate_t lu)
+void update_light(vec3i pos)
 {
-    if (lu.pos.y > 255 || lu.pos.y < 0)
+    if (pos.y > 255 || pos.y < 0)
         return;
-    chunk_t *chunk = get_chunk_from_pos(lu.pos.x, lu.pos.z, false, false);
+    chunk_t *chunk = get_chunk_from_pos(pos.x, pos.z, false, false);
     if (!chunk)
         return;
     light_lock();
-    for (lightupdate_t &update : pending_light_updates)
-    {
-        if (update.pos == lu.pos)
-        {
-            update.block = lu.block;
-            update.sky = lu.sky;
-            light_unlock();
-            return;
-        }
-    }
     ++chunk->light_updates;
-    pending_light_updates.push_back(lu);
+    pending_light_updates.push_back(pos);
     light_unlock();
 }
+
+/*
+ *  Copied from CavEX:
+ *  https://github.com/xtreme8000/CavEX/blob/master/source/lighting.c
+ */
+static inline int8_t MAX_I8(int8_t a, int8_t b) {
+	return a > b ? a : b;
+}
+
 /*
  *  This code is HEAVILY inspired by the CavEX source code by xtreme8000
  *  The code can be obtained from the following GitHub repository:
@@ -137,7 +125,6 @@ void update_light(lightupdate_t lu)
 
 void __update_light(vec3i coords)
 {
-    static std::map<vec3i, uint8_t> vbos_to_update;
     static std::deque<vec3i> light_updates;
 
     light_updates.push_back(coords);
@@ -161,48 +148,38 @@ void __update_light(vec3i coords)
 
         block_t *block = chunk->get_block(pos.x, pos.y, pos.z);
 
-        int new_skylight = 0;
-        int new_blocklight = get_block_luminance(block->get_blockid());
-        int old_light = block->light;
+        uint8_t new_skylight = 0;
+        uint8_t new_blocklight = get_block_luminance(block->get_blockid());
 
-        if (pos.y > chunk->height_map[map_index])
-            chunk->height_map[map_index] = skycast(pos.x, pos.z) + 1;
         if (pos.y >= chunk->height_map[map_index])
             new_skylight = 0xF;
 
         block_t *neighbors[6];
         get_neighbors(pos, neighbors);
-        int opacity = get_block_opacity(block->get_blockid());
+        int8_t opacity = get_block_opacity(block->get_blockid());
         if (opacity != 15)
         {
-            opacity = std::max(opacity, 1);
+            opacity = MAX_I8(opacity, 1);
             for (int i = 0; i < 6; i++)
             {
                 if (!neighbors[i])
                     continue;
-                new_skylight = std::max(std::max(int(neighbors[i]->get_skylight()) - opacity, 0), new_skylight);
-                new_blocklight = std::max(std::max(int(neighbors[i]->get_blocklight()) - opacity, 0), new_blocklight);
+                new_skylight = MAX_I8(MAX_I8(neighbors[i]->sky_light - opacity, 0), new_skylight);
+                new_blocklight = MAX_I8(MAX_I8(neighbors[i]->block_light - opacity, 0), new_blocklight);
             }
         }
 
-        int new_light = (new_skylight << 4) | new_blocklight;
+        uint8_t new_light = (new_skylight << 4) | new_blocklight;
 
-        if (old_light != new_light || coords == pos)
+        if (block->light != new_light || coords == pos)
         {
-            block->light = uint8_t(new_light & 0xFF);
+            block->light = new_light;
             for (int i = 0; i < 6; i++)
             {
                 if (neighbors[i])
                     light_updates.push_back(pos + face_offsets[i]);
             }
-            vbos_to_update[vec3i(chunk->x, pos.y / 16, chunk->z)] = 1;
+            chunk->vbos[(pos.y >> 4) & 15].dirty = true;
         }
     }
-    for (auto &vbo : vbos_to_update)
-    {
-        chunk_t *chunk = get_chunk(vbo.first.x, vbo.first.z, false);
-        if (chunk)
-            chunk->vbos[vbo.first.y].dirty = true;
-    }
-    vbos_to_update.clear();
 }

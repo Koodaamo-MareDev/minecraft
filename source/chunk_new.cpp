@@ -7,6 +7,7 @@
 #include "timers.hpp"
 #include "light.hpp"
 #include "fastnoise/fastnoiselite.h"
+#include "improvednoise/improvednoise.hpp"
 #include "base3d.hpp"
 #include "render.hpp"
 #include "raycast.hpp"
@@ -36,6 +37,7 @@ extern guVector player_pos;
 int heightmap_seed = 0, cavegen_seed = 0;
 FastNoiseLite noise;
 FastNoiseLite cave_noise;
+ImprovedNoise improved_noise;
 mutex_t __chunks_mutex;
 lwp_t __chunk_generator_thread_handle = (lwp_t)NULL;
 bool __chunk_generator_init_done = false;
@@ -72,6 +74,7 @@ chunk_t *get_chunk_from_pos(int x, int z, bool load, bool write_cache)
 std::map<lwp_t, chunk_t *> chunk_cache;
 chunk_t *get_chunk(int chunkX, int chunkZ, bool load, bool write_cache)
 {
+    /*
     lwp_t active_thread = LWP_GetSelf();
     if (chunk_cache.find(active_thread) != chunk_cache.end())
     {
@@ -79,11 +82,12 @@ chunk_t *get_chunk(int chunkX, int chunkZ, bool load, bool write_cache)
         if (cached_chunk && cached_chunk->x == chunkX && cached_chunk->z == chunkZ)
             return cached_chunk;
     }
+    */
     chunk_t *retval = nullptr;
     // Chunk lookup based on x and z position
     for (chunk_t *&chunk : chunks)
     {
-        if (chunk && chunk->valid)
+        if (chunk)
             if (chunk->x == chunkX && chunk->z == chunkZ)
             {
                 retval = chunk;
@@ -95,8 +99,8 @@ chunk_t *get_chunk(int chunkX, int chunkZ, bool load, bool write_cache)
         if (chunks.size() < CHUNK_COUNT)
             add_chunk(chunkX, chunkZ);
     }
-    if (write_cache && retval)
-        chunk_cache[active_thread] = retval;
+    // if (write_cache && retval)
+    //     chunk_cache[active_thread] = retval;
     return retval;
 }
 
@@ -133,9 +137,115 @@ void add_chunk(int chunk_x, int chunk_z)
     unlock_chunks();
 }
 
-bool in_range(int x, int min, int max)
+inline bool in_range(int x, int min, int max)
 {
     return std::clamp(x, min, max) == x;
+}
+
+int fastrand_a = 1;
+/* The state must be initialized to non-zero */
+uint32_t fastrand()
+{
+    /* Algorithm "xor" from p. 4 of Marsaglia, "Xorshift RNGs" */
+    uint32_t x = fastrand_a;
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    return fastrand_a = x;
+}
+
+/* The state must be initialized to non-zero */
+void treerand(int x, int z, uint32_t *output, uint32_t count)
+{
+    float v = z + 0.19f;
+    v += float(x) * 327.67f;
+
+    float *v_ptr = &v;
+    uint32_t a = *((uint32_t *)v_ptr);
+    /* Algorithm "xor" from p. 4 of Marsaglia, "Xorshift RNGs" */
+    while (count-- > 0)
+    {
+        a ^= a << 13;
+        a ^= a >> 17;
+        a ^= a << 5;
+        *(output++) = a;
+    }
+}
+
+void set_block_within_chunk(vec3i position, chunk_t *chunk, BlockID id, bool air_check = false)
+{
+    chunk_t *test_chunk = get_chunk_from_pos(position.x, position.z, false, false);
+    if (test_chunk && chunk->x == test_chunk->x && chunk->z == test_chunk->z)
+    {
+        block_t *block = chunk->get_block(position.x, position.y, position.z);
+        if (air_check && block->get_blockid() != BlockID::air)
+            return;
+        block->set_blockid(id);
+    }
+}
+
+void plant_tree(vec3i position, chunk_t *chunk, int height)
+{
+    if (chunk->get_block(position.x, position.y - 1, position.z)->get_blockid() != BlockID::grass)
+        return;
+    for (int x = -2; x <= 2; x++)
+    {
+        for (int y = height - 3; y < height - 1; y++)
+            for (int z = -2; z <= 2; z++)
+            {
+                vec3i leaves_pos = position + vec3i(x, y, z);
+                set_block_within_chunk(leaves_pos, chunk, BlockID::leaves, true);
+            }
+    }
+    for (int x = -1; x <= 1; x++)
+    {
+        for (int y = height - 1; y <= height; y++)
+        {
+            for (int z = -1; z <= 1; z++)
+            {
+                vec3i leaves_off = vec3i(x, y, z);
+                if (y == height && std::abs(x) == std::abs(z))
+                    continue;
+                set_block_within_chunk(position + leaves_off, chunk, BlockID::leaves, true);
+            }
+        }
+    }
+    for (int y = 0; y < height; y++)
+    {
+        vec3i leaves_pos = position + vec3i(0, y, 0);
+        set_block_within_chunk(leaves_pos, chunk, BlockID::wood, false);
+    }
+}
+
+void generate_trees(chunk_t *chunk)
+{
+    const static uint32_t tree_count = 16;
+    const static int tree_noise_offset = 16384;
+    uint32_t tree_positions[tree_count];
+    for (int x = chunk->x - 1; x <= chunk->x + 1; x++)
+    {
+        for (int z = chunk->z - 1; z <= chunk->z + 1; z++)
+        {
+            chunk_t *current_chunk = get_chunk(x, z, false, false);
+            if (current_chunk)
+            {
+                treerand(current_chunk->x, current_chunk->z, tree_positions, tree_count);
+                for (uint32_t c = 0; c < tree_count; c++)
+                {
+                    uint32_t tree_value = tree_positions[c];
+                    vec3i tree_pos((tree_value & 15) + (current_chunk->x * 16), 0, ((tree_value >> 4) & 15) + (current_chunk->z * 16));
+                    int tree_altitude = uint8_t(noise.GetNoise(float(tree_pos.x), float(tree_pos.z)) * 16.0f) + 65;
+                    tree_pos.y = tree_altitude;
+                    bool plant = (tree_altitude >= 64) && noise.GetNoise(float(tree_pos.x + tree_noise_offset), float(tree_pos.z)) > 0.0f;
+                    if (plant)
+                    {
+                        int tree_height = (tree_value >> 28) & 3;
+                        plant_tree(tree_pos, chunk, 3 + tree_height);
+                    }
+                }
+            }
+        }
+    }
 }
 
 void generate_chunk()
@@ -155,20 +265,38 @@ void generate_chunk()
         return;
     int x_offset = (chunk->x * 16);
     int z_offset = (chunk->z * 16);
-    for (int x = 0, index = 0; x < 16; x++)
-        for (int z = 0; z < 16; z++)
-            height_map[index++] = std::clamp(uint32_t(64 + noise.GetNoise(double(x + x_offset), double(z + z_offset)) * 16), 0U, 255U);
-    uint8_t max_height = *height_map;
-    for (int i = 1; i < 256; i++)
-    {
-        max_height = std::max(height_map[i], max_height);
-    }
-    for (int x = 0, index = 0; x < 16; x++)
-    {
-        for (int z = 0; z < 16; z++)
-        {
-            int value = height_map[index++];
+    int index = 0;
 
+    for (int z = 0; z < 16; z++)
+        for (int x = 0; x < 16; x++)
+            height_map[index++] = uint8_t(noise.GetNoise(float(x + x_offset), float(z + z_offset)) * 16.0f) + 64;
+
+    // static vec3i noise_size = vec3i(16, 1, 16);
+    // vec3f noise_pos = vec3f(x_offset, 0.25f, z_offset);
+    // improved_noise.noise_set(noise_pos, noise_size, 64.0f, 32.0f, height_map);
+    index = 0;
+    for (int z = 0; z < 16; z++)
+    {
+        for (int x = 0; x < 16; x++)
+        {
+            uint8_t value = height_map[index++];
+            /*int y = 1;
+            block_t *y0_block = chunk->get_block(x, 0, z);
+            size_t y_diff = (chunk->get_block(x, 1, z) - y0_block);
+            block_t *block = y0_block;
+            (block += y_diff)->set_blockid(BlockID::bedrock);
+            while (y++ <= 4)
+                (block += y_diff)->id = uint8_t((fastrand() & 1) ? BlockID::bedrock : BlockID::stone);
+            while (y++ <= value - 3)
+                (block += y_diff)->id = uint8_t(BlockID::stone);
+            while (y++ <= value)
+                (block += y_diff)->id = uint8_t(BlockID::dirt);
+            while (y++ <= 63)
+                (block += y_diff)->id = uint8_t(BlockID::water);
+            if (value >= 62)
+                chunk->get_block(x, value - 1, z)->id = uint8_t(BlockID::grass);
+            while ((block -= y_diff) > y0_block)
+                block->visibility_flags = 64;*/
             for (int y = 0; y < 256; y++)
             {
                 BlockID id = BlockID::air;
@@ -186,36 +314,35 @@ void generate_chunk()
                     id = BlockID::stone;
                 // Randomize bedrock
                 else if (in_range(y, 1, 4))
-                    id = (rand() & 1) ? BlockID::bedrock : BlockID::stone;
+                    id = (fastrand() & 1) ? BlockID::bedrock : BlockID::stone;
                 // Bottom layer is bedrock
                 else if (!y)
                     id = BlockID::bedrock;
                 block_t *block = chunk->get_block(x, y, z);
-                block->light = 0;
                 block->set_blockid(id);
             }
         }
     }
     // Carve caves
-    for (int x = 0, index = 0; x < 16; x++)
-        for (int z = 0; z < 16; z++)
+    index = 0;
+    for (int z = 0; z < 16; z++)
+        for (int x = 0; x < 16; x++)
         {
             uint8_t height = height_map[index++];
             for (int y = height; y >= 5; y--)
             {
-                float noise_value = (cave_noise.GetNoise(double(x + x_offset), double(y), double(z + z_offset)));
+                float noise_value = (cave_noise.GetNoise(float(x + x_offset), float(y), float(z + z_offset)));
                 if (noise_value < -.5f && (height > 63 || abs(height - y) > 2))
                     chunk->get_block(x, y, z)->set_blockid(BlockID::air);
+                threadqueue_yield();
             }
-            threadqueue_yield();
         }
-
+    generate_trees(chunk);
     if (!__chunk_generator_init_done)
     {
         delete chunk;
         return;
     }
-
     chunk->valid = true;
     lock_chunks();
     chunks.push_back(chunk);
@@ -272,13 +399,15 @@ void *__chunk_generator_init_internal(void *)
 {
     noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
     noise.SetFrequency(1 / 64.0f);
-    noise.SetSeed(heightmap_seed = rand());
+    noise.SetSeed(heightmap_seed = fastrand());
     noise.SetFractalType(FastNoiseLite::FractalType_FBm);
+    noise.SetFractalOctaves(2);
 
     cave_noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2S);
-    cave_noise.SetFrequency(1 / 32.0f);
-    cave_noise.SetSeed(cavegen_seed = rand());
-    cave_noise.SetFractalType(FastNoiseLite::FractalType_FBm);
+    cave_noise.SetFrequency(1 / 12.0f);
+    cave_noise.SetSeed(cavegen_seed = fastrand());
+    cave_noise.SetFractalType(FastNoiseLite::FractalType_None);
+    cave_noise.SetFractalOctaves(1);
     while (__chunk_generator_init_done)
     {
         generate_chunk();
@@ -308,16 +437,34 @@ block_t *get_block_at(vec3i position)
     return &chunk->blockstates[position.x | (position.y << 4) | (position.z << 12)];
 }
 
-block_t *chunk_t::get_block(int x, int y, int z)
-{
-    return &this->blockstates[(x & 0xF) | ((y & 0xFF) << 4) | ((z & 0xF) << 12)];
-}
-
 void chunk_t::recalculate()
 {
     for (int i = 0; i < VERTICAL_SECTION_COUNT; i++)
     {
         this->recalculate_section(i);
+    }
+}
+
+void chunk_t::update_height_map(vec3i pos)
+{
+    pos.x &= 15;
+    pos.z &= 15;
+    uint8_t *height = height_map + ((pos.x << 4) + pos.z);
+    BlockID id = get_block(pos.x, pos.y, pos.z)->get_blockid();
+    if (get_block_opacity(id))
+    {
+        if (pos.y >= *height)
+            *height = pos.y + 1;
+    }
+    else
+    {
+        while (*height > 0)
+        {
+            id = get_block(pos.x, *height - 1, pos.z)->get_blockid();
+            if (get_block_opacity(id))
+                break;
+            (*height)--;
+        }
     }
 }
 
@@ -331,8 +478,8 @@ void update_block_at(vec3i pos)
     block_t *block = chunk->get_block(pos.x, pos.y, pos.z);
     if (!block)
         return;
-    bool transparent = !get_block_opacity(block->get_blockid());
-    update_light(lightupdate_t(pos, 15 * (block->get_blockid() == BlockID::glowstone), 15 * transparent * (pos.y > chunk->height_map[(pos.x & 15) * 16 + (pos.z & 15)])));
+    chunk->update_height_map(pos);
+    update_light(pos);
 }
 
 void chunk_t::light_up()
@@ -350,8 +497,8 @@ void chunk_t::light_up()
                     return;
                 this->height_map[(x << 4) | z] = end_y + 1;
                 for (int y = 255; y > end_y; y--)
-                    this->get_block(x, y, z)->set_skylight(15);
-                update_light(lightupdate_t(vec3i(chunkX + x, end_y, chunkZ + z), this->get_block(x, end_y, z)->get_blocklight(), 14));
+                    this->get_block(x, y, z)->sky_light = 15;
+                update_light(vec3i(chunkX + x, end_y, chunkZ + z));
             }
         }
         lit_state = 1;

@@ -2,16 +2,16 @@
 #define _BLOCKS_HPP_
 
 #include <cstddef>
-#include "block.hpp"
 #include "block_id.hpp"
 #include "vec3i.hpp"
 
 #define FLUID_UPDATE_REQUIRED_FLAG 0x10
 #define FLOAT_TO_FLUIDMETA(A) (int(roundf((A)*8)))
+class block_t;
 
-int get_block_opacity(BlockID blockid);
+int8_t get_block_opacity(BlockID blockid);
 
-bool is_face_transparent(int texture_index);
+bool is_face_transparent(uint8_t texture_index);
 
 uint8_t get_block_luminance(BlockID block_id);
 

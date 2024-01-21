@@ -30,6 +30,8 @@
 #include "light.hpp"
 #include "texanim.hpp"
 #include "base3d.hpp"
+#include "render.hpp"
+
 #define DEFAULT_FIFO_SIZE (1024 * 1024)
 #define CLASSIC_CONTROLLER_THRESHOLD 4
 #define MAX_PARTICLES 100
@@ -50,6 +52,10 @@ static GXRModeObj *rmode = NULL;
 void *outline = nullptr;
 u32 outline_len = 0;
 
+bool draw_block_outline = false;
+vec3i raycast_block;
+vec3i raycast_block_face;
+
 int dropFrames = 0;
 
 int frameCounter = 0;
@@ -66,13 +72,11 @@ bool destroy_block = false;
 bool place_block = false;
 
 void UpdateLightDir();
-bool DrawScene(Mtx view, bool transparency);
+void DrawScene(Mtx view, Frustum &frustum, std::deque<chunk_t *> &chunks, bool transparency);
+void UpdateScene(std::deque<chunk_t *> &chunks);
 void PrepareTEV();
 void PrepareTexture(GXTexObj texture);
 void GetInput();
-guVector cam = {0.0F, 0.0F, 0.0F},
-         up = {0.0F, 1.0F, 0.0F},
-         look = {0.0F, 0.0F, -1.0F};
 //---------------------------------------------------------------------------------
 bool isExiting = false;
 s8 HWButton = -1;
@@ -308,7 +312,7 @@ int main(int argc, char **argv)
     // set number of rasterized color channels
     GX_SetNumChans(1);
     GX_SetChanCtrl(GX_COLOR0, GX_ENABLE, GX_SRC_REG, GX_SRC_VTX, GX_LIGHT0 | GX_LIGHT1 | GX_LIGHT2, GX_DF_CLAMP, GX_AF_SPOT);
-    GX_SetChanAmbColor(GX_COLOR0, GXColor{127, 127, 127, 255});
+    GX_SetChanAmbColor(GX_COLOR0, GXColor{160, 160, 160, 255});
     GX_SetChanMatColor(GX_COLOR0, GXColor{255, 255, 255, 255});
     //  set number of textures to generate
     GX_SetNumTexGens(1);
@@ -345,14 +349,28 @@ int main(int argc, char **argv)
 
     // setup our camera at the origin
     // looking down the -z axis with y up
+    guVector cam = {0.0F, 0.0F, 0.0F},
+             up = {0.0F, 1.0F, 0.0F},
+             look = {0.0F, 0.0F, -1.0F};
     guLookAt(view, &cam, &up, &look);
     // setup our projection matrix
     // this creates a perspective matrix with a view angle of 90,
     // and aspect ratio based on the display resolution
     f32 w = rmode->viWidth;
     f32 h = rmode->viHeight;
-    guPerspective(perspective, 90, (f32)w / h, 0.1F, 300.0F);
+    f32 FOV = 90;
+    guPerspective(perspective, FOV, (f32)w / h, 0.1F, 300.0F);
     GX_LoadProjectionMtx(perspective, GX_PERSPECTIVE);
+
+    Camera camera = {
+        {0.0f, 0.0f, 0.0f},           // Camera position
+        {0.0f, 0.0f, -1.0f},          // Camera forward vector
+        FOV,                          // Field of view
+        w / h,                        // Aspect ratio
+        0.1f,                         // Near clipping plane
+        (RENDER_DISTANCE + 1) * 16.0f // Far clipping plane
+    };
+
     light_engine_init();
     printf("Initialized basics.\n");
     VIDEO_Flush();
@@ -375,6 +393,7 @@ int main(int argc, char **argv)
     main_thread = LWP_GetSelf();
     GX_SetArray(GX_VA_NRM, face_normals, sizeof(int8_t));
     PrepareTEV();
+    std::deque<chunk_t *> &chunks = get_chunks();
     while (!isExiting)
     {
         u64 frame_start = time_get();
@@ -390,11 +409,10 @@ int main(int argc, char **argv)
         background.g = u8(current_lerpvalue * target_background.g);
         background.b = u8(current_lerpvalue * target_background.b);
         GX_SetCopyClear(background, 0x00FFFFFF);
-        GX_SetFog(GX_FOG_PERSP_EXP2, RENDER_DISTANCE * 0.67f * 16 - 16, RENDER_DISTANCE * 0.67f * 16 - 8, 0.1F, 300.0F, background);
+        GX_SetFog(GX_FOG_PERSP_LIN, RENDER_DISTANCE * 0.67f * 16 - 16, RENDER_DISTANCE * 0.67f * 16 - 8, 0.1F, 300.0F, background);
         if (player_pos.y < -999)
             player_pos.y = skycast(player_pos.x, player_pos.z) + 2;
         UpdateLightDir();
-        // GX_InvVtxCache();
         if (fb)
         {
             water_still_anim.update();
@@ -404,36 +422,40 @@ int main(int argc, char **argv)
             GX_LoadTexObj(&white_texture, GX_TEXMAP1);
         }
         GetInput();
-        // u64 frame_start = time_get();
+
+        guVector forward = AnglesToVector(xrot, yrot, -1);
+
+        camera.position[0] = player_pos.x;
+        camera.position[1] = player_pos.y;
+        camera.position[2] = player_pos.z;
+
+        camera.forward[0] = forward.x;
+        camera.forward[1] = forward.y;
+        camera.forward[2] = forward.z;
+
+        // Construct the view frustum matrix from the camera
+        Frustum frustum = CalculateFrustum(camera);
+
+        UpdateScene(chunks);
 
         // Draw opaque buffer
         GX_SetZMode(GX_TRUE, GX_LESS, GX_TRUE);
         GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_NOOP);
         GX_SetAlphaUpdate(GX_TRUE);
-        // GX_SetAlphaCompare(GX_EQUAL, 255, GX_AOP_AND, GX_ALWAYS, 0);
         GX_SetAlphaCompare(GX_ALWAYS, 0, GX_AOP_OR, GX_ALWAYS, 0);
         GX_SetColorUpdate(GX_TRUE);
-        DrawScene(view, false);
+        DrawScene(view, frustum, chunks, false);
         // Draw transparent buffer
         GX_SetZMode(GX_TRUE, GX_LESS, GX_TRUE);
         GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_NOOP);
         GX_SetAlphaUpdate(GX_FALSE);
-        // GX_SetAlphaCompare(GX_LESS, 255, GX_AOP_AND, GX_ALWAYS, 0); // 1st param: GX_LESS
         GX_SetAlphaCompare(GX_GEQUAL, 16, GX_AOP_AND, GX_ALWAYS, 0);
         GX_SetColorUpdate(GX_TRUE);
-        DrawScene(view, true);
+        DrawScene(view, frustum, chunks, true);
         GX_DrawDone();
-        // bool frame_skip = time_diff_ms(frame_start, time_get()) > 20;
-        // if (frame_skip)
-        //     GX_AbortFrame();
-        // else
         GX_CopyDisp(frameBuffer[fb], GX_TRUE);
-        // AlphaBlend((unsigned char *)frameBuffer, (unsigned char *)(dstBuffer[fb]), rmode->fbWidth, xfbHeight, rmode->fbWidth);
-        //  Update framebuffer
-        //  VIDEO_SetNextFramebuffer(dstBuffer[fb]);
         VIDEO_SetNextFramebuffer(frameBuffer[fb]);
         VIDEO_Flush();
-        threadqueue_broadcast();
         VIDEO_WaitVSync();
         frameCounter++;
         deltaTime = time_diff_s(frame_start, time_get());
@@ -441,7 +463,6 @@ int main(int argc, char **argv)
         if (partialTicks >= 1.0f)
             tickCounter += int(partialTicks);
         partialTicks -= int(partialTicks);
-        //  if (!frame_skip)
         fb ^= 1;
     }
     printf("De-initializing light engine...\n");
@@ -534,57 +555,6 @@ void GetInput()
     if (xrot < -90.f)
         xrot = -90.f;
 }
-guVector RotateVector(guVector vec, float x, float y, float z)
-{
-    x = DegToRad(x);
-    y = DegToRad(y);
-    z = DegToRad(z);
-    float cosa = cos(x);
-    float sina = sin(x);
-
-    float cosb = cos(y);
-    float sinb = sin(y);
-
-    float cosc = cos(z);
-    float sinc = sin(z);
-
-    float Axx = cosa * cosb;
-    float Axy = cosa * sinb * sinc - sina * cosc;
-    float Axz = cosa * sinb * cosc + sina * sinc;
-
-    float Ayx = sina * cosb;
-    float Ayy = sina * sinb * sinc + cosa * cosc;
-    float Ayz = sina * sinb * cosc - cosa * sinc;
-
-    float Azx = -sinb;
-    float Azy = cosb * sinc;
-    float Azz = cosb * cosc;
-    float px = vec.x;
-    float py = vec.y;
-    float pz = vec.z;
-
-    vec.x = Axx * px + Axy * py + Axz * pz;
-    vec.y = Ayx * px + Ayy * py + Ayz * pz;
-    vec.z = Azx * px + Azy * py + Azz * pz;
-    return vec;
-}
-
-guVector RotateVectorAround(guVector vec, float x, float y, float z, guVector around = guVector())
-{
-    guVector toRotate;
-    guVecSub(&vec, &around, &toRotate);
-    toRotate = RotateVector(toRotate, x, y, z);
-    guVecAdd(&toRotate, &around, &toRotate);
-    return toRotate;
-}
-
-guVector AnglesToVector(float x, float y, float distance, guVector vec = guVector())
-{
-    vec.x += cos(DegToRad(x)) * sin(DegToRad(y)) * distance;
-    vec.y += -sin(DegToRad(x)) * distance;
-    vec.z += cos(DegToRad(x)) * cos(DegToRad(y)) * distance;
-    return vec;
-}
 
 void GetLookMtx(Mtx &mtx)
 {
@@ -607,7 +577,7 @@ void GetLookMtx(Mtx &mtx)
 void UpdateLightDir()
 {
     GXLightObj lights[3];
-    guVector dir{0.25, 0, .75};
+    guVector dir{.25, 0., .75};
     guVecNormalize(&dir);
 
     guVector look_dir = dir;
@@ -622,13 +592,12 @@ void UpdateLightDir()
         }
         else if (i == 2)
         {
-            look_dir.x = -dir.z / 2;
-            look_dir.y = 0;
-            look_dir.z = -dir.x;
+            look_dir.x = -dir.x;
+            look_dir.z = -dir.z;
         }
         else
             look_dir = dir;
-        uint8_t intensity = uint8_t(255 - (i << 6));
+        uint8_t intensity = uint8_t(255 - (i * 32));
         GX_InitLightPos(&lights[i], look_dir.x * -1024, look_dir.y * -1024, look_dir.z * -1024);
         GX_InitLightColor(&lights[i], GXColor{intensity, intensity, intensity, 255});
         GX_InitLightAttnA(&lights[i], 1, 1, 1);
@@ -724,32 +693,80 @@ inline void RecalcSectionWater(chunk_t *chunk, int section)
         positions.clear();
     }
 }
-bool DrawScene(Mtx view, bool transparency)
-{
-    // if (transparency)
-    //     print_chunk_status();
-    guVector chunkPos;
-    guVector relative = guVector();
-    relative.x = 0;
-    relative.y = 0;
-    relative.z = 0;
-    relative = AnglesToVector(xrot, yrot, -1);
-    std::deque<chunk_t *> &chunks = get_chunks();
 
-    vec3i rc_block;
-    vec3i rc_block_face;
-    bool draw_block_outline = false;
-    bool facing_block = false;
-    if (raycast(vec3d{player_pos.x - .5, player_pos.y - .5, player_pos.z - .5}, vec3d{relative.x, relative.y, relative.z}, 4, &rc_block, &rc_block_face))
+void GenerateAdditionalChunks(std::deque<chunk_t *> &chunks)
+{
+    for (int x = player_pos.x - GENERATION_DISTANCE; x < player_pos.x + GENERATION_DISTANCE; x += 8)
     {
-        draw_block_outline = facing_block = true;
+        if (chunks.size() >= CHUNK_COUNT || has_pending_chunks())
+            break;
+        int distance = std::abs(x - int(player_pos.x));
+        if (distance > GENERATION_DISTANCE)
+            break;
+        for (int z = player_pos.z - GENERATION_DISTANCE; z < player_pos.z + GENERATION_DISTANCE; z += 8)
+        {
+            if (chunks.size() >= CHUNK_COUNT || has_pending_chunks())
+                break;
+            distance = std::abs(z - int(player_pos.z));
+            if (distance > GENERATION_DISTANCE)
+                break;
+            chunk_t *chunk = get_chunk_from_pos(x, z, true, false);
+            if (!chunk)
+            {
+                threadqueue_broadcast();
+            }
+        }
     }
-    if (facing_block)
+}
+
+void RemoveRedundantChunks(std::deque<chunk_t *> &chunks)
+{
+    lock_chunks();
+    chunks.erase(
+        std::remove_if(chunks.begin(), chunks.end(),
+                       [](chunk_t *&c)
+                       {if(!c) return true; if(!c->valid) {delete c; c = nullptr; return true;} return false; }),
+        chunks.end());
+    unlock_chunks();
+}
+
+void PrepareChunkRemoval(chunk_t *chunk)
+{
+    chunk->valid = false;
+    for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
+    {
+        chunkvbo_t &vbo = chunk->vbos[j];
+        vbo.visible = false;
+        vbo.solid_buffer = nullptr;
+        vbo.solid_buffer_length = 0;
+        vbo.transparent_buffer = nullptr;
+        vbo.transparent_buffer_length = 0;
+        if (vbo.cached_solid_buffer && vbo.cached_solid_buffer_length)
+        {
+            free(vbo.cached_solid_buffer);
+            vbo.cached_solid_buffer = nullptr;
+            vbo.cached_solid_buffer_length = 0;
+        }
+        if (vbo.cached_transparent_buffer && vbo.cached_transparent_buffer_length)
+        {
+            free(vbo.cached_transparent_buffer);
+            vbo.cached_transparent_buffer = nullptr;
+            vbo.cached_transparent_buffer_length = 0;
+        }
+    }
+}
+
+void EditBlocks()
+{
+    guVector forward = AnglesToVector(xrot, yrot, -1);
+
+    draw_block_outline = raycast(vec3d{player_pos.x - .5, player_pos.y - .5, player_pos.z - .5}, vec3d{forward.x, forward.y, forward.z}, 4, &raycast_block, &raycast_block_face);
+    if (draw_block_outline)
     {
         BlockID target_blockid = destroy_block ? BlockID::air : BlockID::glowstone;
         if (destroy_block || place_block)
         {
-            vec3i editable_pos = destroy_block ? (rc_block) : (rc_block + rc_block_face);
+            vec3i editable_pos = destroy_block ? (raycast_block) : (raycast_block + raycast_block_face);
             block_t *editable_block = get_block_at(editable_pos);
             if (place_block)
                 update_block_at(editable_pos);
@@ -759,7 +776,7 @@ bool DrawScene(Mtx view, bool transparency)
             {
                 editable_block->set_blockid(target_blockid);
                 editable_block->meta = 0;
-                update_block_at(rc_block);
+                update_block_at(raycast_block);
                 block_t *neighbors[6];
                 get_neighbors(editable_pos, neighbors);
                 for (int i = 0; i < 6; i++)
@@ -770,8 +787,15 @@ bool DrawScene(Mtx view, bool transparency)
             }
         }
     }
+
+    // Clear the place/destroy block flags to prevent placing blocks immediately.
     place_block = false;
     destroy_block = false;
+}
+
+void UpdateChunkData(std::deque<chunk_t *> &chunks)
+{
+    int light_up_calls = 0;
     for (chunk_t *&chunk : chunks)
     {
         if (chunk && chunk->valid)
@@ -779,43 +803,30 @@ bool DrawScene(Mtx view, bool transparency)
             float distance = std::max(std::abs((chunk->x * 16) - player_pos.x), std::abs((chunk->z * 16) - player_pos.z));
             if (distance > RENDER_DISTANCE * 16)
             {
-                chunk->valid = false;
-                for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
-                {
-                    chunkvbo_t &vbo = chunk->vbos[j];
-                    // Free vbo if the section is out of range.
-                    vbo.visible = false;
-                    vbo.solid_buffer = nullptr;
-                    vbo.solid_buffer_length = 0;
-                    vbo.transparent_buffer = nullptr;
-                    vbo.transparent_buffer_length = 0;
-                    if (vbo.cached_solid_buffer && vbo.cached_solid_buffer_length)
-                    {
-                        free(vbo.cached_solid_buffer);
-                        vbo.cached_solid_buffer = nullptr;
-                        vbo.cached_solid_buffer_length = 0;
-                    }
-                    if (vbo.cached_transparent_buffer && vbo.cached_transparent_buffer_length)
-                    {
-                        free(vbo.cached_transparent_buffer);
-                        vbo.cached_transparent_buffer = nullptr;
-                        vbo.cached_transparent_buffer_length = 0;
-                    }
-                }
+                PrepareChunkRemoval(chunk);
                 continue;
             }
+
+            // Tick chunks
             for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
             {
                 chunkvbo_t &vbo = chunk->vbos[j];
-                chunkPos.y = (j * 16);
-                distance = std::abs(chunkPos.y - player_pos.y);
+                distance = std::abs((j * 16) - player_pos.y);
                 vbo.visible = (distance <= RENDER_DISTANCE * 16);
-                if (transparency && vbo.visible && tickCounter % 4 == 0)
+                if (distance <= SIMULATION_DISTANCE * 16 && tickCounter % 4 == 0)
                     RecalcSectionWater(chunk, j);
             }
-            chunk->light_up();
+            if (!chunk->lit_state && light_up_calls < 1)
+            {
+                light_up_calls++;
+                chunk->light_up();
+            }
         }
     }
+}
+
+void UpdateChunkVBOs(std::deque<chunk_t *> &chunks)
+{
     int chunk_update_count = 0;
     for (chunk_t *&chunk : chunks)
     {
@@ -857,34 +868,75 @@ bool DrawScene(Mtx view, bool transparency)
                 }
             }
             chunk_update_count += chunk_updated;
-            chunk->lit_state = 2;
+            if (chunk->lit_state)
+                chunk->lit_state = 2;
         }
     }
-    GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
+}
+
+void UpdateScene(std::deque<chunk_t *> &chunks)
+{
+    if (!light_engine_busy())
+        GenerateAdditionalChunks(chunks);
+    RemoveRedundantChunks(chunks);
+    EditBlocks();
+    UpdateChunkData(chunks);
+    UpdateChunkVBOs(chunks);
+
+    // Calculate chunk memory usage
     total_chunks_size = 0;
     for (chunk_t *&chunk : chunks)
     {
         total_chunks_size += chunk ? chunk->size() : 0;
-        if (chunk && chunk->valid && chunk->lit_state == 2)
+    }
+}
+
+void DrawScene(Mtx view, Frustum &frustum, std::deque<chunk_t *> &chunks, bool transparency)
+{
+    // Enable indexed colors
+    GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
+
+    // Draw the solid pass
+    if (!transparency)
+    {
+        for (chunk_t *&chunk : chunks)
         {
-            for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
+            if (chunk && chunk->valid && chunk->lit_state == 2)
             {
-                chunkvbo_t &vbo = chunk->vbos[j];
-                if (!vbo.visible)
-                    continue;
-                chunkPos.x = (chunk->x * 16);
-                chunkPos.y = (j * 16);
-                chunkPos.z = (chunk->z * 16);
-                if (!transparency)
+                for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
                 {
-                    if (vbo.cached_solid_buffer && vbo.cached_solid_buffer_length)
+                    chunkvbo_t &vbo = chunk->vbos[j];
+                    if (!vbo.visible)
+                        continue;
+
+                    guVector chunkPos = {(f32)chunk->x * 16, (f32)j * 16, (f32)chunk->z * 16};
+                    vec3f chunkCenter(chunkPos.x + 8, chunkPos.y + 8, chunkPos.z + 8);
+
+                    if (DistanceToFrustum(chunkCenter, frustum) < 14 && vbo.cached_solid_buffer && vbo.cached_solid_buffer_length)
                     {
                         Render(view, chunkPos, vbo.cached_solid_buffer, vbo.cached_solid_buffer_length);
                     }
                 }
-                else
+            }
+        }
+    }
+    // Draw the transparent pass
+    else
+    {
+        for (chunk_t *&chunk : chunks)
+        {
+            if (chunk && chunk->valid && chunk->lit_state == 2)
+            {
+                for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
                 {
-                    if (vbo.cached_transparent_buffer && vbo.cached_transparent_buffer_length)
+                    chunkvbo_t &vbo = chunk->vbos[j];
+                    if (!vbo.visible)
+                        continue;
+
+                    guVector chunkPos = {(f32)chunk->x * 16, (f32)j * 16, (f32)chunk->z * 16};
+                    vec3f chunkCenter(chunkPos.x + 8, chunkPos.y + 8, chunkPos.z + 8);
+
+                    if (DistanceToFrustum(chunkCenter, frustum) < 14 && vbo.cached_transparent_buffer && vbo.cached_transparent_buffer_length)
                     {
                         Render(view, chunkPos, vbo.cached_transparent_buffer, vbo.cached_transparent_buffer_length);
                     }
@@ -892,56 +944,32 @@ bool DrawScene(Mtx view, bool transparency)
             }
         }
     }
-    if (!transparency)
-    {
-        if (!light_engine_busy())
-            for (int x = player_pos.x - GENERATION_DISTANCE; x < player_pos.x + GENERATION_DISTANCE; x += 8)
-            {
-                if (chunks.size() >= CHUNK_COUNT || has_pending_chunks())
-                    break;
-                int distance = std::abs(x - int(player_pos.x));
-                if (distance > GENERATION_DISTANCE)
-                    break;
-                for (int z = player_pos.z - GENERATION_DISTANCE; z < player_pos.z + GENERATION_DISTANCE; z += 8)
-                {
-                    if (chunks.size() >= CHUNK_COUNT || has_pending_chunks())
-                        break;
-                    distance = std::abs(z - int(player_pos.z));
-                    if (distance > GENERATION_DISTANCE)
-                        break;
-                    get_chunk_from_pos(x, z, true, false);
-                    threadqueue_broadcast();
-                }
-            }
-        lock_chunks();
-        chunks.erase(
-            std::remove_if(chunks.begin(), chunks.end(),
-                           [](chunk_t *&c)
-                           {if(!c) return true; if(!c->valid) {delete c; c = nullptr; return true;} return false; }),
-            chunks.end());
-        unlock_chunks();
-    }
+
+    // Enable direct colors
     GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
-    if (!transparency && outline && draw_block_outline)
+
+    // Draw block outlines
+    if (transparency && outline && draw_block_outline)
     {
         GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
         guVector outlinePos = guVector();
-        outlinePos.x = +rc_block.x - .5;
-        outlinePos.y = +rc_block.y - .5;
-        outlinePos.z = +rc_block.z - .5;
+        outlinePos.x = raycast_block.x - .5;
+        outlinePos.y = raycast_block.y - .5;
+        outlinePos.z = raycast_block.z - .5;
         Render(view, outlinePos, outline, outline_len);
-        Transform(view, outlinePos);
+
+        // Draw debug spritesheet
+        if (debug_spritesheet)
+        {
+            Transform(view, outlinePos);
+            GX_BeginGroup(GX_QUADS, 4);
+            GX_Vertex(vertex_property_t(vec3f(-2.0f, 1.1f, -2.0f), 0, 0));
+            GX_Vertex(vertex_property_t(vec3f(2.0f, 1.1f, -2.0f), 128, 0));
+            GX_Vertex(vertex_property_t(vec3f(2.0f, 1.1f, 2.0f), 128, 128));
+            GX_Vertex(vertex_property_t(vec3f(-2.0f, 1.1f, 2.0f), 0, 128));
+            GX_EndGroup();
+        }
     }
-    if (debug_spritesheet)
-    {
-        GX_BeginGroup(GX_QUADS, 4);
-        GX_Vertex(vertex_property_t(vec3f(-2.0f, 1.1f, -2.0f), 0, 0));
-        GX_Vertex(vertex_property_t(vec3f(2.0f, 1.1f, -2.0f), 128, 0));
-        GX_Vertex(vertex_property_t(vec3f(2.0f, 1.1f, 2.0f), 128, 128));
-        GX_Vertex(vertex_property_t(vec3f(-2.0f, 1.1f, 2.0f), 0, 128));
-        GX_EndGroup();
-    }
-    return true;
 }
 void PrepareTEV()
 {
