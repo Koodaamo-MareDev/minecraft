@@ -72,7 +72,7 @@ void light_engine_loop()
         vec3i pos = pending_light_updates.front();
         pending_light_updates.pop_front();
         light_unlock();
-        chunk_t *chunk = get_chunk_from_pos(pos.x, pos.z, false);
+        chunk_t *chunk = get_chunk_from_pos(pos, false);
         if (chunk)
         {
             __update_light(pos);
@@ -98,7 +98,7 @@ void update_light(vec3i pos)
 {
     if (pos.y > 255 || pos.y < 0)
         return;
-    chunk_t *chunk = get_chunk_from_pos(pos.x, pos.z, false, false);
+    chunk_t *chunk = get_chunk_from_pos(pos, false, false);
     if (!chunk)
         return;
     light_lock();
@@ -141,12 +141,12 @@ void __update_light(vec3i coords)
 
         if (pos.y > 255 || pos.y < 0)
             continue;
-        chunk_t *chunk = get_chunk_from_pos(pos.x, pos.z, false, false);
+        chunk_t *chunk = get_chunk_from_pos(pos, false, false);
         if (!chunk)
             continue;
         int map_index = ((pos.x & 15) << 4) | (pos.z & 15);
 
-        block_t *block = chunk->get_block(pos.x, pos.y, pos.z);
+        block_t *block = chunk->get_block(pos);
 
         uint8_t new_skylight = 0;
         uint8_t new_blocklight = get_block_luminance(block->get_blockid());

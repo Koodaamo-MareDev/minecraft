@@ -37,11 +37,13 @@
 #define MAX_PARTICLES 100
 #define LOOKAROUND_SENSITIVITY 360
 #define MOVEMENT_SPEED 10
+#define DIRECTIONAL_LIGHT GX_DISABLE
 
 float lerp(float a, float b, float f)
 {
     return a * (1.0 - f) + (b * f);
 }
+float star_visibility = 0.0f;
 bool debug_spritesheet = false;
 lwp_t main_thread;
 f32 xrot = -22.5f;
@@ -71,6 +73,7 @@ float prev_right_shoulder = 0;
 bool destroy_block = false;
 bool place_block = false;
 
+void Transform(Mtx view, guVector chunkPos);
 void UpdateLightDir();
 void DrawScene(Mtx view, Frustum &frustum, std::deque<chunk_t *> &chunks, bool transparency);
 void UpdateScene(std::deque<chunk_t *> &chunks);
@@ -147,6 +150,110 @@ void AlphaBlend(unsigned char *src, unsigned char *dst, int width, int height, i
             dst[off + 2] = (char)((((((int)(src[off + 2]) & 0xFF) * src_alpha) + ((int)(dst[off + 2]) & 0xFF) * one_minus_src_alpha) / 0xFF) & 0xFF);
         }
     }
+}
+const float JavaFloatUnit = 1.0f / (0x1000000);
+const double JavaDoubleUnit = 1.0 / (0x20000000000000LL);
+const int64_t MaxJavaLCG = 0xFFFFFFFFFFFFLL;
+int64_t SeedJavaLCG = 0;
+const int64_t AJavaLCG = 25214903917;
+const int64_t CJavaLCG = 11;
+void JavaLCGInit(int64_t seed)
+{
+    SeedJavaLCG = (seed ^ AJavaLCG) & MaxJavaLCG;
+}
+int64_t JavaLCG()
+{
+    SeedJavaLCG = (AJavaLCG * SeedJavaLCG + CJavaLCG) & MaxJavaLCG;
+    return SeedJavaLCG;
+}
+float JavaLCGFloat()
+{
+    return (JavaLCG() >> 24) * JavaFloatUnit;
+}
+double JavaLCGDouble()
+{
+    return (((long)(JavaLCG() >> 26) << 27) + (JavaLCG() >> 21)) * JavaDoubleUnit;
+}
+uint32_t stars_len = 0;
+void *stars = nullptr;
+void PrepareStars()
+{
+    size_t len = (VERTEX_ATTR_LENGTH_DIRECTCOLOR * 780 << 2) + 3 + 32;
+    if ((len & 31) != 0)
+    {
+        len += 32;
+        len &= ~31;
+    }
+    void *ret = memalign(32, len);
+    if (!ret)
+        return;
+    GX_BeginDispList(ret, len);
+    GX_BeginGroup(GX_QUADS, 780 << 2);
+    JavaLCGInit(10842);
+    int star_count = 0;
+    for (int var3 = 0; var3 < 1500; ++var3)
+    {
+        double var4 = (double)(JavaLCGFloat() * 2.0F - 1.0F);
+        double var6 = (double)(JavaLCGFloat() * 2.0F - 1.0F);
+        double var8 = (double)(JavaLCGFloat() * 2.0F - 1.0F);
+        double var10 = (double)(0.25F + JavaLCGFloat() * 0.25F);
+        double var12 = var4 * var4 + var6 * var6 + var8 * var8;
+        if (var12 < 1.0 && var12 > 0.01)
+        {
+            var12 = 1.0 / std::sqrt(var12);
+            var4 *= var12;
+            var6 *= var12;
+            var8 *= var12;
+            double var14 = var4 * 100.0;
+            double var16 = var6 * 100.0;
+            double var18 = var8 * 100.0;
+            double var20 = std::atan2(var4, var8);
+            double var22 = std::sin(var20);
+            double var24 = std::cos(var20);
+            double var26 = std::atan2(std::sqrt(var4 * var4 + var8 * var8), var6);
+            double var28 = std::sin(var26);
+            double var30 = std::cos(var26);
+            double var32 = JavaLCGDouble() * M_TWOPI;
+            double var34 = std::sin(var32);
+            double var36 = std::cos(var32);
+
+            for (int var38 = 0; var38 < 4; ++var38)
+            {
+                double var39 = 0.0;
+                double var41 = (double)((var38 & 2) - 1) * var10;
+                double var43 = (double)(((var38 + 1) & 2) - 1) * var10;
+                double var47 = var41 * var36 - var43 * var34;
+                double var49 = var43 * var36 + var41 * var34;
+                double var53 = var47 * var28 + var39 * var30;
+                double var55 = var39 * var28 - var47 * var30;
+                double var57 = var55 * var22 - var49 * var24;
+                double var61 = var49 * var22 + var55 * var24;
+                GX_Vertex(vertex_property_t(vec3f(var14 + var57, var16 + var53, var18 + var61), 0, 0, 255, 255, 255, 255, 255));
+            }
+            star_count++;
+        }
+    }
+    GX_EndGroup();
+    stars_len = GX_EndDispList();
+    DCInvalidateRange(ret, len);
+    stars = ret;
+    if (!stars || !stars_len)
+    {
+        printf("Star count invalid: %d\n", star_count);
+    }
+    else
+    {
+        printf("Star count: %d\n", star_count);
+    }
+}
+
+void DrawStars(Mtx view)
+{
+    if (!stars || !stars_len)
+        return;
+    GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
+    //Transform(view, player_pos);
+    GX_CallDispList(ALIGNPTR(stars), stars_len); // Draw the box
 }
 
 void PrepareOutline()
@@ -311,7 +418,7 @@ int main(int argc, char **argv)
     GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_TEX0, GX_TEX_ST, GX_U16, BASE3D_UV_FRAC_BITS);
     // set number of rasterized color channels
     GX_SetNumChans(1);
-    GX_SetChanCtrl(GX_COLOR0, GX_ENABLE, GX_SRC_REG, GX_SRC_VTX, GX_LIGHT0 | GX_LIGHT1 | GX_LIGHT2, GX_DF_CLAMP, GX_AF_SPOT);
+    GX_SetChanCtrl(GX_COLOR0, DIRECTIONAL_LIGHT, GX_SRC_REG, GX_SRC_VTX, GX_LIGHT0 | GX_LIGHT1 | GX_LIGHT2, GX_DF_CLAMP, GX_AF_SPOT);
     GX_SetChanAmbColor(GX_COLOR0, GXColor{160, 160, 160, 255});
     GX_SetChanMatColor(GX_COLOR0, GXColor{255, 255, 255, 255});
     //  set number of textures to generate
@@ -385,6 +492,7 @@ int main(int argc, char **argv)
     VIDEO_WaitVSync();
     GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
     PrepareOutline();
+    PrepareStars();
     GX_SetZCompLoc(GX_FALSE);
     player_pos.x = 0;
     player_pos.y = -1000;
@@ -403,6 +511,7 @@ int main(int argc, char **argv)
         LightMapBlend(light_day_rgba, light_night_rgba, light_map, uint8_t(light_time_value * 255));
         GX_SetArray(GX_VA_CLR0, light_map, 4 * sizeof(u8));
         target_background = ColorBlend(day_background, night_background, std::clamp(light_time_value, 0.0f, 1.0f));
+        star_visibility = std::clamp(light_time_value, 0.0f, 1.0f);
         float target = std::pow(std::clamp((player_pos.y) * 0.03125f, 0.0f, 1.0f), 2.0f);
         current_lerpvalue = target; // lerp(current_lerpvalue, target, 0.05f);
         background.r = u8(current_lerpvalue * target_background.r);
@@ -411,16 +520,15 @@ int main(int argc, char **argv)
         GX_SetCopyClear(background, 0x00FFFFFF);
         GX_SetFog(GX_FOG_PERSP_LIN, RENDER_DISTANCE * 0.67f * 16 - 16, RENDER_DISTANCE * 0.67f * 16 - 8, 0.1F, 300.0F, background);
         if (player_pos.y < -999)
-            player_pos.y = skycast(player_pos.x, player_pos.z) + 2;
+            player_pos.y = skycast(vec3i(int(player_pos.x), 0, int(player_pos.z))) + 2;
         UpdateLightDir();
         if (fb)
         {
             water_still_anim.update();
             DCFlushRange(texture_ptr, texture_buflen);
             GX_InvalidateTexAll();
-            PrepareTexture(texture);
-            GX_LoadTexObj(&white_texture, GX_TEXMAP1);
         }
+        PrepareTexture(texture);
         GetInput();
 
         guVector forward = AnglesToVector(xrot, yrot, -1);
@@ -452,7 +560,13 @@ int main(int argc, char **argv)
         GX_SetAlphaCompare(GX_GEQUAL, 16, GX_AOP_AND, GX_ALWAYS, 0);
         GX_SetColorUpdate(GX_TRUE);
         DrawScene(view, frustum, chunks, true);
+
+        GX_SetFog(GX_FOG_NONE, RENDER_DISTANCE * 0.67f * 16 - 16, RENDER_DISTANCE * 0.67f * 16 - 8, 0.1F, 300.0F, background);
+        //GX_SetBlendMode(GX_BM_BLEND, GX_BL_ONE, GX_BL_ONE, GX_LO_NOOP);
+        PrepareTexture(white_texture);
+        DrawStars(view);
         GX_DrawDone();
+
         GX_CopyDisp(frameBuffer[fb], GX_TRUE);
         VIDEO_SetNextFramebuffer(frameBuffer[fb]);
         VIDEO_Flush();
@@ -576,6 +690,8 @@ void GetLookMtx(Mtx &mtx)
 // TODO: Finish fake lighting
 void UpdateLightDir()
 {
+    if (!DIRECTIONAL_LIGHT)
+        return;
     GXLightObj lights[3];
     guVector dir{.25, 0., .75};
     guVecNormalize(&dir);
@@ -675,7 +791,7 @@ inline void RecalcSectionWater(chunk_t *chunk, int section)
             current_pos.y = sectionY;
             for (int _y = 0; _y < 16; _y++, current_pos.y++)
             {
-                block_t *block = chunk->get_block(_x, current_pos.y, _z);
+                block_t *block = chunk->get_block(current_pos);
                 if (block && (block->meta & FLUID_UPDATE_REQUIRED_FLAG))
                     fluid_levels[get_fluid_meta_level(block)].push_back(current_pos);
             }
@@ -687,7 +803,7 @@ inline void RecalcSectionWater(chunk_t *chunk, int section)
         std::vector<vec3i> &positions = fluid_levels[i];
         for (vec3i pos : positions)
         {
-            block_t *block = chunk->get_block(pos.x, pos.y, pos.z);
+            block_t *block = chunk->get_block(pos);
             update_fluid(block, pos);
         }
         positions.clear();
@@ -710,7 +826,7 @@ void GenerateAdditionalChunks(std::deque<chunk_t *> &chunks)
             distance = std::abs(z - int(player_pos.z));
             if (distance > GENERATION_DISTANCE)
                 break;
-            chunk_t *chunk = get_chunk_from_pos(x, z, true, false);
+            chunk_t *chunk = get_chunk_from_pos(vec3i(x, 0, z), true, false);
             if (!chunk)
             {
                 threadqueue_broadcast();
@@ -830,7 +946,7 @@ void UpdateChunkVBOs(std::deque<chunk_t *> &chunks)
     int chunk_update_count = 0;
     for (chunk_t *&chunk : chunks)
     {
-        if (!chunk || chunk_update_count >= 1)
+        if (!chunk || chunk_update_count >= 8)
             continue;
         if (chunk->valid && !chunk->light_updates)
         {

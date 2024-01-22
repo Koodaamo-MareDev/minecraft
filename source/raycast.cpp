@@ -29,40 +29,33 @@ double intbound(double s, double ds)
         return (1 - s) / ds;
     }
 }
-int checkabove(int x, int y, int z, chunk_t* chunk)
+int checkabove(vec3i pos, chunk_t* chunk)
 {
     block_t *block = nullptr;
-    chunk = chunk ? chunk : get_chunk_from_pos(x, z, false, false);
+    chunk = chunk ? chunk : get_chunk_from_pos(pos, false, false);
     if (!chunk)
-        return y;
-    // Set x and z to the normal chunk range (0-15)
-    x &= 15;
-    z &= 15;
+        return pos.y;
     // Starting from the y coordinate, cast a ray up that stops at the first (partially) opaque block.
-    y++;
-    while (y < 255 && (block = chunk->get_block(x, y, z)) && !get_block_opacity(block->get_blockid()))
-        y++;
+    pos.y++;
+    while (pos.y < 255 && (block = chunk->get_block(pos)) && !get_block_opacity(block->get_blockid()))
+        pos.y++;
     // This should return 255 at most which means the ray hit the world height limit
-    return y;
+    return pos.y;
 }
-int skycast(int x, int z, chunk_t* chunk)
+int skycast(vec3i pos, chunk_t* chunk)
 {
     block_t *block = nullptr;
-    chunk = chunk ? chunk : get_chunk_from_pos(x, z, false, false);
+    chunk = chunk ? chunk : get_chunk_from_pos(pos, false, false);
     if (!chunk)
         return -9999;
-    // Set x and z to the normal chunk range (0-15)
-    x &= 15;
-    z &= 15;
-
     // Starting from world height limit, cast a ray down that stops at the first (partially) opaque block.
-    int y = 255;
-    while (y > 0 && (block = chunk->get_block(x, y, z)) && !get_block_opacity(block->get_blockid()))
-        y--;
+    pos.y = 255;
+    while (pos.y > 0 && (block = chunk->get_block(pos)) && !get_block_opacity(block->get_blockid()))
+        pos.y--;
     // If the cast went out of the world bounds, tell it to the caller by returning -9999
     if (!block)
         return -9999;
-    return y;
+    return pos.y;
 }
 bool raycast(
     vec3d origin,

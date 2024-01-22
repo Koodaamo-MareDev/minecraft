@@ -64,31 +64,30 @@ std::deque<chunk_t *> &get_chunks()
 {
     return chunks;
 }
-chunk_t *get_chunk_from_pos(int x, int z, bool load, bool write_cache)
+
+vec3i block_to_chunk_pos(vec3i pos)
 {
-    x -= 15 * (x < 0);
-    z -= 15 * (z < 0);
-    return get_chunk(x / 16, z / 16, load, write_cache);
+    pos.x -= 15 * (pos.x < 0);
+    pos.z -= 15 * (pos.z < 0);
+    pos.x /= 16;
+    pos.z /= 16;
+    return pos;
+}
+
+chunk_t *get_chunk_from_pos(vec3i pos, bool load, bool write_cache)
+{
+    return get_chunk(block_to_chunk_pos(pos), load, write_cache);
 }
 
 std::map<lwp_t, chunk_t *> chunk_cache;
-chunk_t *get_chunk(int chunkX, int chunkZ, bool load, bool write_cache)
+chunk_t *get_chunk(vec3i pos, bool load, bool write_cache)
 {
-    /*
-    lwp_t active_thread = LWP_GetSelf();
-    if (chunk_cache.find(active_thread) != chunk_cache.end())
-    {
-        chunk_t *&cached_chunk = chunk_cache[active_thread];
-        if (cached_chunk && cached_chunk->x == chunkX && cached_chunk->z == chunkZ)
-            return cached_chunk;
-    }
-    */
     chunk_t *retval = nullptr;
     // Chunk lookup based on x and z position
     for (chunk_t *&chunk : chunks)
     {
         if (chunk)
-            if (chunk->x == chunkX && chunk->z == chunkZ)
+            if (chunk->x == pos.x && chunk->z == pos.z)
             {
                 retval = chunk;
                 break;
@@ -97,14 +96,13 @@ chunk_t *get_chunk(int chunkX, int chunkZ, bool load, bool write_cache)
     if (!retval && load)
     {
         if (chunks.size() < CHUNK_COUNT)
-            add_chunk(chunkX, chunkZ);
+            add_chunk(pos);
     }
-    // if (write_cache && retval)
-    //     chunk_cache[active_thread] = retval;
+
     return retval;
 }
 
-void add_chunk(int chunk_x, int chunk_z)
+void add_chunk(vec3i pos)
 {
     if (pending_chunks.size() >= RENDER_DISTANCE)
         return;
@@ -112,7 +110,7 @@ void add_chunk(int chunk_x, int chunk_z)
     lock_chunks();
     for (chunk_t *&m_chunk : pending_chunks)
     {
-        if (m_chunk && m_chunk->x == chunk_x && m_chunk->z == chunk_z)
+        if (m_chunk && m_chunk->x == pos.x && m_chunk->z == pos.z)
         {
             unlock_chunks();
             return;
@@ -121,7 +119,7 @@ void add_chunk(int chunk_x, int chunk_z)
 
     for (chunk_t *&m_chunk : chunks)
     {
-        if (m_chunk && m_chunk->x == chunk_x && m_chunk->z == chunk_z)
+        if (m_chunk && m_chunk->x == pos.x && m_chunk->z == pos.z)
         {
             unlock_chunks();
             return;
@@ -130,8 +128,8 @@ void add_chunk(int chunk_x, int chunk_z)
     chunk_t *chunk = new chunk_t;
     if (chunk)
     {
-        chunk->x = chunk_x;
-        chunk->z = chunk_z;
+        chunk->x = pos.x;
+        chunk->z = pos.z;
         pending_chunks.push_back(chunk);
     }
     unlock_chunks();
@@ -157,8 +155,8 @@ uint32_t fastrand()
 /* The state must be initialized to non-zero */
 void treerand(int x, int z, uint32_t *output, uint32_t count)
 {
-    float v = z + 0.19f;
-    v += float(x) * 327.67f;
+    float v = float(z) + 0.19f;
+    v += float(x + 327) + 0.67f;
 
     float *v_ptr = &v;
     uint32_t a = *((uint32_t *)v_ptr);
@@ -174,10 +172,10 @@ void treerand(int x, int z, uint32_t *output, uint32_t count)
 
 void set_block_within_chunk(vec3i position, chunk_t *chunk, BlockID id, bool air_check = false)
 {
-    chunk_t *test_chunk = get_chunk_from_pos(position.x, position.z, false, false);
-    if (test_chunk && chunk->x == test_chunk->x && chunk->z == test_chunk->z)
+    vec3i chunk_pos = block_to_chunk_pos(position);
+    if (chunk_pos.x == chunk->x && chunk_pos.z == chunk->z)
     {
-        block_t *block = chunk->get_block(position.x, position.y, position.z);
+        block_t *block = chunk->get_block(position);
         if (air_check && block->get_blockid() != BlockID::air)
             return;
         block->set_blockid(id);
@@ -186,8 +184,14 @@ void set_block_within_chunk(vec3i position, chunk_t *chunk, BlockID id, bool air
 
 void plant_tree(vec3i position, chunk_t *chunk, int height)
 {
-    if (chunk->get_block(position.x, position.y - 1, position.z)->get_blockid() != BlockID::grass)
+    block_t *base_block = chunk->get_block(position - vec3i(0, 1, 0));
+    if (base_block->get_blockid() != BlockID::grass)
         return;
+
+    // Place dirt below tree
+    base_block->set_blockid(BlockID::dirt);
+
+    // Place wide part of leaves
     for (int x = -2; x <= 2; x++)
     {
         for (int y = height - 3; y < height - 1; y++)
@@ -197,6 +201,7 @@ void plant_tree(vec3i position, chunk_t *chunk, int height)
                 set_block_within_chunk(leaves_pos, chunk, BlockID::leaves, true);
             }
     }
+    // Place narrow part of leaves
     for (int x = -1; x <= 1; x++)
     {
         for (int y = height - 1; y <= height; y++)
@@ -204,44 +209,48 @@ void plant_tree(vec3i position, chunk_t *chunk, int height)
             for (int z = -1; z <= 1; z++)
             {
                 vec3i leaves_off = vec3i(x, y, z);
-                if (y == height && std::abs(x) == std::abs(z))
+                // Place the leaves in a "+" pattern at the top.
+                if (y == height && std::abs(x) == std::abs(z) && (x | z))
                     continue;
                 set_block_within_chunk(position + leaves_off, chunk, BlockID::leaves, true);
             }
         }
     }
+    // Place tree logs
     for (int y = 0; y < height; y++)
     {
-        vec3i leaves_pos = position + vec3i(0, y, 0);
-        set_block_within_chunk(leaves_pos, chunk, BlockID::wood, false);
+        vec3i log_pos = position + vec3i(0, y, 0);
+        set_block_within_chunk(log_pos, chunk, BlockID::wood, false);
     }
 }
 
-void generate_trees(chunk_t *chunk)
+void generate_trees(chunk_t *chunk, uint8_t *height_map)
 {
-    const static uint32_t tree_count = 16;
+    const static uint32_t tree_count = 8;
     const static int tree_noise_offset = 16384;
     uint32_t tree_positions[tree_count];
     for (int x = chunk->x - 1; x <= chunk->x + 1; x++)
     {
         for (int z = chunk->z - 1; z <= chunk->z + 1; z++)
         {
-            chunk_t *current_chunk = get_chunk(x, z, false, false);
-            if (current_chunk)
+            treerand(x, z, tree_positions, tree_count);
+            for (uint32_t c = 0; c < tree_count; c++)
             {
-                treerand(current_chunk->x, current_chunk->z, tree_positions, tree_count);
-                for (uint32_t c = 0; c < tree_count; c++)
+                uint32_t tree_value = tree_positions[c];
+                vec3i tree_pos((tree_value & 15) + (x * 16), 0, ((tree_value >> 24) & 15) + (z * 16));
+                int tree_altitude = height_map[(tree_pos.x & 15) | (tree_pos.z & 15)];
+                tree_pos.y = tree_altitude;
+
+                // Trees should only grow on top of the sea level
+                bool plant = (tree_altitude >= 64);
+                // 5% Chance to plant the tree based on the tree noise map.
+                // plant &= std::abs(noise.GetNoise(float(tree_pos.x + tree_noise_offset), float(tree_pos.z))) < 0.05f;
+                // Dirty fix: Just don't place trees at chunk borders
+                plant &= ((tree_pos.x & 15) >= 2 && (tree_pos.x & 15) <= 13 && (tree_pos.z & 15) >= 2 && (tree_pos.z & 15) <= 13);
+                if (plant)
                 {
-                    uint32_t tree_value = tree_positions[c];
-                    vec3i tree_pos((tree_value & 15) + (current_chunk->x * 16), 0, ((tree_value >> 4) & 15) + (current_chunk->z * 16));
-                    int tree_altitude = uint8_t(noise.GetNoise(float(tree_pos.x), float(tree_pos.z)) * 16.0f) + 65;
-                    tree_pos.y = tree_altitude;
-                    bool plant = (tree_altitude >= 64) && noise.GetNoise(float(tree_pos.x + tree_noise_offset), float(tree_pos.z)) > 0.0f;
-                    if (plant)
-                    {
-                        int tree_height = (tree_value >> 28) & 3;
-                        plant_tree(tree_pos, chunk, 3 + tree_height);
-                    }
+                    int tree_height = (tree_value >> 28) & 3;
+                    plant_tree(tree_pos, chunk, 3 + tree_height);
                 }
             }
         }
@@ -318,7 +327,7 @@ void generate_chunk()
                 // Bottom layer is bedrock
                 else if (!y)
                     id = BlockID::bedrock;
-                block_t *block = chunk->get_block(x, y, z);
+                block_t *block = chunk->get_block(vec3i(x, y, z));
                 block->set_blockid(id);
             }
         }
@@ -333,11 +342,11 @@ void generate_chunk()
             {
                 float noise_value = (cave_noise.GetNoise(float(x + x_offset), float(y), float(z + z_offset)));
                 if (noise_value < -.5f && (height > 63 || abs(height - y) > 2))
-                    chunk->get_block(x, y, z)->set_blockid(BlockID::air);
+                    chunk->get_block(vec3i(x, y, z))->set_blockid(BlockID::air);
                 threadqueue_yield();
             }
         }
-    generate_trees(chunk);
+    generate_trees(chunk, height_map);
     if (!__chunk_generator_init_done)
     {
         delete chunk;
@@ -354,8 +363,8 @@ void generate_chunk()
     unlock_chunks();
     for (int i = -1; i <= 1; i += 2)
     {
-        chunk_t *chunkX = get_chunk(chunk->x + i, chunk->z, false, false);
-        chunk_t *chunkZ = get_chunk(chunk->x, chunk->z + i, false, false);
+        chunk_t *chunkX = get_chunk(vec3i(chunk->x + i, 0, chunk->z), false, false);
+        chunk_t *chunkZ = get_chunk(vec3i(chunk->x, 0, chunk->z + i), false, false);
         if (chunkX)
             for (int vbo_y = 0; vbo_y < 16; vbo_y++)
                 chunkX->vbos[vbo_y].dirty = true;
@@ -428,7 +437,7 @@ block_t *get_block_at(vec3i position)
 {
     if (position.y < 0 || position.y > 255)
         return nullptr;
-    chunk_t *chunk = get_chunk_from_pos(position.x, position.z, false, false);
+    chunk_t *chunk = get_chunk_from_pos(position, false, false);
     if (!chunk)
         return nullptr;
     position.x &= 0x0F;
@@ -450,7 +459,7 @@ void chunk_t::update_height_map(vec3i pos)
     pos.x &= 15;
     pos.z &= 15;
     uint8_t *height = height_map + ((pos.x << 4) + pos.z);
-    BlockID id = get_block(pos.x, pos.y, pos.z)->get_blockid();
+    BlockID id = get_block(pos)->get_blockid();
     if (get_block_opacity(id))
     {
         if (pos.y >= *height)
@@ -460,7 +469,8 @@ void chunk_t::update_height_map(vec3i pos)
     {
         while (*height > 0)
         {
-            id = get_block(pos.x, *height - 1, pos.z)->get_blockid();
+            pos.y = *height - 1;
+            id = get_block(pos)->get_blockid();
             if (get_block_opacity(id))
                 break;
             (*height)--;
@@ -472,10 +482,10 @@ void update_block_at(vec3i pos)
 {
     if (pos.y > 255 || pos.y < 0)
         return;
-    chunk_t *chunk = get_chunk_from_pos(pos.x, pos.z, false, false);
+    chunk_t *chunk = get_chunk_from_pos(pos, false, false);
     if (!chunk)
         return;
-    block_t *block = chunk->get_block(pos.x, pos.y, pos.z);
+    block_t *block = chunk->get_block(pos);
     if (!block)
         return;
     chunk->update_height_map(pos);
@@ -492,12 +502,12 @@ void chunk_t::light_up()
         {
             for (int z = 0; z < 16; z++)
             {
-                int end_y = skycast(x, z, this);
+                int end_y = skycast(vec3i(x, 0, z), this);
                 if (end_y >= 255 || end_y <= 0)
                     return;
                 this->height_map[(x << 4) | z] = end_y + 1;
                 for (int y = 255; y > end_y; y--)
-                    this->get_block(x, y, z)->sky_light = 15;
+                    this->get_block(vec3i(x, y, z))->sky_light = 15;
                 update_light(vec3i(chunkX + x, end_y, chunkZ + z));
             }
         }
@@ -521,7 +531,7 @@ void chunk_t::recalculate_section(int section)
             for (int z = 0; z < 16; z++)
             {
 
-                block_t *block = this->get_block(x, y + chunkY, z);
+                block_t *block = this->get_block(vec3i(x, y + chunkY, z));
                 BlockID block_id = block->get_blockid();
                 vec3i local_pos = {x, y, z};
                 block->visibility_flags = 0x40 * (block_id != BlockID::air);
@@ -556,8 +566,6 @@ void chunk_t::recalculate_section(int section)
                         }
                     }
                 }
-
-                // block->visibility_flags = !(block->visibility_flags & 0x3F) ? 0 : block->visibility_flags;
             }
         }
     }
@@ -702,8 +710,8 @@ int chunk_t::pre_render_fluid_mesh(int section, bool transparent)
         {
             for (int _y = 0; _y < 16; _y++)
             {
-                vec3i blockpos = vec3i{_x, _y, _z} + chunk_offset;
-                block_t *block = get_block(_x, _y + chunk_offset.y, _z);
+                vec3i blockpos = vec3i(_x, _y, _z) + chunk_offset;
+                block_t *block = get_block(blockpos);
                 if (block)
                 {
                     BlockID block_id = block->get_blockid();
@@ -717,7 +725,7 @@ int chunk_t::pre_render_fluid_mesh(int section, bool transparent)
 }
 int chunk_t::render_fluid_mesh(int section, bool transparent, int vertexCount)
 {
-    vec3i chunk_offset = vec3i{this->x * 16, section * 16, this->z * 16};
+    vec3i chunk_offset = vec3i(this->x * 16, section * 16, this->z * 16);
 
     GX_BeginGroup(GX_TRIANGLES, vertexCount);
     vertexCount = 0;
@@ -727,8 +735,8 @@ int chunk_t::render_fluid_mesh(int section, bool transparent, int vertexCount)
         {
             for (int _y = 0; _y < 16; _y++)
             {
-                vec3i blockpos = vec3i{_x, _y, _z} + chunk_offset;
-                block_t *block = get_block(_x, _y + chunk_offset.y, _z);
+                vec3i blockpos = vec3i(_x, _y, _z) + chunk_offset;
+                block_t *block = get_block(blockpos);
                 if (block)
                 {
                     BlockID block_id = block->get_blockid();
@@ -745,17 +753,18 @@ int chunk_t::render_fluid_mesh(int section, bool transparent, int vertexCount)
 int chunk_t::pre_render_block_mesh(int section, bool transparent)
 {
     int vertexCount = 0;
-    vec3i chunk_pos = vec3i(this->x * 16, section * 16, this->z * 16);
+    vec3i chunk_offset = vec3i(this->x * 16, section * 16, this->z * 16);
     GX_BeginGroup(GX_QUADS, 0);
     // Build the mesh from the blockstates
-    for (int x = 0; x < 16; x++)
+    for (int _x = 0; _x < 16; _x++)
     {
-        for (int y = 0; y < 16; y++)
+        for (int _y = 0; _y < 16; _y++)
         {
-            for (int z = 0; z < 16; z++)
+            for (int _z = 0; _z < 16; _z++)
             {
-                block_t *block = this->get_block(x, y + chunk_pos.y, z);
-                vertexCount += render_block(block, chunk_pos + vec3i(x, y, z), transparent);
+                vec3i blockpos = vec3i(_x, _y, _z) + chunk_offset;
+                block_t *block = this->get_block(blockpos);
+                vertexCount += render_block(block, blockpos, transparent);
             }
         }
     }
@@ -765,18 +774,19 @@ int chunk_t::pre_render_block_mesh(int section, bool transparent)
 
 int chunk_t::render_block_mesh(int section, bool transparent, int vertexCount)
 {
-    vec3i chunk_pos = vec3i{this->x * 16, section * 16, this->z * 16};
+    vec3i chunk_offset = vec3i(this->x * 16, section * 16, this->z * 16);
     GX_BeginGroup(GX_QUADS, vertexCount);
     vertexCount = 0;
     // Build the mesh from the blockstates
-    for (int x = 0; x < 16; x++)
+    for (int _x = 0; _x < 16; _x++)
     {
-        for (int y = 0; y < 16; y++)
+        for (int _y = 0; _y < 16; _y++)
         {
-            for (int z = 0; z < 16; z++)
+            for (int _z = 0; _z < 16; _z++)
             {
-                block_t *block = this->get_block(x, y + chunk_pos.y, z);
-                vertexCount += render_block(block, chunk_pos + vec3i(x, y, z), transparent);
+                vec3i blockpos = vec3i(_x, _y, _z) + chunk_offset;
+                block_t *block = this->get_block(blockpos);
+                vertexCount += render_block(block, blockpos, transparent);
             }
         }
     }

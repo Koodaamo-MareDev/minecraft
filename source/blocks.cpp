@@ -288,10 +288,10 @@ void update_fluid(block_t *block, vec3i pos)
         for (int i = 0; i < 5; i++)
         {
             vec3i offset_pos = pos + face_offsets[surrounding_dirs[i]];
-            chunk_t *chunk = get_chunk_from_pos(offset_pos.x, offset_pos.z, false, false);
+            chunk_t *chunk = get_chunk_from_pos(offset_pos, false, false);
             if (chunk)
                 chunk->vbos[pos.y / 16].dirty = true;
-            block_t *other = chunk->get_block(offset_pos.x, offset_pos.y, offset_pos.z);
+            block_t *other = chunk->get_block(offset_pos);
             if (other)
                 other->meta |= FLUID_UPDATE_REQUIRED_FLAG;
         }
@@ -301,11 +301,8 @@ void update_fluid(block_t *block, vec3i pos)
             for (int z = -1; z <= 1; z++)
             {
                 vec3i offset_pos = pos + vec3i(x, y, z);
-                chunk_t *chunk = get_chunk_from_pos(offset_pos.x, offset_pos.z, false, false);
-                /*if (chunk && offset_pos.y >= 0 && offset_pos.y <= 255)
-                    chunk->vbos[offset_pos.y / 16].dirty = true;*/
-
-                block_t *other = chunk->get_block(offset_pos.x, offset_pos.y, offset_pos.z);
+                chunk_t *chunk = get_chunk_from_pos(offset_pos, false, false);
+                block_t *other = chunk->get_block(offset_pos);
                 if (other)
                     update_light(offset_pos);
             }
@@ -344,12 +341,12 @@ float get_fluid_height(vec3i pos, BlockID block_type)
     {
         int check_x = block_x - (i & 1);
         int check_z = block_z - (i >> 1 & 1);
-        if (is_same_fluid(get_block_id_at({check_x, block_y + 1, check_z}), block_type))
+        if (is_same_fluid(get_block_id_at(vec3i(check_x, block_y + 1, check_z)), block_type))
         {
             return 1.0F;
         }
 
-        BlockID check_block_type = get_block_id_at({check_x, block_y, check_z});
+        BlockID check_block_type = get_block_id_at(vec3i(check_x, block_y, check_z));
         if (!is_same_fluid(check_block_type, block_type))
         {
             if (!is_solid(check_block_type))
@@ -360,7 +357,7 @@ float get_fluid_height(vec3i pos, BlockID block_type)
         }
         else
         {
-            int fluid_level = get_fluid_meta_level(get_block_at({check_x, block_y, check_z}));
+            int fluid_level = get_fluid_meta_level(get_block_at(vec3i(check_x, block_y, check_z)));
             if (fluid_level >= 8 || fluid_level == 0)
             {
                 water_percentage += get_percent_air(fluid_level) * 10.0F;

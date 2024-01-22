@@ -50,9 +50,9 @@ public:
     uint8_t height_map[16 * 16] = {0};
     chunkvbo_t vbos[VERTICAL_SECTION_COUNT];
 
-    block_t *get_block(int x, int y, int z)
+    block_t *get_block(vec3i pos)
     {
-        return &this->blockstates[(x & 0xF) | ((y & 0xFF) << 4) | ((z & 0xF) << 12)];
+        return &this->blockstates[(pos.x & 0xF) | ((pos.y & 0xFF) << 4) | ((pos.z & 0xF) << 12)];
     }
 
     void update_height_map(vec3i pos);
@@ -92,9 +92,10 @@ void print_chunk_status();
 bool has_pending_chunks();
 BlockID get_block_id_at(vec3i position, BlockID default_id = BlockID::air);
 block_t *get_block_at(vec3i vec);
-chunk_t *get_chunk_from_pos(int posX, int posZ, bool load, bool write_cache = true);
-chunk_t *get_chunk(int chunkX, int chunkZ, bool load, bool write_cache = true);
-void add_chunk(int chunk_x, int chunk_z);
+vec3i block_to_chunk_pos(vec3i pos);
+chunk_t *get_chunk_from_pos(vec3i pos, bool load, bool write_cache = true);
+chunk_t *get_chunk(vec3i pos, bool load, bool write_cache = true);
+void add_chunk(vec3i pos);
 void generate_chunk();
 void *get_aligned_pointer_32(void *ptr);
 void get_neighbors(vec3i pos, block_t **neighbors);
