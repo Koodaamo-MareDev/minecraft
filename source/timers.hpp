@@ -10,11 +10,11 @@ inline uint64_t time_get() {
 	return gettime();
 }
 
-inline int32_t time_diff_us(uint64_t f, uint64_t s) {
+inline int64_t time_diff_us(uint64_t f, uint64_t s) {
 	return (s - f) / (TB_TIMER_CLOCK / 1000UL);
 }
 
-inline int32_t time_diff_ms(uint64_t f, uint64_t s) {
+inline int64_t time_diff_ms(uint64_t f, uint64_t s) {
 	return (s - f) / TB_TIMER_CLOCK;
 }
 

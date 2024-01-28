@@ -21,7 +21,6 @@ int8_t get_block_opacity(BlockID blockid)
     }
 }
 
-
 bool is_face_transparent(uint8_t texture_index)
 {
     return blockmap_alpha[texture_index] == 0;
@@ -36,6 +35,8 @@ uint8_t get_block_luminance(BlockID block_id)
 {
     switch (block_id)
     {
+    case BlockID::lava:
+    case BlockID::flowing_lava:
     case BlockID::glowstone:
         return 15;
 
@@ -66,9 +67,8 @@ uint32_t get_default_texture_index(BlockID blockid)
     case BlockID::water:
         return 205;
     case BlockID::flowing_lava:
-        return 239;
     case BlockID::lava:
-        return 239;
+        return 237;
     case BlockID::sand:
         return 18;
     case BlockID::gravel:

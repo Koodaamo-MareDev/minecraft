@@ -13,11 +13,11 @@
 #include "block.hpp"
 #include "blocks.hpp"
 #include "blockmap_tpl.h"
-#include "blockmap.h"
+#include "clouds_tpl.h"
+#include "sun_tpl.h"
+#include "moon_tpl.h"
 #include "water_still_tpl.h"
-#include "water_still.h"
 #include "white_tpl.h"
-#include "white.h"
 #include "light_day_rgba.h"
 #include "light_night_rgba.h"
 #include "brightness_values.h"
@@ -37,13 +37,12 @@
 #define MAX_PARTICLES 100
 #define LOOKAROUND_SENSITIVITY 360
 #define MOVEMENT_SPEED 10
-#define DIRECTIONAL_LIGHT GX_DISABLE
+#define DIRECTIONAL_LIGHT GX_ENABLE
 
 float lerp(float a, float b, float f)
 {
     return a * (1.0 - f) + (b * f);
 }
-float star_visibility = 0.0f;
 bool debug_spritesheet = false;
 lwp_t main_thread;
 f32 xrot = -22.5f;
@@ -51,6 +50,14 @@ f32 yrot = 0.0f;
 guVector player_pos = {0.F, 80.0F, 0.F};
 void *frameBuffer[2] = {NULL, NULL};
 static GXRModeObj *rmode = NULL;
+
+GXTexObj white_texture;
+GXTexObj clouds_texture;
+GXTexObj sun_texture;
+GXTexObj moon_texture;
+GXTexObj texture;
+GXTexObj water_still_texture;
+
 void *outline = nullptr;
 u32 outline_len = 0;
 
@@ -151,6 +158,58 @@ void AlphaBlend(unsigned char *src, unsigned char *dst, int width, int height, i
         }
     }
 }
+
+float GetCelestialAngle()
+{
+    int daytime_ticks = (int)(tickCounter % 24000L);
+    float normalized_daytime = ((float)daytime_ticks + partialTicks) / 24000.0F - 0.25F;
+    if (normalized_daytime < 0.0F)
+    {
+        ++normalized_daytime;
+    }
+
+    if (normalized_daytime > 1.0F)
+    {
+        --normalized_daytime;
+    }
+
+    float var4 = normalized_daytime;
+    normalized_daytime = 1.0F - (float)((std::cos((double)normalized_daytime * M_PI) + 1.0) / 2.0);
+    normalized_daytime = var4 + (normalized_daytime - var4) / 3.0F;
+    return normalized_daytime;
+}
+float GetStarBrightness()
+{
+    float var2 = GetCelestialAngle();
+    float var3 = 1.0F - (std::cos(var2 * M_TWOPI) * 2.0F + 0.75F);
+    if (var3 < 0.0F)
+    {
+        var3 = 0.0F;
+    }
+
+    if (var3 > 1.0F)
+    {
+        var3 = 1.0F;
+    }
+
+    return var3 * var3 * 0.5F;
+}
+float GetSkyMultiplier()
+{
+    float var2 = GetCelestialAngle();
+    float var3 = std::cos(var2 * M_TWOPI) * 2.0F + 0.5F;
+    if (var3 < 0.0F)
+    {
+        var3 = 0.0F;
+    }
+
+    if (var3 > 1.0F)
+    {
+        var3 = 1.0F;
+    }
+    return var3;
+}
+
 const float JavaFloatUnit = 1.0f / (0x1000000);
 const double JavaDoubleUnit = 1.0 / (0x20000000000000LL);
 const int64_t MaxJavaLCG = 0xFFFFFFFFFFFFLL;
@@ -174,86 +233,145 @@ double JavaLCGDouble()
 {
     return (((long)(JavaLCG() >> 26) << 27) + (JavaLCG() >> 21)) * JavaDoubleUnit;
 }
-uint32_t stars_len = 0;
-void *stars = nullptr;
-void PrepareStars()
+void GenerateStars()
 {
-    size_t len = (VERTEX_ATTR_LENGTH_DIRECTCOLOR * 780 << 2) + 3 + 32;
-    if ((len & 31) != 0)
+    static bool generated = false;
+    static vec3f vertices[780 << 2];
+    if (!generated)
     {
-        len += 32;
-        len &= ~31;
-    }
-    void *ret = memalign(32, len);
-    if (!ret)
-        return;
-    GX_BeginDispList(ret, len);
-    GX_BeginGroup(GX_QUADS, 780 << 2);
-    JavaLCGInit(10842);
-    int star_count = 0;
-    for (int var3 = 0; var3 < 1500; ++var3)
-    {
-        double var4 = (double)(JavaLCGFloat() * 2.0F - 1.0F);
-        double var6 = (double)(JavaLCGFloat() * 2.0F - 1.0F);
-        double var8 = (double)(JavaLCGFloat() * 2.0F - 1.0F);
-        double var10 = (double)(0.25F + JavaLCGFloat() * 0.25F);
-        double var12 = var4 * var4 + var6 * var6 + var8 * var8;
-        if (var12 < 1.0 && var12 > 0.01)
+        int index = 0;
+        generated = true;
+        for (int var3 = 0; var3 < 1500; ++var3)
         {
-            var12 = 1.0 / std::sqrt(var12);
-            var4 *= var12;
-            var6 *= var12;
-            var8 *= var12;
-            double var14 = var4 * 100.0;
-            double var16 = var6 * 100.0;
-            double var18 = var8 * 100.0;
-            double var20 = std::atan2(var4, var8);
-            double var22 = std::sin(var20);
-            double var24 = std::cos(var20);
-            double var26 = std::atan2(std::sqrt(var4 * var4 + var8 * var8), var6);
-            double var28 = std::sin(var26);
-            double var30 = std::cos(var26);
-            double var32 = JavaLCGDouble() * M_TWOPI;
-            double var34 = std::sin(var32);
-            double var36 = std::cos(var32);
-
-            for (int var38 = 0; var38 < 4; ++var38)
+            double var4 = (double)(JavaLCGFloat() * 2.0F - 1.0F);
+            double var6 = (double)(JavaLCGFloat() * 2.0F - 1.0F);
+            double var8 = (double)(JavaLCGFloat() * 2.0F - 1.0F);
+            double var10 = (double)(0.25F + JavaLCGFloat() * 0.25F);
+            double var12 = var4 * var4 + var6 * var6 + var8 * var8;
+            if (var12 < 1.0 && var12 > 0.01)
             {
-                double var39 = 0.0;
-                double var41 = (double)((var38 & 2) - 1) * var10;
-                double var43 = (double)(((var38 + 1) & 2) - 1) * var10;
-                double var47 = var41 * var36 - var43 * var34;
-                double var49 = var43 * var36 + var41 * var34;
-                double var53 = var47 * var28 + var39 * var30;
-                double var55 = var39 * var28 - var47 * var30;
-                double var57 = var55 * var22 - var49 * var24;
-                double var61 = var49 * var22 + var55 * var24;
-                GX_Vertex(vertex_property_t(vec3f(var14 + var57, var16 + var53, var18 + var61), 0, 0, 255, 255, 255, 255, 255));
+                var12 = 1.0 / std::sqrt(var12);
+                var4 *= var12;
+                var6 *= var12;
+                var8 *= var12;
+                double var14 = var4 * 100.0;
+                double var16 = var6 * 100.0;
+                double var18 = var8 * 100.0;
+                double var20 = std::atan2(var4, var8);
+                double var22 = std::sin(var20);
+                double var24 = std::cos(var20);
+                double var26 = std::atan2(std::sqrt(var4 * var4 + var8 * var8), var6);
+                double var28 = std::sin(var26);
+                double var30 = std::cos(var26);
+                double var32 = JavaLCGDouble() * M_TWOPI;
+                double var34 = std::sin(var32);
+                double var36 = std::cos(var32);
+
+                for (int var38 = 0; var38 < 4; ++var38)
+                {
+                    double var39 = 0.0;
+                    double var41 = (double)((var38 & 2) - 1) * var10;
+                    double var43 = (double)(((var38 + 1) & 2) - 1) * var10;
+                    double var47 = var41 * var36 - var43 * var34;
+                    double var49 = var43 * var36 + var41 * var34;
+                    double var53 = var47 * var28 + var39 * var30;
+                    double var55 = var39 * var28 - var47 * var30;
+                    double var57 = var55 * var22 - var49 * var24;
+                    double var61 = var49 * var22 + var55 * var24;
+                    vertices[index++] = vec3f(var14 + var57, var16 + var53, var18 + var61);
+                }
             }
-            star_count++;
         }
     }
-    GX_EndGroup();
-    stars_len = GX_EndDispList();
-    DCInvalidateRange(ret, len);
-    stars = ret;
-    if (!stars || !stars_len)
+    JavaLCGInit(10842);
+    int brightness_level = (GetStarBrightness() * 255);
+    if (brightness_level > 0)
     {
-        printf("Star count invalid: %d\n", star_count);
-    }
-    else
-    {
-        printf("Star count: %d\n", star_count);
+        GX_BeginGroup(GX_QUADS, 780 << 2);
+        for (int i = 0; i < (780 << 2); i++)
+            GX_Vertex(vertex_property_t(vertices[i], 0, 0, brightness_level, brightness_level, brightness_level, brightness_level));
+        GX_EndGroup();
     }
 }
 
-void DrawStars(Mtx view)
+void DrawSky(Mtx view, GXColor background)
 {
-    if (!stars || !stars_len)
-        return;
+    // The normals of the sky elements are inverted. Fix this by disabling backface culling
+    GX_SetCullMode(GX_CULL_NONE);
+
+    // Disable fog
+    GX_SetFog(GX_FOG_NONE, RENDER_DISTANCE * 0.67f * 16 - 16, RENDER_DISTANCE * 0.67f * 16 - 8, 0.1F, 3000.0F, background);
+
+    // Use additive blending
+    GX_SetBlendMode(GX_BM_BLEND, GX_BL_ONE, GX_BL_ONE, GX_LO_NOOP);
+
+    PrepareTexture(white_texture);
+
+    Mtx celestial_rotated_view;
     GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
-    //Transform(view, player_pos);
-    GX_CallDispList(ALIGNPTR(stars), stars_len); // Draw the box
+
+    guVector axis{1, 0, 0};
+    guMtxRotAxisDeg(celestial_rotated_view, &axis, GetCelestialAngle() * 360.0f);
+    guMtxConcat(view, celestial_rotated_view, celestial_rotated_view);
+
+    Transform(celestial_rotated_view, player_pos);
+    GenerateStars();
+    float size = 30.0f;
+    float dist = 98.0f;
+
+    // Draw sun
+    PrepareTexture(sun_texture);
+    GX_BeginGroup(GX_QUADS, 4);
+    GX_Vertex(vertex_property_t(vec3f(-size, +dist, -size), 0x000, 0x000));
+    GX_Vertex(vertex_property_t(vec3f(+size, +dist, -size), 0x100, 0x000));
+    GX_Vertex(vertex_property_t(vec3f(+size, +dist, +size), 0x100, 0x100));
+    GX_Vertex(vertex_property_t(vec3f(-size, +dist, +size), 0x000, 0x100));
+    GX_EndGroup();
+
+    // Draw moon
+    PrepareTexture(moon_texture);
+    GX_BeginGroup(GX_QUADS, 4);
+    GX_Vertex(vertex_property_t(vec3f(-size, -dist, +size), 0x000, 0x100));
+    GX_Vertex(vertex_property_t(vec3f(+size, -dist, +size), 0x100, 0x100));
+    GX_Vertex(vertex_property_t(vec3f(+size, -dist, -size), 0x100, 0x000));
+    GX_Vertex(vertex_property_t(vec3f(-size, -dist, -size), 0x000, 0x000));
+    GX_EndGroup();
+
+    // Enable fog but place it further away.
+    GX_SetFog(GX_FOG_PERSP_LIN, RENDER_DISTANCE * 2 * 16 - 16, RENDER_DISTANCE * 3 * 16 - 16, 0.1F, 3000.0F, background);
+
+    // Use default blend mode
+    GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_NOOP);
+    GX_SetAlphaUpdate(GX_TRUE);
+    GX_SetAlphaCompare(GX_ALWAYS, 0, GX_AOP_OR, GX_ALWAYS, 0);
+    GX_SetColorUpdate(GX_TRUE);
+
+    // Here we use 0 fractional bits for the position data, because we're drawing large objects.
+    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, 0);
+
+    // Clouds texture is massive.
+    size = 2048.0f / BASE3D_POS_FRAC;
+
+    // The clouds are placed at y=108
+    dist = 108.0f / BASE3D_POS_FRAC;
+
+    // Reset transform and move the clouds
+    Transform(view, guVector{0, 0, ((tickCounter % 40960) + partialTicks) * 0.05f});
+
+    // Get sky color
+    float sky_multiplier = GetSkyMultiplier();
+    uint8_t sky_r = (sky_multiplier * 229.5f + 25.5f);
+    uint8_t sky_g = (sky_multiplier * 229.5f + 25.5f);
+    uint8_t sky_b = (sky_multiplier * 216.75f + 38.25f);
+
+    // Draw clouds
+    PrepareTexture(clouds_texture);
+    GX_BeginGroup(GX_QUADS, 4);
+    GX_Vertex(vertex_property_t(vec3f(-size, dist, +size), 0x000, 0x200, sky_r, sky_g, sky_b));
+    GX_Vertex(vertex_property_t(vec3f(+size, dist, +size), 0x200, 0x200, sky_r, sky_g, sky_b));
+    GX_Vertex(vertex_property_t(vec3f(+size, dist, -size), 0x200, 0x000, sky_r, sky_g, sky_b));
+    GX_Vertex(vertex_property_t(vec3f(-size, dist, -size), 0x000, 0x000, sky_r, sky_g, sky_b));
+    GX_EndGroup();
 }
 
 void PrepareOutline()
@@ -333,8 +451,7 @@ int main(int argc, char **argv)
     Mtx view; // view and perspective matrices
     Mtx44 perspective;
     void *gpfifo = NULL;
-    GXColor day_background = {0x8D, 0xBB, 0xFF, 0xFF};
-    GXColor night_background = {0x03, 0x03, 0x04, 0xFF};
+    GXColor day_background = {0x88, 0xBB, 0xFF, 0xFF};
     GXColor target_background = day_background;
     GXColor background = day_background;
     float current_lerpvalue = 1.f;
@@ -342,9 +459,9 @@ int main(int argc, char **argv)
     TPLFile blockmapTPL;
     TPLFile water_stillTPL;
     TPLFile whiteTPL;
-    GXTexObj texture;
-    GXTexObj water_still_texture;
-    GXTexObj white_texture;
+    TPLFile cloudsTPL;
+    TPLFile sunTPL;
+    TPLFile moonTPL;
     threadqueue_init();
 
     VIDEO_Init();
@@ -395,9 +512,6 @@ int main(int argc, char **argv)
     {
         GX_SetPixelFmt(GX_PF_RGBA6_Z24, GX_ZC_LINEAR);
     }
-
-    GX_SetCullMode(GX_CULL_BACK);
-    // GX_SetCullMode(GX_CULL_NONE);
     GX_CopyDisp(frameBuffer[fb], GX_TRUE);
     GX_SetDispCopyGamma(GX_GM_1_0);
 
@@ -413,13 +527,13 @@ int main(int argc, char **argv)
     GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
     GX_SetVtxDesc(GX_VA_TEX0, GX_DIRECT);
     GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, BASE3D_POS_FRAC_BITS);
-    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_NRM, GX_NRM_XYZ, GX_S8, BASE3D_NRM_FRAC_BITS);
+    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_NRM, GX_NRM_XYZ, GX_F32, 0);
     GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_CLR0, GX_CLR_RGBA, GX_RGBA8, 0);
     GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_TEX0, GX_TEX_ST, GX_U16, BASE3D_UV_FRAC_BITS);
     // set number of rasterized color channels
     GX_SetNumChans(1);
-    GX_SetChanCtrl(GX_COLOR0, DIRECTIONAL_LIGHT, GX_SRC_REG, GX_SRC_VTX, GX_LIGHT0 | GX_LIGHT1 | GX_LIGHT2, GX_DF_CLAMP, GX_AF_SPOT);
-    GX_SetChanAmbColor(GX_COLOR0, GXColor{160, 160, 160, 255});
+    GX_SetChanCtrl(GX_COLOR0, DIRECTIONAL_LIGHT, GX_SRC_REG, GX_SRC_VTX, GX_LIGHT0, GX_DF_CLAMP, GX_AF_SPOT);
+    GX_SetChanAmbColor(GX_COLOR0, GXColor{0, 0, 0, 255});
     GX_SetChanMatColor(GX_COLOR0, GXColor{255, 255, 255, 255});
     //  set number of textures to generate
     GX_SetNumTexGens(1);
@@ -429,17 +543,33 @@ int main(int argc, char **argv)
 
     // Water still texture
     TPL_OpenTPLFromMemory(&water_stillTPL, (void *)water_still_tpl, water_still_tpl_size);
-    TPL_GetTexture(&water_stillTPL, water_still, &water_still_texture);
+    TPL_GetTexture(&water_stillTPL, 0, &water_still_texture);
     GX_InitTexObjFilterMode(&water_still_texture, GX_NEAR, GX_NEAR);
-    // Terrain texture
-    TPL_OpenTPLFromMemory(&blockmapTPL, (void *)blockmap_tpl, blockmap_tpl_size);
-    TPL_GetTexture(&blockmapTPL, blockmap, &texture);
-    GX_InitTexObjFilterMode(&texture, GX_NEAR, GX_NEAR);
 
     // Terrain texture
+    TPL_OpenTPLFromMemory(&blockmapTPL, (void *)blockmap_tpl, blockmap_tpl_size);
+    TPL_GetTexture(&blockmapTPL, 0, &texture);
+    GX_InitTexObjFilterMode(&texture, GX_NEAR, GX_NEAR);
+
+    // White texture
     TPL_OpenTPLFromMemory(&whiteTPL, (void *)white_tpl, white_tpl_size);
-    TPL_GetTexture(&whiteTPL, blockmap, &white_texture);
+    TPL_GetTexture(&whiteTPL, 0, &white_texture);
     GX_InitTexObjFilterMode(&white_texture, GX_NEAR, GX_NEAR);
+
+    // Clouds texture
+    TPL_OpenTPLFromMemory(&cloudsTPL, (void *)clouds_tpl, clouds_tpl_size);
+    TPL_GetTexture(&cloudsTPL, 0, &clouds_texture);
+    GX_InitTexObjFilterMode(&clouds_texture, GX_NEAR, GX_NEAR);
+
+    // Sun texture
+    TPL_OpenTPLFromMemory(&sunTPL, (void *)sun_tpl, sun_tpl_size);
+    TPL_GetTexture(&sunTPL, 0, &sun_texture);
+    GX_InitTexObjFilterMode(&sun_texture, GX_NEAR, GX_NEAR);
+
+    // Moon texture
+    TPL_OpenTPLFromMemory(&moonTPL, (void *)moon_tpl, moon_tpl_size);
+    TPL_GetTexture(&moonTPL, 0, &moon_texture);
+    GX_InitTexObjFilterMode(&moon_texture, GX_NEAR, GX_NEAR);
 
     uint32_t texture_buflen = GX_GetTexBufferSize(GX_GetTexObjWidth(&texture), GX_GetTexObjHeight(&texture), GX_GetTexObjFmt(&texture), GX_FALSE, GX_FALSE);
     void *texture_ptr = MEM_PHYSICAL_TO_K1(GX_GetTexObjData(&texture));
@@ -447,8 +577,8 @@ int main(int argc, char **argv)
     texanim_t water_still_anim;
     water_still_anim.source = MEM_PHYSICAL_TO_K1(GX_GetTexObjData(&water_still_texture));
     water_still_anim.target = texture_ptr;
-    ExtractTPLInfo(water_still_anim, TA_SRC, &water_stillTPL, water_still);
-    ExtractTPLInfo(water_still_anim, TA_DST, &blockmapTPL, blockmap);
+    ExtractTPLInfo(water_still_anim, TA_SRC, &water_stillTPL, 0);
+    ExtractTPLInfo(water_still_anim, TA_DST, &blockmapTPL, 0);
     water_still_anim.tile_width = 16;
     water_still_anim.tile_height = 16;
     water_still_anim.dst_x = 208;
@@ -466,7 +596,7 @@ int main(int argc, char **argv)
     f32 w = rmode->viWidth;
     f32 h = rmode->viHeight;
     f32 FOV = 90;
-    guPerspective(perspective, FOV, (f32)w / h, 0.1F, 300.0F);
+    guPerspective(perspective, FOV, (f32)w / h, 0.1F, 3000.0F);
     GX_LoadProjectionMtx(perspective, GX_PERSPECTIVE);
 
     Camera camera = {
@@ -492,33 +622,33 @@ int main(int argc, char **argv)
     VIDEO_WaitVSync();
     GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
     PrepareOutline();
-    PrepareStars();
     GX_SetZCompLoc(GX_FALSE);
     player_pos.x = 0;
     player_pos.y = -1000;
     player_pos.z = 0;
     VIDEO_SetPostRetraceCallback(&RenderDone);
     main_thread = LWP_GetSelf();
-    GX_SetArray(GX_VA_NRM, face_normals, sizeof(int8_t));
+    init_face_normals();
     PrepareTEV();
     std::deque<chunk_t *> &chunks = get_chunks();
     while (!isExiting)
     {
         u64 frame_start = time_get();
-        float light_time_value = (1 + std::clamp(std::sin((tickCounter - 12000) * (M_PI / 24000)) * 8.0, -1.0, 1.0)) / 2.0f;
+        float sky_multiplier = GetSkyMultiplier();
         if (HWButton != -1)
             break;
-        LightMapBlend(light_day_rgba, light_night_rgba, light_map, uint8_t(light_time_value * 255));
+        GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, BASE3D_POS_FRAC_BITS);
+        LightMapBlend(light_day_rgba, light_night_rgba, light_map, 255 - uint8_t(sky_multiplier * 255));
         GX_SetArray(GX_VA_CLR0, light_map, 4 * sizeof(u8));
-        target_background = ColorBlend(day_background, night_background, std::clamp(light_time_value, 0.0f, 1.0f));
-        star_visibility = std::clamp(light_time_value, 0.0f, 1.0f);
+        GX_InvVtxCache();
+        target_background = GXColor{uint8_t(0x88 * sky_multiplier), uint8_t(0xBB * sky_multiplier), uint8_t(0xFF * sky_multiplier), 255};
         float target = std::pow(std::clamp((player_pos.y) * 0.03125f, 0.0f, 1.0f), 2.0f);
         current_lerpvalue = target; // lerp(current_lerpvalue, target, 0.05f);
         background.r = u8(current_lerpvalue * target_background.r);
         background.g = u8(current_lerpvalue * target_background.g);
         background.b = u8(current_lerpvalue * target_background.b);
         GX_SetCopyClear(background, 0x00FFFFFF);
-        GX_SetFog(GX_FOG_PERSP_LIN, RENDER_DISTANCE * 0.67f * 16 - 16, RENDER_DISTANCE * 0.67f * 16 - 8, 0.1F, 300.0F, background);
+        GX_SetFog(GX_FOG_PERSP_LIN, RENDER_DISTANCE * 0.67f * 16 - 16, RENDER_DISTANCE * 0.67f * 16 - 8, 0.1F, 3000.0F, background);
         if (player_pos.y < -999)
             player_pos.y = skycast(vec3i(int(player_pos.x), 0, int(player_pos.z))) + 2;
         UpdateLightDir();
@@ -546,6 +676,9 @@ int main(int argc, char **argv)
 
         UpdateScene(chunks);
 
+        // Enable backface culling for terrain
+        GX_SetCullMode(GX_CULL_BACK);
+
         // Draw opaque buffer
         GX_SetZMode(GX_TRUE, GX_LESS, GX_TRUE);
         GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_NOOP);
@@ -560,11 +693,8 @@ int main(int argc, char **argv)
         GX_SetAlphaCompare(GX_GEQUAL, 16, GX_AOP_AND, GX_ALWAYS, 0);
         GX_SetColorUpdate(GX_TRUE);
         DrawScene(view, frustum, chunks, true);
-
-        GX_SetFog(GX_FOG_NONE, RENDER_DISTANCE * 0.67f * 16 - 16, RENDER_DISTANCE * 0.67f * 16 - 8, 0.1F, 300.0F, background);
-        //GX_SetBlendMode(GX_BM_BLEND, GX_BL_ONE, GX_BL_ONE, GX_LO_NOOP);
-        PrepareTexture(white_texture);
-        DrawStars(view);
+        // Draw sky
+        DrawSky(view, background);
         GX_DrawDone();
 
         GX_CopyDisp(frameBuffer[fb], GX_TRUE);
@@ -605,6 +735,10 @@ void GetInput()
     if ((wiimote1_down & WPAD_BUTTON_1))
     {
         printf("PRIM_CHUNK_MEMORY: %d B\n", total_chunks_size);
+    }
+    if ((wiimote1_down & WPAD_BUTTON_2))
+    {
+        tickCounter += 6000;
     }
 
     expansion_t expansion;
@@ -692,35 +826,14 @@ void UpdateLightDir()
 {
     if (!DIRECTIONAL_LIGHT)
         return;
-    GXLightObj lights[3];
-    guVector dir{.25, 0., .75};
-    guVecNormalize(&dir);
-
-    guVector look_dir = dir;
-
-    for (int i = 0; i < 3; i++)
-    {
-        if (i == 0)
-        {
-            look_dir.x = 0;
-            look_dir.y = 1;
-            look_dir.z = 0;
-        }
-        else if (i == 2)
-        {
-            look_dir.x = -dir.x;
-            look_dir.z = -dir.z;
-        }
-        else
-            look_dir = dir;
-        uint8_t intensity = uint8_t(255 - (i * 32));
-        GX_InitLightPos(&lights[i], look_dir.x * -1024, look_dir.y * -1024, look_dir.z * -1024);
-        GX_InitLightColor(&lights[i], GXColor{intensity, intensity, intensity, 255});
-        GX_InitLightAttnA(&lights[i], 1, 1, 1);
-        GX_InitLightDistAttn(&lights[i], 1.0, 1.0, GX_DA_OFF);
-        GX_InitLightDir(&lights[i], look_dir.x, look_dir.y, look_dir.z);
-        GX_LoadLightObj(&lights[i], 1 << i);
-    }
+    GXLightObj light;
+    guVector look_dir{0, 1, 0};
+    GX_InitLightPos(&light, look_dir.x * -8192, look_dir.y * -8192, look_dir.z * -8192);
+    GX_InitLightColor(&light, GXColor{255, 255, 255, 255});
+    GX_InitLightAttnA(&light, 1.0, 0.0, 0.0);
+    GX_InitLightDistAttn(&light, 1.0, 1.0, GX_DA_OFF);
+    GX_InitLightDir(&light, look_dir.x, look_dir.y, look_dir.z);
+    GX_LoadLightObj(&light, GX_LIGHT0);
 }
 
 void Transform(Mtx view, guVector chunkPos)
@@ -812,24 +925,24 @@ inline void RecalcSectionWater(chunk_t *chunk, int section)
 
 void GenerateAdditionalChunks(std::deque<chunk_t *> &chunks)
 {
+    if (chunks.size() >= CHUNK_COUNT)
+    {
+        return;
+    }
     for (int x = player_pos.x - GENERATION_DISTANCE; x < player_pos.x + GENERATION_DISTANCE; x += 8)
     {
-        if (chunks.size() >= CHUNK_COUNT || has_pending_chunks())
-            break;
         int distance = std::abs(x - int(player_pos.x));
         if (distance > GENERATION_DISTANCE)
-            break;
+            return;
         for (int z = player_pos.z - GENERATION_DISTANCE; z < player_pos.z + GENERATION_DISTANCE; z += 8)
         {
-            if (chunks.size() >= CHUNK_COUNT || has_pending_chunks())
-                break;
             distance = std::abs(z - int(player_pos.z));
             if (distance > GENERATION_DISTANCE)
-                break;
-            chunk_t *chunk = get_chunk_from_pos(vec3i(x, 0, z), true, false);
-            if (!chunk)
+                return;
+            if (!get_chunk_from_pos(vec3i(x, 0, z), true, false))
             {
                 threadqueue_broadcast();
+                return;
             }
         }
     }
@@ -946,13 +1059,15 @@ void UpdateChunkVBOs(std::deque<chunk_t *> &chunks)
     int chunk_update_count = 0;
     for (chunk_t *&chunk : chunks)
     {
-        if (!chunk || chunk_update_count >= 8)
+        if (!chunk || chunk_update_count >= 1)
             continue;
         if (chunk->valid && !chunk->light_updates)
         {
             bool chunk_updated = false;
             for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
             {
+                if (light_engine_busy())
+                    return;
                 chunkvbo_t &vbo = chunk->vbos[j];
                 if (!vbo.visible)
                     continue;

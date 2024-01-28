@@ -14,6 +14,8 @@
 #define GENERATION_DISTANCE ((RENDER_DISTANCE - 1) * 16)
 #define VERTICAL_SECTION_COUNT 16
 
+#define WORLDGEN_TREE_ATTEMPTS 8
+
 #define VBO_SOLID 1
 #define VBO_TRANSPARENT 2
 #define VBO_ALL 0xFF
@@ -55,6 +57,19 @@ public:
         return &this->blockstates[(pos.x & 0xF) | ((pos.y & 0xFF) << 4) | ((pos.z & 0xF) << 12)];
     }
 
+    void set_block(vec3i pos, BlockID block_id)
+    {
+        this->blockstates[(pos.x & 0xF) | ((pos.y & 0xFF) << 4) | ((pos.z & 0xF) << 12)].set_blockid(block_id);
+    }
+
+    void replace_air(vec3i position, BlockID id)
+    {
+        block_t *block = this->get_block(position);
+        if (block->get_blockid() != BlockID::air)
+            return;
+        block->set_blockid(id);
+    }
+
     void update_height_map(vec3i pos);
     void recalculate();
     void light_up();
@@ -83,8 +98,8 @@ private:
 // 3 = -x, +z
 extern const vec3i face_offsets[];
 
-void lock_chunks();
-void unlock_chunks();
+bool lock_chunks();
+bool unlock_chunks();
 std::deque<chunk_t *> &get_chunks();
 void init_chunks();
 void deinit_chunks();

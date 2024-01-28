@@ -90,16 +90,8 @@ void CPUGX_End()
 }
 int CPUGX_EndDispList()
 { 
-    u64 diff = ((char *)current_buffer - (char *)buffer_start);
-    u64 bytes_to_add = 32;
-    if ((diff & 0x1F))
-    {
-        bytes_to_add += (diff & 0x1F);
-        diff = (diff + 32) & ~0x1F;
-    }
-    diff += 32;
-    memset(current_buffer, 0, bytes_to_add);
-    //printf("DISPLIST_DIFF=%d", int(diff - current_size));
+    u32 diff = ((char *)current_buffer - (char *)buffer_start);
+    memset(current_buffer, 0, current_size - diff);
     return diff;
 }
 

@@ -43,13 +43,13 @@ lwp_t __chunk_generator_thread_handle = (lwp_t)NULL;
 bool __chunk_generator_init_done = false;
 void *__chunk_generator_init_internal(void *);
 
-void lock_chunks()
+bool lock_chunks()
 {
-    LWP_MutexLock(__chunks_mutex);
+    return LWP_MutexLock(__chunks_mutex);
 }
-void unlock_chunks()
+bool unlock_chunks()
 {
-    LWP_MutexUnlock(__chunks_mutex);
+    return LWP_MutexUnlock(__chunks_mutex);
 }
 
 std::deque<chunk_t *> chunks;
@@ -107,7 +107,8 @@ void add_chunk(vec3i pos)
     if (pending_chunks.size() >= RENDER_DISTANCE)
         return;
 
-    lock_chunks();
+    while (lock_chunks())
+        threadqueue_yield();
     for (chunk_t *&m_chunk : pending_chunks)
     {
         if (m_chunk && m_chunk->x == pos.x && m_chunk->z == pos.z)
@@ -155,11 +156,9 @@ uint32_t fastrand()
 /* The state must be initialized to non-zero */
 void treerand(int x, int z, uint32_t *output, uint32_t count)
 {
-    float v = float(z) + 0.19f;
-    v += float(x + 327) + 0.67f;
-
-    float *v_ptr = &v;
-    uint32_t a = *((uint32_t *)v_ptr);
+    float v = float(z * (x + 327) + z) + 0.19f;
+    uint32_t a;
+    memcpy(&a, &v, 4);
     /* Algorithm "xor" from p. 4 of Marsaglia, "Xorshift RNGs" */
     while (count-- > 0)
     {
@@ -167,18 +166,6 @@ void treerand(int x, int z, uint32_t *output, uint32_t count)
         a ^= a >> 17;
         a ^= a << 5;
         *(output++) = a;
-    }
-}
-
-void set_block_within_chunk(vec3i position, chunk_t *chunk, BlockID id, bool air_check = false)
-{
-    vec3i chunk_pos = block_to_chunk_pos(position);
-    if (chunk_pos.x == chunk->x && chunk_pos.z == chunk->z)
-    {
-        block_t *block = chunk->get_block(position);
-        if (air_check && block->get_blockid() != BlockID::air)
-            return;
-        block->set_blockid(id);
     }
 }
 
@@ -198,7 +185,7 @@ void plant_tree(vec3i position, chunk_t *chunk, int height)
             for (int z = -2; z <= 2; z++)
             {
                 vec3i leaves_pos = position + vec3i(x, y, z);
-                set_block_within_chunk(leaves_pos, chunk, BlockID::leaves, true);
+                chunk->replace_air(leaves_pos, BlockID::leaves);
             }
     }
     // Place narrow part of leaves
@@ -210,65 +197,53 @@ void plant_tree(vec3i position, chunk_t *chunk, int height)
             {
                 vec3i leaves_off = vec3i(x, y, z);
                 // Place the leaves in a "+" pattern at the top.
-                if (y == height && std::abs(x) == std::abs(z) && (x | z))
+                if (y == height && (x | z) && std::abs(x) == std::abs(z))
                     continue;
-                set_block_within_chunk(position + leaves_off, chunk, BlockID::leaves, true);
+                chunk->replace_air(position + leaves_off, BlockID::leaves);
             }
         }
     }
     // Place tree logs
     for (int y = 0; y < height; y++)
     {
-        vec3i log_pos = position + vec3i(0, y, 0);
-        set_block_within_chunk(log_pos, chunk, BlockID::wood, false);
+        chunk->set_block(position, BlockID::wood);
+        ++position.y;
     }
 }
 
-void generate_trees(chunk_t *chunk, uint8_t *height_map)
+void generate_trees(chunk_t *chunk)
 {
-    const static uint32_t tree_count = 8;
-    const static int tree_noise_offset = 16384;
-    uint32_t tree_positions[tree_count];
-    for (int x = chunk->x - 1; x <= chunk->x + 1; x++)
+    static uint32_t tree_positions[WORLDGEN_TREE_ATTEMPTS];
+    treerand(chunk->x, chunk->z, tree_positions, WORLDGEN_TREE_ATTEMPTS);
+    for (uint32_t c = 0; c < WORLDGEN_TREE_ATTEMPTS; c++)
     {
-        for (int z = chunk->z - 1; z <= chunk->z + 1; z++)
-        {
-            treerand(x, z, tree_positions, tree_count);
-            for (uint32_t c = 0; c < tree_count; c++)
-            {
-                uint32_t tree_value = tree_positions[c];
-                vec3i tree_pos((tree_value & 15) + (x * 16), 0, ((tree_value >> 24) & 15) + (z * 16));
-                int tree_altitude = height_map[(tree_pos.x & 15) | (tree_pos.z & 15)];
-                tree_pos.y = tree_altitude;
+        uint32_t tree_value = tree_positions[c];
+        vec3i tree_pos((tree_value & 15), 0, ((tree_value >> 24) & 15));
 
-                // Trees should only grow on top of the sea level
-                bool plant = (tree_altitude >= 64);
-                // 5% Chance to plant the tree based on the tree noise map.
-                // plant &= std::abs(noise.GetNoise(float(tree_pos.x + tree_noise_offset), float(tree_pos.z))) < 0.05f;
-                // Dirty fix: Just don't place trees at chunk borders
-                plant &= ((tree_pos.x & 15) >= 2 && (tree_pos.x & 15) <= 13 && (tree_pos.z & 15) >= 2 && (tree_pos.z & 15) <= 13);
-                if (plant)
-                {
-                    int tree_height = (tree_value >> 28) & 3;
-                    plant_tree(tree_pos, chunk, 3 + tree_height);
-                }
-            }
+        // Dirty fix: Just don't place trees at chunk borders
+        if (tree_pos.x < 2 || tree_pos.x > 13 || tree_pos.z < 2 || tree_pos.z > 13)
+            continue;
+
+        // Place the trees on above ground.
+        tree_pos.y = chunk->height_map[tree_pos.x | (tree_pos.z << 4)] + 1;
+
+        // Trees should only grow on top of the sea level
+        if (tree_pos.y >= 64)
+        {
+            int tree_height = (tree_value >> 28) & 3;
+            plant_tree(tree_pos, chunk, 3 + tree_height);
         }
     }
 }
 
 void generate_chunk()
 {
-    static uint8_t height_map[256];
     while (pending_chunks.size() == 0)
     {
+        threadqueue_sleep();
         if (!__chunk_generator_init_done)
             return;
-        threadqueue_sleep();
     }
-    if (!__chunk_generator_init_done)
-        return;
-
     chunk_t *chunk = pending_chunks.back();
     if (!chunk)
         return;
@@ -277,36 +252,22 @@ void generate_chunk()
     int index = 0;
 
     for (int z = 0; z < 16; z++)
+    {
         for (int x = 0; x < 16; x++)
-            height_map[index++] = uint8_t(noise.GetNoise(float(x + x_offset), float(z + z_offset)) * 16.0f) + 64;
-
-    // static vec3i noise_size = vec3i(16, 1, 16);
-    // vec3f noise_pos = vec3f(x_offset, 0.25f, z_offset);
-    // improved_noise.noise_set(noise_pos, noise_size, 64.0f, 32.0f, height_map);
+        {
+            // The chunk's heightmap is used differently here. In particular,
+            // it's used for storing the noise value for later parts of the
+            // terrain generation, like the altitude of trees and caves.
+            chunk->height_map[index++] = uint8_t(noise.GetNoise(float(x + x_offset), float(z + z_offset)) * 16.0f + 64.0f);
+        }
+    }
     index = 0;
     for (int z = 0; z < 16; z++)
     {
         for (int x = 0; x < 16; x++)
         {
-            uint8_t value = height_map[index++];
-            /*int y = 1;
-            block_t *y0_block = chunk->get_block(x, 0, z);
-            size_t y_diff = (chunk->get_block(x, 1, z) - y0_block);
-            block_t *block = y0_block;
-            (block += y_diff)->set_blockid(BlockID::bedrock);
-            while (y++ <= 4)
-                (block += y_diff)->id = uint8_t((fastrand() & 1) ? BlockID::bedrock : BlockID::stone);
-            while (y++ <= value - 3)
-                (block += y_diff)->id = uint8_t(BlockID::stone);
-            while (y++ <= value)
-                (block += y_diff)->id = uint8_t(BlockID::dirt);
-            while (y++ <= 63)
-                (block += y_diff)->id = uint8_t(BlockID::water);
-            if (value >= 62)
-                chunk->get_block(x, value - 1, z)->id = uint8_t(BlockID::grass);
-            while ((block -= y_diff) > y0_block)
-                block->visibility_flags = 64;*/
-            for (int y = 0; y < 256; y++)
+            uint8_t value = chunk->height_map[index++];
+            for (int y = 0; y < 64 || y <= value; y++)
             {
                 BlockID id = BlockID::air;
                 // Coat with grass
@@ -327,33 +288,45 @@ void generate_chunk()
                 // Bottom layer is bedrock
                 else if (!y)
                     id = BlockID::bedrock;
-                block_t *block = chunk->get_block(vec3i(x, y, z));
-                block->set_blockid(id);
+                chunk->set_block(vec3i(x, y, z), id);
             }
         }
     }
     // Carve caves
     index = 0;
     for (int z = 0; z < 16; z++)
+    {
         for (int x = 0; x < 16; x++)
         {
-            uint8_t height = height_map[index++];
-            for (int y = height; y >= 5; y--)
+
+            while (lock_chunks())
+                threadqueue_yield();
+            uint8_t height = chunk->height_map[index++];
+            for (int y = height; y >= 0; y--)
             {
+                block_t* block = chunk->get_block(vec3i(x, y, z));
                 float noise_value = (cave_noise.GetNoise(float(x + x_offset), float(y), float(z + z_offset)));
                 if (noise_value < -.5f && (height > 63 || abs(height - y) > 2))
-                    chunk->get_block(vec3i(x, y, z))->set_blockid(BlockID::air);
-                threadqueue_yield();
+                    block->set_blockid(y >= 5 ? BlockID::air : BlockID::lava);
             }
+            unlock_chunks();
         }
-    generate_trees(chunk, height_map);
+    }
+    generate_trees(chunk);
+
+    // Reset chunk heightmap for further use.
+    memset(chunk->height_map, 0, 256);
+
+    // If the chunk generator has already been de-initialized
+    // during generation, clean up the chunk and return
     if (!__chunk_generator_init_done)
     {
         delete chunk;
         return;
     }
     chunk->valid = true;
-    lock_chunks();
+    while (lock_chunks())
+        threadqueue_yield();
     chunks.push_back(chunk);
     pending_chunks.erase(
         std::remove_if(pending_chunks.begin(), pending_chunks.end(),
@@ -361,18 +334,16 @@ void generate_chunk()
                        { return !c || c->valid; }),
         pending_chunks.end());
     unlock_chunks();
-    for (int i = -1; i <= 1; i += 2)
-    {
-        chunk_t *chunkX = get_chunk(vec3i(chunk->x + i, 0, chunk->z), false, false);
-        chunk_t *chunkZ = get_chunk(vec3i(chunk->x, 0, chunk->z + i), false, false);
-        if (chunkX)
-            for (int vbo_y = 0; vbo_y < 16; vbo_y++)
-                chunkX->vbos[vbo_y].dirty = true;
-        if (chunkZ)
-            for (int vbo_y = 0; vbo_y < 16; vbo_y++)
-                chunkZ->vbos[vbo_y].dirty = true;
-    }
-    // printf("Generated chunk %d, %d", chunk->x, chunk->z);
+    chunk_t *neighbor_chunks[4];
+    neighbor_chunks[0] = get_chunk(vec3i(chunk->x + 1, 0, chunk->z), false, false);
+    neighbor_chunks[1] = get_chunk(vec3i(chunk->x - 1, 0, chunk->z), false, false);
+    neighbor_chunks[2] = get_chunk(vec3i(chunk->x, 0, chunk->z + 1), false, false);
+    neighbor_chunks[3] = get_chunk(vec3i(chunk->x, 0, chunk->z - 1), false, false);
+    chunk_t **c = neighbor_chunks;
+    for (int i = 0; i < 4; i++, c++)
+        for (int vbo_y = 0; vbo_y < 16; vbo_y++)
+            if (*c)
+                (*c)->vbos[vbo_y].dirty = true;
 }
 
 void print_chunk_status()
@@ -412,7 +383,7 @@ void *__chunk_generator_init_internal(void *)
     noise.SetFractalType(FastNoiseLite::FractalType_FBm);
     noise.SetFractalOctaves(2);
 
-    cave_noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2S);
+    cave_noise.SetNoiseType(FastNoiseLite::NoiseType_Perlin);
     cave_noise.SetFrequency(1 / 12.0f);
     cave_noise.SetSeed(cavegen_seed = fastrand());
     cave_noise.SetFractalType(FastNoiseLite::FractalType_None);
@@ -813,13 +784,13 @@ int DrawHorizontalQuad(vertex_property_t p0, vertex_property_t p1, vertex_proper
     uint8_t curr = min_vertex.index;
     for (int i = 0; i < 3; i++)
     {
-        GX_VertexLit(vertices[curr], light, 255);
+        GX_VertexLit(vertices[curr], light, 3);
         curr = (curr + 1) & 3;
     }
     curr = (min_vertex.index + 2) & 3;
     for (int i = 0; i < 3; i++)
     {
-        GX_VertexLit(vertices[curr], light, 255);
+        GX_VertexLit(vertices[curr], light, 3);
         curr = (curr + 1) & 3;
     }
     return 2;
@@ -838,7 +809,7 @@ int DrawVerticalQuad(vertex_property_t p0, vertex_property_t p1, vertex_property
     {
         for (int i = 0; i < 3; i++)
         {
-            GX_VertexLit(vertices[curr], light, 255);
+            GX_VertexLit(vertices[curr], light, 3);
             curr = (curr + 1) & 3;
         }
         faceCount++;
@@ -848,7 +819,7 @@ int DrawVerticalQuad(vertex_property_t p0, vertex_property_t p1, vertex_property
     {
         for (int i = 0; i < 3; i++)
         {
-            GX_VertexLit(vertices[curr], light, 255);
+            GX_VertexLit(vertices[curr], light, 3);
             curr = (curr + 1) & 3;
         }
         faceCount++;
@@ -945,9 +916,7 @@ int chunk_t::render_fluid(block_t *block, vec3i pos)
     // If surrounded by 3, the water texture is flowing to the 1 other direction
     // If surrounded by 4, the water texture is still
 
-    const uint8_t texture_offsets[5] = {
-        205, 206, 207, 222, 223};
-    uint8_t texture_offset = texture_offsets[0];
+    uint8_t texture_offset = get_default_texture_index(block_id);
     /*
         uint8_t count = 0;
         uint8_t bitmask = 0;
@@ -1003,9 +972,9 @@ int chunk_t::render_fluid(block_t *block, vec3i pos)
         {(local_pos + vec3f{-.5f, -.5f + corner_tops[0], -.5f}), texture_start_x, texture_end_y},
     };
     if (!is_same_fluid(block_id, neighbor_ids[FACE_PY]))
-        faceCount += DrawHorizontalQuad(topPlaneCoords[0], topPlaneCoords[1], topPlaneCoords[2], topPlaneCoords[3], neighbors[FACE_PY] ? neighbors[FACE_PY]->light : light);
+        faceCount += DrawHorizontalQuad(topPlaneCoords[0], topPlaneCoords[1], topPlaneCoords[2], topPlaneCoords[3], is_solid(neighbor_ids[FACE_PY]) ? light : neighbors[FACE_PY]->light);
 
-    texture_offset = basefluid(block_id) == BlockID::water ? WATER_SIDE : LAVA_SIDE;
+    texture_offset = get_default_texture_index(block_id);
 
     vertex_property_t sideCoords[4] = {0};
 

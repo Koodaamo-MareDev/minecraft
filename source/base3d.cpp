@@ -5,13 +5,7 @@ bool base3d_is_drawing = false;
 
 #include "ogc/gx.h"
 
-int8_t face_normals[] = {
-    -16, 0, 0,
-    +16, 0, 0,
-    0, -16, 0,
-    0, +16, 0,
-    0, 0, -16,
-    0, 0, +16};
+float face_normals[6 * 3];
 
 uint16_t __group_vtxcount;
 
