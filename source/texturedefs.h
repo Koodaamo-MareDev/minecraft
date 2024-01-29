@@ -27,7 +27,11 @@
 #define VERTEX_ATTR_LENGTH 23
 #endif
 
-#define WATER_SIDE (205)
-#define LAVA_SIDE (239)
+extern GXTexObj white_texture;
+extern GXTexObj clouds_texture;
+extern GXTexObj sun_texture;
+extern GXTexObj moon_texture;
+extern GXTexObj blockmap_texture;
+extern GXTexObj water_still_texture;
 
 #endif

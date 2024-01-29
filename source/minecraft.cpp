@@ -12,12 +12,6 @@
 #include "chunk_new.hpp"
 #include "block.hpp"
 #include "blocks.hpp"
-#include "blockmap_tpl.h"
-#include "clouds_tpl.h"
-#include "sun_tpl.h"
-#include "moon_tpl.h"
-#include "water_still_tpl.h"
-#include "white_tpl.h"
 #include "light_day_rgba.h"
 #include "light_night_rgba.h"
 #include "brightness_values.h"
@@ -39,10 +33,6 @@
 #define MOVEMENT_SPEED 10
 #define DIRECTIONAL_LIGHT GX_ENABLE
 
-float lerp(float a, float b, float f)
-{
-    return a * (1.0 - f) + (b * f);
-}
 bool debug_spritesheet = false;
 lwp_t main_thread;
 f32 xrot = -22.5f;
@@ -50,13 +40,6 @@ f32 yrot = 0.0f;
 guVector player_pos = {0.F, 80.0F, 0.F};
 void *frameBuffer[2] = {NULL, NULL};
 static GXRModeObj *rmode = NULL;
-
-GXTexObj white_texture;
-GXTexObj clouds_texture;
-GXTexObj sun_texture;
-GXTexObj moon_texture;
-GXTexObj texture;
-GXTexObj water_still_texture;
 
 void *outline = nullptr;
 u32 outline_len = 0;
@@ -80,12 +63,11 @@ float prev_right_shoulder = 0;
 bool destroy_block = false;
 bool place_block = false;
 
-void Transform(Mtx view, guVector chunkPos);
+void transform_view(Mtx view, guVector chunkPos);
 void UpdateLightDir();
-void DrawScene(Mtx view, Frustum &frustum, std::deque<chunk_t *> &chunks, bool transparency);
+void DrawScene(Mtx view, frustum_t &frustum, std::deque<chunk_t *> &chunks, bool transparency);
 void UpdateScene(std::deque<chunk_t *> &chunks);
 void PrepareTEV();
-void PrepareTexture(GXTexObj texture);
 void GetInput();
 //---------------------------------------------------------------------------------
 bool isExiting = false;
@@ -159,221 +141,6 @@ void AlphaBlend(unsigned char *src, unsigned char *dst, int width, int height, i
     }
 }
 
-float GetCelestialAngle()
-{
-    int daytime_ticks = (int)(tickCounter % 24000L);
-    float normalized_daytime = ((float)daytime_ticks + partialTicks) / 24000.0F - 0.25F;
-    if (normalized_daytime < 0.0F)
-    {
-        ++normalized_daytime;
-    }
-
-    if (normalized_daytime > 1.0F)
-    {
-        --normalized_daytime;
-    }
-
-    float var4 = normalized_daytime;
-    normalized_daytime = 1.0F - (float)((std::cos((double)normalized_daytime * M_PI) + 1.0) / 2.0);
-    normalized_daytime = var4 + (normalized_daytime - var4) / 3.0F;
-    return normalized_daytime;
-}
-float GetStarBrightness()
-{
-    float var2 = GetCelestialAngle();
-    float var3 = 1.0F - (std::cos(var2 * M_TWOPI) * 2.0F + 0.75F);
-    if (var3 < 0.0F)
-    {
-        var3 = 0.0F;
-    }
-
-    if (var3 > 1.0F)
-    {
-        var3 = 1.0F;
-    }
-
-    return var3 * var3 * 0.5F;
-}
-float GetSkyMultiplier()
-{
-    float var2 = GetCelestialAngle();
-    float var3 = std::cos(var2 * M_TWOPI) * 2.0F + 0.5F;
-    if (var3 < 0.0F)
-    {
-        var3 = 0.0F;
-    }
-
-    if (var3 > 1.0F)
-    {
-        var3 = 1.0F;
-    }
-    return var3;
-}
-
-const float JavaFloatUnit = 1.0f / (0x1000000);
-const double JavaDoubleUnit = 1.0 / (0x20000000000000LL);
-const int64_t MaxJavaLCG = 0xFFFFFFFFFFFFLL;
-int64_t SeedJavaLCG = 0;
-const int64_t AJavaLCG = 25214903917;
-const int64_t CJavaLCG = 11;
-void JavaLCGInit(int64_t seed)
-{
-    SeedJavaLCG = (seed ^ AJavaLCG) & MaxJavaLCG;
-}
-int64_t JavaLCG()
-{
-    SeedJavaLCG = (AJavaLCG * SeedJavaLCG + CJavaLCG) & MaxJavaLCG;
-    return SeedJavaLCG;
-}
-float JavaLCGFloat()
-{
-    return (JavaLCG() >> 24) * JavaFloatUnit;
-}
-double JavaLCGDouble()
-{
-    return (((long)(JavaLCG() >> 26) << 27) + (JavaLCG() >> 21)) * JavaDoubleUnit;
-}
-void GenerateStars()
-{
-    static bool generated = false;
-    static vec3f vertices[780 << 2];
-    if (!generated)
-    {
-        int index = 0;
-        generated = true;
-        for (int var3 = 0; var3 < 1500; ++var3)
-        {
-            double var4 = (double)(JavaLCGFloat() * 2.0F - 1.0F);
-            double var6 = (double)(JavaLCGFloat() * 2.0F - 1.0F);
-            double var8 = (double)(JavaLCGFloat() * 2.0F - 1.0F);
-            double var10 = (double)(0.25F + JavaLCGFloat() * 0.25F);
-            double var12 = var4 * var4 + var6 * var6 + var8 * var8;
-            if (var12 < 1.0 && var12 > 0.01)
-            {
-                var12 = 1.0 / std::sqrt(var12);
-                var4 *= var12;
-                var6 *= var12;
-                var8 *= var12;
-                double var14 = var4 * 100.0;
-                double var16 = var6 * 100.0;
-                double var18 = var8 * 100.0;
-                double var20 = std::atan2(var4, var8);
-                double var22 = std::sin(var20);
-                double var24 = std::cos(var20);
-                double var26 = std::atan2(std::sqrt(var4 * var4 + var8 * var8), var6);
-                double var28 = std::sin(var26);
-                double var30 = std::cos(var26);
-                double var32 = JavaLCGDouble() * M_TWOPI;
-                double var34 = std::sin(var32);
-                double var36 = std::cos(var32);
-
-                for (int var38 = 0; var38 < 4; ++var38)
-                {
-                    double var39 = 0.0;
-                    double var41 = (double)((var38 & 2) - 1) * var10;
-                    double var43 = (double)(((var38 + 1) & 2) - 1) * var10;
-                    double var47 = var41 * var36 - var43 * var34;
-                    double var49 = var43 * var36 + var41 * var34;
-                    double var53 = var47 * var28 + var39 * var30;
-                    double var55 = var39 * var28 - var47 * var30;
-                    double var57 = var55 * var22 - var49 * var24;
-                    double var61 = var49 * var22 + var55 * var24;
-                    vertices[index++] = vec3f(var14 + var57, var16 + var53, var18 + var61);
-                }
-            }
-        }
-    }
-    JavaLCGInit(10842);
-    int brightness_level = (GetStarBrightness() * 255);
-    if (brightness_level > 0)
-    {
-        GX_BeginGroup(GX_QUADS, 780 << 2);
-        for (int i = 0; i < (780 << 2); i++)
-            GX_Vertex(vertex_property_t(vertices[i], 0, 0, brightness_level, brightness_level, brightness_level, brightness_level));
-        GX_EndGroup();
-    }
-}
-
-void DrawSky(Mtx view, GXColor background)
-{
-    // The normals of the sky elements are inverted. Fix this by disabling backface culling
-    GX_SetCullMode(GX_CULL_NONE);
-
-    // Disable fog
-    GX_SetFog(GX_FOG_NONE, RENDER_DISTANCE * 0.67f * 16 - 16, RENDER_DISTANCE * 0.67f * 16 - 8, 0.1F, 3000.0F, background);
-
-    // Use additive blending
-    GX_SetBlendMode(GX_BM_BLEND, GX_BL_ONE, GX_BL_ONE, GX_LO_NOOP);
-
-    PrepareTexture(white_texture);
-
-    Mtx celestial_rotated_view;
-    GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
-
-    guVector axis{1, 0, 0};
-    guMtxRotAxisDeg(celestial_rotated_view, &axis, GetCelestialAngle() * 360.0f);
-    guMtxConcat(view, celestial_rotated_view, celestial_rotated_view);
-
-    Transform(celestial_rotated_view, player_pos);
-    GenerateStars();
-    float size = 30.0f;
-    float dist = 98.0f;
-
-    // Draw sun
-    PrepareTexture(sun_texture);
-    GX_BeginGroup(GX_QUADS, 4);
-    GX_Vertex(vertex_property_t(vec3f(-size, +dist, -size), 0x000, 0x000));
-    GX_Vertex(vertex_property_t(vec3f(+size, +dist, -size), 0x100, 0x000));
-    GX_Vertex(vertex_property_t(vec3f(+size, +dist, +size), 0x100, 0x100));
-    GX_Vertex(vertex_property_t(vec3f(-size, +dist, +size), 0x000, 0x100));
-    GX_EndGroup();
-
-    // Draw moon
-    PrepareTexture(moon_texture);
-    GX_BeginGroup(GX_QUADS, 4);
-    GX_Vertex(vertex_property_t(vec3f(-size, -dist, +size), 0x000, 0x100));
-    GX_Vertex(vertex_property_t(vec3f(+size, -dist, +size), 0x100, 0x100));
-    GX_Vertex(vertex_property_t(vec3f(+size, -dist, -size), 0x100, 0x000));
-    GX_Vertex(vertex_property_t(vec3f(-size, -dist, -size), 0x000, 0x000));
-    GX_EndGroup();
-
-    // Enable fog but place it further away.
-    GX_SetFog(GX_FOG_PERSP_LIN, RENDER_DISTANCE * 2 * 16 - 16, RENDER_DISTANCE * 3 * 16 - 16, 0.1F, 3000.0F, background);
-
-    // Use default blend mode
-    GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_NOOP);
-    GX_SetAlphaUpdate(GX_TRUE);
-    GX_SetAlphaCompare(GX_ALWAYS, 0, GX_AOP_OR, GX_ALWAYS, 0);
-    GX_SetColorUpdate(GX_TRUE);
-
-    // Here we use 0 fractional bits for the position data, because we're drawing large objects.
-    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, 0);
-
-    // Clouds texture is massive.
-    size = 2048.0f / BASE3D_POS_FRAC;
-
-    // The clouds are placed at y=108
-    dist = 108.0f / BASE3D_POS_FRAC;
-
-    // Reset transform and move the clouds
-    Transform(view, guVector{0, 0, ((tickCounter % 40960) + partialTicks) * 0.05f});
-
-    // Get sky color
-    float sky_multiplier = GetSkyMultiplier();
-    uint8_t sky_r = (sky_multiplier * 229.5f + 25.5f);
-    uint8_t sky_g = (sky_multiplier * 229.5f + 25.5f);
-    uint8_t sky_b = (sky_multiplier * 216.75f + 38.25f);
-
-    // Draw clouds
-    PrepareTexture(clouds_texture);
-    GX_BeginGroup(GX_QUADS, 4);
-    GX_Vertex(vertex_property_t(vec3f(-size, dist, +size), 0x000, 0x200, sky_r, sky_g, sky_b));
-    GX_Vertex(vertex_property_t(vec3f(+size, dist, +size), 0x200, 0x200, sky_r, sky_g, sky_b));
-    GX_Vertex(vertex_property_t(vec3f(+size, dist, -size), 0x200, 0x000, sky_r, sky_g, sky_b));
-    GX_Vertex(vertex_property_t(vec3f(-size, dist, -size), 0x000, 0x000, sky_r, sky_g, sky_b));
-    GX_EndGroup();
-}
-
 void PrepareOutline()
 {
     size_t len = (VERTEX_ATTR_LENGTH_DIRECTCOLOR * 24) + 3 + 32;
@@ -424,25 +191,6 @@ void PrepareOutline()
     outline = ret;
 }
 
-void ExtractTPLInfo(texanim_t &anim, bool dst, TPLFile *tpl, int index = 0)
-{
-    uint32_t fmt;
-    uint16_t w;
-    uint16_t h;
-    TPL_GetTextureInfo(tpl, index, &fmt, &w, &h);
-    if (dst)
-    {
-        anim.dst_format = fmt;
-        anim.dst_width = w;
-    }
-    else
-    {
-        anim.src_format = fmt;
-        anim.src_width = w;
-        anim.src_height = h;
-    }
-}
-
 int main(int argc, char **argv)
 {
     u32 fb = 0;
@@ -451,10 +199,7 @@ int main(int argc, char **argv)
     Mtx view; // view and perspective matrices
     Mtx44 perspective;
     void *gpfifo = NULL;
-    GXColor day_background = {0x88, 0xBB, 0xFF, 0xFF};
-    GXColor target_background = day_background;
-    GXColor background = day_background;
-    float current_lerpvalue = 1.f;
+    GXColor background = get_sky_color();
 
     TPLFile blockmapTPL;
     TPLFile water_stillTPL;
@@ -541,44 +286,11 @@ int main(int argc, char **argv)
     GX_InvVtxCache();
     GX_InvalidateTexAll();
 
-    // Water still texture
-    TPL_OpenTPLFromMemory(&water_stillTPL, (void *)water_still_tpl, water_still_tpl_size);
-    TPL_GetTexture(&water_stillTPL, 0, &water_still_texture);
-    GX_InitTexObjFilterMode(&water_still_texture, GX_NEAR, GX_NEAR);
+    init_textures();
 
-    // Terrain texture
-    TPL_OpenTPLFromMemory(&blockmapTPL, (void *)blockmap_tpl, blockmap_tpl_size);
-    TPL_GetTexture(&blockmapTPL, 0, &texture);
-    GX_InitTexObjFilterMode(&texture, GX_NEAR, GX_NEAR);
-
-    // White texture
-    TPL_OpenTPLFromMemory(&whiteTPL, (void *)white_tpl, white_tpl_size);
-    TPL_GetTexture(&whiteTPL, 0, &white_texture);
-    GX_InitTexObjFilterMode(&white_texture, GX_NEAR, GX_NEAR);
-
-    // Clouds texture
-    TPL_OpenTPLFromMemory(&cloudsTPL, (void *)clouds_tpl, clouds_tpl_size);
-    TPL_GetTexture(&cloudsTPL, 0, &clouds_texture);
-    GX_InitTexObjFilterMode(&clouds_texture, GX_NEAR, GX_NEAR);
-
-    // Sun texture
-    TPL_OpenTPLFromMemory(&sunTPL, (void *)sun_tpl, sun_tpl_size);
-    TPL_GetTexture(&sunTPL, 0, &sun_texture);
-    GX_InitTexObjFilterMode(&sun_texture, GX_NEAR, GX_NEAR);
-
-    // Moon texture
-    TPL_OpenTPLFromMemory(&moonTPL, (void *)moon_tpl, moon_tpl_size);
-    TPL_GetTexture(&moonTPL, 0, &moon_texture);
-    GX_InitTexObjFilterMode(&moon_texture, GX_NEAR, GX_NEAR);
-
-    uint32_t texture_buflen = GX_GetTexBufferSize(GX_GetTexObjWidth(&texture), GX_GetTexObjHeight(&texture), GX_GetTexObjFmt(&texture), GX_FALSE, GX_FALSE);
-    void *texture_ptr = MEM_PHYSICAL_TO_K1(GX_GetTexObjData(&texture));
-
+    uint32_t texture_buflen = GX_GetTexBufferSize(GX_GetTexObjWidth(&blockmap_texture), GX_GetTexObjHeight(&blockmap_texture), GX_GetTexObjFmt(&blockmap_texture), GX_FALSE, GX_FALSE);
     texanim_t water_still_anim;
-    water_still_anim.source = MEM_PHYSICAL_TO_K1(GX_GetTexObjData(&water_still_texture));
-    water_still_anim.target = texture_ptr;
-    ExtractTPLInfo(water_still_anim, TA_SRC, &water_stillTPL, 0);
-    ExtractTPLInfo(water_still_anim, TA_DST, &blockmapTPL, 0);
+    extract_texanim_info(water_still_anim, water_still_texture, blockmap_texture);
     water_still_anim.tile_width = 16;
     water_still_anim.tile_height = 16;
     water_still_anim.dst_x = 208;
@@ -599,7 +311,7 @@ int main(int argc, char **argv)
     guPerspective(perspective, FOV, (f32)w / h, 0.1F, 3000.0F);
     GX_LoadProjectionMtx(perspective, GX_PERSPECTIVE);
 
-    Camera camera = {
+    camera_t camera = {
         {0.0f, 0.0f, 0.0f},           // Camera position
         {0.0f, 0.0f, -1.0f},          // Camera forward vector
         FOV,                          // Field of view
@@ -634,19 +346,14 @@ int main(int argc, char **argv)
     while (!isExiting)
     {
         u64 frame_start = time_get();
-        float sky_multiplier = GetSkyMultiplier();
+        float sky_multiplier = get_sky_multiplier();
         if (HWButton != -1)
             break;
         GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, BASE3D_POS_FRAC_BITS);
         LightMapBlend(light_day_rgba, light_night_rgba, light_map, 255 - uint8_t(sky_multiplier * 255));
         GX_SetArray(GX_VA_CLR0, light_map, 4 * sizeof(u8));
         GX_InvVtxCache();
-        target_background = GXColor{uint8_t(0x88 * sky_multiplier), uint8_t(0xBB * sky_multiplier), uint8_t(0xFF * sky_multiplier), 255};
-        float target = std::pow(std::clamp((player_pos.y) * 0.03125f, 0.0f, 1.0f), 2.0f);
-        current_lerpvalue = target; // lerp(current_lerpvalue, target, 0.05f);
-        background.r = u8(current_lerpvalue * target_background.r);
-        background.g = u8(current_lerpvalue * target_background.g);
-        background.b = u8(current_lerpvalue * target_background.b);
+        background = get_sky_color();
         GX_SetCopyClear(background, 0x00FFFFFF);
         GX_SetFog(GX_FOG_PERSP_LIN, RENDER_DISTANCE * 0.67f * 16 - 16, RENDER_DISTANCE * 0.67f * 16 - 8, 0.1F, 3000.0F, background);
         if (player_pos.y < -999)
@@ -655,13 +362,13 @@ int main(int argc, char **argv)
         if (fb)
         {
             water_still_anim.update();
-            DCFlushRange(texture_ptr, texture_buflen);
+            DCFlushRange(water_still_anim.target, texture_buflen);
             GX_InvalidateTexAll();
         }
-        PrepareTexture(texture);
+        use_texture(blockmap_texture);
         GetInput();
 
-        guVector forward = AnglesToVector(xrot, yrot, -1);
+        guVector forward = angles_to_vector(xrot, yrot, -1);
 
         camera.position[0] = player_pos.x;
         camera.position[1] = player_pos.y;
@@ -672,7 +379,7 @@ int main(int argc, char **argv)
         camera.forward[2] = forward.z;
 
         // Construct the view frustum matrix from the camera
-        Frustum frustum = CalculateFrustum(camera);
+        frustum_t frustum = calculate_frustum(camera);
 
         UpdateScene(chunks);
 
@@ -694,7 +401,7 @@ int main(int argc, char **argv)
         GX_SetColorUpdate(GX_TRUE);
         DrawScene(view, frustum, chunks, true);
         // Draw sky
-        DrawSky(view, background);
+        draw_sky(view, background);
         GX_DrawDone();
 
         GX_CopyDisp(frameBuffer[fb], GX_TRUE);
@@ -836,53 +543,11 @@ void UpdateLightDir()
     GX_LoadLightObj(&light, GX_LIGHT0);
 }
 
-void Transform(Mtx view, guVector chunkPos)
-{
-    Mtx model, modelview;
-    Mtx offset;
-    Mtx posmtx;
-    Mtx rotx;
-    Mtx roty;
-    Mtx rotz;
-    guVector axis; // Axis to rotate on
-
-    // Reset matrices
-    guMtxIdentity(model);
-    guMtxIdentity(offset);
-    guMtxIdentity(posmtx);
-    guMtxIdentity(rotz);
-    guMtxIdentity(roty);
-    guMtxIdentity(rotx);
-
-    // Position the chunks on the screen
-    guMtxTrans(offset, -chunkPos.x, -chunkPos.y, -chunkPos.z);
-    guMtxTrans(posmtx, player_pos.x, player_pos.y, player_pos.z);
-
-    // Rotate view
-    axis.x = 1;
-    axis.y = 0;
-    axis.z = 0;
-    guMtxRotAxisDeg(rotx, &axis, xrot);
-    axis.x = 0;
-    axis.y = 1;
-    axis.z = 0;
-    guMtxRotAxisDeg(roty, &axis, yrot);
-
-    // Apply matrices
-    guMtxConcat(posmtx, offset, offset);
-    guMtxConcat(offset, rotz, rotz);
-    guMtxConcat(rotz, roty, roty);
-    guMtxConcat(roty, rotx, model);
-    guMtxInverse(model, model);
-    guMtxConcat(model, view, modelview);
-    GX_LoadPosMtxImm(modelview, GX_PNMTX0);
-}
-
 void Render(Mtx view, guVector chunkPos, void *buffer, u32 length)
 {
     if (!buffer || !length)
         return;
-    Transform(view, chunkPos);
+    transform_view(view, chunkPos);
     // Render
     GX_CallDispList(ALIGNPTR(buffer), length); // Draw the box
 }
@@ -987,7 +652,7 @@ void PrepareChunkRemoval(chunk_t *chunk)
 
 void EditBlocks()
 {
-    guVector forward = AnglesToVector(xrot, yrot, -1);
+    guVector forward = angles_to_vector(xrot, yrot, -1);
 
     draw_block_outline = raycast(vec3d{player_pos.x - .5, player_pos.y - .5, player_pos.z - .5}, vec3d{forward.x, forward.y, forward.z}, 4, &raycast_block, &raycast_block_face);
     if (draw_block_outline)
@@ -1122,7 +787,7 @@ void UpdateScene(std::deque<chunk_t *> &chunks)
     }
 }
 
-void DrawScene(Mtx view, Frustum &frustum, std::deque<chunk_t *> &chunks, bool transparency)
+void DrawScene(Mtx view, frustum_t &frustum, std::deque<chunk_t *> &chunks, bool transparency)
 {
     // Enable indexed colors
     GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
@@ -1143,7 +808,7 @@ void DrawScene(Mtx view, Frustum &frustum, std::deque<chunk_t *> &chunks, bool t
                     guVector chunkPos = {(f32)chunk->x * 16, (f32)j * 16, (f32)chunk->z * 16};
                     vec3f chunkCenter(chunkPos.x + 8, chunkPos.y + 8, chunkPos.z + 8);
 
-                    if (DistanceToFrustum(chunkCenter, frustum) < 14 && vbo.cached_solid_buffer && vbo.cached_solid_buffer_length)
+                    if (distance_to_frustum(chunkCenter, frustum) < 14 && vbo.cached_solid_buffer && vbo.cached_solid_buffer_length)
                     {
                         Render(view, chunkPos, vbo.cached_solid_buffer, vbo.cached_solid_buffer_length);
                     }
@@ -1167,7 +832,7 @@ void DrawScene(Mtx view, Frustum &frustum, std::deque<chunk_t *> &chunks, bool t
                     guVector chunkPos = {(f32)chunk->x * 16, (f32)j * 16, (f32)chunk->z * 16};
                     vec3f chunkCenter(chunkPos.x + 8, chunkPos.y + 8, chunkPos.z + 8);
 
-                    if (DistanceToFrustum(chunkCenter, frustum) < 14 && vbo.cached_transparent_buffer && vbo.cached_transparent_buffer_length)
+                    if (distance_to_frustum(chunkCenter, frustum) < 14 && vbo.cached_transparent_buffer && vbo.cached_transparent_buffer_length)
                     {
                         Render(view, chunkPos, vbo.cached_transparent_buffer, vbo.cached_transparent_buffer_length);
                     }
@@ -1192,7 +857,7 @@ void DrawScene(Mtx view, Frustum &frustum, std::deque<chunk_t *> &chunks, bool t
         // Draw debug spritesheet
         if (debug_spritesheet)
         {
-            Transform(view, outlinePos);
+            transform_view(view, outlinePos);
             GX_BeginGroup(GX_QUADS, 4);
             GX_Vertex(vertex_property_t(vec3f(-2.0f, 1.1f, -2.0f), 0, 0));
             GX_Vertex(vertex_property_t(vec3f(2.0f, 1.1f, -2.0f), 128, 0));
@@ -1208,9 +873,4 @@ void PrepareTEV()
     GX_SetTexCoordGen(GX_TEXCOORD0, GX_TG_MTX2x4, GX_TG_TEX0, GX_IDENTITY);
     GX_SetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
     GX_SetTevOp(GX_TEVSTAGE0, GX_MODULATE);
-}
-
-void PrepareTexture(GXTexObj texture)
-{
-    GX_LoadTexObj(&texture, GX_TEXMAP0);
 }
