@@ -2,6 +2,10 @@
 #define _VEC3F_HPP_
 #include "vec3i.hpp"
 
+#if HW_RVL
+#include "ogc/gx.h"
+#endif
+
 class vec3i; // Forward declaration
 
 class vec3f
@@ -17,6 +21,10 @@ public:
     vec3f(float x, float y, float z) : x(x), y(y), z(z) {}
     vec3f(int xyz) : x(xyz), y(xyz), z(xyz) {}
     vec3f() : x(0), y(0), z(0) {}
+
+#if HW_RVL
+    guVector operator()();
+#endif
 
 private:
     // Member variables
