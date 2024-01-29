@@ -311,8 +311,8 @@ void draw_stars()
     static vec3f vertices[780 << 2];
     if (!generated)
     {
+        JavaLCGInit(10842);
         int index = 0;
-        generated = true;
         for (int var3 = 0; var3 < 1500; ++var3)
         {
             double var4 = (double)(JavaLCGFloat() * 2.0F - 1.0F);
@@ -354,8 +354,8 @@ void draw_stars()
                 }
             }
         }
+        generated = true;
     }
-    JavaLCGInit(10842);
     int brightness_level = (get_star_brightness() * 255);
     if (brightness_level > 0)
     {
