@@ -1,12 +1,5 @@
 #include "render.hpp"
 
-#include "ported/JavaRandom.hpp"
-#include "chunk_new.hpp"
-#include "texturedefs.h"
-#include "base3d.hpp"
-#include "texanim.hpp"
-#include "ogcsys.h"
-
 #include "white_tpl.h"
 #include "clouds_tpl.h"
 #include "sun_tpl.h"

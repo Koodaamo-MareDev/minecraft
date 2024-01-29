@@ -201,12 +201,6 @@ int main(int argc, char **argv)
     void *gpfifo = NULL;
     GXColor background = get_sky_color();
 
-    TPLFile blockmapTPL;
-    TPLFile water_stillTPL;
-    TPLFile whiteTPL;
-    TPLFile cloudsTPL;
-    TPLFile sunTPL;
-    TPLFile moonTPL;
     threadqueue_init();
 
     VIDEO_Init();

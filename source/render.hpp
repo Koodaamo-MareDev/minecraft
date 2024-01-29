@@ -2,6 +2,14 @@
 #define _RENDER_HPP_
 #include "vec3i.hpp"
 #include "vec3f.hpp"
+
+#include "ported/JavaRandom.hpp"
+#include "chunk_new.hpp"
+#include "texturedefs.h"
+#include "base3d.hpp"
+#include "texanim.hpp"
+#include <ogcsys.h>
+
 #include <cstdint>
 #include <algorithm>
 #include <cmath>
