@@ -10,8 +10,6 @@
 
 struct texanim_t
 {
-    uint32_t src_format;
-    uint32_t dst_format;
     void* source = nullptr;
     void* target = nullptr;
     uint32_t src_width = 16;
