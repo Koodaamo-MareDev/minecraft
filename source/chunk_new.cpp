@@ -304,7 +304,7 @@ void generate_chunk()
             uint8_t height = chunk->height_map[index++];
             for (int y = height; y >= 0; y--)
             {
-                block_t* block = chunk->get_block(vec3i(x, y, z));
+                block_t *block = chunk->get_block(vec3i(x, y, z));
                 float noise_value = (cave_noise.GetNoise(float(x + x_offset), float(y), float(z + z_offset)));
                 if (noise_value < -.5f && (height > 63 || abs(height - y) > 2))
                     block->set_blockid(y >= 5 ? BlockID::air : BlockID::lava);
@@ -829,32 +829,25 @@ int DrawVerticalQuad(vertex_property_t p0, vertex_property_t p1, vertex_property
 
 void get_neighbors(vec3i pos, block_t **neighbors)
 {
-    /*
-    int x = (pos.x & 15);
-    int z = (pos.x & 15);
-    if (!((x + 1) & 17) && !((z + 1) & 17))
-    {
-        chunk_t *chunk = get_chunk_from_pos(pos.x, pos.z, false);
-        if (!chunk)
-            return;
-
-        for (int x = 0; x < 6; x++)
-        {
-            vec3i neighbor_pos = pos + face_offsets[x];
-            neighbors[x] = chunk->get_block(neighbor_pos.x, neighbor_pos.y, neighbor_pos.z);
-        }
-    }
-    else*/
-    {
-        for (int x = 0; x < 6; x++)
-            neighbors[x] = get_block_at(pos + face_offsets[x]);
-    }
+    for (int x = 0; x < 6; x++)
+        neighbors[x] = get_block_at(pos + face_offsets[x]);
 }
 
 int chunk_t::render_block(block_t *block, vec3i pos, bool transparent)
 {
     if (!block->get_visibility() || is_fluid(block->get_blockid()))
         return 0;
+    if (transparent)
+    {
+        switch (block->get_blockid())
+        {
+        case BlockID::torch:
+            return render_torch(block, pos);
+
+        default:
+            break;
+        }
+    }
     vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
     vec3f vertex_pos(local_pos.x, local_pos.y, local_pos.z);
     uint32_t texture_index = 0;
@@ -866,6 +859,40 @@ int chunk_t::render_block(block_t *block, vec3i pos, bool transparent)
     }
     return vertexCount;
 }
+int chunk_t::render_torch(block_t *block, vec3i pos)
+{
+    int lighting = get_block_luminance(BlockID::torch);
+    vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
+    vec3f vertex_pos(local_pos.x, local_pos.y, local_pos.z);
+    uint32_t texture_index = get_default_texture_index(block->get_blockid());
+    // Positive X side
+    GX_VertexLit({vertex_pos + vec3f{-.0625f, -.5f, -.5f}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NX);
+    GX_VertexLit({vertex_pos + vec3f{-.0625f, 0.5f, -.5f}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_NX);
+    GX_VertexLit({vertex_pos + vec3f{-.0625f, 0.5f, 0.5f}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_NX);
+    GX_VertexLit({vertex_pos + vec3f{-.0625f, -.5f, 0.5f}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NX);
+    // Positive X side
+    GX_VertexLit({vertex_pos + vec3f{0.0625f, -.5f, 0.5f}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PX);
+    GX_VertexLit({vertex_pos + vec3f{0.0625f, 0.5f, 0.5f}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PX);
+    GX_VertexLit({vertex_pos + vec3f{0.0625f, 0.5f, -.5f}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PX);
+    GX_VertexLit({vertex_pos + vec3f{0.0625f, -.5f, -.5f}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PX);
+    // Negative Z side
+    GX_VertexLit({vertex_pos + vec3f{0.5f, -.5f, -.0625f}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NZ);
+    GX_VertexLit({vertex_pos + vec3f{0.5f, 0.5f, -.0625f}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_NZ);
+    GX_VertexLit({vertex_pos + vec3f{-.5f, 0.5f, -.0625f}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_NZ);
+    GX_VertexLit({vertex_pos + vec3f{-.5f, -.5f, -.0625f}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NZ);
+    // Positive Z side
+    GX_VertexLit({vertex_pos + vec3f{-.5f, -.5f, 0.0625f}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PZ);
+    GX_VertexLit({vertex_pos + vec3f{-.5f, 0.5f, 0.0625f}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PZ);
+    GX_VertexLit({vertex_pos + vec3f{0.5f, 0.5f, 0.0625f}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PZ);
+    GX_VertexLit({vertex_pos + vec3f{0.5f, -.5f, 0.0625f}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PZ);
+    // Top side
+    GX_VertexLit({vertex_pos + vec3f{0.0625f, 0.125f, -.0625f}, TEXTURE_X(texture_index) + 9, TEXTURE_Y(texture_index) + 8}, lighting, FACE_PY);
+    GX_VertexLit({vertex_pos + vec3f{0.0625f, 0.125f, 0.0625f}, TEXTURE_X(texture_index) + 9, TEXTURE_Y(texture_index) + 6}, lighting, FACE_PY);
+    GX_VertexLit({vertex_pos + vec3f{-.0625f, 0.125f, 0.0625f}, TEXTURE_X(texture_index) + 7, TEXTURE_Y(texture_index) + 6}, lighting, FACE_PY);
+    GX_VertexLit({vertex_pos + vec3f{-.0625f, 0.125f, -.0625f}, TEXTURE_X(texture_index) + 7, TEXTURE_Y(texture_index) + 8}, lighting, FACE_PY);
+
+    return 20;
+}
 
 int chunk_t::render_fluid(block_t *block, vec3i pos)
 {
@@ -873,7 +900,6 @@ int chunk_t::render_fluid(block_t *block, vec3i pos)
 
     int faceCount = 0;
     vec3i local_pos = {pos.x & 0xF, pos.y & 0xF, pos.z & 0xF};
-    // uint8_t fluid_level = get_fluid_meta_level(block);
 
     // Used to check block types around the fluid
     block_t *neighbors[6];

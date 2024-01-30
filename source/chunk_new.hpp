@@ -85,6 +85,7 @@ public:
     int pre_render_block_mesh(int section, bool transparent);
     int render_block_mesh(int section, bool transparent, int vertexCount);
     int render_block(block_t *block, vec3i pos, bool transparent);
+    int render_torch(block_t *block, vec3i pos);
     uint32_t size();
     chunk_t()
     {

@@ -39,6 +39,8 @@ uint8_t get_block_luminance(BlockID block_id)
     case BlockID::flowing_lava:
     case BlockID::glowstone:
         return 15;
+    case BlockID::torch:
+        return 14;
 
     default:
         return 0;
@@ -109,6 +111,8 @@ uint32_t get_default_texture_index(BlockID blockid)
         return 104;
     case BlockID::glowstone:
         return 105;
+    case BlockID::torch:
+        return 80;
     default:
         return int(blockid) & 0xFF;
     }

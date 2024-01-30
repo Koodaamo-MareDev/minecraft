@@ -300,7 +300,7 @@ int main(int argc, char **argv)
     // this creates a perspective matrix with a view angle of 90,
     // and aspect ratio based on the display resolution
     f32 w = rmode->viWidth;
-    f32 h = rmode->viHeight;
+    f32 h = rmode->efbHeight;
     f32 FOV = 90;
     guPerspective(perspective, FOV, (f32)w / h, 0.1F, 3000.0F);
     GX_LoadProjectionMtx(perspective, GX_PERSPECTIVE);
@@ -651,7 +651,7 @@ void EditBlocks()
     draw_block_outline = raycast(vec3d{player_pos.x - .5, player_pos.y - .5, player_pos.z - .5}, vec3d{forward.x, forward.y, forward.z}, 4, &raycast_block, &raycast_block_face);
     if (draw_block_outline)
     {
-        BlockID target_blockid = destroy_block ? BlockID::air : BlockID::glowstone;
+        BlockID target_blockid = destroy_block ? BlockID::air : BlockID::torch;
         if (destroy_block || place_block)
         {
             vec3i editable_pos = destroy_block ? (raycast_block) : (raycast_block + raycast_block_face);
