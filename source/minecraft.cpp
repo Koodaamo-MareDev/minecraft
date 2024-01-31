@@ -25,7 +25,7 @@
 #include "texanim.hpp"
 #include "base3d.hpp"
 #include "render.hpp"
-
+#include "render_gui.hpp"
 #define DEFAULT_FIFO_SIZE (1024 * 1024)
 #define CLASSIC_CONTROLLER_THRESHOLD 4
 #define MAX_PARTICLES 100
@@ -63,7 +63,6 @@ float prev_right_shoulder = 0;
 bool destroy_block = false;
 bool place_block = false;
 
-void transform_view(Mtx view, guVector chunkPos);
 void UpdateLightDir();
 void DrawScene(Mtx view, frustum_t &frustum, std::deque<chunk_t *> &chunks, bool transparency);
 void UpdateScene(std::deque<chunk_t *> &chunks);
@@ -302,8 +301,6 @@ int main(int argc, char **argv)
     f32 w = rmode->viWidth;
     f32 h = rmode->efbHeight;
     f32 FOV = 90;
-    guPerspective(perspective, FOV, (f32)w / h, 0.1F, 3000.0F);
-    GX_LoadProjectionMtx(perspective, GX_PERSPECTIVE);
 
     camera_t camera = {
         {0.0f, 0.0f, 0.0f},           // Camera position
@@ -377,6 +374,10 @@ int main(int argc, char **argv)
 
         UpdateScene(chunks);
 
+        // Prepare projection matrix for rendering the world
+        guPerspective(perspective, FOV, (f32)w / h, 0.1F, 3000.0F);
+        GX_LoadProjectionMtx(perspective, GX_PERSPECTIVE);
+
         // Enable backface culling for terrain
         GX_SetCullMode(GX_CULL_BACK);
 
@@ -396,6 +397,31 @@ int main(int argc, char **argv)
         DrawScene(view, frustum, chunks, true);
         // Draw sky
         draw_sky(view, background);
+
+        // Prepare projection matrix for rendering GUI elements
+        guOrtho(perspective, 0, h-1, 0, w-1, 0, 3000);
+        GX_LoadProjectionMtx(perspective, GX_ORTHOGRAPHIC);
+
+        // Prepare position matrix for rendering GUI elements
+        Mtx flat_matrix;
+        guMtxIdentity(flat_matrix);
+        guMtxTransApply(flat_matrix, flat_matrix, 0.0F, 0.0F, -0.5F);
+        GX_LoadPosMtxImm(flat_matrix, GX_PNMTX0);
+        
+        // Use 0 fractional bits for the position data, because we're drawing in pixel space.
+        GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, 0);
+
+        // Disable fog
+        GX_SetFog(GX_FOG_NONE, RENDER_DISTANCE * 0.67f * 16 - 16, RENDER_DISTANCE * 0.67f * 16 - 8, 0.1F, 3000.0F, background);
+        
+        // Draw GUI elements
+        GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
+		GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_CLEAR);
+		GX_SetAlphaUpdate(GX_TRUE);
+		GX_SetColorUpdate(GX_TRUE);
+
+        draw_simple_textured_quad(blockmap_texture, 16, 32, 256, 256);
+
         GX_DrawDone();
 
         GX_CopyDisp(frameBuffer[fb], GX_TRUE);

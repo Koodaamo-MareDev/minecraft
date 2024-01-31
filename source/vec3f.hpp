@@ -18,6 +18,7 @@ public:
     vec3f operator-(vec3f const &a) const;
     vec3f operator+(vec3i const &a) const;
     vec3f operator-(vec3i const &a) const;
+    vec3f operator*(float const &a) const;
     vec3f(float x, float y, float z) : x(x), y(y), z(z) {}
     vec3f(int xyz) : x(xyz), y(xyz), z(xyz) {}
     vec3f() : x(0), y(0), z(0) {}
@@ -29,4 +30,8 @@ public:
 private:
     // Member variables
 };
+inline vec3f operator*(float const &a, vec3f const &b)
+{
+    return b * a;
+}
 #endif
