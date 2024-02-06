@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <wiiuse/wpad.h>
 #include <ogc/lwp_watchdog.h>
+#include <fat.h>
+#include <ogc/conf.h>
 #include "threadhandler.hpp"
 #include "chunk_new.hpp"
 #include "block.hpp"
@@ -298,8 +300,19 @@ int main(int argc, char **argv)
     // setup our projection matrix
     // this creates a perspective matrix with a view angle of 90,
     // and aspect ratio based on the display resolution
-    f32 w = rmode->viWidth;
+    f32 w = rmode->fbWidth;
     f32 h = rmode->efbHeight;
+    s32 ar = CONF_GetAspectRatio();
+
+    if (ar == CONF_ASPECT_16_9)
+    {
+        h *= 0.825f;
+    }
+    else
+    {
+        h *= 1 / 0.9f;
+    }
+
     f32 FOV = 90;
 
     camera_t camera = {
@@ -311,6 +324,7 @@ int main(int argc, char **argv)
         (RENDER_DISTANCE + 1) * 16.0f // Far clipping plane
     };
 
+    printf("Render resolution: %f,%f, Widescreen: %s\n", w, h, ar == CONF_ASPECT_16_9 ? "Yes" : "No");
     light_engine_init();
     printf("Initialized basics.\n");
     VIDEO_Flush();
@@ -399,7 +413,7 @@ int main(int argc, char **argv)
         draw_sky(view, background);
 
         // Prepare projection matrix for rendering GUI elements
-        guOrtho(perspective, 0, h-1, 0, w-1, 0, 3000);
+        guOrtho(perspective, 0, h - 1, 0, w - 1, 0, 3000);
         GX_LoadProjectionMtx(perspective, GX_ORTHOGRAPHIC);
 
         // Prepare position matrix for rendering GUI elements
@@ -407,18 +421,18 @@ int main(int argc, char **argv)
         guMtxIdentity(flat_matrix);
         guMtxTransApply(flat_matrix, flat_matrix, 0.0F, 0.0F, -0.5F);
         GX_LoadPosMtxImm(flat_matrix, GX_PNMTX0);
-        
+
         // Use 0 fractional bits for the position data, because we're drawing in pixel space.
         GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, 0);
 
         // Disable fog
         GX_SetFog(GX_FOG_NONE, RENDER_DISTANCE * 0.67f * 16 - 16, RENDER_DISTANCE * 0.67f * 16 - 8, 0.1F, 3000.0F, background);
-        
+
         // Draw GUI elements
         GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
-		GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_CLEAR);
-		GX_SetAlphaUpdate(GX_TRUE);
-		GX_SetColorUpdate(GX_TRUE);
+        GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_CLEAR);
+        GX_SetAlphaUpdate(GX_TRUE);
+        GX_SetColorUpdate(GX_TRUE);
 
         draw_simple_textured_quad(blockmap_texture, 16, 32, 256, 256);
 
