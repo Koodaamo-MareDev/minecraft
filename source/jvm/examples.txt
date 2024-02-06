@@ -1,0 +1,19 @@
+// To use java in a file, one must include the 'jhelper.hpp' file.
+#include "jhelper.hpp"
+
+// To load a class from a file on the sd card, on wii/gc you must first initialize the filesystem:
+#include <fat.h>
+void init_fs()
+{
+    fatInitDefault();
+}
+
+// Calling the class main function in C++ using java_exec(classname)
+// The class will be loaded from sd:/<classname>.class and will remain loaded.
+void gx_with_java(Mtx view, guVector player_pos)
+{
+    transform_view(view, player_pos);
+    GX_Begin(GX_QUADS, GX_VTXFMT0, 4);
+    java_exec("HelloWorld");
+    GX_End();
+}

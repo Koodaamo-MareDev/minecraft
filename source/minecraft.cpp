@@ -323,7 +323,7 @@ int main(int argc, char **argv)
         0.1f,                         // Near clipping plane
         (RENDER_DISTANCE + 1) * 16.0f // Far clipping plane
     };
-
+    fatInitDefault();
     printf("Render resolution: %f,%f, Widescreen: %s\n", w, h, ar == CONF_ASPECT_16_9 ? "Yes" : "No");
     light_engine_init();
     printf("Initialized basics.\n");
