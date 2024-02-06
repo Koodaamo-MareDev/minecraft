@@ -302,12 +302,14 @@ void generate_chunk()
             while (lock_chunks())
                 threadqueue_yield();
             uint8_t height = chunk->height_map[index++];
-            for (int y = height; y >= 0; y--)
+            for (int y = height; y > 0; y--)
             {
                 block_t *block = chunk->get_block(vec3i(x, y, z));
+                if (block->get_blockid() != BlockID::stone)
+                    continue;
                 float noise_value = (cave_noise.GetNoise(float(x + x_offset), float(y), float(z + z_offset)));
                 if (noise_value < -.5f && (height > 63 || abs(height - y) > 2))
-                    block->set_blockid(y >= 5 ? BlockID::air : BlockID::lava);
+                    block->set_blockid(y >= 10 ? BlockID::air : BlockID::lava);
             }
             unlock_chunks();
         }
