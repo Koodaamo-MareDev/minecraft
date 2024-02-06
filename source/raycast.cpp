@@ -132,7 +132,7 @@ bool raycast(
             if (!block)
                 return false;
             BlockID blockid = block->get_blockid();
-            if (blockid != BlockID::air && blockid != BlockID::water && blockid != BlockID::flowing_water)
+            if (blockid != BlockID::air && !is_fluid(blockid))
             {
                 if (output)
                     *output = {int(x), int(y), int(z)};
