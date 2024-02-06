@@ -482,6 +482,15 @@ void chunk_t::light_up()
                 for (int y = 255; y > end_y; y--)
                     this->get_block(vec3i(x, y, z))->sky_light = 15;
                 update_light(vec3i(chunkX + x, end_y, chunkZ + z));
+
+                // Update block lights
+                for (int y = 0; y < end_y; y++)
+                {
+                    if (get_block_luminance(this->get_block(vec3i(x, y, z))->get_blockid()))
+                    {
+                        update_light(vec3i(chunkX + x, y, chunkZ + z));
+                    }
+                }
             }
         }
         lit_state = 1;
