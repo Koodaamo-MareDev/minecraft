@@ -35,7 +35,7 @@
 
 bool debug_spritesheet = false;
 lwp_t main_thread;
-f32 xrot = -22.5f;
+f32 xrot = 0.0f;
 f32 yrot = 0.0f;
 guVector player_pos = {0.F, 80.0F, 0.F};
 void *frameBuffer[2] = {NULL, NULL};
