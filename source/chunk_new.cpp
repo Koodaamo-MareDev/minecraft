@@ -530,7 +530,7 @@ void chunk_t::recalculate_section(int section)
                         bool other_visibility = false;
                         if (other_block)
                         {
-                            other_face_transparent = is_face_transparent(get_face_texture_index(other_block, i ^ 1));
+                            other_face_transparent = is_fluid(other_id) || is_face_transparent(get_face_texture_index(other_block, i ^ 1));
                             other_visibility = other_block->get_visibility();
                         }
                         else if (other.y >= 0 && other.y <= 255)
