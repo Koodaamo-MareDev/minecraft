@@ -29,7 +29,7 @@ double intbound(double s, double ds)
         return (1 - s) / ds;
     }
 }
-int checkabove(vec3i pos, chunk_t* chunk)
+int checkabove(vec3i pos, chunk_t *chunk)
 {
     block_t *block = nullptr;
     chunk = chunk ? chunk : get_chunk_from_pos(pos, false, false);
@@ -42,7 +42,7 @@ int checkabove(vec3i pos, chunk_t* chunk)
     // This should return 255 at most which means the ray hit the world height limit
     return pos.y;
 }
-int skycast(vec3i pos, chunk_t* chunk)
+int skycast(vec3i pos, chunk_t *chunk)
 {
     block_t *block = nullptr;
     chunk = chunk ? chunk : get_chunk_from_pos(pos, false, false);
@@ -109,7 +109,7 @@ bool raycast(
     double tDeltaZ = stepZ / dz;
 
     // Buffer for reporting faces to the callback.
-    vec3i face = {0, 0, 0};
+    vec3i face = vec3i(0, 0, 0);
 
     // Avoids an infinite loop.
     if (dx == 0 && dy == 0 && dz == 0)
@@ -120,25 +120,26 @@ bool raycast(
     float radius = dst / std::sqrt(dx * dx + dy * dy + dz * dz);
     // float radius = dst;
     //  Deal with world bounds or their absence.
-    vec3i maxvec = vec3i{int(origin.x) + 10, int(origin.y) + 10, int(origin.z) + 10};
-    vec3i minvec = vec3i{int(origin.x) - 10, int(origin.y) - 10, int(origin.z) - 10};
+    vec3i maxvec = vec3i(int(origin.x) + 10, int(origin.y) + 10, int(origin.z) + 10);
+    vec3i minvec = vec3i(int(origin.x) - 10, int(origin.y) - 10, int(origin.z) - 10);
 
     while (true)
     {
         if (!(x < minvec.x || y < minvec.y || z < minvec.z || x >= maxvec.x || y >= maxvec.y || z >= maxvec.z))
         {
-            vec3i block_pos = vec3i{int(x), int(y), int(z)};
+            vec3i block_pos = vec3i(int(x), int(y), int(z));
             block_t *block = get_block_at(block_pos);
-            if (!block)
-                return false;
-            BlockID blockid = block->get_blockid();
-            if (blockid != BlockID::air && !is_fluid(blockid))
+            if (block)
             {
-                if (output)
-                    *output = {int(x), int(y), int(z)};
-                if (get_block_at(block_pos + face) && output_face)
-                    *output_face = face;
-                return true;
+                BlockID blockid = block->get_blockid();
+                if (blockid != BlockID::air && !is_fluid(blockid))
+                {
+                    if (output)
+                        *output = vec3i(int(x), int(y), int(z));
+                    if (get_block_at(block_pos + face) && output_face)
+                        *output_face = face;
+                    return true;
+                }
             }
         }
 
