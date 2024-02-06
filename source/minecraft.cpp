@@ -430,7 +430,7 @@ int main(int argc, char **argv)
 
         // Draw GUI elements
         GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
-        GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_CLEAR);
+        GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_NOOP);
         GX_SetAlphaUpdate(GX_TRUE);
         GX_SetColorUpdate(GX_TRUE);
 
