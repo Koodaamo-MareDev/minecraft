@@ -10,9 +10,9 @@ int8_t get_block_opacity(BlockID blockid)
     {
     case BlockID::air:
     case BlockID::glass:
-    case BlockID::leaves:
     case BlockID::glowstone:
         return 0;
+    case BlockID::leaves:
     case BlockID::water:
     case BlockID::flowing_water:
         return 1;
