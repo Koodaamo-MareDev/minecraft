@@ -1,4 +1,3 @@
-#include "cpugx.hpp"
 #include "chunk_new.hpp"
 #include "block.hpp"
 #include "texturedefs.h"
@@ -629,10 +628,9 @@ int chunk_t::build_vbo(int section, bool transparent)
         printf("Failed to allocate %d bytes for section %d VBO at (%d, %d)\n", estimatedMemory, section, this->x, this->z);
         return (1);
     }
-    DCInvalidateRange(ALIGNPTR(displist_vbo), estimatedMemory);
-    // memset(ALIGNPTR(displist_vbo), 0, estimatedMemory);
+    DCInvalidateRange(displist_vbo, estimatedMemory);
 
-    GX_BeginDispList(ALIGNPTR(displist_vbo), estimatedMemory);
+    GX_BeginDispList(displist_vbo, estimatedMemory);
     if (quadVertexCount)
     {
         int newQuadVertexCount;

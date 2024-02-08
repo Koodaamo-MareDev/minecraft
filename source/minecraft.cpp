@@ -21,7 +21,6 @@
 #include "vec3d.hpp"
 #include "timers.hpp"
 #include "texturedefs.h"
-#include "cpugx.hpp"
 #include "raycast.hpp"
 #include "light.hpp"
 #include "texanim.hpp"
@@ -583,7 +582,7 @@ void Render(Mtx view, guVector chunkPos, void *buffer, u32 length)
         return;
     transform_view(view, chunkPos);
     // Render
-    GX_CallDispList(ALIGNPTR(buffer), length); // Draw the box
+    GX_CallDispList(buffer, length); // Draw the box
 }
 
 inline void RecalcSectionWater(chunk_t *chunk, int section)
