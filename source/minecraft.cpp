@@ -27,7 +27,7 @@
 #include "base3d.hpp"
 #include "render.hpp"
 #include "render_gui.hpp"
-#define DEFAULT_FIFO_SIZE (1024 * 1024)
+#define DEFAULT_FIFO_SIZE (256 * 1024)
 #define CLASSIC_CONTROLLER_THRESHOLD 4
 #define MAX_PARTICLES 100
 #define LOOKAROUND_SENSITIVITY 360
@@ -65,7 +65,7 @@ bool destroy_block = false;
 bool place_block = false;
 
 void UpdateLightDir();
-void DrawScene(Mtx view, frustum_t &frustum, std::deque<chunk_t *> &chunks, bool transparency);
+void DrawScene(frustum_t &frustum, std::deque<chunk_t *> &chunks, bool transparency);
 void UpdateScene(std::deque<chunk_t *> &chunks);
 void PrepareTEV();
 void GetInput();
@@ -196,8 +196,6 @@ int main(int argc, char **argv)
     u32 fb = 0;
     f32 yscale;
     u32 xfbHeight;
-    Mtx view; // view and perspective matrices
-    Mtx44 perspective;
     void *gpfifo = NULL;
     GXColor background = get_sky_color();
 
@@ -209,17 +207,18 @@ int main(int argc, char **argv)
     SYS_SetPowerCallback(WiiPowerPressed);
     SYS_SetResetCallback(WiiResetPressed);
     WPAD_SetPowerButtonCallback(WiimotePowerPressed);
-    // allocate the fifo buffer
+    
+    // Allocate the fifo buffer
     gpfifo = memalign(32, DEFAULT_FIFO_SIZE);
     memset(gpfifo, 0, DEFAULT_FIFO_SIZE);
 
-    // allocate 2 framebuffers for double buffering
+    // Allocate 2 framebuffers for double buffering
     frameBuffer[0] = MEM_K0_TO_K1(SYS_AllocateFramebuffer(rmode));
     frameBuffer[1] = MEM_K0_TO_K1(SYS_AllocateFramebuffer(rmode));
-    // dstBuffer[0] = SYS_AllocateFramebuffer(rmode);
-    // dstBuffer[1] = SYS_AllocateFramebuffer(rmode);
+
     CON_Init(frameBuffer[0], 20, 20, rmode->fbWidth, rmode->xfbHeight, rmode->fbWidth * VI_DISPLAY_PIX_SZ);
-    // configure video
+
+    // Configure video
     VIDEO_Configure(rmode);
     VIDEO_SetNextFramebuffer(frameBuffer[0]);
     VIDEO_SetBlack(FALSE);
@@ -228,10 +227,11 @@ int main(int argc, char **argv)
     if (rmode->viTVMode & VI_NON_INTERLACE)
         VIDEO_WaitVSync();
     fb ^= 1;
-    // init the flipper
+
+    // Init the GPU
     GX_Init(gpfifo, DEFAULT_FIFO_SIZE);
 
-    // clears the bg to color and clears the z buffer
+    // Clears the bg to color and clears the z buffer
     GX_SetCopyClear(background, 0x00FFFFFF);
 
     // other gx setup
@@ -254,12 +254,7 @@ int main(int argc, char **argv)
     GX_CopyDisp(frameBuffer[fb], GX_TRUE);
     GX_SetDispCopyGamma(GX_GM_1_0);
 
-    // setup the vertex attribute table
-    // describes the data
-    // args: vat location 0-7, type of data, data format, size, scale
-    // so for ex. in the first call we are sending position data with
-    // 3 values X,Y,Z of size F32. scale sets the number of fractional
-    // bits for non float data.
+    // Setup the default vertex attribute table
     GX_ClearVtxDesc();
     GX_SetVtxDesc(GX_VA_POS, GX_DIRECT);
     GX_SetVtxDesc(GX_VA_NRM, GX_INDEX8);
@@ -269,12 +264,12 @@ int main(int argc, char **argv)
     GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_NRM, GX_NRM_XYZ, GX_F32, 0);
     GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_CLR0, GX_CLR_RGBA, GX_RGBA8, 0);
     GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_TEX0, GX_TEX_ST, GX_U16, BASE3D_UV_FRAC_BITS);
-    // set number of rasterized color channels
+    
+    // Prepare TEV
     GX_SetNumChans(1);
     GX_SetChanCtrl(GX_COLOR0, DIRECTIONAL_LIGHT, GX_SRC_REG, GX_SRC_VTX, GX_LIGHT0, GX_DF_CLAMP, GX_AF_SPOT);
     GX_SetChanAmbColor(GX_COLOR0, GXColor{0, 0, 0, 255});
     GX_SetChanMatColor(GX_COLOR0, GXColor{255, 255, 255, 255});
-    //  set number of textures to generate
     GX_SetNumTexGens(1);
 
     GX_InvVtxCache();
@@ -290,40 +285,21 @@ int main(int argc, char **argv)
     water_still_anim.dst_x = 208;
     water_still_anim.dst_y = 192;
 
-    // setup our camera at the origin
-    // looking down the -z axis with y up
-    guVector cam = {0.0F, 0.0F, 0.0F},
-             up = {0.0F, 1.0F, 0.0F},
-             look = {0.0F, 0.0F, -1.0F};
-    guLookAt(view, &cam, &up, &look);
-    // setup our projection matrix
-    // this creates a perspective matrix with a view angle of 90,
-    // and aspect ratio based on the display resolution
-    f32 w = rmode->fbWidth;
-    f32 h = rmode->efbHeight;
-    s32 ar = CONF_GetAspectRatio();
-
-    if (ar == CONF_ASPECT_16_9)
-    {
-        h *= 0.825f;
-    }
-    else
-    {
-        h *= 1 / 0.9f;
-    }
+    // Init viewport params
+    view_t viewport = view_t(rmode->fbWidth, rmode->efbHeight, CONF_GetAspectRatio(), 90, CAMERA_NEAR, CAMERA_FAR, yscale);
 
     f32 FOV = 90;
 
     camera_t camera = {
-        {0.0f, 0.0f, 0.0f},           // Camera position
-        {0.0f, 0.0f, -1.0f},          // Camera forward vector
-        FOV,                          // Field of view
-        w / h,                        // Aspect ratio
-        0.1f,                         // Near clipping plane
-        (RENDER_DISTANCE + 1) * 16.0f // Far clipping plane
+        {0.0f, 0.0f, 0.0f},  // Camera position
+        {0.0f, 0.0f, -1.0f}, // Camera forward vector
+        FOV,                 // Field of view
+        viewport.aspect,     // Aspect ratio
+        viewport.near,       // Near clipping plane
+        viewport.far         // Far clipping plane
     };
     fatInitDefault();
-    printf("Render resolution: %f,%f, Widescreen: %s\n", w, h, ar == CONF_ASPECT_16_9 ? "Yes" : "No");
+    printf("Render resolution: %f,%f, Widescreen: %s\n", viewport.width, viewport.height, viewport.widescreen ? "Yes" : "No");
     light_engine_init();
     printf("Initialized basics.\n");
     VIDEO_Flush();
@@ -359,7 +335,10 @@ int main(int argc, char **argv)
         GX_InvVtxCache();
         background = get_sky_color();
         GX_SetCopyClear(background, 0x00FFFFFF);
-        GX_SetFog(GX_FOG_PERSP_LIN, RENDER_DISTANCE * 0.67f * 16 - 16, RENDER_DISTANCE * 0.67f * 16 - 8, 0.1F, 3000.0F, background);
+
+        // Enable fog
+        use_fog(true, viewport, background, RENDER_DISTANCE * 0.7f * 16 - 8, RENDER_DISTANCE * 0.7f * 16);
+
         if (player_pos.y < -999)
             player_pos.y = skycast(vec3i(int(player_pos.x), 0, int(player_pos.z))) + 2;
         UpdateLightDir();
@@ -387,9 +366,7 @@ int main(int argc, char **argv)
 
         UpdateScene(chunks);
 
-        // Prepare projection matrix for rendering the world
-        guPerspective(perspective, FOV, (f32)w / h, 0.1F, 3000.0F);
-        GX_LoadProjectionMtx(perspective, GX_PERSPECTIVE);
+        use_perspective(viewport);
 
         // Enable backface culling for terrain
         GX_SetCullMode(GX_CULL_BACK);
@@ -400,32 +377,23 @@ int main(int argc, char **argv)
         GX_SetAlphaUpdate(GX_TRUE);
         GX_SetAlphaCompare(GX_ALWAYS, 0, GX_AOP_OR, GX_ALWAYS, 0);
         GX_SetColorUpdate(GX_TRUE);
-        DrawScene(view, frustum, chunks, false);
+        DrawScene(frustum, chunks, false);
         // Draw transparent buffer
         GX_SetZMode(GX_TRUE, GX_LESS, GX_TRUE);
         GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_NOOP);
         GX_SetAlphaUpdate(GX_FALSE);
         GX_SetAlphaCompare(GX_GEQUAL, 16, GX_AOP_AND, GX_ALWAYS, 0);
         GX_SetColorUpdate(GX_TRUE);
-        DrawScene(view, frustum, chunks, true);
+        DrawScene(frustum, chunks, true);
         // Draw sky
-        draw_sky(view, background);
+        draw_sky(background);
 
-        // Prepare projection matrix for rendering GUI elements
-        guOrtho(perspective, 0, h - 1, 0, w - 1, 0, 3000);
-        GX_LoadProjectionMtx(perspective, GX_ORTHOGRAPHIC);
-
-        // Prepare position matrix for rendering GUI elements
-        Mtx flat_matrix;
-        guMtxIdentity(flat_matrix);
-        guMtxTransApply(flat_matrix, flat_matrix, 0.0F, 0.0F, -0.5F);
-        GX_LoadPosMtxImm(flat_matrix, GX_PNMTX0);
-
+        use_ortho(viewport);
         // Use 0 fractional bits for the position data, because we're drawing in pixel space.
         GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, 0);
 
         // Disable fog
-        GX_SetFog(GX_FOG_NONE, RENDER_DISTANCE * 0.67f * 16 - 16, RENDER_DISTANCE * 0.67f * 16 - 8, 0.1F, 3000.0F, background);
+        use_fog(false, viewport, background, 0, 0);
 
         // Draw GUI elements
         GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
@@ -576,18 +544,18 @@ void UpdateLightDir()
     GX_LoadLightObj(&light, GX_LIGHT0);
 }
 
-void Render(Mtx view, guVector chunkPos, void *buffer, u32 length)
+void Render(guVector chunkPos, void *buffer, u32 length)
 {
     if (!buffer || !length)
         return;
-    transform_view(view, chunkPos);
+    transform_view(get_view_matrix(), chunkPos);
     // Render
     GX_CallDispList(buffer, length); // Draw the box
 }
 
 inline void RecalcSectionWater(chunk_t *chunk, int section)
 {
-    static std::vector<std::vector<vec3i>> fluid_levels(9);
+    static std::vector<std::vector<vec3i>> fluid_levels(8);
 
     int chunkX = (chunk->x * 16);
     int chunkZ = (chunk->z * 16);
@@ -604,11 +572,11 @@ inline void RecalcSectionWater(chunk_t *chunk, int section)
             {
                 block_t *block = chunk->get_block(current_pos);
                 if (block && (block->meta & FLUID_UPDATE_REQUIRED_FLAG))
-                    fluid_levels[get_fluid_meta_level(block)].push_back(current_pos);
+                    fluid_levels[get_fluid_meta_level(block) & 7].push_back(current_pos);
             }
         }
     }
-    // for (int i = fluid_levels.size() - 1; i >= 0; i--)
+    
     for (size_t i = 0; i < fluid_levels.size(); i++)
     {
         std::vector<vec3i> &positions = fluid_levels[i];
@@ -820,7 +788,7 @@ void UpdateScene(std::deque<chunk_t *> &chunks)
     }
 }
 
-void DrawScene(Mtx view, frustum_t &frustum, std::deque<chunk_t *> &chunks, bool transparency)
+void DrawScene(frustum_t &frustum, std::deque<chunk_t *> &chunks, bool transparency)
 {
     // Enable indexed colors
     GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
@@ -843,7 +811,7 @@ void DrawScene(Mtx view, frustum_t &frustum, std::deque<chunk_t *> &chunks, bool
 
                     if (distance_to_frustum(chunkCenter, frustum) < 14 && vbo.cached_solid_buffer && vbo.cached_solid_buffer_length)
                     {
-                        Render(view, chunkPos, vbo.cached_solid_buffer, vbo.cached_solid_buffer_length);
+                        Render(chunkPos, vbo.cached_solid_buffer, vbo.cached_solid_buffer_length);
                     }
                 }
             }
@@ -867,7 +835,7 @@ void DrawScene(Mtx view, frustum_t &frustum, std::deque<chunk_t *> &chunks, bool
 
                     if (distance_to_frustum(chunkCenter, frustum) < 14 && vbo.cached_transparent_buffer && vbo.cached_transparent_buffer_length)
                     {
-                        Render(view, chunkPos, vbo.cached_transparent_buffer, vbo.cached_transparent_buffer_length);
+                        Render(chunkPos, vbo.cached_transparent_buffer, vbo.cached_transparent_buffer_length);
                     }
                 }
             }
@@ -885,12 +853,12 @@ void DrawScene(Mtx view, frustum_t &frustum, std::deque<chunk_t *> &chunks, bool
         outlinePos.x = raycast_block.x - .5;
         outlinePos.y = raycast_block.y - .5;
         outlinePos.z = raycast_block.z - .5;
-        Render(view, outlinePos, outline, outline_len);
+        Render(outlinePos, outline, outline_len);
 
         // Draw debug spritesheet
         if (debug_spritesheet)
         {
-            transform_view(view, outlinePos);
+            transform_view(get_view_matrix(), outlinePos);
             GX_BeginGroup(GX_QUADS, 4);
             GX_Vertex(vertex_property_t(vec3f(-2.0f, 1.1f, -2.0f), 0, 0));
             GX_Vertex(vertex_property_t(vec3f(2.0f, 1.1f, -2.0f), 128, 0));

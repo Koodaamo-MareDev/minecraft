@@ -8,9 +8,9 @@ int draw_textured_quad(GXTexObj &texture, int32_t x, int32_t y, int32_t w, int32
     float scale_y = float(BASE3D_UV_FRAC) / GX_GetTexObjHeight(&texture);
     GX_BeginGroup(GX_QUADS, 4);
     GX_Vertex(vertex_property_t(global_scale * vec3f(x, y, 0), (scale_x * u1), (scale_y * v1)));
-    GX_Vertex(vertex_property_t(global_scale * vec3f(x + w - 1, y, 0), (scale_x * u2), (scale_y * v1)));
-    GX_Vertex(vertex_property_t(global_scale * vec3f(x + w - 1, y + h - 1, 0), (scale_x * u2), (scale_y * v2)));
-    GX_Vertex(vertex_property_t(global_scale * vec3f(x, y + h - 1, 0), (scale_x * u1), (scale_y * v2)));
+    GX_Vertex(vertex_property_t(global_scale * vec3f(x + w, y, 0), (scale_x * u2), (scale_y * v1)));
+    GX_Vertex(vertex_property_t(global_scale * vec3f(x + w, y + h, 0), (scale_x * u2), (scale_y * v2)));
+    GX_Vertex(vertex_property_t(global_scale * vec3f(x, y + h, 0), (scale_x * u1), (scale_y * v2)));
     GX_EndGroup();
     return 4;
 }

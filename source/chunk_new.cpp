@@ -140,20 +140,19 @@ inline bool in_range(int x, int min, int max)
     return std::clamp(x, min, max) == x;
 }
 
-int fastrand_a = 1;
 /* The state must be initialized to non-zero */
-uint32_t fastrand()
+inline uint32_t fastrand()
 {
     /* Algorithm "xor" from p. 4 of Marsaglia, "Xorshift RNGs" */
-    uint32_t x = fastrand_a;
+    static uint32_t x = 1;
     x ^= x << 13;
     x ^= x >> 17;
     x ^= x << 5;
-    return fastrand_a = x;
+    return x;
 }
 
 /* The state must be initialized to non-zero */
-void treerand(int x, int z, uint32_t *output, uint32_t count)
+inline void treerand(int x, int z, uint32_t *output, uint32_t count)
 {
     float v = float(z * (x + 327) + z) + 0.19f;
     uint32_t a;
@@ -168,7 +167,7 @@ void treerand(int x, int z, uint32_t *output, uint32_t count)
     }
 }
 
-void plant_tree(vec3i position, chunk_t *chunk, int height)
+inline void plant_tree(vec3i position, chunk_t *chunk, int height)
 {
     block_t *base_block = chunk->get_block(position - vec3i(0, 1, 0));
     if (base_block->get_blockid() != BlockID::grass)
@@ -210,7 +209,7 @@ void plant_tree(vec3i position, chunk_t *chunk, int height)
     }
 }
 
-void generate_trees(chunk_t *chunk)
+inline void generate_trees(chunk_t *chunk)
 {
     static uint32_t tree_positions[WORLDGEN_TREE_ATTEMPTS];
     treerand(chunk->x, chunk->z, tree_positions, WORLDGEN_TREE_ATTEMPTS);
@@ -237,12 +236,6 @@ void generate_trees(chunk_t *chunk)
 
 void generate_chunk()
 {
-    while (pending_chunks.size() == 0)
-    {
-        threadqueue_sleep();
-        if (!__chunk_generator_init_done)
-            return;
-    }
     chunk_t *chunk = pending_chunks.back();
     if (!chunk)
         return;
@@ -292,6 +285,7 @@ void generate_chunk()
         }
     }
     // Carve caves
+    // TODO: Use GetNoiseSet here for better performance.
     index = 0;
     for (int z = 0; z < 16; z++)
     {
@@ -301,13 +295,15 @@ void generate_chunk()
             while (lock_chunks())
                 threadqueue_yield();
             uint8_t height = chunk->height_map[index++];
+            block_t *block = chunk->get_block(vec3i(x, height, z));
+            size_t off = block - chunk->get_block(vec3i(x, height - 1, z));
             for (int y = height; y > 0; y--)
             {
-                block_t *block = chunk->get_block(vec3i(x, y, z));
+                block -= off;
                 if (block->get_blockid() != BlockID::stone)
                     continue;
-                float noise_value = (cave_noise.GetNoise(float(x + x_offset), float(y), float(z + z_offset)));
-                if (noise_value < -.5f && (height > 63 || abs(height - y) > 2))
+                float noise_value = (improved_noise.GetNoise(float(x + x_offset) / 12.f, float(y) / 12.f, float(z + z_offset) / 12.f));
+                if (noise_value < -.25f && (height > 63 || abs(height - y) > 2))
                     block->set_blockid(y >= 10 ? BlockID::air : BlockID::lava);
             }
             unlock_chunks();
@@ -389,10 +385,19 @@ void *__chunk_generator_init_internal(void *)
     cave_noise.SetSeed(cavegen_seed = fastrand());
     cave_noise.SetFractalType(FastNoiseLite::FractalType_None);
     cave_noise.SetFractalOctaves(1);
+
+    improved_noise.Init(cavegen_seed);
+    
     while (__chunk_generator_init_done)
     {
+        while (pending_chunks.size() == 0)
+        {
+            threadqueue_sleep();
+            if (!__chunk_generator_init_done)
+                break;
+        }
         generate_chunk();
-        threadqueue_sleep();
+        //threadqueue_sleep();
     }
     chunks.clear();
     return NULL;

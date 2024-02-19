@@ -49,6 +49,65 @@ void extract_texanim_info(texanim_t &anim, GXTexObj &src_texture, GXTexObj &dst_
     anim.target = MEM_PHYSICAL_TO_K1(GX_GetTexObjData(&dst_texture));
 }
 
+void init_fog(Mtx44 &projection_mtx, uint16_t viewport_width)
+{
+    static bool fog_init_done = false;
+
+    static GXFogAdjTbl fog_adjust_table;
+    
+    if (fog_init_done)
+        return;
+    GX_InitFogAdjTable(&fog_adjust_table, viewport_width, projection_mtx);
+    GX_SetFogRangeAdj(GX_ENABLE, viewport_width >> 1, &fog_adjust_table);
+    fog_init_done = true;
+}
+
+void use_fog(bool use, view_t view, GXColor color, float start, float end)
+{
+    GX_SetFog(use ? GX_FOG_PERSP_LIN : GX_FOG_NONE, start, end, view.near, view.far, color);
+}
+
+void use_ortho(view_t view)
+{
+    // Prepare projection matrix for rendering GUI elements
+    Mtx44 ortho_mtx;
+    guOrtho(ortho_mtx, 0, view.height, 0, view.width, 0, CAMERA_FAR);
+    GX_LoadProjectionMtx(ortho_mtx, GX_ORTHOGRAPHIC);
+
+    // Prepare position matrix for rendering GUI elements
+    Mtx flat_matrix;
+    guMtxIdentity(flat_matrix);
+    guMtxTransApply(flat_matrix, flat_matrix, 0.0F, 0.0F, -0.5F);
+    GX_LoadPosMtxImm(flat_matrix, GX_PNMTX0);
+}
+
+void use_perspective(view_t view)
+{
+    // Prepare projection matrix for rendering the world
+    Mtx44 prespective_mtx;
+    guPerspective(prespective_mtx, view.fov, view.aspect, view.near, view.far);
+    GX_LoadProjectionMtx(prespective_mtx, GX_PERSPECTIVE);
+
+    // Init fog params
+    init_fog(prespective_mtx, uint16_t(view.width));
+}
+
+static Mtx view_mtx;
+Mtx &get_view_matrix()
+{
+    static bool view_mtx_init = false;
+    if (!view_mtx_init)
+    {
+        // Setup our view matrix at the origin looking down the -Z axis with +Y up
+        guVector cam = {0.0F, 0.0F, 0.0F},
+                 up = {0.0F, 1.0F, 0.0F},
+                 look = {0.0F, 0.0F, -1.0F};
+        guLookAt(view_mtx, &cam, &up, &look);
+        view_mtx_init = true;
+    }
+    return view_mtx;
+}
+
 uint8_t get_face_brightness(uint8_t face)
 {
     switch (face)
@@ -423,7 +482,7 @@ GXColor get_sky_color(bool cave_darkness)
     float brightness = elevation_brightness * sky_multiplier;
     return GXColor{uint8_t(sky_color.r * brightness), uint8_t(sky_color.g * brightness), uint8_t(sky_color.b * brightness), 0xFF};
 }
-void draw_sky(Mtx view, GXColor background)
+void draw_sky(GXColor background)
 {
     // The normals of the sky elements are inverted. Fix this by disabling backface culling
     GX_SetCullMode(GX_CULL_NONE);
@@ -441,7 +500,7 @@ void draw_sky(Mtx view, GXColor background)
 
     guVector axis{1, 0, 0};
     guMtxRotAxisDeg(celestial_rotated_view, &axis, get_celestial_angle() * 360.0f);
-    guMtxConcat(view, celestial_rotated_view, celestial_rotated_view);
+    guMtxConcat(get_view_matrix(), celestial_rotated_view, celestial_rotated_view);
 
     transform_view(celestial_rotated_view, player_pos);
     draw_stars();
@@ -485,7 +544,7 @@ void draw_sky(Mtx view, GXColor background)
     dist = 108.0f / BASE3D_POS_FRAC;
 
     // Reset transform and move the clouds
-    transform_view(view, guVector{0, 0, ((tickCounter % 40960) + partialTicks) * 0.05f});
+    transform_view(get_view_matrix(), guVector{0, 0, ((tickCounter % 40960) + partialTicks) * 0.05f});
 
     // Clouds are a bit yellowish white. They are also affected by the time
     float sky_multiplier = get_sky_multiplier();
