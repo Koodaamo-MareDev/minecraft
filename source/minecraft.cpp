@@ -349,7 +349,6 @@ int main(int argc, char **argv)
             DCFlushRange(water_still_anim.target, texture_buflen);
             GX_InvalidateTexAll();
         }
-        use_texture(blockmap_texture);
         GetInput();
 
         guVector forward = angles_to_vector(xrot, yrot, -1);
@@ -791,6 +790,9 @@ void UpdateScene(std::deque<chunk_t *> &chunks)
 
 void DrawScene(frustum_t &frustum, std::deque<chunk_t *> &chunks, bool transparency)
 {
+    // Use terrain texture
+    use_texture(blockmap_texture);
+
     // Enable indexed colors
     GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
 
