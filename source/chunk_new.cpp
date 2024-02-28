@@ -236,6 +236,8 @@ inline void generate_trees(chunk_t *chunk)
 
 void generate_chunk()
 {
+    if (pending_chunks.size() == 0)
+        return;
     chunk_t *chunk = pending_chunks.back();
     if (!chunk)
         return;
