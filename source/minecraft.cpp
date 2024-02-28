@@ -36,6 +36,7 @@
 
 bool debug_spritesheet = false;
 lwp_t main_thread;
+lwpq_t __thread_queue;
 f32 xrot = 0.0f;
 f32 yrot = 0.0f;
 guVector player_pos = {0.F, 80.0F, 0.F};
