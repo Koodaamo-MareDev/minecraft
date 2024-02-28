@@ -2,9 +2,9 @@
 #define _BASE3D_HPP_
 #include <cstdint>
 #include <cmath>
+#include <ogc/gx.h>
 #include "vec3f.hpp"
 #include "block.hpp"
-#include "ogc/gx.h"
 
 #define BASE3D_POS_FRAC_BITS 5
 #define BASE3D_NRM_FRAC_BITS 4
@@ -33,8 +33,7 @@ public:
 
 extern float face_normals[];
 extern bool base3d_is_drawing;
-void GX_BeginGroup(uint8_t primitive, uint16_t vtxcount = 0);
-uint16_t GX_EndGroup();
+extern uint16_t __group_vtxcount;
 inline void init_face_normals()
 {
     guVector vecs[] = {
@@ -55,7 +54,41 @@ inline void init_face_normals()
     }
     GX_SetArray(GX_VA_NRM, face_normals, 3*sizeof(float));
 }
-void GX_Vertex(vertex_property_t vert, uint8_t face = FACE_PY);
-void GX_VertexLit(vertex_property_t vert, uint8_t light, uint8_t face = FACE_PY);
 
+inline void GX_BeginGroup(uint8_t primitive, uint16_t vtxcount = 0)
+{
+    __group_vtxcount = 0;
+    base3d_is_drawing = vtxcount;
+    if (base3d_is_drawing)
+        GX_Begin(primitive, GX_VTXFMT0, vtxcount);
+}
+
+inline uint16_t GX_EndGroup()
+{
+    GX_End();
+    base3d_is_drawing = false;
+    return __group_vtxcount;
+}
+
+inline void GX_Vertex(vertex_property_t vert, uint8_t face = FACE_PY)
+{
+    ++__group_vtxcount;
+    if (!base3d_is_drawing)
+        return;
+    GX_Position3s16(BASE3D_POS_FRAC * vert.pos.x, BASE3D_POS_FRAC * vert.pos.y, BASE3D_POS_FRAC * vert.pos.z);
+    GX_Normal1x8(face);
+    GX_Color4u8(vert.color_r, vert.color_g, vert.color_b, vert.color_a);
+    GX_TexCoord2u16(vert.x_uv, vert.y_uv);
+}
+
+inline void GX_VertexLit(vertex_property_t vert, uint8_t light, uint8_t face = FACE_PY)
+{
+    ++__group_vtxcount;
+    if (!base3d_is_drawing)
+        return;
+    GX_Position3s16(BASE3D_POS_FRAC * vert.pos.x, BASE3D_POS_FRAC * vert.pos.y, BASE3D_POS_FRAC * vert.pos.z);
+    GX_Normal1x8(face);
+    GX_Color1x8(light);
+    GX_TexCoord2u16(vert.x_uv, vert.y_uv);
+}
 #endif
