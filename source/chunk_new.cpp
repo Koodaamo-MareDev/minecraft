@@ -32,9 +32,7 @@ void *get_aligned_pointer_32(void *ptr)
 {
     return (void *)((u64(ptr) + 0x1F) & (~0x1F));
 }
-int heightmap_seed = 0, cavegen_seed = 0;
-FastNoiseLite noise;
-FastNoiseLite cave_noise;
+int cavegen_seed = 0;
 ImprovedNoise improved_noise;
 mutex_t __chunks_mutex;
 lwp_t __chunk_generator_thread_handle = (lwp_t)NULL;
@@ -136,7 +134,7 @@ void add_chunk(vec3i pos)
 
 inline bool in_range(int x, int min, int max)
 {
-    return std::clamp(x, min, max) == x;
+    return x >= min && x <= max;
 }
 
 /* The state must be initialized to non-zero */
@@ -244,36 +242,37 @@ void generate_chunk()
     int z_offset = (chunk->z * 16);
     int index = 0;
 
-    for (int z = 0; z < 16; z++)
-    {
-        for (int x = 0; x < 16; x++)
-        {
-            // The chunk's heightmap is used differently here. In particular,
-            // it's used for storing the noise value for later parts of the
-            // terrain generation, like the altitude of trees and caves.
-            chunk->height_map[index++] = uint8_t(noise.GetNoise(float(x + x_offset), float(z + z_offset)) * 16.0f + 64.0f);
-        }
-    }
+    // This is used to limit the height of cave noise to minimize
+    // the amount of unnecessary calls to the noise generator.
+    uint8_t max_height = 0;
+
+    // The chunk's heightmap is used differently here. In particular,
+    // it's used for storing the noise value for later parts of the
+    // terrain generation, like the altitude of trees and caves.
+    improved_noise.GetNoiseSet(x_offset, 512, z_offset, 16, 1, 16, 32, 2, chunk->height_map);
+
     index = 0;
     for (int z = 0; z < 16; z++)
     {
         for (int x = 0; x < 16; x++)
         {
-            uint8_t value = chunk->height_map[index++];
-            for (int y = 0; y < 64 || y <= value; y++)
+            uint8_t height = (chunk->height_map[index] >> 3) + 48;
+            chunk->height_map[index++] = height;
+            max_height = std::max(height, max_height);
+            for (int y = 0; y < 64 || y <= height; y++)
             {
                 BlockID id = BlockID::air;
                 // Coat with grass
-                if (y == value)
+                if (y == height)
                     id = BlockID::grass;
                 // Add some dirt
-                else if (in_range(y, value - 2, value - 1))
+                else if (in_range(y, height - 2, height - 1))
                     id = BlockID::dirt;
                 // Place water
-                else if (value < 63 && in_range(y, value + 1, 63))
+                else if (height < 63 && in_range(y, height + 1, 63))
                     id = BlockID::water;
                 // Place stone
-                else if (in_range(y, 5, value - 3))
+                else if (in_range(y, 5, height - 3))
                     id = BlockID::stone;
                 // Randomize bedrock
                 else if (in_range(y, 1, 4))
@@ -286,29 +285,22 @@ void generate_chunk()
         }
     }
     // Carve caves
-    // TODO: Use GetNoiseSet here for better performance.
-    index = 0;
-    for (int z = 0; z < 16; z++)
+    static uint8_t noise_set[4096];
+    block_t *block = &chunk->blockstates[256];
+    for (int y = 1; y <= max_height;)
     {
-        for (int x = 0; x < 16; x++)
-        {
-
-            while (lock_chunks())
-                threadqueue_yield();
-            uint8_t height = chunk->height_map[index++];
-            block_t *block = chunk->get_block(vec3i(x, height, z));
-            size_t off = block - chunk->get_block(vec3i(x, height - 1, z));
-            for (int y = height; y > 0; y--)
+        uint8_t slice_amount = (max_height & 15) + 1;
+        uint8_t *noise_set_ptr = noise_set;
+        improved_noise.GetNoiseSet(x_offset, y, z_offset, 16, slice_amount, 16, 12, 1, noise_set);
+        for (int s = 0; s < slice_amount; s++, y++)
+            for (int i = 0; i < 256; i++, block++, noise_set_ptr++)
             {
-                block -= off;
-                if (block->get_blockid() != BlockID::stone)
+                uint8_t height = chunk->height_map[i];
+                if (y > height || block->get_blockid() != BlockID::stone)
                     continue;
-                float noise_value = (improved_noise.GetNoise(float(x + x_offset) / 12.f, float(y) / 12.f, float(z + z_offset) / 12.f));
-                if (noise_value < -.25f && (height > 63 || abs(height - y) > 2))
+                if (*noise_set_ptr < 96 && (height > 63 || abs(height - y) > 2))
                     block->set_blockid(y >= 10 ? BlockID::air : BlockID::lava);
             }
-            unlock_chunks();
-        }
     }
     generate_trees(chunk);
 
@@ -375,20 +367,8 @@ void init_chunks()
 
 void *__chunk_generator_init_internal(void *)
 {
-    noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
-    noise.SetFrequency(1 / 64.0f);
-    noise.SetSeed(heightmap_seed = fastrand());
-    noise.SetFractalType(FastNoiseLite::FractalType_FBm);
-    noise.SetFractalOctaves(2);
+    improved_noise.Init(cavegen_seed = fastrand());
 
-    cave_noise.SetNoiseType(FastNoiseLite::NoiseType_Perlin);
-    cave_noise.SetFrequency(1 / 12.0f);
-    cave_noise.SetSeed(cavegen_seed = fastrand());
-    cave_noise.SetFractalType(FastNoiseLite::FractalType_None);
-    cave_noise.SetFractalOctaves(1);
-
-    improved_noise.Init(cavegen_seed);
-    
     while (__chunk_generator_init_done)
     {
         while (pending_chunks.size() == 0)
@@ -398,7 +378,6 @@ void *__chunk_generator_init_internal(void *)
                 break;
         }
         generate_chunk();
-        //threadqueue_sleep();
     }
     chunks.clear();
     return NULL;
@@ -421,7 +400,7 @@ block_t *get_block_at(vec3i position)
     position.x &= 0x0F;
     position.y &= 0xFF;
     position.z &= 0x0F;
-    return &chunk->blockstates[position.x | (position.y << 4) | (position.z << 12)];
+    return chunk->get_block(position);
 }
 
 void chunk_t::recalculate()
