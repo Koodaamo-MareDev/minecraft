@@ -772,7 +772,7 @@ inline int DrawHorizontalQuad(vertex_property_t p0, vertex_property_t p1, vertex
         if (vertices[i].pos.y < min_vertex.pos.y)
             min_vertex = vertices[i];
     }
-    uint8_t curr = min_vertex.index;
+    curr = min_vertex.index;
     for (int i = 0; i < 3; i++)
     {
         GX_VertexLit(vertices[curr], light, 3);
