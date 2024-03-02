@@ -67,7 +67,12 @@ bool place_block = false;
 
 void UpdateLightDir();
 void DrawScene(frustum_t &frustum, std::deque<chunk_t *> &chunks, bool transparency);
+void GenerateAdditionalChunks(std::deque<chunk_t *> &chunks);
+void RemoveRedundantChunks(std::deque<chunk_t *> &chunks);
+void PrepareChunkRemoval(chunk_t *chunk);
+void UpdateChunkData(std::deque<chunk_t *> &chunks);
 void UpdateScene(std::deque<chunk_t *> &chunks);
+void UpdateChunkVBOs(std::deque<chunk_t *> &chunks);
 void PrepareTEV();
 void GetInput();
 //---------------------------------------------------------------------------------
@@ -91,7 +96,6 @@ void WiimotePowerPressed(s32 chan)
 s8 has_retraced = 0;
 void RenderDone(u32 enterCount)
 {
-    // LWP_ResumeThread(main_thread);
     has_retraced = 1;
 }
 uint8_t light_map[1024] ATTRIBUTE_ALIGN(32) = {0};
@@ -208,7 +212,7 @@ int main(int argc, char **argv)
     SYS_SetPowerCallback(WiiPowerPressed);
     SYS_SetResetCallback(WiiResetPressed);
     WPAD_SetPowerButtonCallback(WiimotePowerPressed);
-    
+
     // Allocate the fifo buffer
     gpfifo = memalign(32, DEFAULT_FIFO_SIZE);
     memset(gpfifo, 0, DEFAULT_FIFO_SIZE);
@@ -265,7 +269,7 @@ int main(int argc, char **argv)
     GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_NRM, GX_NRM_XYZ, GX_F32, 0);
     GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_CLR0, GX_CLR_RGBA, GX_RGBA8, 0);
     GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_TEX0, GX_TEX_ST, GX_U16, BASE3D_UV_FRAC_BITS);
-    
+
     // Prepare TEV
     GX_SetNumChans(1);
     GX_SetChanCtrl(GX_COLOR0, DIRECTIONAL_LIGHT, GX_SRC_REG, GX_SRC_VTX, GX_LIGHT0, GX_DF_CLAMP, GX_AF_SPOT);
@@ -573,7 +577,7 @@ inline void RecalcSectionWater(chunk_t *chunk, int section)
             }
         }
     }
-    
+
     for (size_t i = 0; i < fluid_levels.size(); i++)
     {
         std::vector<vec3i> &positions = fluid_levels[i];
@@ -604,7 +608,7 @@ void GenerateAdditionalChunks(std::deque<chunk_t *> &chunks)
                 return;
             if (!get_chunk_from_pos(vec3i(x, 0, z), true, false))
             {
-                threadqueue_broadcast();
+                threadqueue_sleep();
                 return;
             }
         }
@@ -613,7 +617,8 @@ void GenerateAdditionalChunks(std::deque<chunk_t *> &chunks)
 
 void RemoveRedundantChunks(std::deque<chunk_t *> &chunks)
 {
-    lock_chunks();
+    while (lock_chunks())
+        threadqueue_yield();
     chunks.erase(
         std::remove_if(chunks.begin(), chunks.end(),
                        [](chunk_t *&c)
@@ -717,54 +722,70 @@ void UpdateChunkData(std::deque<chunk_t *> &chunks)
     }
 }
 
+bool SortVBOs(chunkvbo_t *&a, chunkvbo_t *&b)
+{
+    return *a < *b;
+}
+
 void UpdateChunkVBOs(std::deque<chunk_t *> &chunks)
 {
-    int chunk_update_count = 0;
+    if (light_engine_busy())
+        return;
+    std::vector<chunkvbo_t *> vbos_to_update;
     for (chunk_t *&chunk : chunks)
     {
-        if (!chunk || chunk_update_count >= 1)
-            continue;
-        if (chunk->valid && !chunk->light_updates)
+        if (chunk && chunk->valid && !chunk->light_updates)
         {
-            bool chunk_updated = false;
+            bool updated = false;
             for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
             {
-                if (light_engine_busy())
-                    return;
                 chunkvbo_t &vbo = chunk->vbos[j];
-                if (!vbo.visible)
-                    continue;
-                if (vbo.dirty && !chunk->light_updates)
+                vbo.x = chunk->x * 16;
+                vbo.y = j * 16;
+                vbo.z = chunk->z * 16;
+
+                if (vbo.visible && vbo.dirty && !chunk->light_updates)
                 {
-                    vbo.dirty = false;
-                    chunk->recalculate_section(j);
-                    chunk->build_vbo(j, false);
-                    chunk->build_vbo(j, true);
-                    chunk_updated = true;
-                }
-                if (vbo.solid_buffer != vbo.cached_solid_buffer)
-                {
-                    if (vbo.cached_solid_buffer && vbo.cached_solid_buffer_length)
-                    {
-                        free(vbo.cached_solid_buffer);
-                    }
-                    vbo.cached_solid_buffer = vbo.solid_buffer;
-                    vbo.cached_solid_buffer_length = vbo.solid_buffer_length;
-                }
-                if (vbo.transparent_buffer != vbo.cached_transparent_buffer)
-                {
-                    if (vbo.cached_transparent_buffer && vbo.cached_transparent_buffer_length)
-                    {
-                        free(vbo.cached_transparent_buffer);
-                    }
-                    vbo.cached_transparent_buffer = vbo.transparent_buffer;
-                    vbo.cached_transparent_buffer_length = vbo.transparent_buffer_length;
+                    vbos_to_update.push_back(&vbo);
+                    updated = true;
                 }
             }
-            chunk_update_count += chunk_updated;
-            if (chunk->lit_state)
-                chunk->lit_state = 2;
+            if(!updated)
+            {
+                if (chunk->lit_state == 1)
+                    chunk->lit_state = 2;
+            }
         }
+    }
+    std::sort(vbos_to_update.begin(), vbos_to_update.end(), SortVBOs);
+    for (chunkvbo_t *vbo_ptr : vbos_to_update)
+    {
+        chunkvbo_t &vbo = *vbo_ptr;
+        vbo.dirty = false;
+        int vbo_i = vbo.y / 16;
+        chunk_t *chunk = get_chunk_from_pos(vec3i(vbo.x, 0, vbo.z), false);
+        chunk->recalculate_section(vbo_i);
+        chunk->build_vbo(vbo_i, false);
+        chunk->build_vbo(vbo_i, true);
+        if (vbo.solid_buffer != vbo.cached_solid_buffer)
+        {
+            if (vbo.cached_solid_buffer && vbo.cached_solid_buffer_length)
+            {
+                free(vbo.cached_solid_buffer);
+            }
+            vbo.cached_solid_buffer = vbo.solid_buffer;
+            vbo.cached_solid_buffer_length = vbo.solid_buffer_length;
+        }
+        if (vbo.transparent_buffer != vbo.cached_transparent_buffer)
+        {
+            if (vbo.cached_transparent_buffer && vbo.cached_transparent_buffer_length)
+            {
+                free(vbo.cached_transparent_buffer);
+            }
+            vbo.cached_transparent_buffer = vbo.transparent_buffer;
+            vbo.cached_transparent_buffer_length = vbo.transparent_buffer_length;
+        }
+        return;
     }
 }
 
