@@ -8,13 +8,14 @@
 #include "texturedefs.h"
 #include "base3d.hpp"
 #include "texanim.hpp"
-#include <ogcsys.h>
+#include "base3d.hpp"
 
 #include <cstdint>
 #include <algorithm>
 #include <cmath>
 #include <ogc/gx.h>
 #include <ogc/tpl.h>
+#include <ogcsys.h>
 
 #define CAMERA_WIDTH (640.0f)
 #define CAMERA_HEIGHT (480.0f)
@@ -33,6 +34,7 @@ struct frustum_t
 
 struct camera_t
 {
+    float rot[2];
     float position[3]; // Camera position
     float forward[3];  // Camera forward vector
     float fov;         // Field of view angle
@@ -84,8 +86,6 @@ void use_perspective(view_t view);
 
 Mtx &get_view_matrix();
 
-float get_face_light_index(vec3i pos, uint8_t face);
-uint8_t get_face_brightness(uint8_t face);
 int render_face(vec3i pos, uint8_t face, uint32_t texture_index);
 
 guVector angles_to_vector(float x, float y, float distance, guVector vec = guVector());

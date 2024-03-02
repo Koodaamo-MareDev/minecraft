@@ -292,6 +292,7 @@ int main(int argc, char **argv)
     f32 FOV = 90;
 
     camera_t camera = {
+        {0.0f, 0.0f},
         {0.0f, 0.0f, 0.0f},  // Camera position
         {0.0f, 0.0f, -1.0f}, // Camera forward vector
         FOV,                 // Field of view
@@ -351,15 +352,11 @@ int main(int argc, char **argv)
         }
         GetInput();
 
-        guVector forward = angles_to_vector(xrot, yrot, -1);
-
         camera.position[0] = player_pos.x;
         camera.position[1] = player_pos.y;
         camera.position[2] = player_pos.z;
-
-        camera.forward[0] = forward.x;
-        camera.forward[1] = forward.y;
-        camera.forward[2] = forward.z;
+        camera.rot[0] = xrot;
+        camera.rot[1] = yrot;
 
         // Construct the view frustum matrix from the camera
         frustum_t frustum = calculate_frustum(camera);

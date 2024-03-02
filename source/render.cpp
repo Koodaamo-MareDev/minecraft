@@ -246,11 +246,18 @@ frustum_t calculate_frustum(camera_t &camera)
 {
     frustum_t frustum;
 
+
+    float half_fov = camera.fov * 0.5f;
+    guVector forward = angles_to_vector(camera.rot[0], camera.rot[1], -1);
+    guVector right_vec = angles_to_vector(camera.rot[0], camera.rot[1] + 90 + half_fov, -1);
+    guVector up_vec = angles_to_vector(camera.rot[0] + 90 + half_fov, camera.rot[1], -1);
+
+    camera.forward[0] = forward.x;
+    camera.forward[1] = forward.y;
+    camera.forward[2] = forward.z;
+    
     // Calculate the camera's right and up vectors
-    float right[3], up[3];
-    float global_up[3] = {0.0f, 1.0f, 0.0f};
-    cross_product(camera.forward, global_up, right);
-    cross_product(right, camera.forward, up);
+    float right[3] = {right_vec.x, right_vec.y, right_vec.z}, up[3] = {up_vec.x, up_vec.y, up_vec.z};
 
     // Calculate points on the near and far planes
     float nearCenter[3] = {
@@ -264,9 +271,9 @@ frustum_t calculate_frustum(camera_t &camera)
         camera.position[2] + camera.forward[2] * camera.far};
 
     // Calculate the normals to the frustum planes
-    float normalLeft[3] = {-right[0], -right[1], -right[2]};
+    float normalLeft[3] = {-right[0], -right[1], right[2]};
     float normalRight[3] = {right[0], right[1], right[2]};
-    float normalBottom[3] = {-up[0], -up[1], -up[2]};
+    float normalBottom[3] = {-up[0], -up[1], up[2]};
     float normalTop[3] = {up[0], up[1], up[2]};
     float normalNear[3] = {-camera.forward[0], -camera.forward[1], -camera.forward[2]};
     float normalFar[3] = {camera.forward[0], camera.forward[1], camera.forward[2]};
