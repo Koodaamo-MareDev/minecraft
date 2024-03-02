@@ -45,21 +45,28 @@ public:
                               grad(impnoise_permutation[BB + 1], x - 1, y - 1, z - 1))));
     }
 
-    inline void GetNoiseSet(float pos_x, float pos_y, float pos_z, uint32_t size_x, uint32_t size_y, uint32_t size_z, float frequency, uint8_t *out)
+    inline void GetNoiseSet(float pos_x, float pos_y, float pos_z, uint32_t size_x, uint32_t size_y, uint32_t size_z, float frequency, uint8_t octaves, uint8_t *out)
     {
         float amplitude = 255.0f;
         float inv_frequency = 1.0f / frequency;
         float half_amplitude = amplitude * 0.5f;
-        float _z = pos_z * inv_frequency;
-        for (uint32_t i = 0; i < size_z; i++, _z += inv_frequency)
+
+        float _y = pos_y * inv_frequency;
+        for (uint32_t j = 0; j < size_y; j++, _y += inv_frequency)
         {
-            float _y = pos_y * inv_frequency;
-            for (uint32_t j = 0; j < size_y; j++, _y += inv_frequency)
+            float _z = pos_z * inv_frequency;
+            for (uint32_t i = 0; i < size_z; i++, _z += inv_frequency)
             {
                 float _x = pos_x * inv_frequency;
                 for (uint32_t k = 0; k < size_x; k++, _x += inv_frequency)
                 {
-                    *(out++) = uint8_t(half_amplitude + (half_amplitude)*GetNoise(_x, _y, _z));
+                    float val = 0;
+                    for (uint8_t i = 0, octave_multiplier = 1; i < octaves; i++)
+                    {
+                        val += GetNoise(_x * octave_multiplier, _y * octave_multiplier, _z * octave_multiplier) / octave_multiplier;
+                        octave_multiplier <<= 1;
+                    }
+                    *(out++) = uint8_t(half_amplitude + (half_amplitude * val));
                 }
             }
         }

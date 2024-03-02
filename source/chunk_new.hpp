@@ -54,12 +54,12 @@ public:
 
     block_t *get_block(vec3i pos)
     {
-        return &this->blockstates[(pos.x & 0xF) | ((pos.y & 0xFF) << 4) | ((pos.z & 0xF) << 12)];
+        return &this->blockstates[(pos.x & 0xF) | ((pos.y & 0xFF) << 8) | ((pos.z & 0xF) << 4)];
     }
 
     void set_block(vec3i pos, BlockID block_id)
     {
-        this->blockstates[(pos.x & 0xF) | ((pos.y & 0xFF) << 4) | ((pos.z & 0xF) << 12)].set_blockid(block_id);
+        this->blockstates[(pos.x & 0xF) | ((pos.y & 0xFF) << 8) | ((pos.z & 0xF) << 4)].set_blockid(block_id);
     }
 
     void replace_air(vec3i position, BlockID id)
