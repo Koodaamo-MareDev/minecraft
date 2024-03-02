@@ -108,24 +108,15 @@ Mtx &get_view_matrix()
     return view_mtx;
 }
 
-uint8_t get_face_brightness(uint8_t face)
+uint8_t face_brightness_values[] = {
+    153, 153, 127, 255, 204, 204
+};
+inline uint8_t get_face_brightness(uint8_t face)
 {
-    switch (face)
-    {
-    case 0:
-    case 1:
-        return 153;
-    case 2:
-        return 127;
-    case 4:
-    case 5:
-        return 204;
-    default:
-        return 255;
-    }
+    return face_brightness_values[face];
 }
 extern uint8_t light_map[256];
-float get_face_light_index(vec3i pos, uint8_t face)
+inline float get_face_light_index(vec3i pos, uint8_t face)
 {
     vec3i other = pos + face_offsets[face];
     block_t *other_block = get_block_at(other);
