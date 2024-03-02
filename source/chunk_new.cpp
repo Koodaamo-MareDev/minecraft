@@ -782,20 +782,17 @@ int chunk_t::render_block_mesh(int section, bool transparent, int vertexCount)
     return vertexCount;
 }
 
-bool CompareVertices(const vertex_property_t &a, const vertex_property_t &b)
+inline int DrawHorizontalQuad(vertex_property_t p0, vertex_property_t p1, vertex_property_t p2, vertex_property_t p3, uint8_t light)
 {
-    return a.pos.y < b.pos.y;
-}
-
-int DrawHorizontalQuad(vertex_property_t p0, vertex_property_t p1, vertex_property_t p2, vertex_property_t p3, uint8_t light)
-{
-    static std::vector<vertex_property_t> vertices(4);
-
-    (vertices[0] = p0).index = 0;
-    (vertices[1] = p1).index = 1;
-    (vertices[2] = p2).index = 2;
-    (vertices[3] = p3).index = 3;
-    vertex_property_t min_vertex = *std::min_element(vertices.begin(), vertices.end(), CompareVertices);
+    vertex_property_t vertices[4] = {p0, p1, p2, p3};
+    uint8_t curr = 0;
+    // Find the vertex with smallest y position and start there.
+    vertex_property_t min_vertex = vertices[0];
+    for (int i = 1; i < 4; i++)
+    {
+        if (vertices[i].pos.y < min_vertex.pos.y)
+            min_vertex = vertices[i];
+    }
     uint8_t curr = min_vertex.index;
     for (int i = 0; i < 3; i++)
     {
@@ -811,13 +808,9 @@ int DrawHorizontalQuad(vertex_property_t p0, vertex_property_t p1, vertex_proper
     return 2;
 }
 
-int DrawVerticalQuad(vertex_property_t p0, vertex_property_t p1, vertex_property_t p2, vertex_property_t p3, uint8_t light)
+inline int DrawVerticalQuad(vertex_property_t p0, vertex_property_t p1, vertex_property_t p2, vertex_property_t p3, uint8_t light)
 {
-    static std::vector<vertex_property_t> vertices(4);
-    vertices[0] = p0;
-    vertices[1] = p1;
-    vertices[2] = p2;
-    vertices[3] = p3;
+    vertex_property_t vertices[4] = {p0, p1, p2, p3};
     int faceCount = 0;
     uint8_t curr = 0;
     if (p0.y_uv != p1.y_uv)
