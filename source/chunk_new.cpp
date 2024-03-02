@@ -942,9 +942,9 @@ int chunk_t::render_fluid(block_t *block, vec3i pos)
     };
     for (int i = 0; i < 4; i++)
     {
-        corner_max[i] = get_fluid_visual_level(pos + corner_offsets[i], block_id);
+        corner_max[i] = get_fluid_visual_level(pos + corner_offsets[i], block_id) << 1;
         corner_min[i] = 0;
-        corner_tops[i] = float(corner_max[i]) * 0.125f;
+        corner_tops[i] = float(corner_max[i]) * 0.0625f;
         corner_bottoms[i] = 0.0f;
     }
 
