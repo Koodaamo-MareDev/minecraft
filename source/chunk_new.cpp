@@ -32,7 +32,6 @@ void *get_aligned_pointer_32(void *ptr)
 {
     return (void *)((u64(ptr) + 0x1F) & (~0x1F));
 }
-extern guVector player_pos;
 int heightmap_seed = 0, cavegen_seed = 0;
 FastNoiseLite noise;
 FastNoiseLite cave_noise;

@@ -20,6 +20,8 @@
 #define VBO_TRANSPARENT 2
 #define VBO_ALL 0xFF
 
+extern guVector player_pos;
+
 class chunkvbo_t
 {
 public:
@@ -36,6 +38,15 @@ public:
     int cached_transparent_buffer_length = 0;
     void *cached_solid_buffer = nullptr;
     void *cached_transparent_buffer = nullptr;
+
+    float player_taxicab_distance() {
+        return std::abs(this->x - player_pos.x) * 2.0f + std::abs(this->y - player_pos.y) * 0.5f + std::abs(this->z - player_pos.z) * 2.0f;
+    }
+
+    bool operator< (chunkvbo_t& other)
+    {
+        return this->player_taxicab_distance() < other.player_taxicab_distance();
+    }
 };
 
 class chunk_t
