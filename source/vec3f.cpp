@@ -36,7 +36,7 @@ vec3f vec3f::operator*(float const &a) const
 }
 
 #if HW_RVL
-guVector vec3f::operator()()
+vec3f::operator guVector()
 {
     return {x, y, z};
 }

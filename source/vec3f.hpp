@@ -24,7 +24,8 @@ public:
     vec3f() : x(0), y(0), z(0) {}
 
 #if HW_RVL
-    guVector operator()();
+    vec3f(guVector a) : x(a.x), y(a.y), z(a.z) {}
+    operator guVector();
 #endif
 
 private:
