@@ -54,7 +54,7 @@ void init_fog(Mtx44 &projection_mtx, uint16_t viewport_width)
     static bool fog_init_done = false;
 
     static GXFogAdjTbl fog_adjust_table;
-    
+
     if (fog_init_done)
         return;
     GX_InitFogAdjTable(&fog_adjust_table, viewport_width, projection_mtx);
@@ -109,8 +109,7 @@ Mtx &get_view_matrix()
 }
 
 uint8_t face_brightness_values[] = {
-    153, 153, 127, 255, 204, 204
-};
+    153, 153, 127, 255, 204, 204};
 inline uint8_t get_face_brightness(uint8_t face)
 {
     return face_brightness_values[face];
@@ -192,8 +191,8 @@ guVector angles_to_vector(float x, float y, float distance, guVector vec)
 // Function to calculate the signed distance from a point to a frustum plane
 float distance_to_plane(const vec3f &point, const frustum_t &frustum, int planeIndex)
 {
-    const float *plane = frustum.planes[planeIndex];
-    return plane[0] * point.x + plane[1] * point.y + plane[2] * point.z + plane[3];
+    plane_t plane = frustum.planes[planeIndex];
+    return plane.direction.x * point.x + plane.direction.y * point.y + plane.direction.z * point.z - plane.distance;
 }
 
 // Function to calculate the distance from a point to a frustum
@@ -212,110 +211,55 @@ float distance_to_frustum(const vec3f &point, const frustum_t &frustum)
 
     return minDistance;
 }
-// Function to normalize a 3D vector
-void normalize(float &x, float &y, float &z)
-{
-    float length = std::sqrt(x * x + y * y + z * z);
-    if (length != 0.0f)
-    {
-        float invLength = 1.0f / length;
-        x *= invLength;
-        y *= invLength;
-        z *= invLength;
-    }
-}
 
-void cross_product(float *a, float *b, float *out)
-{
-    guVector v_a = guVector{a[0], a[1], a[2]};
-    guVector v_b = guVector{b[0], b[1], b[2]};
-    guVector v_out;
-    guVecCross(&v_a, &v_b, &v_out);
-    out[0] = v_out.x;
-    out[1] = v_out.y;
-    out[2] = v_out.z;
-}
-float dot_product(float *a, float *b)
-{
-    guVector v_a = guVector{a[0], a[1], a[2]};
-    guVector v_b = guVector{b[0], b[1], b[2]};
-    return guVecDotProduct(&v_a, &v_b);
-}
 // Function to calculate the frustum planes from camera parameters
 frustum_t calculate_frustum(camera_t &camera)
 {
     frustum_t frustum;
-
-
-    float half_fov = camera.fov * 0.5f;
-    guVector forward = angles_to_vector(camera.rot[0], camera.rot[1], -1);
-    guVector right_vec = angles_to_vector(camera.rot[0], camera.rot[1] + 90 + half_fov, -1);
-    guVector up_vec = angles_to_vector(camera.rot[0] + 90 + half_fov, camera.rot[1], -1);
-
-    camera.forward[0] = forward.x;
-    camera.forward[1] = forward.y;
-    camera.forward[2] = forward.z;
     
-    // Calculate the camera's right and up vectors
-    float right[3] = {right_vec.x, right_vec.y, right_vec.z}, up[3] = {up_vec.x, up_vec.y, up_vec.z};
+    // Calculate half-width and half-height at near plane
+    float half_fov = camera.fov * 0.5f;
+    
+    // Calculate forward vector
+    guVector forward = angles_to_vector(camera.rot.x, camera.rot.y, -1);
+    guVector backward = vec3f() - forward;
 
+    // Calculate the 4 perspective frustum planes (not near and far)
+    guVector right_vec = angles_to_vector(camera.rot.x, camera.rot.y + 90 + half_fov, 1);
+    guVector left_vec = angles_to_vector(camera.rot.x, camera.rot.y - 90 - half_fov, 1);
+    guVector up_vec = angles_to_vector(camera.rot.x + 90 + half_fov, camera.rot.y, 1);
+    guVector down_vec = angles_to_vector(camera.rot.x - 90 - half_fov, camera.rot.y, 1);
+    
     // Calculate points on the near and far planes
-    float nearCenter[3] = {
-        camera.position[0] + camera.forward[0] * camera.near,
-        camera.position[1] + camera.forward[1] * camera.near,
-        camera.position[2] + camera.forward[2] * camera.near};
+    guVector near_center = camera.position + (vec3f(forward) * (camera.near));
+    guVector far_center = camera.position + (vec3f(forward) * (camera.far));
 
-    float farCenter[3] = {
-        camera.position[0] + camera.forward[0] * camera.far,
-        camera.position[1] + camera.forward[1] * camera.far,
-        camera.position[2] + camera.forward[2] * camera.far};
-
-    // Calculate the normals to the frustum planes
-    float normalLeft[3] = {-right[0], -right[1], right[2]};
-    float normalRight[3] = {right[0], right[1], right[2]};
-    float normalBottom[3] = {-up[0], -up[1], up[2]};
-    float normalTop[3] = {up[0], up[1], up[2]};
-    float normalNear[3] = {-camera.forward[0], -camera.forward[1], -camera.forward[2]};
-    float normalFar[3] = {camera.forward[0], camera.forward[1], camera.forward[2]};
-
-    // Normalize the normals
-    normalize(normalLeft[0], normalLeft[1], normalLeft[2]);
-    normalize(normalRight[0], normalRight[1], normalRight[2]);
-    normalize(normalBottom[0], normalBottom[1], normalBottom[2]);
-    normalize(normalTop[0], normalTop[1], normalTop[2]);
-    normalize(normalNear[0], normalNear[1], normalNear[2]);
-    normalize(normalFar[0], normalFar[1], normalFar[2]);
+    // Normalize the directions
+    guVecNormalize(&forward);
+    guVecNormalize(&backward);
+    guVecNormalize(&right_vec);
+    guVecNormalize(&left_vec);
+    guVecNormalize(&up_vec);
+    guVecNormalize(&down_vec);
 
     // Calculate the frustum plane equations in the form Ax + By + Cz + D = 0
-    frustum.planes[0][0] = normalLeft[0];
-    frustum.planes[0][1] = normalLeft[1];
-    frustum.planes[0][2] = normalLeft[2];
-    frustum.planes[0][3] = dot_product(normalLeft, nearCenter);
+    frustum.planes[0].direction = left_vec;
+    frustum.planes[0].distance = guVecDotProduct(&left_vec, &near_center);
 
-    frustum.planes[1][0] = normalRight[0];
-    frustum.planes[1][1] = normalRight[1];
-    frustum.planes[1][2] = normalRight[2];
-    frustum.planes[1][3] = dot_product(normalRight, nearCenter);
+    frustum.planes[1].direction = right_vec;
+    frustum.planes[1].distance = guVecDotProduct(&right_vec, &near_center);
 
-    frustum.planes[2][0] = normalBottom[0];
-    frustum.planes[2][1] = normalBottom[1];
-    frustum.planes[2][2] = normalBottom[2];
-    frustum.planes[2][3] = dot_product(normalBottom, nearCenter);
+    frustum.planes[2].direction = down_vec;
+    frustum.planes[2].distance = guVecDotProduct(&down_vec, &near_center);
 
-    frustum.planes[3][0] = normalTop[0];
-    frustum.planes[3][1] = normalTop[1];
-    frustum.planes[3][2] = normalTop[2];
-    frustum.planes[3][3] = dot_product(normalTop, nearCenter);
+    frustum.planes[3].direction = up_vec;
+    frustum.planes[3].distance = guVecDotProduct(&up_vec, &near_center);
 
-    frustum.planes[4][0] = normalNear[0];
-    frustum.planes[4][1] = normalNear[1];
-    frustum.planes[4][2] = normalNear[2];
-    frustum.planes[4][3] = dot_product(normalNear, nearCenter);
+    frustum.planes[4].direction = forward;
+    frustum.planes[4].distance = guVecDotProduct(&forward, &near_center);
 
-    frustum.planes[5][0] = normalFar[0];
-    frustum.planes[5][1] = normalFar[1];
-    frustum.planes[5][2] = normalFar[2];
-    frustum.planes[5][3] = dot_product(normalFar, farCenter);
+    frustum.planes[5].direction = backward;
+    frustum.planes[5].distance = guVecDotProduct(&backward, &far_center);
 
     return frustum;
 }

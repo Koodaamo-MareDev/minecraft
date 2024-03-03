@@ -27,20 +27,25 @@ extern float xrot, yrot;
 extern int tickCounter;
 extern float partialTicks;
 
+struct plane_t
+{
+    vec3f direction;
+    float distance;
+};
+
 struct frustum_t
 {
-    float planes[6][4]; // Six planes of the frustum
+    plane_t planes[6]; // Six planes of the frustum
 };
 
 struct camera_t
 {
-    float rot[2];
-    float position[3]; // Camera position
-    float forward[3];  // Camera forward vector
-    float fov;         // Field of view angle
-    float aspect;      // Aspect ratio
-    float near;        // Near clipping plane
-    float far;         // Far clipping plane
+    vec3f rot;
+    vec3f position; // Camera position
+    float fov;      // Field of view angle
+    float aspect;   // Aspect ratio
+    float near;     // Near clipping plane
+    float far;      // Far clipping plane
 };
 
 struct view_t
@@ -93,12 +98,6 @@ guVector angles_to_vector(float x, float y, float distance, guVector vec = guVec
 float distance_to_plane(const vec3f &point, const frustum_t &frustum, int planeIndex);
 
 float distance_to_frustum(const vec3f &point, const frustum_t &frustum);
-
-void normalize(float &x, float &y, float &z);
-
-void cross_product(float *a, float *b, float *out);
-
-float dot_product(float *a, float *b);
 
 frustum_t calculate_frustum(camera_t &camera);
 

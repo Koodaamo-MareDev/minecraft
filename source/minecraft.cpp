@@ -66,12 +66,12 @@ bool destroy_block = false;
 bool place_block = false;
 
 void UpdateLightDir();
-void DrawScene(frustum_t &frustum, std::deque<chunk_t *> &chunks, bool transparency);
+void DrawScene(std::deque<chunk_t *> &chunks, bool transparency);
 void GenerateAdditionalChunks(std::deque<chunk_t *> &chunks);
 void RemoveRedundantChunks(std::deque<chunk_t *> &chunks);
 void PrepareChunkRemoval(chunk_t *chunk);
-void UpdateChunkData(std::deque<chunk_t *> &chunks);
-void UpdateScene(std::deque<chunk_t *> &chunks);
+void UpdateChunkData(frustum_t &frustum, std::deque<chunk_t *> &chunks);
+void UpdateScene(frustum_t &frustum, std::deque<chunk_t *> &chunks);
 void UpdateChunkVBOs(std::deque<chunk_t *> &chunks);
 void PrepareTEV();
 void GetInput();
@@ -296,9 +296,8 @@ int main(int argc, char **argv)
     f32 FOV = 90;
 
     camera_t camera = {
-        {0.0f, 0.0f},
+        {0.0f, 0.0f, 0.0f},
         {0.0f, 0.0f, 0.0f},  // Camera position
-        {0.0f, 0.0f, -1.0f}, // Camera forward vector
         FOV,                 // Field of view
         viewport.aspect,     // Aspect ratio
         viewport.near,       // Near clipping plane
@@ -356,16 +355,14 @@ int main(int argc, char **argv)
         }
         GetInput();
 
-        camera.position[0] = player_pos.x;
-        camera.position[1] = player_pos.y;
-        camera.position[2] = player_pos.z;
-        camera.rot[0] = xrot;
-        camera.rot[1] = yrot;
+        camera.position = player_pos;
+        camera.rot.x = xrot;
+        camera.rot.y = yrot;
 
         // Construct the view frustum matrix from the camera
         frustum_t frustum = calculate_frustum(camera);
 
-        UpdateScene(chunks);
+        UpdateScene(frustum, chunks);
 
         use_perspective(viewport);
 
@@ -378,14 +375,14 @@ int main(int argc, char **argv)
         GX_SetAlphaUpdate(GX_TRUE);
         GX_SetAlphaCompare(GX_ALWAYS, 0, GX_AOP_OR, GX_ALWAYS, 0);
         GX_SetColorUpdate(GX_TRUE);
-        DrawScene(frustum, chunks, false);
+        DrawScene(chunks, false);
         // Draw transparent buffer
         GX_SetZMode(GX_TRUE, GX_LESS, GX_TRUE);
         GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_NOOP);
         GX_SetAlphaUpdate(GX_FALSE);
         GX_SetAlphaCompare(GX_GEQUAL, 16, GX_AOP_AND, GX_ALWAYS, 0);
         GX_SetColorUpdate(GX_TRUE);
-        DrawScene(frustum, chunks, true);
+        DrawScene(chunks, true);
         // Draw sky
         draw_sky(background);
 
@@ -690,7 +687,7 @@ void EditBlocks()
     destroy_block = false;
 }
 
-void UpdateChunkData(std::deque<chunk_t *> &chunks)
+void UpdateChunkData(frustum_t &frustum, std::deque<chunk_t *> &chunks)
 {
     int light_up_calls = 0;
     for (chunk_t *&chunk : chunks)
@@ -708,8 +705,11 @@ void UpdateChunkData(std::deque<chunk_t *> &chunks)
             for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
             {
                 chunkvbo_t &vbo = chunk->vbos[j];
+                vbo.x = chunk->x * 16;
+                vbo.y = j * 16;
+                vbo.z = chunk->z * 16;
                 distance = std::abs((j * 16) - player_pos.y);
-                vbo.visible = (distance <= RENDER_DISTANCE * 16);
+                vbo.visible = (distance <= RENDER_DISTANCE * 16) && distance_to_frustum(vec3f(vbo.x, vbo.y, vbo.z), frustum) < 32;
                 if (distance <= SIMULATION_DISTANCE * 16 && tickCounter % 4 == 0)
                     RecalcSectionWater(chunk, j);
             }
@@ -736,24 +736,13 @@ void UpdateChunkVBOs(std::deque<chunk_t *> &chunks)
     {
         if (chunk && chunk->valid && !chunk->light_updates)
         {
-            bool updated = false;
             for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
             {
                 chunkvbo_t &vbo = chunk->vbos[j];
-                vbo.x = chunk->x * 16;
-                vbo.y = j * 16;
-                vbo.z = chunk->z * 16;
-
                 if (vbo.visible && vbo.dirty && !chunk->light_updates)
                 {
                     vbos_to_update.push_back(&vbo);
-                    updated = true;
                 }
-            }
-            if(!updated)
-            {
-                if (chunk->lit_state == 1)
-                    chunk->lit_state = 2;
             }
         }
     }
@@ -789,13 +778,13 @@ void UpdateChunkVBOs(std::deque<chunk_t *> &chunks)
     }
 }
 
-void UpdateScene(std::deque<chunk_t *> &chunks)
+void UpdateScene(frustum_t &frustum, std::deque<chunk_t *> &chunks)
 {
     if (!light_engine_busy())
         GenerateAdditionalChunks(chunks);
     RemoveRedundantChunks(chunks);
     EditBlocks();
-    UpdateChunkData(chunks);
+    UpdateChunkData(frustum, chunks);
     UpdateChunkVBOs(chunks);
 
     // Calculate chunk memory usage
@@ -806,7 +795,7 @@ void UpdateScene(std::deque<chunk_t *> &chunks)
     }
 }
 
-void DrawScene(frustum_t &frustum, std::deque<chunk_t *> &chunks, bool transparency)
+void DrawScene(std::deque<chunk_t *> &chunks, bool transparency)
 {
     // Use terrain texture
     use_texture(blockmap_texture);
@@ -819,7 +808,7 @@ void DrawScene(frustum_t &frustum, std::deque<chunk_t *> &chunks, bool transpare
     {
         for (chunk_t *&chunk : chunks)
         {
-            if (chunk && chunk->valid && chunk->lit_state == 2)
+            if (chunk && chunk->valid && chunk->lit_state)
             {
                 for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
                 {
@@ -828,9 +817,7 @@ void DrawScene(frustum_t &frustum, std::deque<chunk_t *> &chunks, bool transpare
                         continue;
 
                     guVector chunkPos = {(f32)chunk->x * 16, (f32)j * 16, (f32)chunk->z * 16};
-                    vec3f chunkCenter(chunkPos.x + 8, chunkPos.y + 8, chunkPos.z + 8);
-
-                    if (distance_to_frustum(chunkCenter, frustum) < 14 && vbo.cached_solid_buffer && vbo.cached_solid_buffer_length)
+                    if (vbo.cached_solid_buffer && vbo.cached_solid_buffer_length)
                     {
                         Render(chunkPos, vbo.cached_solid_buffer, vbo.cached_solid_buffer_length);
                     }
@@ -843,7 +830,7 @@ void DrawScene(frustum_t &frustum, std::deque<chunk_t *> &chunks, bool transpare
     {
         for (chunk_t *&chunk : chunks)
         {
-            if (chunk && chunk->valid && chunk->lit_state == 2)
+            if (chunk && chunk->valid && chunk->lit_state)
             {
                 for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
                 {
@@ -852,9 +839,7 @@ void DrawScene(frustum_t &frustum, std::deque<chunk_t *> &chunks, bool transpare
                         continue;
 
                     guVector chunkPos = {(f32)chunk->x * 16, (f32)j * 16, (f32)chunk->z * 16};
-                    vec3f chunkCenter(chunkPos.x + 8, chunkPos.y + 8, chunkPos.z + 8);
-
-                    if (distance_to_frustum(chunkCenter, frustum) < 14 && vbo.cached_transparent_buffer && vbo.cached_transparent_buffer_length)
+                    if (vbo.cached_transparent_buffer && vbo.cached_transparent_buffer_length)
                     {
                         Render(chunkPos, vbo.cached_transparent_buffer, vbo.cached_transparent_buffer_length);
                     }
