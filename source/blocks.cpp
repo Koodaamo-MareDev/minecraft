@@ -173,7 +173,7 @@ uint32_t get_face_texture_index(block_t *block, int face)
     }
 }
 
-void update_fluid(block_t *block, vec3i pos)
+void update_fluid(block_t *block, vec3i pos, chunk_t *near)
 {
     if (!(block->meta & FLUID_UPDATE_REQUIRED_FLAG))
         return;
@@ -185,12 +185,12 @@ void update_fluid(block_t *block, vec3i pos)
     uint8_t old_level = get_fluid_meta_level(block);
     uint8_t level = 0;
     // All directions except +Y because of gravity.
-    block_t *nx = get_block_at(pos + face_offsets[FACE_NX]);
-    block_t *px = get_block_at(pos + face_offsets[FACE_PX]);
-    block_t *ny = get_block_at(pos + face_offsets[FACE_NY]);
-    block_t *py = get_block_at(pos + face_offsets[FACE_PY]);
-    block_t *nz = get_block_at(pos + face_offsets[FACE_NZ]);
-    block_t *pz = get_block_at(pos + face_offsets[FACE_PZ]);
+    block_t *nx = get_block_at(pos + face_offsets[FACE_NX], near);
+    block_t *px = get_block_at(pos + face_offsets[FACE_PX], near);
+    block_t *ny = get_block_at(pos + face_offsets[FACE_NY], near);
+    block_t *py = get_block_at(pos + face_offsets[FACE_PY], near);
+    block_t *nz = get_block_at(pos + face_offsets[FACE_NZ], near);
+    block_t *pz = get_block_at(pos + face_offsets[FACE_PZ], near);
     block_t *surroundings[6] = {ny, nx, px, nz, pz, py};
     int surrounding_dirs[6] = {FACE_NY, FACE_NX, FACE_PX, FACE_NZ, FACE_PZ, FACE_PY};
     if (is_flowing_fluid(block_id))
@@ -335,7 +335,7 @@ float get_percent_air(int fluid_level)
 // All I did was make it human readable and
 // converted it into suitable C++ code.
 // - Marcus
-float get_fluid_height(vec3i pos, BlockID block_type)
+float get_fluid_height(vec3i pos, BlockID block_type, chunk_t *near)
 {
     int block_x = pos.x, block_y = pos.y, block_z = pos.z;
     int surrounding_water = 0;
@@ -345,12 +345,12 @@ float get_fluid_height(vec3i pos, BlockID block_type)
     {
         int check_x = block_x - (i & 1);
         int check_z = block_z - (i >> 1 & 1);
-        if (is_same_fluid(get_block_id_at(vec3i(check_x, block_y + 1, check_z)), block_type))
+        if (is_same_fluid(get_block_id_at(vec3i(check_x, block_y + 1, check_z), BlockID::air, near), block_type))
         {
             return 1.0F;
         }
 
-        BlockID check_block_type = get_block_id_at(vec3i(check_x, block_y, check_z));
+        BlockID check_block_type = get_block_id_at(vec3i(check_x, block_y, check_z), BlockID::air, near);
         if (!is_same_fluid(check_block_type, block_type))
         {
             if (!is_solid(check_block_type))
@@ -361,7 +361,7 @@ float get_fluid_height(vec3i pos, BlockID block_type)
         }
         else
         {
-            int fluid_level = get_fluid_meta_level(get_block_at(vec3i(check_x, block_y, check_z)));
+            int fluid_level = get_fluid_meta_level(get_block_at(vec3i(check_x, block_y, check_z), near));
             if (fluid_level >= 8 || fluid_level == 0)
             {
                 water_percentage += get_percent_air(fluid_level) * 10.0F;
@@ -389,9 +389,9 @@ uint8_t get_fluid_meta_level(block_t *block)
     return 8;
 }
 
-uint8_t get_fluid_visual_level(vec3i pos, BlockID block_id)
+uint8_t get_fluid_visual_level(vec3i pos, BlockID block_id, chunk_t *near)
 {
-    return FLOAT_TO_FLUIDMETA(get_fluid_height(pos, block_id));
+    return FLOAT_TO_FLUIDMETA(get_fluid_height(pos, block_id, near));
 }
 bool is_fluid_overridable(BlockID id)
 {

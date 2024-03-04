@@ -383,23 +383,22 @@ void *__chunk_generator_init_internal(void *)
     return NULL;
 }
 
-BlockID get_block_id_at(vec3i position, BlockID default_id)
+BlockID get_block_id_at(vec3i position, BlockID default_id, chunk_t *near)
 {
-    block_t *block = get_block_at(position);
+    block_t *block = get_block_at(position, near);
     if (!block)
         return default_id;
     return block->get_blockid();
 }
-block_t *get_block_at(vec3i position)
+block_t *get_block_at(vec3i position, chunk_t *near)
 {
     if (position.y < 0 || position.y > 255)
         return nullptr;
+    if (near && (near->x * 16) == (position.x & ~0xF) && (near->z * 16) == (position.z & ~0xF))
+        return near->get_block(position);
     chunk_t *chunk = get_chunk_from_pos(position, false, false);
     if (!chunk)
         return nullptr;
-    position.x &= 0x0F;
-    position.y &= 0xFF;
-    position.z &= 0x0F;
     return chunk->get_block(position);
 }
 
@@ -415,7 +414,7 @@ void chunk_t::update_height_map(vec3i pos)
 {
     pos.x &= 15;
     pos.z &= 15;
-    uint8_t *height = height_map + ((pos.x << 4) + pos.z);
+    uint8_t *height = &height_map[((pos.x << 4) | pos.z)];
     BlockID id = get_block(pos)->get_blockid();
     if (get_block_opacity(id))
     {
@@ -506,7 +505,7 @@ void chunk_t::recalculate_section(int section)
                     for (int i = 0; i < 6; i++)
                     {
                         vec3i other = chunk_pos + local_pos + face_offsets[i];
-                        block_t *other_block = get_block_at(other);
+                        block_t *other_block = get_block_at(other, this);
                         BlockID other_id = !other_block ? BlockID::air : other_block->get_blockid();
                         bool face_transparent = is_face_transparent(get_face_texture_index(block, i));
 

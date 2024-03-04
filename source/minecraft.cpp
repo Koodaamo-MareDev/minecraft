@@ -297,11 +297,11 @@ int main(int argc, char **argv)
 
     camera_t camera = {
         {0.0f, 0.0f, 0.0f},
-        {0.0f, 0.0f, 0.0f},  // Camera position
-        FOV,                 // Field of view
-        viewport.aspect,     // Aspect ratio
-        viewport.near,       // Near clipping plane
-        viewport.far         // Far clipping plane
+        {0.0f, 0.0f, 0.0f}, // Camera position
+        FOV,                // Field of view
+        viewport.aspect,    // Aspect ratio
+        viewport.near,      // Near clipping plane
+        viewport.far        // Far clipping plane
     };
     fatInitDefault();
     printf("Render resolution: %f,%f, Widescreen: %s\n", viewport.width, viewport.height, viewport.widescreen ? "Yes" : "No");
@@ -342,7 +342,7 @@ int main(int argc, char **argv)
         GX_SetCopyClear(background, 0x00FFFFFF);
 
         // Enable fog
-        use_fog(true, viewport, background, RENDER_DISTANCE * 0.7f * 16 - 8, RENDER_DISTANCE * 0.7f * 16);
+        use_fog(true, viewport, background, GENERATION_DISTANCE * 0.7f - 8, GENERATION_DISTANCE * 0.7f);
 
         if (player_pos.y < -999)
             player_pos.y = skycast(vec3i(int(player_pos.x), 0, int(player_pos.z))) + 2;
@@ -709,7 +709,7 @@ void UpdateChunkData(frustum_t &frustum, std::deque<chunk_t *> &chunks)
                 vbo.y = j * 16;
                 vbo.z = chunk->z * 16;
                 distance = std::abs((j * 16) - player_pos.y);
-                vbo.visible = (distance <= RENDER_DISTANCE * 16) && distance_to_frustum(vec3f(vbo.x, vbo.y, vbo.z), frustum) < 32;
+                vbo.visible = (distance <= GENERATION_DISTANCE) && distance_to_frustum(vec3f(vbo.x, vbo.y, vbo.z), frustum) < 32;
                 if (distance <= SIMULATION_DISTANCE * 16 && tickCounter % 4 == 0)
                     RecalcSectionWater(chunk, j);
             }
@@ -750,9 +750,19 @@ void UpdateChunkVBOs(std::deque<chunk_t *> &chunks)
     for (chunkvbo_t *vbo_ptr : vbos_to_update)
     {
         chunkvbo_t &vbo = *vbo_ptr;
-        vbo.dirty = false;
         int vbo_i = vbo.y / 16;
         chunk_t *chunk = get_chunk_from_pos(vec3i(vbo.x, 0, vbo.z), false);
+
+        // Check if chunk has other chunks around it.
+        bool surrounding = true;
+        for (int x = sgn(chunk->x); x <= 1; x += 2)
+            for (int z = sgn(chunk->z); z <= 1; z += 2)
+            {
+                surrounding &= get_chunk(vec3i(chunk->x + x, 0, chunk->z + z), false) != nullptr;
+            }
+        if (!surrounding)
+            continue;
+        vbo.dirty = false;
         chunk->recalculate_section(vbo_i);
         chunk->build_vbo(vbo_i, false);
         chunk->build_vbo(vbo_i, true);

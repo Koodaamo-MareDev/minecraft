@@ -40,7 +40,7 @@ public:
     void *cached_transparent_buffer = nullptr;
 
     float player_taxicab_distance() {
-        return std::abs(this->x - player_pos.x) * 2.0f + std::abs(this->y - player_pos.y) * 0.5f + std::abs(this->z - player_pos.z) * 2.0f;
+        return std::abs(this->x - player_pos.x) + std::abs(this->y - player_pos.y) + std::abs(this->z - player_pos.z);
     }
 
     bool operator< (chunkvbo_t& other)
@@ -117,8 +117,8 @@ void init_chunks();
 void deinit_chunks();
 void print_chunk_status();
 bool has_pending_chunks();
-BlockID get_block_id_at(vec3i position, BlockID default_id = BlockID::air);
-block_t *get_block_at(vec3i vec);
+BlockID get_block_id_at(vec3i position, BlockID default_id = BlockID::air, chunk_t *near = nullptr);
+block_t *get_block_at(vec3i vec, chunk_t *near = nullptr);
 vec3i block_to_chunk_pos(vec3i pos);
 chunk_t *get_chunk_from_pos(vec3i pos, bool load, bool write_cache = true);
 chunk_t *get_chunk(vec3i pos, bool load, bool write_cache = true);

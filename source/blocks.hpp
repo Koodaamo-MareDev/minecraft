@@ -8,6 +8,7 @@
 #define FLUID_UPDATE_REQUIRED_FLAG 0x10
 #define FLOAT_TO_FLUIDMETA(A) (int(roundf((A)*8)))
 class block_t;
+class chunk_t;
 
 int8_t get_block_opacity(BlockID blockid);
 
@@ -19,14 +20,14 @@ uint32_t get_default_texture_index(BlockID blockid);
 uint32_t get_face_texture_index(block_t *block, int face);
 
 bool is_solid(BlockID block_id);
-void update_fluid(block_t *block, vec3i pos);
+void update_fluid(block_t *block, vec3i pos, chunk_t *near = nullptr);
 void set_fluid_level(block_t *block, uint8_t level);
 uint8_t get_fluid_meta_level(block_t *block);
-uint8_t get_fluid_visual_level(vec3i pos, BlockID block_id);
+uint8_t get_fluid_visual_level(vec3i pos, BlockID block_id, chunk_t *near = nullptr);
 
 bool is_fluid_overridable(BlockID id);
 float get_percent_air(int fluid_level);
-float get_fluid_height(vec3i pos, BlockID block_type);
+float get_fluid_height(vec3i pos, BlockID block_type, chunk_t *near = nullptr);
 
 inline bool is_flowing_fluid(BlockID id)
 {

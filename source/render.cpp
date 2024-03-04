@@ -115,16 +115,16 @@ inline uint8_t get_face_brightness(uint8_t face)
     return face_brightness_values[face];
 }
 extern uint8_t light_map[256];
-inline float get_face_light_index(vec3i pos, uint8_t face)
+inline float get_face_light_index(vec3i pos, uint8_t face, chunk_t *near)
 {
     vec3i other = pos + face_offsets[face];
-    block_t *other_block = get_block_at(other);
+    block_t *other_block = get_block_at(other, near);
     if (!other_block)
-        return get_block_at(pos)->light;
+        return get_block_at(pos, near)->light;
     return other_block->light;
 }
 
-int render_face(vec3i pos, uint8_t face, uint32_t texture_index)
+int render_face(vec3i pos, uint8_t face, uint32_t texture_index, chunk_t *near)
 {
     if (!base3d_is_drawing || face >= 6)
     {
@@ -135,7 +135,7 @@ int render_face(vec3i pos, uint8_t face, uint32_t texture_index)
     }
     vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
     vec3f vertex_pos(local_pos.x, local_pos.y, local_pos.z);
-    uint8_t lighting = get_face_light_index(pos, face);
+    uint8_t lighting = get_face_light_index(pos, face, near);
     switch (face)
     {
     case 0:
