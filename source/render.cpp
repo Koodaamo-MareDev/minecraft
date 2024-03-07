@@ -22,6 +22,7 @@ void init_texture(GXTexObj &texture, const void *data_src, uint32_t data_len)
     TPL_OpenTPLFromMemory(&tpl_file, (void *)data_src, data_len);
     TPL_GetTexture(&tpl_file, 0, &texture);
     GX_InitTexObjFilterMode(&texture, GX_NEAR, GX_NEAR);
+    GX_InitTexObjWrapMode(&texture, GX_MIRROR, GX_MIRROR);
     TPL_CloseTPLFile(&tpl_file);
 }
 
@@ -71,7 +72,7 @@ void use_ortho(view_t view)
 {
     // Prepare projection matrix for rendering GUI elements
     Mtx44 ortho_mtx;
-    guOrtho(ortho_mtx, 0, view.height, 0, view.width, 0, CAMERA_FAR);
+    guOrtho(ortho_mtx, 0, view.height, 0, view.width, 0, view.far);
     GX_LoadProjectionMtx(ortho_mtx, GX_ORTHOGRAPHIC);
 
     // Prepare position matrix for rendering GUI elements
@@ -430,7 +431,7 @@ void draw_sky(GXColor background)
     GX_SetCullMode(GX_CULL_NONE);
 
     // Disable fog
-    GX_SetFog(GX_FOG_NONE, RENDER_DISTANCE * 0.67f * 16 - 16, RENDER_DISTANCE * 0.67f * 16 - 8, 0.1F, 3000.0F, background);
+    GX_SetFog(GX_FOG_NONE, RENDER_DISTANCE * 0.67f * 16 - 16, RENDER_DISTANCE * 0.67f * 16 - 8, CAMERA_NEAR, CAMERA_FAR, background);
 
     // Use additive blending
     GX_SetBlendMode(GX_BM_BLEND, GX_BL_ONE, GX_BL_ONE, GX_LO_NOOP);
@@ -452,38 +453,38 @@ void draw_sky(GXColor background)
     // Draw sun
     use_texture(sun_texture);
     GX_BeginGroup(GX_QUADS, 4);
-    GX_Vertex(vertex_property_t(vec3f(-size, +dist, -size), 0x000, 0x000));
-    GX_Vertex(vertex_property_t(vec3f(+size, +dist, -size), 0x100, 0x000));
-    GX_Vertex(vertex_property_t(vec3f(+size, +dist, +size), 0x100, 0x100));
-    GX_Vertex(vertex_property_t(vec3f(-size, +dist, +size), 0x000, 0x100));
+    GX_Vertex(vertex_property_t(vec3f(-size, +dist, -size), 0, 0));
+    GX_Vertex(vertex_property_t(vec3f(+size, +dist, -size), BASE3D_UV_FRAC, 0));
+    GX_Vertex(vertex_property_t(vec3f(+size, +dist, +size), BASE3D_UV_FRAC, BASE3D_UV_FRAC));
+    GX_Vertex(vertex_property_t(vec3f(-size, +dist, +size), 0, BASE3D_UV_FRAC));
     GX_EndGroup();
 
     // Draw moon
     use_texture(moon_texture);
     GX_BeginGroup(GX_QUADS, 4);
-    GX_Vertex(vertex_property_t(vec3f(-size, -dist, +size), 0x000, 0x100));
-    GX_Vertex(vertex_property_t(vec3f(+size, -dist, +size), 0x100, 0x100));
-    GX_Vertex(vertex_property_t(vec3f(+size, -dist, -size), 0x100, 0x000));
-    GX_Vertex(vertex_property_t(vec3f(-size, -dist, -size), 0x000, 0x000));
+    GX_Vertex(vertex_property_t(vec3f(-size, -dist, +size), 0, BASE3D_UV_FRAC));
+    GX_Vertex(vertex_property_t(vec3f(+size, -dist, +size), BASE3D_UV_FRAC, BASE3D_UV_FRAC));
+    GX_Vertex(vertex_property_t(vec3f(+size, -dist, -size), BASE3D_UV_FRAC, 0));
+    GX_Vertex(vertex_property_t(vec3f(-size, -dist, -size), 0, 0));
     GX_EndGroup();
 
     // Enable fog but place it further away.
-    GX_SetFog(GX_FOG_PERSP_LIN, RENDER_DISTANCE * 2 * 16 - 16, RENDER_DISTANCE * 3 * 16 - 16, 0.1F, 3000.0F, background);
+    GX_SetFog(GX_FOG_PERSP_LIN, RENDER_DISTANCE * 2 * 16 - 16, RENDER_DISTANCE * 3 * 16 - 16, CAMERA_NEAR, CAMERA_FAR, background);
 
     // Use default blend mode
     GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_NOOP);
     GX_SetAlphaUpdate(GX_TRUE);
     GX_SetAlphaCompare(GX_ALWAYS, 0, GX_AOP_OR, GX_ALWAYS, 0);
     GX_SetColorUpdate(GX_TRUE);
-
+    
     // Here we use 0 fractional bits for the position data, because we're drawing large objects.
     GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, 0);
-
+    constexpr float scale = 1.0f / BASE3D_POS_FRAC;
     // Clouds texture is massive.
-    size = 2048.0f / BASE3D_POS_FRAC;
+    size = 2048.0f * scale;
 
     // The clouds are placed at y=108
-    dist = 108.0f / BASE3D_POS_FRAC;
+    dist = 108.0f * scale;
 
     // Reset transform and move the clouds
     transform_view(get_view_matrix(), guVector{0, 0, ((tickCounter % 40960) + partialTicks) * 0.05f});
@@ -497,9 +498,9 @@ void draw_sky(GXColor background)
     // Draw clouds
     use_texture(clouds_texture);
     GX_BeginGroup(GX_QUADS, 4);
-    GX_Vertex(vertex_property_t(vec3f(-size, dist, +size), 0x000, 0x200, sky_r, sky_g, sky_b));
-    GX_Vertex(vertex_property_t(vec3f(+size, dist, +size), 0x200, 0x200, sky_r, sky_g, sky_b));
-    GX_Vertex(vertex_property_t(vec3f(+size, dist, -size), 0x200, 0x000, sky_r, sky_g, sky_b));
-    GX_Vertex(vertex_property_t(vec3f(-size, dist, -size), 0x000, 0x000, sky_r, sky_g, sky_b));
+    GX_Vertex(vertex_property_t(vec3f(-size, dist, +size), 0, BASE3D_UV_FRAC << 1, sky_r, sky_g, sky_b));
+    GX_Vertex(vertex_property_t(vec3f(+size, dist, +size), BASE3D_UV_FRAC << 1, BASE3D_UV_FRAC << 1, sky_r, sky_g, sky_b));
+    GX_Vertex(vertex_property_t(vec3f(+size, dist, -size), BASE3D_UV_FRAC << 1, 0, sky_r, sky_g, sky_b));
+    GX_Vertex(vertex_property_t(vec3f(-size, dist, -size), 0, 0, sky_r, sky_g, sky_b));
     GX_EndGroup();
 }

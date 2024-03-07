@@ -872,10 +872,10 @@ int chunk_t::render_torch(block_t *block, vec3i pos)
     GX_VertexLit({vertex_pos + vec3f{0.5f, 0.5f, 0.0625f}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PZ);
     GX_VertexLit({vertex_pos + vec3f{0.5f, -.5f, 0.0625f}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PZ);
     // Top side
-    GX_VertexLit({vertex_pos + vec3f{0.0625f, 0.125f, -.0625f}, TEXTURE_X(texture_index) + 9, TEXTURE_Y(texture_index) + 8}, lighting, FACE_PY);
-    GX_VertexLit({vertex_pos + vec3f{0.0625f, 0.125f, 0.0625f}, TEXTURE_X(texture_index) + 9, TEXTURE_Y(texture_index) + 6}, lighting, FACE_PY);
-    GX_VertexLit({vertex_pos + vec3f{-.0625f, 0.125f, 0.0625f}, TEXTURE_X(texture_index) + 7, TEXTURE_Y(texture_index) + 6}, lighting, FACE_PY);
-    GX_VertexLit({vertex_pos + vec3f{-.0625f, 0.125f, -.0625f}, TEXTURE_X(texture_index) + 7, TEXTURE_Y(texture_index) + 8}, lighting, FACE_PY);
+    GX_VertexLit({vertex_pos + vec3f{0.0625f, 0.125f, -.0625f}, TEXTURE_X(texture_index) + 9 * BASE3D_UV_FRAC_LO, TEXTURE_Y(texture_index) + 8 * BASE3D_UV_FRAC_LO}, lighting, FACE_PY);
+    GX_VertexLit({vertex_pos + vec3f{0.0625f, 0.125f, 0.0625f}, TEXTURE_X(texture_index) + 9 * BASE3D_UV_FRAC_LO, TEXTURE_Y(texture_index) + 6 * BASE3D_UV_FRAC_LO}, lighting, FACE_PY);
+    GX_VertexLit({vertex_pos + vec3f{-.0625f, 0.125f, 0.0625f}, TEXTURE_X(texture_index) + 7 * BASE3D_UV_FRAC_LO, TEXTURE_Y(texture_index) + 6 * BASE3D_UV_FRAC_LO}, lighting, FACE_PY);
+    GX_VertexLit({vertex_pos + vec3f{-.0625f, 0.125f, -.0625f}, TEXTURE_X(texture_index) + 7 * BASE3D_UV_FRAC_LO, TEXTURE_Y(texture_index) + 8 * BASE3D_UV_FRAC_LO}, lighting, FACE_PY);
 
     return 20;
 }
@@ -892,8 +892,8 @@ int chunk_t::render_fluid(block_t *block, vec3i pos)
     BlockID neighbor_ids[6];
 
     // Sorted maximum and minimum values of the corners above
-    uint8_t corner_min[4];
-    uint8_t corner_max[4];
+    int corner_min[4];
+    int corner_max[4];
 
     // These determine the placement of the quad
     float corner_bottoms[4];
@@ -963,10 +963,10 @@ int chunk_t::render_fluid(block_t *block, vec3i pos)
             j++;
         }
     */
-    uint8_t texture_start_x = TEXTURE_X(texture_offset);
-    uint8_t texture_start_y = TEXTURE_Y(texture_offset);
-    uint8_t texture_end_x = texture_start_x + UV_SCALE;
-    uint8_t texture_end_y = texture_start_y + UV_SCALE;
+    uint32_t texture_start_x = TEXTURE_X(texture_offset);
+    uint32_t texture_start_y = TEXTURE_Y(texture_offset);
+    uint32_t texture_end_x = texture_start_x + UV_SCALE;
+    uint32_t texture_end_y = texture_start_y + UV_SCALE;
 
     vertex_property_t bottomPlaneCoords[4] = {
         {(local_pos + vec3f{-.5f, -.5f, -.5f}), texture_start_x, texture_end_y},

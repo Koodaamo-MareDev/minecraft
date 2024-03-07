@@ -9,10 +9,24 @@
 #define BASE3D_POS_FRAC_BITS 5
 #define BASE3D_NRM_FRAC_BITS 4
 #define BASE3D_UV_FRAC_BITS 8
+#define BASE3D_UV_FRAC_BITS_HI (BASE3D_UV_FRAC_BITS - 8)
 #define BASE3D_COLOR_BYTES 1
 
 #define BASE3D_POS_FRAC (1 << BASE3D_POS_FRAC_BITS)
 #define BASE3D_UV_FRAC (1 << BASE3D_UV_FRAC_BITS)
+#define BASE3D_UV_FRAC_LO (1 << BASE3D_UV_FRAC_BITS_HI)
+
+#define UV_SCALE ((16) << BASE3D_UV_FRAC_BITS_HI)
+#define TEXTURE_X(x) (UV_SCALE * (x & 15))
+#define TEXTURE_Y(y) (UV_SCALE * ((y >> 4) & 15))
+
+#define TEXTURE_NX(x) (TEXTURE_X(x))
+#define TEXTURE_NY(y) (TEXTURE_Y(y))
+#define TEXTURE_PX(x) (TEXTURE_X(x) + UV_SCALE)
+#define TEXTURE_PY(y) (TEXTURE_Y(y) + UV_SCALE)
+
+#define VERTEX_ATTR_LENGTH (3 * sizeof(int16_t) + 1 * sizeof(uint8_t) + 1 * sizeof(uint8_t) + 2 * sizeof(float_t))
+#define VERTEX_ATTR_LENGTH_DIRECTCOLOR (3 * sizeof(int16_t) + 1 * sizeof(uint8_t) + 4 * sizeof(uint8_t) + 2 * sizeof(float_t))
 
 class vertex_property_t
 {
@@ -75,10 +89,11 @@ inline void GX_Vertex(vertex_property_t vert, uint8_t face = FACE_PY)
     ++__group_vtxcount;
     if (!base3d_is_drawing)
         return;
+    constexpr float uv_invscale = 1. / BASE3D_UV_FRAC;
     GX_Position3s16(BASE3D_POS_FRAC * vert.pos.x, BASE3D_POS_FRAC * vert.pos.y, BASE3D_POS_FRAC * vert.pos.z);
     GX_Normal1x8(face);
     GX_Color4u8(vert.color_r, vert.color_g, vert.color_b, vert.color_a);
-    GX_TexCoord2u16(vert.x_uv, vert.y_uv);
+    GX_TexCoord2f32(uv_invscale * vert.x_uv, uv_invscale * vert.y_uv);
 }
 
 inline void GX_VertexLit(vertex_property_t vert, uint8_t light, uint8_t face = FACE_PY)
@@ -86,9 +101,10 @@ inline void GX_VertexLit(vertex_property_t vert, uint8_t light, uint8_t face = F
     ++__group_vtxcount;
     if (!base3d_is_drawing)
         return;
+    constexpr float uv_invscale = 1. / BASE3D_UV_FRAC;
     GX_Position3s16(BASE3D_POS_FRAC * vert.pos.x, BASE3D_POS_FRAC * vert.pos.y, BASE3D_POS_FRAC * vert.pos.z);
     GX_Normal1x8(face);
     GX_Color1x8(light);
-    GX_TexCoord2u16(vert.x_uv, vert.y_uv);
+    GX_TexCoord2f32(uv_invscale * vert.x_uv, uv_invscale * vert.y_uv);
 }
 #endif
