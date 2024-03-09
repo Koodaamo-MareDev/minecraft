@@ -9,7 +9,7 @@
 #include <vector>
 #include <deque>
 #define SIMULATION_DISTANCE 2
-#define RENDER_DISTANCE 3
+#define RENDER_DISTANCE 4
 #define CHUNK_COUNT ((RENDER_DISTANCE) * (RENDER_DISTANCE + 1) * 4)
 #define GENERATION_DISTANCE ((RENDER_DISTANCE - 1) * 16)
 #define VERTICAL_SECTION_COUNT 16
@@ -79,6 +79,15 @@ public:
         if (block->get_blockid() != BlockID::air)
             return;
         block->set_blockid(id);
+    }
+    
+    float player_taxicab_distance() {
+        return std::abs(this->x - player_pos.x) + std::abs(this->z - player_pos.z);
+    }
+
+    bool operator< (chunk_t& other)
+    {
+        return this->player_taxicab_distance() < other.player_taxicab_distance();
     }
 
     void update_height_map(vec3i pos);

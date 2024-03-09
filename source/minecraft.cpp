@@ -342,7 +342,7 @@ int main(int argc, char **argv)
         GX_SetCopyClear(background, 0x00FFFFFF);
 
         // Enable fog
-        use_fog(true, viewport, background, GENERATION_DISTANCE * 0.7f - 8, GENERATION_DISTANCE * 0.7f);
+        use_fog(true, viewport, background, GENERATION_DISTANCE * 0.5f - 8, GENERATION_DISTANCE * 0.5f);
 
         if (player_pos.y < -999)
             player_pos.y = skycast(vec3i(int(player_pos.x), 0, int(player_pos.z))) + 2;

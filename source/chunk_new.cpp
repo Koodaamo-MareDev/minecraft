@@ -56,6 +56,11 @@ bool has_pending_chunks()
     return pending_chunks.size() > 0;
 }
 
+bool chunk_sorter(chunk_t*& a, chunk_t *&b)
+{
+    return !(*a < *b);
+}
+
 std::deque<chunk_t *> &get_chunks()
 {
     return chunks;
@@ -128,6 +133,7 @@ void add_chunk(vec3i pos)
         chunk->x = pos.x;
         chunk->z = pos.z;
         pending_chunks.push_back(chunk);
+        std::sort(pending_chunks.begin(), pending_chunks.end(), chunk_sorter);
     }
     unlock_chunks();
 }
