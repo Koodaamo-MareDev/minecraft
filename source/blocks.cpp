@@ -239,7 +239,7 @@ void update_fluid(block_t *block, vec3i pos, chunk_t *near)
     }
     level = get_fluid_meta_level(block);
     //  Fluid spread:
-    if (level < 7)
+    if (level <= 7)
     {
         for (int i = 0; i < 5; i++)
         {
@@ -262,7 +262,7 @@ void update_fluid(block_t *block, vec3i pos, chunk_t *near)
                         }
                         break;
                     }
-                    else
+                    else if(level < 7)
                     {
                         if (surround_id != flowfluid(block_id) || surrounding_level > level + 1)
                         {
