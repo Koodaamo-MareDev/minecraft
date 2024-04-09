@@ -54,6 +54,7 @@ int dropFrames = 0;
 
 int frameCounter = 0;
 int tickCounter = 0;
+int lastWaterTick = 0;
 float deltaTime = 0.0f;
 float partialTicks = 0.0f;
 
@@ -409,9 +410,8 @@ int main(int argc, char **argv)
         VIDEO_WaitVSync();
         frameCounter++;
         deltaTime = time_diff_s(frame_start, time_get());
-        partialTicks += deltaTime * 20;
-        if (partialTicks >= 1.0f)
-            tickCounter += int(partialTicks);
+        partialTicks += deltaTime * 20.0f;
+        tickCounter += int(partialTicks);
         partialTicks -= int(partialTicks);
         fb ^= 1;
     }
@@ -441,6 +441,7 @@ void GetInput()
     if ((wiimote1_down & WPAD_BUTTON_1))
     {
         printf("PRIM_CHUNK_MEMORY: %d B\n", total_chunks_size);
+        printf("TICK: %d, WATER: %d\n", tickCounter, lastWaterTick);
     }
     if ((wiimote1_down & WPAD_BUTTON_2))
     {
@@ -710,7 +711,7 @@ void UpdateChunkData(frustum_t &frustum, std::deque<chunk_t *> &chunks)
                 vbo.z = chunk->z * 16;
                 distance = std::abs((j * 16) - player_pos.y);
                 vbo.visible = (distance <= GENERATION_DISTANCE) && distance_to_frustum(vec3f(vbo.x, vbo.y, vbo.z), frustum) < 32;
-                if (distance <= SIMULATION_DISTANCE * 16 && tickCounter % 4 == 0)
+                if (distance <= SIMULATION_DISTANCE * 16 && tickCounter - lastWaterTick >= 8)
                     RecalcSectionWater(chunk, j);
             }
             if (!chunk->lit_state && light_up_calls < 1)
@@ -720,6 +721,8 @@ void UpdateChunkData(frustum_t &frustum, std::deque<chunk_t *> &chunks)
             }
         }
     }
+    if (tickCounter - lastWaterTick >= 8)
+        lastWaterTick = tickCounter;
 }
 
 bool SortVBOs(chunkvbo_t *&a, chunkvbo_t *&b)
