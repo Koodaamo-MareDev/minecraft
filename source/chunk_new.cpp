@@ -68,8 +68,8 @@ std::deque<chunk_t *> &get_chunks()
 
 vec3i block_to_chunk_pos(vec3i pos)
 {
-    pos.x -= 15 * (pos.x < 0);
-    pos.z -= 15 * (pos.z < 0);
+    pos.x &= ~0xF;
+    pos.z &= ~0xF;
     pos.x /= 16;
     pos.z /= 16;
     return pos;
