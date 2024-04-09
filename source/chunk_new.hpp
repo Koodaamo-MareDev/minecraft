@@ -28,15 +28,15 @@ public:
     uint32_t light_updates;
     bool visible = false;
     bool dirty = false;
-    int x = 0;
-    unsigned char y = 0;
-    int z = 0;
-    int solid_buffer_length = 0;
-    int transparent_buffer_length = 0;
+    int32_t x = 0;
+    uint8_t y = 0;
+    int32_t z = 0;
+    uint32_t solid_buffer_length = 0;
+    uint32_t transparent_buffer_length = 0;
     void *solid_buffer = nullptr;
     void *transparent_buffer = nullptr;
-    int cached_solid_buffer_length = 0;
-    int cached_transparent_buffer_length = 0;
+    uint32_t cached_solid_buffer_length = 0;
+    uint32_t cached_transparent_buffer_length = 0;
     void *cached_solid_buffer = nullptr;
     void *cached_transparent_buffer = nullptr;
 
