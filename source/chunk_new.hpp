@@ -25,6 +25,7 @@ extern guVector player_pos;
 class chunkvbo_t
 {
 public:
+    uint32_t light_updates;
     bool visible = false;
     bool dirty = false;
     int x = 0;
@@ -58,7 +59,6 @@ public:
     uint32_t chunk_seed_x;
     uint32_t chunk_seed_z;
     uint8_t lit_state = 0;
-    uint32_t light_updates = 0;
     block_t blockstates[16 * 16 * 256] = {0};
     uint8_t height_map[16 * 16] = {0};
     chunkvbo_t vbos[VERTICAL_SECTION_COUNT];

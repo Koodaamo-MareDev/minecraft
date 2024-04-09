@@ -734,12 +734,12 @@ void UpdateChunkVBOs(std::deque<chunk_t *> &chunks)
     std::vector<chunkvbo_t *> vbos_to_update;
     for (chunk_t *&chunk : chunks)
     {
-        if (chunk && chunk->valid && !chunk->light_updates)
+        if (chunk && chunk->valid)
         {
             for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
             {
                 chunkvbo_t &vbo = chunk->vbos[j];
-                if (vbo.visible && vbo.dirty && !chunk->light_updates)
+                if (vbo.visible && vbo.dirty && !vbo.light_updates)
                 {
                     vbos_to_update.push_back(&vbo);
                 }
@@ -747,10 +747,11 @@ void UpdateChunkVBOs(std::deque<chunk_t *> &chunks)
         }
     }
     std::sort(vbos_to_update.begin(), vbos_to_update.end(), SortVBOs);
+    uint32_t max_vbo_updates = 2;
     for (chunkvbo_t *vbo_ptr : vbos_to_update)
     {
         chunkvbo_t &vbo = *vbo_ptr;
-        int vbo_i = vbo.y / 16;
+        int vbo_i = vbo.y >> 4;
         chunk_t *chunk = get_chunk_from_pos(vec3i(vbo.x, 0, vbo.z), false);
 
         // Check if chunk has other chunks around it.
@@ -784,7 +785,8 @@ void UpdateChunkVBOs(std::deque<chunk_t *> &chunks)
             vbo.cached_transparent_buffer = vbo.transparent_buffer;
             vbo.cached_transparent_buffer_length = vbo.transparent_buffer_length;
         }
-        return;
+        if (!--max_vbo_updates)
+            break;
     }
 }
 
