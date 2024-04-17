@@ -25,7 +25,6 @@ extern guVector player_pos;
 class chunkvbo_t
 {
 public:
-    uint32_t light_updates;
     bool visible = false;
     bool dirty = false;
     int32_t x = 0;

@@ -76,7 +76,6 @@ void light_engine_loop()
         if (chunk)
         {
             __update_light(pos);
-            --chunk->vbos[pos.y >> 4].light_updates;
         }
         if (++updates % 1000 == 0)
             threadqueue_yield();
@@ -102,7 +101,6 @@ void update_light(vec3i pos)
     if (!chunk)
         return;
     light_lock();
-    ++chunk->vbos[pos.y >> 4].light_updates;
     pending_light_updates.push_back(pos);
     light_unlock();
 }

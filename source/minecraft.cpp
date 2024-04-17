@@ -742,7 +742,7 @@ void UpdateChunkVBOs(std::deque<chunk_t *> &chunks)
             for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
             {
                 chunkvbo_t &vbo = chunk->vbos[j];
-                if (vbo.visible && vbo.dirty && !vbo.light_updates)
+                if (vbo.visible && vbo.dirty)
                 {
                     vbos_to_update.push_back(&vbo);
                 }
