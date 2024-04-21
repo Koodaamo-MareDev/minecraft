@@ -116,12 +116,16 @@ inline uint8_t get_face_brightness(uint8_t face)
     return face_brightness_values[face];
 }
 extern uint8_t light_map[256];
-inline float get_face_light_index(vec3i pos, uint8_t face, chunk_t *near)
+inline uint8_t get_face_light_index(vec3i pos, uint8_t face, chunk_t *near, block_t *default_block = nullptr)
 {
     vec3i other = pos + face_offsets[face];
     block_t *other_block = get_block_at(other, near);
     if (!other_block)
-        return get_block_at(pos, near)->light;
+    {
+        if (default_block)
+            return default_block->light;
+        return 255;
+    }
     return other_block->light;
 }
 
@@ -136,7 +140,8 @@ int render_face(vec3i pos, uint8_t face, uint32_t texture_index, chunk_t *near)
     }
     vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
     vec3f vertex_pos(local_pos.x, local_pos.y, local_pos.z);
-    uint8_t lighting = get_face_light_index(pos, face, near);
+    block_t *block = get_block_at(pos, near);
+    uint8_t lighting = get_face_light_index(pos, face, near, block);
     switch (face)
     {
     case 0:
@@ -217,10 +222,10 @@ float distance_to_frustum(const vec3f &point, const frustum_t &frustum)
 frustum_t calculate_frustum(camera_t &camera)
 {
     frustum_t frustum;
-    
+
     // Calculate half-width and half-height at near plane
     float half_fov = camera.fov * 0.5f;
-    
+
     // Calculate forward vector
     guVector forward = angles_to_vector(camera.rot.x, camera.rot.y, -1);
     guVector backward = vec3f() - forward;
@@ -230,7 +235,7 @@ frustum_t calculate_frustum(camera_t &camera)
     guVector left_vec = angles_to_vector(camera.rot.x, camera.rot.y - 90 - half_fov, 1);
     guVector up_vec = angles_to_vector(camera.rot.x + 90 + half_fov, camera.rot.y, 1);
     guVector down_vec = angles_to_vector(camera.rot.x - 90 - half_fov, camera.rot.y, 1);
-    
+
     // Calculate points on the near and far planes
     guVector near_center = camera.position + (vec3f(forward) * (camera.near));
     guVector far_center = camera.position + (vec3f(forward) * (camera.far));
@@ -302,6 +307,24 @@ void transform_view(Mtx view, guVector chunkPos)
     guMtxConcat(offset, rotz, rotz);
     guMtxConcat(rotz, roty, roty);
     guMtxConcat(roty, rotx, model);
+    guMtxInverse(model, model);
+    guMtxConcat(model, view, modelview);
+    GX_LoadPosMtxImm(modelview, GX_PNMTX0);
+}
+
+void transform_view_screen(Mtx view, guVector off)
+{
+    Mtx model, modelview;
+    Mtx posmtx;
+
+    // Reset matrices
+    guMtxIdentity(model);
+    guMtxIdentity(posmtx);
+
+    // Position the object on the screen
+    guMtxTrans(posmtx, -off.x, -off.y, -off.z);
+    // Apply matrices
+    guMtxConcat(posmtx, model, model);
     guMtxInverse(model, model);
     guMtxConcat(model, view, modelview);
     GX_LoadPosMtxImm(modelview, GX_PNMTX0);
@@ -476,7 +499,7 @@ void draw_sky(GXColor background)
     GX_SetAlphaUpdate(GX_TRUE);
     GX_SetAlphaCompare(GX_ALWAYS, 0, GX_AOP_OR, GX_ALWAYS, 0);
     GX_SetColorUpdate(GX_TRUE);
-    
+
     // Here we use 0 fractional bits for the position data, because we're drawing large objects.
     GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, 0);
     constexpr float scale = 1.0f / BASE3D_POS_FRAC;

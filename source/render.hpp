@@ -103,6 +103,8 @@ frustum_t calculate_frustum(camera_t &camera);
 
 void transform_view(Mtx view, guVector chunkPos);
 
+void transform_view_screen(Mtx view, guVector off);
+
 void draw_sky(GXColor background);
 
 GXColor get_sky_color(bool cave_darkness = true);

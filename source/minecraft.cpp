@@ -65,6 +65,7 @@ float prev_left_shoulder = 0;
 float prev_right_shoulder = 0;
 bool destroy_block = false;
 bool place_block = false;
+block_t selected_block = {BlockID::stone, 0x7F, 0, 0xF, 0xF};
 
 void UpdateLightDir();
 void DrawScene(std::deque<chunk_t *> &chunks, bool transparency);
@@ -384,6 +385,10 @@ int main(int argc, char **argv)
         GX_SetAlphaCompare(GX_GEQUAL, 16, GX_AOP_AND, GX_ALWAYS, 0);
         GX_SetColorUpdate(GX_TRUE);
         DrawScene(chunks, true);
+
+        // Re-enable depth testing
+        GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
+
         // Draw sky
         draw_sky(background);
 
@@ -658,7 +663,7 @@ void EditBlocks()
     draw_block_outline = raycast(vec3d{player_pos.x - .5, player_pos.y - .5, player_pos.z - .5}, vec3d{forward.x, forward.y, forward.z}, 4, &raycast_block, &raycast_block_face);
     if (draw_block_outline)
     {
-        BlockID target_blockid = destroy_block ? BlockID::air : BlockID::torch;
+        BlockID target_blockid = destroy_block ? BlockID::air : selected_block.get_blockid();
         if (destroy_block || place_block)
         {
             vec3i editable_pos = destroy_block ? (raycast_block) : (raycast_block + raycast_block_face);
@@ -888,6 +893,59 @@ void DrawScene(std::deque<chunk_t *> &chunks, bool transparency)
             GX_EndGroup();
         }
     }
+    if (chunks.size() == 0)
+        return;
+    block_t *view_block = get_block_at(vec3i(player_pos.x, player_pos.y, player_pos.z));
+    if (view_block)
+    {
+        // Set the light level of the selected block
+        selected_block.block_light = view_block->block_light;
+        selected_block.sky_light = view_block->sky_light;
+    }
+    else
+    {
+        selected_block.block_light = 0xF;
+        selected_block.sky_light = 0xF;
+    }
+
+    // Disable depth testing
+    GX_SetZMode(GX_TRUE, GX_ALWAYS, GX_TRUE);
+
+    // Enable indexed colors
+    GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
+
+    // Specify the selected block offset
+    // 6.75 comes from the -10 offset in the render_block function
+    // It's -10 & 0x0F = 6, subtracting 0.75 as an offset.
+    guVector selectedBlockPos = guVector{+.85f, -6.75f, -1.f};
+
+    // Transform the selected block position
+    transform_view_screen(get_view_matrix(), selectedBlockPos);
+
+    // Precalculate the vertex count
+    GX_BeginGroup(GX_QUADS, 0);
+
+    // Precalculate the vertex count. Set position to Y = -10 to render "outside the world"
+    int vertexCount = chunks[0]->render_block(&selected_block, vec3i(0, -10, 0), transparency);
+
+    // Get the vertex count
+    int endGroup = GX_EndGroup();
+
+    // Check if the vertex count is correct
+    if (endGroup != vertexCount)
+    {
+        printf("Vertex count mismatch: %d != %d\n", endGroup, vertexCount);
+        return;
+    }
+
+    // Draw the selected block
+    GX_BeginGroup(GX_QUADS, vertexCount);
+
+    // Render the selected block. Set position to Y = -10 to render "outside the world"
+    chunks[0]->render_block(&selected_block, vec3i(0, -10, 0), transparency);
+
+    // End the group
+    GX_EndGroup();
 }
 void PrepareTEV()
 {
