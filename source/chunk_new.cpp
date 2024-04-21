@@ -299,6 +299,7 @@ void generate_chunk()
         uint8_t *noise_set_ptr = noise_set;
         improved_noise.GetNoiseSet(x_offset, y, z_offset, 16, slice_amount, 16, 12, 1, noise_set);
         for (int s = 0; s < slice_amount; s++, y++)
+        {
             for (int i = 0; i < 256; i++, block++, noise_set_ptr++)
             {
                 uint8_t height = chunk->height_map[i];
@@ -307,6 +308,10 @@ void generate_chunk()
                 if (*noise_set_ptr < 96 && (height > 63 || abs(height - y) > 2))
                     block->set_blockid(y >= 10 ? BlockID::air : BlockID::lava);
             }
+            // Sleep every 32 slices to prevent the game from freezing
+            if (y % 16 == 0)
+                threadqueue_sleep();
+        }
     }
     generate_trees(chunk);
 
