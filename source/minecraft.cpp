@@ -705,14 +705,10 @@ void EditBlocks()
             {
                 editable_block->set_blockid(target_blockid);
                 editable_block->meta = target_blockid == BlockID::air ? 0 : selected_block.meta;
-            if (place_block)
-                update_block_at(editable_pos);
-            for (int i = 0; i < 6; i++)
-                update_block_at(editable_pos + face_offsets[i]);
-            if (editable_block)
-            {
-                editable_block->set_blockid(target_blockid);
-                editable_block->meta = 0;
+                if (place_block)
+                    update_block_at(editable_pos);
+                for (int i = 0; i < 6; i++)
+                    update_block_at(editable_pos + face_offsets[i]);
                 update_block_at(raycast_block);
                 block_t *neighbors[6];
                 get_neighbors(editable_pos, neighbors);
