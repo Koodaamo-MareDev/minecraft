@@ -701,6 +701,10 @@ void EditBlocks()
         {
             vec3i editable_pos = destroy_block ? (raycast_block) : (raycast_block + raycast_block_face);
             block_t *editable_block = get_block_at(editable_pos);
+            if (editable_block)
+            {
+                editable_block->set_blockid(target_blockid);
+                editable_block->meta = target_blockid == BlockID::air ? 0 : selected_block.meta;
             if (place_block)
                 update_block_at(editable_pos);
             for (int i = 0; i < 6; i++)
