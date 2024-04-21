@@ -1,4 +1,4 @@
-#include "blocks.hpp"
+#include "block.hpp"
 #include "blockmap_alpha.h"
 #include "vec3i.hpp"
 #include "chunk_new.hpp"
@@ -131,8 +131,6 @@ uint32_t get_face_texture_index(block_t *block, int face)
     // Have to handle differently for different blocks, e.g. grass, logs, crafting table
     switch (blockid)
     {
-    case BlockID::stone:
-        return 0;
     case BlockID::grass:
     {
         switch (face)
@@ -406,3 +404,46 @@ bool is_fluid_overridable(BlockID id)
         return false;
     }
 }
+
+blockproperties_t block_properties[256] = {
+    {BlockID::air, 0, 0, 0, 1, 0, 0, 0, 0, BlockID::air, BlockID::air},
+    {BlockID::stone, 0, 0, 15, 0, 0, 1, 0, 0, BlockID::air, BlockID::air},
+    {BlockID::grass, 0, 3, 15, 0, 0, 1, 0, 0, BlockID::air, BlockID::air},
+    {BlockID::dirt, 0, 2, 15, 0, 0, 1, 0, 0, BlockID::air, BlockID::air},
+    {BlockID::cobblestone, 0, 16, 15, 0, 0, 1, 0, 0, BlockID::air, BlockID::air},
+    {BlockID::planks, 0, 4, 15, 0, 0, 1, 0, 0, BlockID::air, BlockID::air},
+    {BlockID::sapling, 0, 15, 15, 0, 0, 1, 0, 0, BlockID::air, BlockID::air},
+    {BlockID::bedrock, 0, 17, 15, 0, 0, 1, 0, 0, BlockID::air, BlockID::air},
+    {BlockID::flowing_water, 0, 205, 15, 0, 0, 1, 1, 1, BlockID::water, BlockID::flowing_water},
+    {BlockID::water, 0, 205, 15, 0, 0, 1, 1, 1, BlockID::water, BlockID::flowing_water},
+    {BlockID::flowing_lava, 0, 237, 15, 0, 15, 1, 1, 2, BlockID::lava, BlockID::flowing_lava},
+    {BlockID::lava, 0, 237, 15, 0, 15, 1, 1, 2, BlockID::lava, BlockID::flowing_lava},
+    {BlockID::sand, 0, 18, 15, 0, 0, 1, 0, 0, BlockID::air, BlockID::air},
+    {BlockID::gravel, 0, 19, 15, 0, 0, 1, 0, 0, BlockID::air, BlockID::air},
+    {BlockID::gold_ore, 0, 32, 15, 0, 0, 1, 0, 0, BlockID::air, BlockID::air},
+    {BlockID::iron_ore, 0, 33, 15, 0, 0, 1, 0, 0, BlockID::air, BlockID::air},
+    {BlockID::coal_ore, 0, 34, 15, 0, 0, 1, 0, 0, BlockID::air, BlockID::air},
+    {BlockID::wood, 0, 20, 15, 0, 0, 1, 0, 0, BlockID::air, BlockID::air},
+    {BlockID::leaves, 0, 52, 15, 0, 0, 1, 0, 0, BlockID::air, BlockID::air},
+    {BlockID::sponge, 0, 48, 15, 0, 0, 1, 0, 0, BlockID::air, BlockID::air},
+    {BlockID::glass, 0, 49, 15, 0, 0, 1, 0, 0, BlockID::air, BlockID::air},
+    {BlockID::lapis_ore, 0, 160, 15, 0, 0, 1, 0, 0, BlockID::air, BlockID::air},
+    {BlockID::lapis_block, 0, 144, 15, 0, 0, 1, 0, 0, BlockID::air, BlockID::air},
+    {BlockID::dispenser, 0, 45, 15, 0, 0, 1, 0, 0, BlockID::air, BlockID::air},
+    {BlockID::sandstone, 0, 176, 15, 0, 0, 1, 0, 0, BlockID::air, BlockID::air},
+    {BlockID::note_block, 0, 74, 15, 0, 0, 1, 0, 0, BlockID::air, BlockID::air},
+    {BlockID::bed, 0, 135, 15, 0, 0, 1, 0, 0, BlockID::air, BlockID::air},
+    {BlockID::golden_rail, 0, 163, 15, 0, 0, 1, 0, 0, BlockID::air, BlockID::air},
+    {BlockID::detector_rail, 0, 179, 15, 0, 0, 1, 0, 0, BlockID::air, BlockID::air},
+    {BlockID::sticky_piston, 0, 29, 15, 0, 0, 1, 0, 0, BlockID::air, BlockID::air},
+    {BlockID::cobweb, 0, 11, 0, 0, 0, 1, 0, 0, BlockID::air, BlockID::air},
+    {BlockID::tallgrass, 0, 38, 0, 0, 0, 1, 0, 0, BlockID::air, BlockID::air},
+    {BlockID::deadbush, 0, 54, 0, 0, 0, 1, 0, 0, BlockID::air, BlockID::air},
+    {BlockID::piston, 0, 108, 0, 0, 0, 1, 0, 0, BlockID::air, BlockID::air},
+    {BlockID::piston_head, 0, 107, 0, 0, 0, 1, 0, 0, BlockID::air, BlockID::air},
+    {BlockID::wool, 0, 64, 15, 0, 0, 1, 0, 0, BlockID::air, BlockID::air},
+    {BlockID::air, 0, 0, 0, 0, 0, 1, 0, 0, BlockID::air, BlockID::air}, // 35 - unused
+    {BlockID::dandelion, 0, 13, 0, 0, 0, 1, 0, 0, BlockID::air, BlockID::air},
+    {BlockID::rose, 0, 12, 0, 0, 0, 1, 0, 0, BlockID::air, BlockID::air},
+    {BlockID::brown_mushroom, 0, 29, 0, 0, 0, 1, 0, 0, BlockID::air, BlockID::air},
+};

@@ -14,6 +14,21 @@
 #define FACE_PZ 5
 #define RENDER_FLAG_VISIBLE 6
 
+struct blockproperties_t
+{
+    BlockID id = BlockID::air;
+    uint8_t default_state = 0;
+    uint8_t texture_index = 0;
+    uint8_t opacity = 0;
+    uint8_t transparent = 0;
+    uint8_t luminance = 0;
+    uint8_t is_solid = 0;
+    uint8_t is_fluid = 0;
+    uint8_t fluid_decay = 0;
+    BlockID base_fluid = BlockID::air;
+    BlockID flow_fluid = BlockID::air;
+};
+
 class block_t
 {
 public:
@@ -77,4 +92,7 @@ public:
         return std::max(cast_light, int8_t(0));
     }
 };
+
+extern blockproperties_t block_properties[256];
+
 #endif
