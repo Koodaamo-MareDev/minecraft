@@ -109,8 +109,9 @@ void update_light(vec3i pos)
  *  Copied from CavEX:
  *  https://github.com/xtreme8000/CavEX/blob/master/source/lighting.c
  */
-static inline int8_t MAX_I8(int8_t a, int8_t b) {
-	return a > b ? a : b;
+static inline int8_t MAX_I8(int8_t a, int8_t b)
+{
+    return a > b ? a : b;
 }
 
 /*
@@ -177,7 +178,7 @@ void __update_light(vec3i coords)
                 if (neighbors[i])
                     light_updates.push_back(pos + face_offsets[i]);
             }
-            chunk->vbos[(pos.y >> 4) & 15].dirty = true;
         }
+        chunk->vbos[(pos.y >> 4) & 15].dirty = true;
     }
 }
