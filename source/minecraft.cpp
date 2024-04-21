@@ -899,13 +899,11 @@ void DrawScene(std::deque<chunk_t *> &chunks, bool transparency)
     if (view_block)
     {
         // Set the light level of the selected block
-        selected_block.block_light = view_block->block_light;
-        selected_block.sky_light = view_block->sky_light;
+        selected_block.light = view_block->light;
     }
     else
     {
-        selected_block.block_light = 0xF;
-        selected_block.sky_light = 0xF;
+        selected_block.light = 0xFF;
     }
 
     // Disable depth testing

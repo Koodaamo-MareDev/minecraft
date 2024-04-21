@@ -129,7 +129,7 @@ inline uint8_t get_face_light_index(vec3i pos, uint8_t face, chunk_t *near, bloc
     return other_block->light;
 }
 
-int render_face(vec3i pos, uint8_t face, uint32_t texture_index, chunk_t *near)
+int render_face(vec3i pos, uint8_t face, uint32_t texture_index, chunk_t *near, block_t *block)
 {
     if (!base3d_is_drawing || face >= 6)
     {
@@ -140,7 +140,8 @@ int render_face(vec3i pos, uint8_t face, uint32_t texture_index, chunk_t *near)
     }
     vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
     vec3f vertex_pos(local_pos.x, local_pos.y, local_pos.z);
-    block_t *block = get_block_at(pos, near);
+    if (!block)
+        block = get_block_at(pos, near);
     uint8_t lighting = get_face_light_index(pos, face, near, block);
     switch (face)
     {

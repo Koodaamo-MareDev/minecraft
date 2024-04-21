@@ -91,7 +91,7 @@ void use_perspective(view_t view);
 
 Mtx &get_view_matrix();
 
-int render_face(vec3i pos, uint8_t face, uint32_t texture_index, chunk_t *near = nullptr);
+int render_face(vec3i pos, uint8_t face, uint32_t texture_index, chunk_t *near = nullptr, block_t* block = nullptr);
 
 guVector angles_to_vector(float x, float y, float distance, guVector vec = guVector());
 

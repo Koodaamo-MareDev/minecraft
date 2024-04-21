@@ -852,13 +852,13 @@ int chunk_t::render_block(block_t *block, vec3i pos, bool transparent)
     for (uint8_t face = 0; face < 6; face++)
     {
         if (block->get_opacity(face) && transparent == is_face_transparent(texture_index = get_face_texture_index(block, face)))
-            vertexCount += render_face(pos, face, texture_index);
+            vertexCount += render_face(pos, face, texture_index, nullptr, block);
     }
     return vertexCount;
 }
 int chunk_t::render_torch(block_t *block, vec3i pos)
 {
-    int lighting = get_block_luminance(BlockID::torch);
+    uint8_t lighting = block->light;
     vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
     vec3f vertex_pos(local_pos.x, local_pos.y, local_pos.z);
     uint32_t texture_index = get_default_texture_index(block->get_blockid());
