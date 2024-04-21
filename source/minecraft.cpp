@@ -776,62 +776,85 @@ void UpdateChunkVBOs(std::deque<chunk_t *> &chunks)
 {
     if (light_engine_busy())
         return;
-    std::vector<chunkvbo_t *> vbos_to_update;
+    static std::vector<chunkvbo_t *> vbos_to_update;
+
+    std::vector<chunkvbo_t *> vbos_to_rebuild;
     for (chunk_t *&chunk : chunks)
     {
         if (chunk && chunk->valid)
         {
+            // Check if chunk has other chunks around it.
+            bool surrounding = true;
+            for (int i = 0; surrounding && i < 6; i++)
+            {
+                // Skip the top and bottom faces
+                if (face_offsets->y)
+                    continue;
+                // Check if the surrounding chunk exists
+                surrounding &= get_chunk(vec3i(chunk->x, 0, chunk->z) + face_offsets[i], false) != nullptr;
+            }
+            // If the chunk has no surrounding chunks, skip it.
+            if (!surrounding)
+                continue;
             for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
             {
                 chunkvbo_t &vbo = chunk->vbos[j];
                 if (vbo.visible && vbo.dirty)
                 {
-                    vbos_to_update.push_back(&vbo);
+                    vbos_to_rebuild.push_back(&vbo);
                 }
             }
         }
     }
-    std::sort(vbos_to_update.begin(), vbos_to_update.end(), SortVBOs);
-    uint32_t max_vbo_updates = 7;
-    for (chunkvbo_t *vbo_ptr : vbos_to_update)
+    std::sort(vbos_to_rebuild.begin(), vbos_to_rebuild.end(), SortVBOs);
+    uint32_t max_vbo_updates = 2;
+    for (chunkvbo_t *vbo_ptr : vbos_to_rebuild)
     {
         chunkvbo_t &vbo = *vbo_ptr;
         int vbo_i = vbo.y >> 4;
         chunk_t *chunk = get_chunk_from_pos(vec3i(vbo.x, 0, vbo.z), false);
-
-        // Check if chunk has other chunks around it.
-        bool surrounding = true;
-        for (int x = sgn(chunk->x); x <= 1; x += 2)
-            for (int z = sgn(chunk->z); z <= 1; z += 2)
-            {
-                surrounding &= get_chunk(vec3i(chunk->x + x, 0, chunk->z + z), false) != nullptr;
-            }
-        if (!surrounding)
-            continue;
         vbo.dirty = false;
         chunk->recalculate_section(vbo_i);
         chunk->build_vbo(vbo_i, false);
         chunk->build_vbo(vbo_i, true);
-        if (vbo.solid_buffer != vbo.cached_solid_buffer)
-        {
-            if (vbo.cached_solid_buffer && vbo.cached_solid_buffer_length)
-            {
-                free(vbo.cached_solid_buffer);
-            }
-            vbo.cached_solid_buffer = vbo.solid_buffer;
-            vbo.cached_solid_buffer_length = vbo.solid_buffer_length;
-        }
-        if (vbo.transparent_buffer != vbo.cached_transparent_buffer)
-        {
-            if (vbo.cached_transparent_buffer && vbo.cached_transparent_buffer_length)
-            {
-                free(vbo.cached_transparent_buffer);
-            }
-            vbo.cached_transparent_buffer = vbo.transparent_buffer;
-            vbo.cached_transparent_buffer_length = vbo.transparent_buffer_length;
-        }
+        vbos_to_update.push_back(vbo_ptr);
         if (!--max_vbo_updates)
             break;
+    }
+
+    // Update cached buffers when no vbos need to be rebuilt.
+    // This ensures that the buffers are updated synchronously.
+    if (vbos_to_rebuild.size() == 0)
+    {
+        for (chunkvbo_t *vbo_ptr : vbos_to_update)
+        {
+            chunkvbo_t &vbo = *vbo_ptr;
+            if (vbo.solid_buffer != vbo.cached_solid_buffer)
+            {
+                // Free the old buffer if it exists
+                if (vbo.cached_solid_buffer && vbo.cached_solid_buffer_length)
+                {
+                    free(vbo.cached_solid_buffer);
+                }
+
+                // Update the cached buffer
+                vbo.cached_solid_buffer = vbo.solid_buffer;
+                vbo.cached_solid_buffer_length = vbo.solid_buffer_length;
+            }
+            if (vbo.transparent_buffer != vbo.cached_transparent_buffer)
+            {
+                // Free the old buffer if it exists
+                if (vbo.cached_transparent_buffer && vbo.cached_transparent_buffer_length)
+                {
+                    free(vbo.cached_transparent_buffer);
+                }
+
+                // Update the cached buffer
+                vbo.cached_transparent_buffer = vbo.transparent_buffer;
+                vbo.cached_transparent_buffer_length = vbo.transparent_buffer_length;
+            }
+        }
+        vbos_to_update.clear();
     }
 }
 
