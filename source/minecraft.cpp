@@ -490,7 +490,40 @@ void GetInput()
             if ((wiimote1_held & WPAD_CLASSIC_BUTTON_FULL_R) && ((wiimote1_down & WPAD_CLASSIC_BUTTON_FULL_R) || shoulder_btn_frame_counter % 10 == 0))
                 place_block = !(destroy_block = true);
         }
-
+        if (wiimote1_down & WPAD_CLASSIC_BUTTON_ZL)
+        {
+            do
+            {
+                // Decrease the selected block id by 1 unless we're at the lowest block id already
+                if (selected_block.id > 0)
+                {
+                    selected_block.id = BlockID(selected_block.id - 1);
+                }
+                else
+                {
+                    break; // Break out of the loop if we're at the lowest block id
+                }
+                // If the selected block is air, don't allow the player to select it
+            } while (BlockID(selected_block.id) == BlockID::air);
+        }
+        if (wiimote1_down & WPAD_CLASSIC_BUTTON_ZR)
+        {
+            do
+            {
+                // Increase the selected block id by 1 unless we're at the highest block id already
+                if (selected_block.id < 255)
+                {
+                    selected_block.id = BlockID(selected_block.id + 1);
+                }
+                else
+                {
+                    break; // Break out of the loop if we're at the highest block id
+                }
+                // If the selected block is air, don't allow the player to select it
+            } while (BlockID(selected_block.id) == BlockID::air);
+        }
+        if (selected_block.get_blockid() == BlockID::air)
+            selected_block.set_blockid(BlockID::stone);
         x = expansion.classic.ljs.pos.x;
         y = expansion.classic.ljs.pos.y;
         y -= expansion.classic.ljs.center.y;
