@@ -755,7 +755,7 @@ void UpdateChunkVBOs(std::deque<chunk_t *> &chunks)
         }
     }
     std::sort(vbos_to_update.begin(), vbos_to_update.end(), SortVBOs);
-    uint32_t max_vbo_updates = 2;
+    uint32_t max_vbo_updates = 7;
     for (chunkvbo_t *vbo_ptr : vbos_to_update)
     {
         chunkvbo_t &vbo = *vbo_ptr;
