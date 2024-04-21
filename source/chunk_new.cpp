@@ -405,7 +405,7 @@ block_t *get_block_at(vec3i position, chunk_t *near)
 {
     if (position.y < 0 || position.y > 255)
         return nullptr;
-    if (near && (near->x * 16) == (position.x & ~0xF) && (near->z * 16) == (position.z & ~0xF))
+    if (near && near->x == (position.x >> 4) && near->z == (position.z >> 4))
         return near->get_block(position);
     chunk_t *chunk = get_chunk_from_pos(position, false, false);
     if (!chunk)
