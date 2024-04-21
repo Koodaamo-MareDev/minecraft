@@ -872,7 +872,7 @@ void DrawScene(std::deque<chunk_t *> &chunks, bool transparency)
     GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
 
     // Draw block outlines
-    if (transparency && outline && draw_block_outline)
+    if (!transparency && outline && draw_block_outline)
     {
         GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
         guVector outlinePos = guVector();
