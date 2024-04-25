@@ -1145,6 +1145,12 @@ void chunk_t::update_entities(float dt)
                             // Reset y velocity if the entity hits the ceiling
                             if (push.y < 0.0f)
                                 entity->velocity.y = 0.0f;
+
+                            // Reset x/z velocity if the entity hits a wall
+                            if (push.x != 0.0f)
+                                entity->velocity.x = 0.0f;
+                            if (push.z != 0.0f)
+                                entity->velocity.z = 0.0f;
                         }
                     }
                 }
