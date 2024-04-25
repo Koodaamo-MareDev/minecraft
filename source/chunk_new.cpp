@@ -11,6 +11,7 @@
 #include "render.hpp"
 #include "raycast.hpp"
 #include "threadhandler.hpp"
+#include <tuple>
 #include <map>
 #include <vector>
 #include <deque>
@@ -56,7 +57,7 @@ bool has_pending_chunks()
     return pending_chunks.size() > 0;
 }
 
-bool chunk_sorter(chunk_t*& a, chunk_t *&b)
+bool chunk_sorter(chunk_t *&a, chunk_t *&b)
 {
     return !(*a < *b);
 }
@@ -1059,11 +1060,152 @@ void chunk_t::prepare_render()
     this->build_all_vbos();
 }
 
+void chunk_t::update_entities(float dt)
+{
+    // Resolve collisions with current chunk and neighboring chunks' entities
+    for (int i = 0; i <= 6; i++)
+    {
+        if (i == FACE_NY || i == FACE_PY)
+            continue;
+        chunk_t *neighbor = (i == 6 ? this : get_chunk(vec3i(this->x + face_offsets[i].x, 0, this->z + face_offsets[i].z), false, false));
+        if (neighbor)
+        {
+            for (aabb_entity_t *&entity : neighbor->entities)
+            {
+                for (aabb_entity_t *&this_entity : this->entities)
+                {
+                    // Prevent entities from colliding with themselves
+                    if (entity != this_entity && entity->collides(this_entity))
+                    {
+                        entity->resolve_collision(this_entity);
+                    }
+                }
+            }
+        }
+    }
+
+    // Update entities
+    for (aabb_entity_t *&entity : this->entities)
+    {
+        entity->update(dt);
+    }
+
+    // Resolve collisions with the blocks surrounding the entity
+    for (aabb_entity_t *&entity : entities)
+    {
+        // Perform collision detection per-axis
+        std::array<vec3f, 3> axes = (entity->velocity * dt).split();
+
+        // We'll check for collisions on the y x z order
+        int order[3] = {1, 0, 2};
+
+        // Check for collisions with blocks on each axis
+        for (int i = 0; i < 3; i++)
+        {
+            vec3f axis = axes[order[i]];
+            entity->move(axis);
+
+            for (int x = entity->aabb.min.x - 1; x <= entity->aabb.max.x + 1; x++)
+            {
+                for (int y = entity->aabb.min.y - 1; y <= entity->aabb.max.y + 1; y++)
+                {
+                    for (int z = entity->aabb.min.z - 1; z <= entity->aabb.max.z + 1; z++)
+                    {
+                        vec3i block_pos = vec3i(x, y, z);
+                        block_t *block = get_block_at(block_pos, this);
+                        if (block && block->get_blockid() != BlockID::air && !is_fluid(block->get_blockid()) && entity->aabb.intersects(block->get_aabb(block_pos)))
+                        {
+                            vec3f push = entity->aabb.push_out(block->get_aabb(block_pos));
+
+                            if (order[i] == 0)
+                            {
+                                push.y = 0.0f;
+                                push.z = 0.0f;
+                            }
+                            else if (order[i] == 1)
+                            {
+                                push.x = 0.0f;
+                                push.z = 0.0f;
+                            }
+                            else if (order[i] == 2)
+                            {
+                                push.x = 0.0f;
+                                push.y = 0.0f;
+                            }
+
+                            entity->move(push);
+
+                            // Reset y velocity and set on_ground flag if the entity hits the ground
+                            if (push.y > 0.0f)
+                            {
+                                entity->velocity.y = 0.0f;
+                                entity->on_ground = true;
+                            }
+
+                            // Reset y velocity if the entity hits the ceiling
+                            if (push.y < 0.0f)
+                                entity->velocity.y = 0.0f;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Apply friction to entities
+    for (aabb_entity_t *&entity : entities)
+    {
+        entity->apply_friction(0.85f);
+    }
+
+    // Update the entities' positions for the next frame
+    for (aabb_entity_t *&entity : entities)
+    {
+        entity->prev_position = entity->position;
+    }
+
+    // Get a list of entities that are out of bounds while iterating
+    std::vector<aabb_entity_t *> out_of_bounds;
+    for (aabb_entity_t *&entity : entities)
+    {
+        vec3i entity_pos = vec3i(int(entity->position.x), int(entity->position.y), int(entity->position.z));
+        if (entity_pos.x < this->x * 16 || entity_pos.x >= (this->x + 1) * 16 || entity_pos.z < this->z * 16 || entity_pos.z >= (this->z + 1) * 16)
+        {
+            out_of_bounds.push_back(entity);
+        }
+    }
+
+    // Remove out of bounds entities from this chunk, we'll handle them later
+    for (aabb_entity_t *&entity : out_of_bounds)
+    {
+        entities.erase(std::remove(entities.begin(), entities.end(), entity), entities.end());
+    }
+
+    // Place out of bounds entities in the correct chunk
+    for (aabb_entity_t *&entity : out_of_bounds)
+    {
+        vec3i entity_pos = vec3i(int(entity->position.x), int(entity->position.y), int(entity->position.z));
+        chunk_t *new_chunk = get_chunk_from_pos(entity_pos, false, false);
+
+        // Check if the chunk is loaded
+        if (new_chunk)
+        {
+            new_chunk->entities.push_back(entity);
+        }
+        else
+        {
+            // If the chunk is not loaded, delete the entity
+            delete entity;
+        }
+    }
+}
+
 uint32_t chunk_t::size()
 {
     uint32_t base_size = sizeof(chunk_t);
     for (int i = 0; i < VERTICAL_SECTION_COUNT; i++)
         base_size += this->vbos[i].cached_solid_buffer_length + this->vbos[i].cached_transparent_buffer_length + sizeof(chunkvbo_t);
+    base_size += this->entities.size() * (sizeof(aabb_entity_t *) + sizeof(aabb_entity_t));
     return base_size;
 }
 

@@ -5,6 +5,8 @@
 #include <cmath>
 #include "block_id.hpp"
 #include "blocks.hpp"
+#include "aabb.hpp"
+#include "vec3f.hpp"
 
 #define FACE_NX 0
 #define FACE_PX 1
@@ -90,6 +92,12 @@ public:
         int8_t opacity = get_block_opacity(get_blockid());
         int8_t cast_light = int8_t(block_light) - std::max(opacity, int8_t(1));
         return std::max(cast_light, int8_t(0));
+    }
+
+    aabb_t get_aabb(vec3i pos)
+    {
+        // TODO: Implement per-block AABBs
+        return aabb_t(pos + vec3f(0, 0, 0), pos + vec3f(1, 1, 1));
     }
 };
 

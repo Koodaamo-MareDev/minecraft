@@ -31,7 +31,8 @@
 #define CLASSIC_CONTROLLER_THRESHOLD 4
 #define MAX_PARTICLES 100
 #define LOOKAROUND_SENSITIVITY 360
-#define MOVEMENT_SPEED 10
+#define MOVEMENT_SPEED 15
+#define JUMP_HEIGHT 1.25f
 #define DIRECTIONAL_LIGHT GX_ENABLE
 
 bool debug_spritesheet = false;
@@ -39,6 +40,7 @@ lwp_t main_thread;
 lwpq_t __thread_queue;
 f32 xrot = 0.0f;
 f32 yrot = 0.0f;
+aabb_entity_t *player = nullptr;
 guVector player_pos = {0.F, 80.0F, 0.F};
 void *frameBuffer[2] = {NULL, NULL};
 static GXRModeObj *rmode = NULL;
@@ -146,6 +148,11 @@ void AlphaBlend(unsigned char *src, unsigned char *dst, int width, int height, i
             dst[off + 2] = (char)((((((int)(src[off + 2]) & 0xFF) * src_alpha) + ((int)(dst[off + 2]) & 0xFF) * one_minus_src_alpha) / 0xFF) & 0xFF);
         }
     }
+}
+
+float flerp(float a, float b, float f)
+{
+    return a + f * (b - a);
 }
 
 void PrepareOutline()
@@ -347,7 +354,35 @@ int main(int argc, char **argv)
         use_fog(true, viewport, background, GENERATION_DISTANCE * 0.5f - 8, GENERATION_DISTANCE * 0.5f);
 
         if (player_pos.y < -999)
+        {
             player_pos.y = skycast(vec3i(int(player_pos.x), 0, int(player_pos.z))) + 2;
+
+            if (player_pos.y > -999)
+            {
+                // Check if the player entity exists
+                if (player)
+                {
+                    // Update the player entity's position
+                    player->position = player_pos;
+                    player->update_aabb();
+                }
+                else
+                {
+                    // Add the player to the chunks
+                    vec3i player_chunk_pos = vec3i(int(player_pos.x), int(player_pos.y), int(player_pos.z));
+                    chunk_t *player_chunk = get_chunk_from_pos(player_chunk_pos, false, false);
+                    if (player_chunk)
+                    {
+                        player = new aabb_entity_t();
+                        player->position = player_pos;
+                        player->prev_position = player_pos;
+                        vec3f player_view_offset = vec3f(-.5f, -.5f, -.5f);
+                        player->set_bounds(aabb_t(vec3f(-0.3f, -1.5f, -0.3f) - player_view_offset, vec3f(0.3f, 0.3f, 0.3f) - player_view_offset));
+                        player_chunk->entities.push_back(player);
+                    }
+                }
+            }
+        }
         UpdateLightDir();
         if (fb)
         {
@@ -356,6 +391,12 @@ int main(int argc, char **argv)
             GX_InvalidateTexAll();
         }
         GetInput();
+
+        // If the player entity exists, update camera position
+        if (player)
+        {
+            player_pos = player->position;
+        }
 
         camera.position = player_pos;
         camera.rot.x = xrot;
@@ -470,11 +511,6 @@ void GetInput()
             xrot += (float(y) / (expansion.classic.rjs.max.y - expansion.classic.rjs.min.y)) * LOOKAROUND_SENSITIVITY * deltaTime;
         }
 
-        if (wiimote1_held & WPAD_CLASSIC_BUTTON_UP)
-            player_pos.y += MOVEMENT_SPEED * deltaTime;
-        if (wiimote1_held & WPAD_CLASSIC_BUTTON_DOWN)
-            player_pos.y -= MOVEMENT_SPEED * deltaTime;
-
         if (!((wiimote1_held & WPAD_CLASSIC_BUTTON_FULL_L) || (wiimote1_held & WPAD_CLASSIC_BUTTON_FULL_R)))
             shoulder_btn_frame_counter = -1;
         else
@@ -528,15 +564,37 @@ void GetInput()
         y = expansion.classic.ljs.pos.y;
         y -= expansion.classic.ljs.center.y;
         x -= expansion.classic.ljs.center.x;
+        float target_x = 0;
+        float target_z = 0;
+
         if (std::abs(x) > CLASSIC_CONTROLLER_THRESHOLD)
         {
-            player_pos.x += (float(x) / (expansion.classic.ljs.max.y - expansion.classic.ljs.min.y)) * sin(DegToRad(yrot + 90)) * MOVEMENT_SPEED * deltaTime;
-            player_pos.z += (float(x) / (expansion.classic.ljs.max.y - expansion.classic.ljs.min.y)) * cos(DegToRad(yrot + 90)) * MOVEMENT_SPEED * deltaTime;
+            target_x += (float(x) / (expansion.classic.ljs.max.x - expansion.classic.ljs.min.x)) * sin(DegToRad(yrot + 90));
+            target_z += (float(x) / (expansion.classic.ljs.max.x - expansion.classic.ljs.min.x)) * cos(DegToRad(yrot + 90));
         }
         if (std::abs(y) > CLASSIC_CONTROLLER_THRESHOLD)
         {
-            player_pos.x -= (float(y) / (expansion.classic.ljs.max.y - expansion.classic.ljs.min.y)) * sin(DegToRad(yrot)) * MOVEMENT_SPEED * deltaTime;
-            player_pos.z -= (float(y) / (expansion.classic.ljs.max.y - expansion.classic.ljs.min.y)) * cos(DegToRad(yrot)) * MOVEMENT_SPEED * deltaTime;
+            target_x -= (float(y) / (expansion.classic.ljs.max.y - expansion.classic.ljs.min.y)) * sin(DegToRad(yrot));
+            target_z -= (float(y) / (expansion.classic.ljs.max.y - expansion.classic.ljs.min.y)) * cos(DegToRad(yrot));
+        }
+
+        // Multiply the joystick input by the player's movement speed
+        target_x *= MOVEMENT_SPEED;
+        target_z *= MOVEMENT_SPEED;
+
+        // Check if the player entity exists
+        if (player)
+        {
+            // Update the player entity's velocity
+            player->velocity.x = flerp(player->velocity.x, target_x, deltaTime * 5);
+            player->velocity.z = flerp(player->velocity.z, target_z, deltaTime * 5);
+
+            // If the player is on the ground, allow them to jump
+            if ((wiimote1_held & WPAD_CLASSIC_BUTTON_B) && player->on_ground)
+            {
+                player->velocity.y = sqrt(ENTITY_GRAVITY * 2.0f * JUMP_HEIGHT);
+                player->on_ground = false;
+            }
         }
     }
     if (yrot > 360.f)
@@ -757,6 +815,9 @@ void UpdateChunkData(frustum_t &frustum, std::deque<chunk_t *> &chunks)
                 light_up_calls++;
                 chunk->light_up();
             }
+
+            // Update the entities in the chunk
+            chunk->update_entities(deltaTime);
         }
     }
     if (tickCounter - lastWaterTick >= 8)

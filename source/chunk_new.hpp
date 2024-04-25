@@ -4,6 +4,7 @@
 #include "vec3i.hpp"
 #include "vec3f.hpp"
 #include "block.hpp"
+#include "entity.hpp"
 #include <ogc/gu.h>
 #include <cstddef>
 #include <vector>
@@ -61,6 +62,7 @@ public:
     block_t blockstates[16 * 16 * 256] = {0};
     uint8_t height_map[16 * 16] = {0};
     chunkvbo_t vbos[VERTICAL_SECTION_COUNT];
+    std::vector<aabb_entity_t *> entities;
 
     block_t *get_block(vec3i pos)
     {
@@ -105,6 +107,9 @@ public:
     int render_block_mesh(int section, bool transparent, int vertexCount);
     int render_block(block_t *block, vec3i pos, bool transparent);
     int render_torch(block_t *block, vec3i pos);
+
+    void update_entities(float dt);
+
     uint32_t size();
     chunk_t()
     {
