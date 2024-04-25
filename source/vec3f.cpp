@@ -35,6 +35,14 @@ vec3f vec3f::operator*(float const &a) const
     return vec3f{x * a, y * a, z * a};
 }
 
+vec3f vec3f::operator/(float const &a) const
+{
+    return vec3f{x / a, y / a, z / a};
+}
+vec3f vec3f::operator-() const
+{
+    return vec3f(-x, -y, -z);
+}
 #if HW_RVL
 vec3f::operator guVector()
 {
