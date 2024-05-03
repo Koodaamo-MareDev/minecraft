@@ -70,6 +70,7 @@ bool place_block = false;
 block_t selected_block = {BlockID::stone, 0x7F, 0, 0xF, 0xF};
 
 void UpdateLightDir();
+void DrawSelectedBlock(std::deque<chunk_t *> &chunks, bool transparency);
 void DrawScene(std::deque<chunk_t *> &chunks, bool transparency);
 void GenerateAdditionalChunks(std::deque<chunk_t *> &chunks);
 void RemoveRedundantChunks(std::deque<chunk_t *> &chunks);
@@ -413,19 +414,25 @@ int main(int argc, char **argv)
         GX_SetCullMode(GX_CULL_BACK);
 
         // Draw opaque buffer
-        GX_SetZMode(GX_TRUE, GX_LESS, GX_TRUE);
+        GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
         GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_NOOP);
         GX_SetAlphaUpdate(GX_TRUE);
         GX_SetAlphaCompare(GX_ALWAYS, 0, GX_AOP_OR, GX_ALWAYS, 0);
         GX_SetColorUpdate(GX_TRUE);
         DrawScene(chunks, false);
         // Draw transparent buffer
-        GX_SetZMode(GX_TRUE, GX_LESS, GX_TRUE);
+        GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
         GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_NOOP);
         GX_SetAlphaUpdate(GX_FALSE);
         GX_SetAlphaCompare(GX_GEQUAL, 16, GX_AOP_AND, GX_ALWAYS, 0);
         GX_SetColorUpdate(GX_TRUE);
         DrawScene(chunks, true);
+
+        // Draw selected block in solid mode
+        DrawSelectedBlock(chunks, false);
+
+        // Draw selected block in transparent mode
+        DrawSelectedBlock(chunks, true);
 
         // Re-enable depth testing
         GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
@@ -932,6 +939,61 @@ void UpdateScene(frustum_t &frustum, std::deque<chunk_t *> &chunks)
     }
 }
 
+void DrawSelectedBlock(std::deque<chunk_t *> &chunks, bool transparency)
+{
+    if (chunks.size() == 0)
+        return;
+    block_t *view_block = get_block_at(vec3i(player_pos.x, player_pos.y, player_pos.z));
+    if (view_block)
+    {
+        // Set the light level of the selected block
+        selected_block.light = view_block->light;
+    }
+    else
+    {
+        selected_block.light = 0xFF;
+    }
+
+    // Disable depth testing
+    GX_SetZMode(GX_TRUE, GX_ALWAYS, GX_TRUE);
+
+    // Enable indexed colors
+    GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
+
+    // Specify the selected block offset
+    // 6.75 comes from the -10 offset in the render_block function
+    // It's -10 & 0x0F = 6, subtracting 0.75 as an offset.
+    guVector selectedBlockPos = guVector{+.85f, -6.75f, -1.f};
+
+    // Transform the selected block position
+    transform_view_screen(get_view_matrix(), selectedBlockPos);
+
+    // Precalculate the vertex count
+    GX_BeginGroup(GX_QUADS, 0);
+
+    // Precalculate the vertex count. Set position to Y = -10 to render "outside the world"
+    int vertexCount = chunks[0]->render_block(&selected_block, vec3i(0, -10, 0), transparency);
+
+    // Get the vertex count
+    int endGroup = GX_EndGroup();
+
+    // Check if the vertex count is correct
+    if (endGroup != vertexCount)
+    {
+        printf("Vertex count mismatch: %d != %d\n", endGroup, vertexCount);
+        return;
+    }
+
+    // Draw the selected block
+    GX_BeginGroup(GX_QUADS, vertexCount);
+
+    // Render the selected block. Set position to Y = -10 to render "outside the world"
+    chunks[0]->render_block(&selected_block, vec3i(0, -10, 0), transparency);
+
+    // End the group
+    GX_EndGroup();
+}
+
 void DrawScene(std::deque<chunk_t *> &chunks, bool transparency)
 {
     // Use terrain texture
@@ -1010,57 +1072,6 @@ void DrawScene(std::deque<chunk_t *> &chunks, bool transparency)
             GX_EndGroup();
         }
     }
-    if (chunks.size() == 0)
-        return;
-    block_t *view_block = get_block_at(vec3i(player_pos.x, player_pos.y, player_pos.z));
-    if (view_block)
-    {
-        // Set the light level of the selected block
-        selected_block.light = view_block->light;
-    }
-    else
-    {
-        selected_block.light = 0xFF;
-    }
-
-    // Disable depth testing
-    GX_SetZMode(GX_TRUE, GX_ALWAYS, GX_TRUE);
-
-    // Enable indexed colors
-    GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
-
-    // Specify the selected block offset
-    // 6.75 comes from the -10 offset in the render_block function
-    // It's -10 & 0x0F = 6, subtracting 0.75 as an offset.
-    guVector selectedBlockPos = guVector{+.85f, -6.75f, -1.f};
-
-    // Transform the selected block position
-    transform_view_screen(get_view_matrix(), selectedBlockPos);
-
-    // Precalculate the vertex count
-    GX_BeginGroup(GX_QUADS, 0);
-
-    // Precalculate the vertex count. Set position to Y = -10 to render "outside the world"
-    int vertexCount = chunks[0]->render_block(&selected_block, vec3i(0, -10, 0), transparency);
-
-    // Get the vertex count
-    int endGroup = GX_EndGroup();
-
-    // Check if the vertex count is correct
-    if (endGroup != vertexCount)
-    {
-        printf("Vertex count mismatch: %d != %d\n", endGroup, vertexCount);
-        return;
-    }
-
-    // Draw the selected block
-    GX_BeginGroup(GX_QUADS, vertexCount);
-
-    // Render the selected block. Set position to Y = -10 to render "outside the world"
-    chunks[0]->render_block(&selected_block, vec3i(0, -10, 0), transparency);
-
-    // End the group
-    GX_EndGroup();
 }
 void PrepareTEV()
 {
