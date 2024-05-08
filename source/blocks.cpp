@@ -66,9 +66,11 @@ uint32_t get_default_texture_index(BlockID blockid)
     case BlockID::bedrock:
         return 17;
     case BlockID::flowing_water:
+        return 206;
     case BlockID::water:
         return 205;
     case BlockID::flowing_lava:
+        return 238;
     case BlockID::lava:
         return 237;
     case BlockID::sand:

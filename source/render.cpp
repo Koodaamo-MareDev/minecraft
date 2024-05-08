@@ -16,6 +16,10 @@ GXTexObj moon_texture;
 GXTexObj blockmap_texture;
 GXTexObj water_still_texture;
 
+// Animated textures
+water_texanim_t water_still_anim;
+lava_texanim_t lava_still_anim;
+
 void init_texture(GXTexObj &texture, const void *data_src, uint32_t data_len)
 {
     TPLFile tpl_file;
@@ -28,26 +32,52 @@ void init_texture(GXTexObj &texture, const void *data_src, uint32_t data_len)
 
 void init_textures()
 {
+
+    // Basic textures
     init_texture(white_texture, white_tpl, white_tpl_size);
     init_texture(clouds_texture, clouds_tpl, clouds_tpl_size);
     init_texture(sun_texture, sun_tpl, sun_tpl_size);
     init_texture(moon_texture, moon_tpl, moon_tpl_size);
     init_texture(water_still_texture, water_still_tpl, water_still_tpl_size);
     init_texture(blockmap_texture, blockmap_tpl, blockmap_tpl_size);
+
+    // Animated textures
+
+    // Lava
+    lava_still_anim.target = MEM_PHYSICAL_TO_K1(GX_GetTexObjData(&blockmap_texture));
+    lava_still_anim.dst_width = 256;
+    lava_still_anim.tile_width = 16;
+    lava_still_anim.tile_height = 16;
+    lava_still_anim.dst_x = 208;
+    lava_still_anim.dst_y = 224;
+    lava_still_anim.flow_dst_x = 224;
+    lava_still_anim.flow_dst_y = 224;
+
+    // Water
+    water_still_anim.target = MEM_PHYSICAL_TO_K1(GX_GetTexObjData(&blockmap_texture));
+    water_still_anim.dst_width = 256;
+    water_still_anim.tile_width = 16;
+    water_still_anim.tile_height = 16;
+    water_still_anim.dst_x = 208;
+    water_still_anim.dst_y = 192;
+    water_still_anim.flow_dst_x = 224;
+    water_still_anim.flow_dst_y = 192;
+}
+
+void update_textures()
+{
+    water_still_anim.update();
+    lava_still_anim.update();
+
+    static void *texture_buf = MEM_PHYSICAL_TO_K1(GX_GetTexObjData(&blockmap_texture));
+    static uint32_t texture_buflen = GX_GetTexBufferSize(GX_GetTexObjWidth(&blockmap_texture), GX_GetTexObjHeight(&blockmap_texture), GX_GetTexObjFmt(&blockmap_texture), GX_FALSE, GX_FALSE);
+    DCFlushRange(texture_buf, texture_buflen);
+    GX_InvalidateTexAll();
 }
 
 void use_texture(GXTexObj &texture)
 {
     GX_LoadTexObj(&texture, GX_TEXMAP0);
-}
-
-void extract_texanim_info(texanim_t &anim, GXTexObj &src_texture, GXTexObj &dst_texture)
-{
-    anim.dst_width = GX_GetTexObjWidth(&dst_texture);
-    anim.src_width = GX_GetTexObjWidth(&src_texture);
-    anim.src_height = GX_GetTexObjHeight(&src_texture);
-    anim.source = MEM_PHYSICAL_TO_K1(GX_GetTexObjData(&src_texture));
-    anim.target = MEM_PHYSICAL_TO_K1(GX_GetTexObjData(&dst_texture));
 }
 
 void init_fog(Mtx44 &projection_mtx, uint16_t viewport_width)

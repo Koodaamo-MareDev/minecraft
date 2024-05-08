@@ -43,6 +43,15 @@ vec3f vec3f::operator-() const
 {
     return vec3f(-x, -y, -z);
 }
+vec3f vec3f::normalize() const
+{
+    float length = std::sqrt(x * x + y * y + z * z);
+    if (length == 0)
+    {
+        return vec3f(0, 0, 0);
+    }
+    return vec3f(x / length, y / length, z / length);
+}
 #if HW_RVL
 vec3f::operator guVector()
 {

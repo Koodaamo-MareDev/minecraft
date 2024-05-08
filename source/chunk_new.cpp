@@ -892,6 +892,39 @@ int chunk_t::render_torch(block_t *block, vec3i pos)
     return 20;
 }
 
+vec3f get_fluid_direction(block_t *block, vec3i pos)
+{
+
+    BlockID block_id = block->get_blockid();
+
+    // Used to check block types around the fluid
+    block_t *neighbors[6];
+    get_neighbors(pos, neighbors);
+
+    vec3f direction = vec3f(0.0f, 0.0f, 0.0f);
+
+    bool direction_set = false;
+
+    for (int i = 0; i < 6; i++)
+    {
+        if (i == FACE_NY || i == FACE_PY)
+            continue;
+        if (neighbors[i] && is_same_fluid(neighbors[i]->get_blockid(), block_id))
+        {
+            direction_set = true;
+            if (get_fluid_meta_level(neighbors[i]) < get_fluid_meta_level(block))
+                direction = direction - vec3f(face_offsets[i].x, 0, face_offsets[i].z);
+            else if (get_fluid_meta_level(neighbors[i]) > get_fluid_meta_level(block))
+                direction = direction + vec3f(face_offsets[i].x, 0, face_offsets[i].z);
+            else
+                direction_set = false;
+        }
+    }
+    if (!direction_set)
+        direction.y = -1.0f;
+    return direction.normalize();
+}
+
 int chunk_t::render_fluid(block_t *block, vec3i pos)
 {
     BlockID block_id = block->get_blockid();
@@ -940,41 +973,8 @@ int chunk_t::render_fluid(block_t *block, vec3i pos)
     // If surrounded by 3, the water texture is flowing to the 1 other direction
     // If surrounded by 4, the water texture is still
 
-    uint8_t texture_offset = get_default_texture_index(block_id);
-    /*
-        uint8_t count = 0;
-        uint8_t bitmask = 0;
+    uint8_t texture_offset = get_default_texture_index(flowfluid(block_id));
 
-        for (int i = 0, j = 0; i < 6; i++)
-        {
-            if (i == 2 || i == 3)
-                continue;
-            if (get_fluid_meta_level(neighbors[i]) < fluid_level)
-            {
-                bitmask |= (1 << j);
-                count++;
-                switch (count)
-                {
-                case 1:
-                    texture_offset = texture_offsets[1 + (j >> 1)];
-                    break;
-                case 2:
-                    texture_offset = texture_offsets[1 + (((!(bitmask & 3)) != (!(bitmask & 12))) << 1)];
-                    break;
-                case 3:
-                    texture_offset = texture_offsets[1 + ((!(bitmask & 1)) != (!(bitmask & 2)))];
-                    break;
-                case 4:
-                    texture_offset = texture_offsets[0];
-                    break;
-
-                default:
-                    break;
-                }
-            }
-            j++;
-        }
-    */
     uint32_t texture_start_x = TEXTURE_X(texture_offset);
     uint32_t texture_start_y = TEXTURE_Y(texture_offset);
     uint32_t texture_end_x = texture_start_x + UV_SCALE;
@@ -989,16 +989,33 @@ int chunk_t::render_fluid(block_t *block, vec3i pos)
     if (!is_same_fluid(block_id, neighbor_ids[FACE_NY]) && !is_solid(neighbor_ids[FACE_NY]))
         faceCount += DrawHorizontalQuad(bottomPlaneCoords[0], bottomPlaneCoords[1], bottomPlaneCoords[2], bottomPlaneCoords[3], neighbors[FACE_NY] ? neighbors[FACE_NY]->light : light);
 
+    vec3f direction = get_fluid_direction(block, pos);
+    float angle = direction.x == 0 && direction.z == 0 ? -1000 : std::atan2(direction.x, direction.z) + M_PI;
+    float cos_angle = std::cos(angle) * 8;
+    float sin_angle = std::sin(angle) * 8;
+
+    uint32_t tex_off_x = TEXTURE_X(texture_offset) + 16;
+    uint32_t tex_off_y = TEXTURE_Y(texture_offset) + 16;
+    if (angle < -999)
+    {
+        cos_angle = 8;
+        sin_angle = 0;
+        int basefluid_offset = get_default_texture_index(basefluid(block_id));
+        tex_off_x = TEXTURE_X(basefluid_offset) + 8;
+        tex_off_y = TEXTURE_Y(basefluid_offset) + 8;
+
+    }
+
     vertex_property_t topPlaneCoords[4] = {
-        {(local_pos + vec3f{+.5f, -.5f + corner_tops[3], -.5f}), texture_end_x, texture_end_y},
-        {(local_pos + vec3f{+.5f, -.5f + corner_tops[2], +.5f}), texture_end_x, texture_start_y},
-        {(local_pos + vec3f{-.5f, -.5f + corner_tops[1], +.5f}), texture_start_x, texture_start_y},
-        {(local_pos + vec3f{-.5f, -.5f + corner_tops[0], -.5f}), texture_start_x, texture_end_y},
+        {(local_pos + vec3f{+.5f, -.5f + corner_tops[3], -.5f}), uint32_t(tex_off_x - cos_angle - sin_angle), uint32_t(tex_off_y - cos_angle + sin_angle)},
+        {(local_pos + vec3f{+.5f, -.5f + corner_tops[2], +.5f}), uint32_t(tex_off_x - cos_angle + sin_angle), uint32_t(tex_off_y + cos_angle + sin_angle)},
+        {(local_pos + vec3f{-.5f, -.5f + corner_tops[1], +.5f}), uint32_t(tex_off_x + cos_angle + sin_angle), uint32_t(tex_off_y + cos_angle - sin_angle)},
+        {(local_pos + vec3f{-.5f, -.5f + corner_tops[0], -.5f}), uint32_t(tex_off_x + cos_angle - sin_angle), uint32_t(tex_off_y - cos_angle - sin_angle)},
     };
     if (!is_same_fluid(block_id, neighbor_ids[FACE_PY]))
         faceCount += DrawHorizontalQuad(topPlaneCoords[0], topPlaneCoords[1], topPlaneCoords[2], topPlaneCoords[3], is_solid(neighbor_ids[FACE_PY]) ? light : neighbors[FACE_PY]->light);
 
-    texture_offset = get_default_texture_index(block_id);
+    texture_offset = get_default_texture_index(flowfluid(block_id));
 
     vertex_property_t sideCoords[4] = {0};
 

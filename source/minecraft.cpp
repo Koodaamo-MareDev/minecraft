@@ -291,15 +291,7 @@ int main(int argc, char **argv)
     GX_InvalidateTexAll();
 
     init_textures();
-
-    uint32_t texture_buflen = GX_GetTexBufferSize(GX_GetTexObjWidth(&blockmap_texture), GX_GetTexObjHeight(&blockmap_texture), GX_GetTexObjFmt(&blockmap_texture), GX_FALSE, GX_FALSE);
-    texanim_t water_still_anim;
-    extract_texanim_info(water_still_anim, water_still_texture, blockmap_texture);
-    water_still_anim.tile_width = 16;
-    water_still_anim.tile_height = 16;
-    water_still_anim.dst_x = 208;
-    water_still_anim.dst_y = 192;
-
+    update_textures();
     // Init viewport params
     view_t viewport = view_t(rmode->fbWidth, rmode->efbHeight, CONF_GetAspectRatio(), 90, CAMERA_NEAR, CAMERA_FAR, yscale);
 
@@ -385,12 +377,12 @@ int main(int argc, char **argv)
             }
         }
         UpdateLightDir();
-        if (fb)
+        
+        if (frameCounter % 3 == 0)
         {
-            water_still_anim.update();
-            DCFlushRange(water_still_anim.target, texture_buflen);
-            GX_InvalidateTexAll();
+            update_textures();
         }
+
         GetInput();
 
         // If the player entity exists, update camera position
@@ -944,7 +936,7 @@ void DrawSelectedBlock(std::deque<chunk_t *> &chunks, bool transparency)
     if (chunks.size() == 0)
         return;
     // Get the block at the player's position, rounded down
-    block_t *view_block = get_block_at(vec3i(std::floor(player_pos.x -.5f), std::floor(player_pos.y -.5f), std::floor(player_pos.z -.5f)));
+    block_t *view_block = get_block_at(vec3i(std::floor(player_pos.x - .5f), std::floor(player_pos.y - .5f), std::floor(player_pos.z - .5f)));
     if (view_block)
     {
         // Set the light level of the selected block

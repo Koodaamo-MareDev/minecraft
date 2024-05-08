@@ -8,35 +8,53 @@
 #define TA_DST (1)
 #define TA_SRC (0)
 
-struct texanim_t
+class texanim_t
 {
-    void* source = nullptr;
-    void* target = nullptr;
-    uint32_t src_width = 16;
-    uint32_t src_height = 512;
+public:
+    void *source = nullptr;
+    void *target = nullptr;
+    void *src_ptr = nullptr;
     uint32_t dst_width = 256;
     uint32_t tile_width = 16;
     uint32_t tile_height = 16;
     uint32_t dst_x = 0;
     uint32_t dst_y = 0;
-    uint32_t current_y = 0;
 
-    void update()
-    {
-        this->current_y += tile_height;
-        this->current_y %= src_height;
-        void *src_ptr = (void *)(u32(this->source) + (this->current_y * src_width * 4));
-        for (uint32_t y = dst_y; y < dst_y + tile_height; y += 4)
-        {
-            for (uint32_t x = dst_x; x < dst_x + tile_width; x += 4)
-            {
-                void* dst_ptr = (void *)(u32(target) + (dst_width * 4 * y + x * 16));
-                memcpy(dst_ptr, src_ptr, 64);
-                src_ptr = (void *)(u32(src_ptr) + 64);
-            }
-        }
-    }
+    virtual void update();
+    void copy(void *src_ptr, uint32_t dst_x, uint32_t dst_y);
+    void copy_tpl();
+};
 
+class water_texanim_t : public texanim_t
+{
+    float data_a[256] = {0};
+    float data_b[256] = {0};
+    float data_c[256] = {0};
+    float data_d[256] = {0};
+    uint8_t texture_data_still[256 * 4] = {0};
+    uint8_t texture_data_flow[256 * 4] = {0};
+    uint32_t frame = 0;
+
+public:
+    uint32_t flow_dst_x = 0;
+    uint32_t flow_dst_y = 0;
+    void update() override;
+};
+
+class lava_texanim_t : public texanim_t
+{
+    float data_a[256] = {0};
+    float data_b[256] = {0};
+    float data_c[256] = {0};
+    float data_d[256] = {0};
+    uint8_t texture_data_still[256 * 4] = {0};
+    uint8_t texture_data_flow[256 * 4] = {0};
+    uint32_t frame = 0;
+
+public:
+    uint32_t flow_dst_x = 0;
+    uint32_t flow_dst_y = 0;
+    void update() override;
 };
 
 inline void SimpleTexObjInit(GXTexObj *texture, int width, int height, void *buffer = nullptr)

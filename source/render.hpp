@@ -77,9 +77,9 @@ void init_texture(GXTexObj &texture, void *data_src, uint32_t data_len);
 
 void init_textures();
 
-void use_texture(GXTexObj &texture);
+void update_textures();
 
-void extract_texanim_info(texanim_t &anim, GXTexObj &src_texture, GXTexObj &dst_texture);
+void use_texture(GXTexObj &texture);
 
 void init_fog(Mtx44 &projection_mtx, uint16_t viewport_width);
 
