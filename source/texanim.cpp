@@ -124,10 +124,10 @@ void water_texanim_t::update()
             {
                 int tex_x = x & 0xF;
                 int tex_y = i & 0xF;
-                val += data_a[tex_x + tex_y * 16];
+                val += data_e[tex_x + tex_y * 16];
             }
 
-            data_b[x + y * 16] = val / 3.2f + (data_c[x + y * 16]) * 0.8f;
+            data_f[x + y * 16] = val / 3.2f + (data_g[x + y * 16]) * 0.8f;
         }
     }
 
@@ -135,15 +135,15 @@ void water_texanim_t::update()
     {
         for (int y = 0; y < 16; ++y)
         {
-            data_c[x + y * 16] += data_d[x + y * 16] * 0.05f;
-            if (data_c[x + y * 16] < 0.0f)
+            data_g[x + y * 16] += data_h[x + y * 16] * 0.05f;
+            if (data_g[x + y * 16] < 0.0f)
             {
-                data_c[x + y * 16] = 0.0f;
+                data_g[x + y * 16] = 0.0f;
             }
-            data_d[x + y * 16] -= 0.3f;
+            data_h[x + y * 16] -= 0.3f;
             if (rand() % 5 == 0)
             {
-                data_d[x + y * 16] = 0.5f;
+                data_h[x + y * 16] = 0.5f;
             }
         }
     }
@@ -151,7 +151,7 @@ void water_texanim_t::update()
     texture_data_ptr = (uint8_t *)texture_data_flow;
     for (int i = 0; i < 256; ++i)
     {
-        float val = data_b[(i - frame * 16) & 0xFF];
+        float val = data_f[(i - frame * 16) & 0xFF];
         if (val > 1.0f)
         {
             val = 1.0f;

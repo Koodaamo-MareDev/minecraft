@@ -31,6 +31,11 @@ class water_texanim_t : public texanim_t
     float data_b[256] = {0};
     float data_c[256] = {0};
     float data_d[256] = {0};
+
+    float data_e[256] = {0};
+    float data_f[256] = {0};
+    float data_g[256] = {0};
+    float data_h[256] = {0};
     uint8_t texture_data_still[256 * 4] = {0};
     uint8_t texture_data_flow[256 * 4] = {0};
     uint32_t frame = 0;
