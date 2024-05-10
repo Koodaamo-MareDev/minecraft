@@ -52,6 +52,8 @@ void water_texanim_t::update()
     static bool flip = false;
     float *data_a = flip ? this->data_a : this->data_b;
     float *data_b = flip ? this->data_b : this->data_a;
+    float *data_e = flip ? this->data_e : this->data_f;
+    float *data_f = flip ? this->data_f : this->data_e;
 
     // Update the still texture
     for (int x = 0; x < 16; ++x)
