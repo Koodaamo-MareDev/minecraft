@@ -377,7 +377,7 @@ int main(int argc, char **argv)
             }
         }
         UpdateLightDir();
-        
+
         if (frameCounter % 3 == 0)
         {
             update_textures();
@@ -774,6 +774,8 @@ void EditBlocks()
                     if (neighbors[i] && is_fluid(neighbors[i]->get_blockid()))
                         neighbors[i]->meta |= FLUID_UPDATE_REQUIRED_FLAG;
                 }
+                if (is_fluid(editable_block->get_blockid()))
+                    editable_block->meta |= FLUID_UPDATE_REQUIRED_FLAG;
             }
         }
     }
