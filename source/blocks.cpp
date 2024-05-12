@@ -193,6 +193,54 @@ void update_fluid(block_t *block, vec3i pos, chunk_t *near)
     block_t *pz = get_block_at(pos + face_offsets[FACE_PZ], near);
     block_t *surroundings[6] = {ny, nx, px, nz, pz, py};
     int surrounding_dirs[6] = {FACE_NY, FACE_NX, FACE_PX, FACE_NZ, FACE_PZ, FACE_PY};
+
+    for (int i = 0; i < 6; i++)
+    {
+        block_t *surrounding = surroundings[i];
+        if (surrounding)
+        {
+            BlockID surrounding_id = surrounding->get_blockid();
+            if (is_fluid(surrounding_id) && !is_same_fluid(surrounding_id, block_id))
+            {
+                bool surrounding_changed = false;
+                if (surrounding_dirs[i] != FACE_PY && basefluid(block_id) == BlockID::water)
+                {
+                    if (surrounding_id == BlockID::lava)
+                        surrounding->set_blockid(BlockID::obsidian);
+                    else
+                        surrounding->set_blockid(BlockID::cobblestone);
+                    surrounding->meta = 0;
+                    update_light(pos + face_offsets[surrounding_dirs[i]]);
+
+                    surrounding_changed = true;
+                }
+                else if (surrounding_dirs[i] == FACE_NY && basefluid(block_id) == BlockID::lava)
+                {
+                    surrounding->set_blockid(BlockID::stone);
+                    surrounding->meta = 0;
+                    update_light(pos + face_offsets[FACE_NY]);
+
+                    surrounding_changed = true;
+                }
+                if (surrounding_changed)
+                {
+                    block_t *neighbors[6];
+                    get_neighbors(pos + face_offsets[surrounding_dirs[i]], neighbors);
+                    for (int j = 0; j < 6; j++)
+                    {
+                        block_t *other = neighbors[j];
+                        if (other && is_fluid(other->get_blockid()))
+                        {
+                            update_light(pos + face_offsets[FACE_NY]);
+                            other->meta |= FLUID_UPDATE_REQUIRED_FLAG;
+                        }
+                    }
+                    return;
+                }
+            }
+        }
+    }
+
     if (is_flowing_fluid(block_id))
     {
         uint8_t surrounding_sources = 0;
