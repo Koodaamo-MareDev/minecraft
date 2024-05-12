@@ -393,6 +393,7 @@ bool is_fluid_overridable(BlockID id)
     case BlockID::air:
     case BlockID::flowing_water:
     case BlockID::flowing_lava:
+    case BlockID::torch:
         return true;
 
     default:
