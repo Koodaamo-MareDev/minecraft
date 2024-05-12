@@ -297,19 +297,12 @@ void update_fluid(block_t *block, vec3i pos, chunk_t *near)
                 chunk->vbos[pos.y / 16].dirty = true;
             block_t *other = chunk->get_block(offset_pos);
             if (other)
+            {
                 other->meta |= FLUID_UPDATE_REQUIRED_FLAG;
+                update_light(offset_pos);
+            }
         }
     }
-    for (int x = -1; x <= 1; x++)
-        for (int y = -1; y <= 1; y++)
-            for (int z = -1; z <= 1; z++)
-            {
-                vec3i offset_pos = pos + vec3i(x, y, z);
-                chunk_t *chunk = get_chunk_from_pos(offset_pos, false, false);
-                block_t *other = chunk->get_block(offset_pos);
-                if (other)
-                    update_light(offset_pos);
-            }
 }
 
 void set_fluid_level(block_t *block, uint8_t level)
