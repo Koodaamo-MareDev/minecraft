@@ -937,8 +937,8 @@ void DrawSelectedBlock(std::deque<chunk_t *> &chunks, bool transparency)
 {
     if (chunks.size() == 0)
         return;
-    // Get the block at the player's position, rounded down
-    block_t *view_block = get_block_at(vec3i(std::floor(player_pos.x - .5f), std::floor(player_pos.y - .5f), std::floor(player_pos.z - .5f)));
+    // Get the block at the player's position
+    block_t *view_block = get_block_at(vec3i(std::round(player_pos.x), std::round(player_pos.y), std::round(player_pos.z)));
     if (view_block)
     {
         // Set the light level of the selected block
