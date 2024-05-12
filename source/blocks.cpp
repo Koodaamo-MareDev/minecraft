@@ -287,10 +287,36 @@ void update_fluid(block_t *block, vec3i pos, chunk_t *near)
     }
     level = get_fluid_meta_level(block);
     //  Fluid spread:
-    if (level <= 7)
+    if (level <= 7 && pos.y > 0)
     {
+        int flow_weights[4] = {1000, 1000, 1000, 1000};
+        int min_weight = 1000;
+        // Calculate horizontal flow weights
+        for (int i = 0; i < 4; i++)
+        {
+            vec3i offset = face_offsets[surrounding_dirs[i + 1]];
+            for (int j = 1; j <= 5; j++)
+            {
+                vec3i other_pos = pos + (j * offset);
+                BlockID other_id = get_block_id_at(other_pos, BlockID::stone, near);
+                if (other_id != BlockID::air)
+                    break;
+
+                other_pos = other_pos + vec3i(0, -1, 0);
+                other_id = get_block_id_at(other_pos, BlockID::air, near);
+                if (is_same_fluid(other_id, block_id) || is_fluid_overridable(other_id))
+                {
+                    flow_weights[i] = j;
+                    break;
+                }
+            }
+            min_weight = std::min(min_weight, flow_weights[i]);
+        }
+
         for (int i = 0; i < 5; i++)
         {
+            if (i != 0 && flow_weights[i - 1] != min_weight)
+                continue;
             block_t *surrounding = surroundings[i];
             if (surrounding)
             {
@@ -310,7 +336,7 @@ void update_fluid(block_t *block, vec3i pos, chunk_t *near)
                         }
                         break;
                     }
-                    else if(level < 7)
+                    else if (level < 7)
                     {
                         if (surround_id != flowfluid(block_id) || surrounding_level > level + 1)
                         {
@@ -320,6 +346,10 @@ void update_fluid(block_t *block, vec3i pos, chunk_t *near)
                             update_light(pos + surrounding_offset);
                         }
                     }
+                }
+                else if (surrounding_dirs[i] == FACE_NY && is_same_fluid(surround_id, block_id))
+                {
+                    break;
                 }
             }
         }
