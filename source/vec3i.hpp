@@ -24,21 +24,6 @@ private:
     // Member variables
 };
 
-class vec3u {
-public:
-    uint32_t x = 0, y = 0, z = 0;
-    // Constructors, member variables, and other member functions
-    
-    bool operator==(vec3u const& a) const;
-    vec3u operator+(vec3u const& a) const;
-    vec3u operator-(vec3u const& a) const;
-    vec3u(uint32_t x, uint32_t y, uint32_t z) : x(x), y(y), z(z) {}
-    vec3u(uint32_t xyz) : x(xyz), y(xyz), z(xyz) {}
-    vec3u() : x(0), y(0), z(0) {}
-
-private:
-    // Member variables
-};
 inline vec3i operator*(int const &a, vec3i const &b)
 {
     return b * a;
