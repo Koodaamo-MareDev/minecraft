@@ -455,6 +455,11 @@ int main(int argc, char **argv)
         VIDEO_WaitVSync();
         frameCounter++;
         deltaTime = time_diff_s(frame_start, time_get());
+
+        // Ensure that the delta time is not too large to prevent issues
+        if(deltaTime > 0.05f)
+            deltaTime = 0.05f;
+        
         partialTicks += deltaTime * 20.0f;
         tickCounter += int(partialTicks);
         partialTicks -= int(partialTicks);
