@@ -35,14 +35,6 @@ int methodcall(ClassFile *class, Frame *frame, char *name, char *descr, U2 flags
 static char **classpath = NULL;         /* NULL-terminated array of path strings */
 static ClassFile *classes = NULL;       /* list of loaded classes */
 
-/* show usage */
-static void
-usage(void)
-{
-	(void)fprintf(stderr, "usage: java [-cp classpath] class\n");
-	exit(EXIT_FAILURE);
-}
-
 /* check if a class with the given name is loaded */
 static ClassFile *
 getclass(char *classname)
@@ -2410,15 +2402,15 @@ opputstatic(Frame *frame)
 			memcpy(&cp->info.integer_info.bytes, &v.i, 4);
 			break;
 		case CONSTANT_Long:
-			memcpy(&cp->info.long_info.high_bytes, (&v.l) + 0, 4);
-			memcpy(&cp->info.long_info.low_bytes, (&v.l) + 4, 4);
+			memcpy(&cp->info.long_info.high_bytes, ((char*)(&v.l)) + 0, 4);
+			memcpy(&cp->info.long_info.low_bytes, ((char*)(&v.l)) + 4, 4);
 			break;
 		case CONSTANT_Float:
 			memcpy(&cp->info.float_info.bytes, &v.f, 4);
 			break;
 		case CONSTANT_Double:
-			memcpy(&cp->info.double_info.high_bytes, (&v.d) + 0, 4);
-			memcpy(&cp->info.double_info.low_bytes, (&v.d) + 4, 4);
+			memcpy(&cp->info.double_info.high_bytes, ((char*)(&v.d)) + 0, 4);
+			memcpy(&cp->info.double_info.low_bytes, ((char*)(&v.d)) + 4, 4);
 			break;
 		}
 	}
@@ -2814,7 +2806,7 @@ java(int argc, char *argv[])
 	// TODO: free heap
 }
 
-int java_exec(const char* class_name)
+int java_exec(char* class_name)
 {
 	static ClassFile *class;
 	static Frame *frame;
@@ -2839,7 +2831,7 @@ int java_exec(const char* class_name)
 
 /* java: launches a java application */
 int
-java_launch(const char* java_appname)
+java_launch(char* java_appname)
 {
 	char *cpath = "sd:/minecraft";
     char *app_params[] = {java_appname};
