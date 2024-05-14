@@ -812,7 +812,7 @@ void UpdateChunkData(frustum_t &frustum, std::deque<chunk_t *> &chunks)
                 vbo.y = j * 16;
                 vbo.z = chunk->z * 16;
                 distance = std::abs((j * 16) - player_pos.y);
-                vbo.visible = (distance <= GENERATION_DISTANCE) && distance_to_frustum(vec3f(vbo.x, vbo.y, vbo.z), frustum) < 32;
+                vbo.visible = (distance <= GENERATION_DISTANCE) && distance_to_frustum(vec3f(vbo.x + 8, vbo.y + 8, vbo.z + 8), frustum) > -24;
                 if (distance <= SIMULATION_DISTANCE * 16 && tickCounter - lastWaterTick >= 8)
                     RecalcSectionWater(chunk, j);
             }
