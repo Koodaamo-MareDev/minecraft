@@ -176,40 +176,40 @@ int render_face(vec3i pos, uint8_t face, uint32_t texture_index, chunk_t *near, 
     switch (face)
     {
     case 0:
-        GX_VertexLit({vertex_pos + vec3f{-.5f, -.5f, -.5f}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, face);
-        GX_VertexLit({vertex_pos + vec3f{-.5f, 0.5f, -.5f}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, face);
-        GX_VertexLit({vertex_pos + vec3f{-.5f, 0.5f, 0.5f}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, face);
-        GX_VertexLit({vertex_pos + vec3f{-.5f, -.5f, 0.5f}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, face);
+        GX_VertexLit({vertex_pos + vec3f{-.5, -.5, -.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, face);
+        GX_VertexLit({vertex_pos + vec3f{-.5, 0.5, -.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, face);
+        GX_VertexLit({vertex_pos + vec3f{-.5, 0.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, face);
+        GX_VertexLit({vertex_pos + vec3f{-.5, -.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, face);
         break;
     case 1:
-        GX_VertexLit({vertex_pos + vec3f{0.5f, -.5f, 0.5f}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, face);
-        GX_VertexLit({vertex_pos + vec3f{0.5f, 0.5f, 0.5f}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, face);
-        GX_VertexLit({vertex_pos + vec3f{0.5f, 0.5f, -.5f}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, face);
-        GX_VertexLit({vertex_pos + vec3f{0.5f, -.5f, -.5f}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, face);
+        GX_VertexLit({vertex_pos + vec3f{0.5, -.5, 0.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, face);
+        GX_VertexLit({vertex_pos + vec3f{0.5, 0.5, 0.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, face);
+        GX_VertexLit({vertex_pos + vec3f{0.5, 0.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, face);
+        GX_VertexLit({vertex_pos + vec3f{0.5, -.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, face);
         break;
     case 2:
-        GX_VertexLit({vertex_pos + vec3f{-.5f, -.5f, -.5f}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, face);
-        GX_VertexLit({vertex_pos + vec3f{-.5f, -.5f, 0.5f}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, face);
-        GX_VertexLit({vertex_pos + vec3f{0.5f, -.5f, 0.5f}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, face);
-        GX_VertexLit({vertex_pos + vec3f{0.5f, -.5f, -.5f}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, face);
+        GX_VertexLit({vertex_pos + vec3f{-.5, -.5, -.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, face);
+        GX_VertexLit({vertex_pos + vec3f{-.5, -.5, 0.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, face);
+        GX_VertexLit({vertex_pos + vec3f{0.5, -.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, face);
+        GX_VertexLit({vertex_pos + vec3f{0.5, -.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, face);
         break;
     case 3:
-        GX_VertexLit({vertex_pos + vec3f{0.5f, 0.5f, -.5f}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, face);
-        GX_VertexLit({vertex_pos + vec3f{0.5f, 0.5f, 0.5f}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, face);
-        GX_VertexLit({vertex_pos + vec3f{-.5f, 0.5f, 0.5f}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, face);
-        GX_VertexLit({vertex_pos + vec3f{-.5f, 0.5f, -.5f}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, face);
+        GX_VertexLit({vertex_pos + vec3f{0.5, 0.5, -.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, face);
+        GX_VertexLit({vertex_pos + vec3f{0.5, 0.5, 0.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, face);
+        GX_VertexLit({vertex_pos + vec3f{-.5, 0.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, face);
+        GX_VertexLit({vertex_pos + vec3f{-.5, 0.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, face);
         break;
     case 4:
-        GX_VertexLit({vertex_pos + vec3f{0.5f, -.5f, -.5f}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, face);
-        GX_VertexLit({vertex_pos + vec3f{0.5f, 0.5f, -.5f}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, face);
-        GX_VertexLit({vertex_pos + vec3f{-.5f, 0.5f, -.5f}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, face);
-        GX_VertexLit({vertex_pos + vec3f{-.5f, -.5f, -.5f}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, face);
+        GX_VertexLit({vertex_pos + vec3f{0.5, -.5, -.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, face);
+        GX_VertexLit({vertex_pos + vec3f{0.5, 0.5, -.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, face);
+        GX_VertexLit({vertex_pos + vec3f{-.5, 0.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, face);
+        GX_VertexLit({vertex_pos + vec3f{-.5, -.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, face);
         break;
     case 5:
-        GX_VertexLit({vertex_pos + vec3f{-.5f, -.5f, 0.5f}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, face);
-        GX_VertexLit({vertex_pos + vec3f{-.5f, 0.5f, 0.5f}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, face);
-        GX_VertexLit({vertex_pos + vec3f{0.5f, 0.5f, 0.5f}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, face);
-        GX_VertexLit({vertex_pos + vec3f{0.5f, -.5f, 0.5f}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, face);
+        GX_VertexLit({vertex_pos + vec3f{-.5, -.5, 0.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, face);
+        GX_VertexLit({vertex_pos + vec3f{-.5, 0.5, 0.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, face);
+        GX_VertexLit({vertex_pos + vec3f{0.5, 0.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, face);
+        GX_VertexLit({vertex_pos + vec3f{0.5, -.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, face);
         break;
     default:
         break;

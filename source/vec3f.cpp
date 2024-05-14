@@ -30,12 +30,12 @@ vec3f vec3f::operator-(vec3i const &a) const
     return vec3f{x - a.x, y - a.y, z - a.z};
 }
 
-vec3f vec3f::operator*(float const &a) const
+vec3f vec3f::operator*(vfloat_t const &a) const
 {
     return vec3f{x * a, y * a, z * a};
 }
 
-vec3f vec3f::operator/(float const &a) const
+vec3f vec3f::operator/(vfloat_t const &a) const
 {
     return vec3f{x / a, y / a, z / a};
 }
@@ -55,6 +55,6 @@ vec3f vec3f::normalize() const
 #if HW_RVL
 vec3f::operator guVector()
 {
-    return {x, y, z};
+    return {float(x), float(y), float(z)};
 }
 #endif

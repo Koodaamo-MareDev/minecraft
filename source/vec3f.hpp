@@ -11,22 +11,24 @@
 
 class vec3i; // Forward declaration
 
+typedef double vfloat_t;
+
 class vec3f
 {
 public:
     // Constructors, member variables, and other member functions
-    float x = 0, y = 0, z = 0;
+    vfloat_t x = 0, y = 0, z = 0;
     bool operator==(vec3f const &a) const;
     vec3f operator+(vec3f const &a) const;
     vec3f operator-(vec3f const &a) const;
     vec3f operator+(vec3i const &a) const;
     vec3f operator-(vec3i const &a) const;
-    vec3f operator*(float const &a) const;
-    vec3f operator/(float const &a) const;
+    vec3f operator*(vfloat_t const &a) const;
+    vec3f operator/(vfloat_t const &a) const;
     vec3f operator-() const;
     vec3f normalize() const;
-    vec3f(float x, float y, float z) : x(x), y(y), z(z) {}
-    vec3f(int xyz) : x(xyz), y(xyz), z(xyz) {}
+    vec3f(vfloat_t x, vfloat_t y, vfloat_t z) : x(x), y(y), z(z) {}
+    vec3f(vfloat_t xyz) : x(xyz), y(xyz), z(xyz) {}
     vec3f() : x(0), y(0), z(0) {}
 
     vec3f abs() const
@@ -52,7 +54,7 @@ public:
 private:
     // Member variables
 };
-inline vec3f operator*(float const &a, vec3f const &b)
+inline vec3f operator*(vfloat_t const &a, vec3f const &b)
 {
     return b * a;
 }
