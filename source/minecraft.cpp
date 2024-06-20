@@ -771,16 +771,6 @@ void EditBlocks()
                     update_block_at(editable_pos);
                 for (int i = 0; i < 6; i++)
                     update_block_at(editable_pos + face_offsets[i]);
-                update_block_at(raycast_block);
-                block_t *neighbors[6];
-                get_neighbors(editable_pos, neighbors);
-                for (int i = 0; i < 6; i++)
-                {
-                    if (neighbors[i] && is_fluid(neighbors[i]->get_blockid()))
-                        neighbors[i]->meta |= FLUID_UPDATE_REQUIRED_FLAG;
-                }
-                if (is_fluid(editable_block->get_blockid()))
-                    editable_block->meta |= FLUID_UPDATE_REQUIRED_FLAG;
             }
         }
     }
