@@ -29,6 +29,21 @@ struct blockproperties_t
     uint8_t fluid_decay = 0;
     BlockID base_fluid = BlockID::air;
     BlockID flow_fluid = BlockID::air;
+
+    blockproperties_t(BlockID id = BlockID::air, uint8_t default_state = 0, uint8_t texture_index = 0, uint8_t opacity = 0, uint8_t transparent = 0, uint8_t luminance = 0, uint8_t is_solid = 0, uint8_t is_fluid = 0, uint8_t fluid_decay = 0, BlockID base_fluid = BlockID::air, BlockID flow_fluid = BlockID::air)
+    {
+        this->id = id;
+        this->default_state = default_state;
+        this->texture_index = texture_index;
+        this->opacity = opacity;
+        this->transparent = transparent;
+        this->luminance = luminance;
+        this->is_solid = is_solid;
+        this->is_fluid = is_fluid;
+        this->fluid_decay = fluid_decay;
+        this->base_fluid = base_fluid;
+        this->flow_fluid = flow_fluid;
+    }
 };
 
 class block_t
