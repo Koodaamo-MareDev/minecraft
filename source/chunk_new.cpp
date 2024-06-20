@@ -456,6 +456,7 @@ void update_block_at(vec3i pos)
     block_t *block = chunk->get_block(pos);
     if (!block)
         return;
+    block->meta |= is_fluid(block->get_blockid()) << 4; // 0x10 if fluid, 0x00 if not, see FLUID_UPDATE_REQUIRED_FLAG
     chunk->update_height_map(pos);
     update_light(pos);
 }
