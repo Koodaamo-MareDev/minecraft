@@ -222,6 +222,23 @@ void update_fluid(block_t *block, vec3i pos, chunk_t *near)
 
                     surrounding_changed = true;
                 }
+                else if (basefluid(block_id) == BlockID::lava)
+                {
+                    block->set_blockid(BlockID::cobblestone);
+                    block->meta = 0;
+                    update_light(pos);
+                    
+                    for (int j = 0; j < 6; j++)
+                    {
+                        block_t *other = surroundings[j];
+                        if (other && is_fluid(other->get_blockid()))
+                        {
+                            update_light(pos + face_offsets[j]);
+                            other->meta |= FLUID_UPDATE_REQUIRED_FLAG;
+                        }
+                    }
+                    return;
+                }
                 if (surrounding_changed)
                 {
                     block_t *neighbors[6];
