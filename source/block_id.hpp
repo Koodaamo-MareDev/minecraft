@@ -39,7 +39,8 @@ enum BlockID
     piston,
     piston_head,
     wool, // contains all variants
-    dandelion = 37,
+    piston_extension,
+    dandelion,
     rose,
     brown_mushroom,
     red_mushroom,
