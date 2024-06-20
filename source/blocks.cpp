@@ -248,7 +248,7 @@ void update_fluid(block_t *block, vec3i pos, chunk_t *near)
                         block_t *other = neighbors[j];
                         if (other && is_fluid(other->get_blockid()))
                         {
-                            update_light(pos + face_offsets[FACE_NY]);
+                            update_light(pos + face_offsets[j]);
                             other->meta |= FLUID_UPDATE_REQUIRED_FLAG;
                         }
                     }
