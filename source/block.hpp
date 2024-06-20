@@ -37,8 +37,10 @@ public:
     uint8_t id = 0;
     uint8_t visibility_flags = 0;
     uint8_t meta = 0;
-    union {
-        struct {
+    union
+    {
+        struct
+        {
             uint8_t sky_light : 4;
             uint8_t block_light : 4;
         };
@@ -53,12 +55,12 @@ public:
 
     void set_visibility(uint8_t flag)
     {
-        this->set_opacity(6, flag);
+        this->visibility_flags = (this->visibility_flags & ~(0x40)) | (flag << 6);
     }
 
     uint8_t get_visibility()
     {
-        return this->get_opacity(6);
+        return this->visibility_flags & (0x40);
     }
 
     uint8_t get_opacity(uint8_t face)
@@ -68,10 +70,8 @@ public:
 
     void set_opacity(uint8_t face, uint8_t flag)
     {
-        if (flag)
-            this->visibility_flags |= (1 << face);
-        else
-            this->visibility_flags &= ~(1 << face);
+        this->visibility_flags &= ~(1 << face);
+        this->visibility_flags |= (flag << face);
     }
 
     void set_blockid(BlockID value)
@@ -79,7 +79,7 @@ public:
         this->id = uint8_t(value);
         this->set_visibility(value != BlockID::air && !is_fluid(value));
     }
-    
+
     int8_t get_cast_skylight()
     {
         int8_t opacity = get_block_opacity(get_blockid());
