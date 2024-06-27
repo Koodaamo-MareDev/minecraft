@@ -9,6 +9,7 @@
 #include "base3d.hpp"
 #include "texanim.hpp"
 #include "base3d.hpp"
+#include "particle.hpp"
 
 #include <cstdint>
 #include <algorithm>
@@ -110,6 +111,8 @@ void draw_sky(GXColor background);
 GXColor get_sky_color(bool cave_darkness = true);
 
 void draw_particle(camera_t &camera, vec3f pos, uint32_t texture_index, float size, uint8_t brightness);
+
+void draw_particles(camera_t &camera, particle_t *particles, int count);
 
 void draw_stars();
 

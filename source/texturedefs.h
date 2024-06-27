@@ -9,7 +9,7 @@ extern GXTexObj clouds_texture;
 extern GXTexObj sun_texture;
 extern GXTexObj moon_texture;
 extern GXTexObj blockmap_texture;
-extern GXTexObj water_still_texture;
+extern GXTexObj particles_texture;
 
 // Animated textures
 extern water_texanim_t water_still_anim;

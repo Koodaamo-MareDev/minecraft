@@ -28,6 +28,7 @@
 #include "render.hpp"
 #include "render_gui.hpp"
 #include "lock.hpp"
+#include "particle.hpp"
 #define DEFAULT_FIFO_SIZE (256 * 1024)
 #define CLASSIC_CONTROLLER_THRESHOLD 4
 #define MAX_PARTICLES 100
@@ -69,6 +70,8 @@ float prev_right_shoulder = 0;
 bool destroy_block = false;
 bool place_block = false;
 block_t selected_block = {BlockID::stone, 0x7F, 0, 0xF, 0xF};
+
+particle_system_t particle_system;
 
 void UpdateLightDir();
 void DrawSelectedBlock(std::deque<chunk_t *> &chunks, bool transparency);
@@ -409,16 +412,20 @@ int main(int argc, char **argv)
         // Prepare the transformation matrix
         transform_view(get_view_matrix(), guVector{0, 0, 0});
 
-        // Draw particles - for now, just draw a single particle above the spawn point
-        draw_particle(camera, vec3f(0, 68, 0), 2, 1, 255);
-
         // Draw opaque buffer
         GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
         GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_NOOP);
         GX_SetAlphaUpdate(GX_TRUE);
-        GX_SetAlphaCompare(GX_ALWAYS, 0, GX_AOP_OR, GX_ALWAYS, 0);
         GX_SetColorUpdate(GX_TRUE);
+
+        // Draw particles
+        GX_SetAlphaCompare(GX_GEQUAL, 16, GX_AOP_AND, GX_ALWAYS, 0);
+        draw_particles(camera, particle_system.particles, particle_system.size());
+
+        // Draw chunks
+        GX_SetAlphaCompare(GX_ALWAYS, 0, GX_AOP_OR, GX_ALWAYS, 0);
         DrawScene(chunks, false);
+
         // Draw transparent buffer
         GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
         GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_NOOP);
@@ -464,9 +471,9 @@ int main(int argc, char **argv)
         deltaTime = time_diff_s(frame_start, time_get());
 
         // Ensure that the delta time is not too large to prevent issues
-        if(deltaTime > 0.05f)
+        if (deltaTime > 0.05f)
             deltaTime = 0.05f;
-        
+
         partialTicks += deltaTime * 20.0f;
         tickCounter += int(partialTicks);
         partialTicks -= int(partialTicks);
@@ -933,6 +940,36 @@ void UpdateScene(frustum_t &frustum, std::deque<chunk_t *> &chunks)
     EditBlocks();
     UpdateChunkData(frustum, chunks);
     UpdateChunkVBOs(chunks);
+
+    // Add a block particle
+    particle_t particle;
+    particle.position = vec3f(JavaLCGFloat() - .5f, 65.f + JavaLCGFloat() - .5f, JavaLCGFloat() - .5f);
+    particle.velocity = vec3f(JavaLCGFloat() - .5f, JavaLCGFloat() - .25f, JavaLCGFloat() - .5f) * 10;
+    particle.life_time = particle.max_life_time = 60;
+    particle.physics = PPHYSIC_FLAG_ALL;
+    particle.type = 0; // Block particle
+    particle.size = 16;
+    particle.brightness = 0xFF;
+    particle.u = 32;
+    particle.v = 0;
+    particle_system.add_particle(particle);
+
+    // Add a colored particle
+    particle.position = vec3f(JavaLCGFloat() - .5f, 65.f + JavaLCGFloat() - .5f, JavaLCGFloat() - .5f);
+    particle.velocity = vec3f(JavaLCGFloat() - .5f, JavaLCGFloat() - .25f, JavaLCGFloat() - .5f) * 10;
+    particle.life_time = particle.max_life_time = 60;
+    particle.physics = 0;
+    particle.type = 1; // Colored particle
+    particle.size = 16;
+    particle.brightness = 0xFF;
+    particle.r = rand() & 0xFF;
+    particle.g = rand() & 0xFF;
+    particle.b = rand() & 0xFF;
+    particle.a = 0xFF;
+    particle_system.add_particle(particle);
+
+    // Update the particle system
+    particle_system.update(deltaTime);
 
     // Calculate chunk memory usage
     total_chunks_size = 0;

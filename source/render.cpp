@@ -5,7 +5,7 @@
 #include "sun_tpl.h"
 #include "moon_tpl.h"
 #include "blockmap_tpl.h"
-#include "water_still_tpl.h"
+#include "particles_tpl.h"
 
 const GXColor sky_color = {0x88, 0xBB, 0xFF, 0xFF};
 
@@ -14,7 +14,7 @@ GXTexObj clouds_texture;
 GXTexObj sun_texture;
 GXTexObj moon_texture;
 GXTexObj blockmap_texture;
-GXTexObj water_still_texture;
+GXTexObj particles_texture;
 
 // Animated textures
 water_texanim_t water_still_anim;
@@ -38,7 +38,7 @@ void init_textures()
     init_texture(clouds_texture, clouds_tpl, clouds_tpl_size);
     init_texture(sun_texture, sun_tpl, sun_tpl_size);
     init_texture(moon_texture, moon_tpl, moon_tpl_size);
-    init_texture(water_still_texture, water_still_tpl, water_still_tpl_size);
+    init_texture(particles_texture, particles_tpl, particles_tpl_size);
     init_texture(blockmap_texture, blockmap_tpl, blockmap_tpl_size);
 
     // Animated textures
@@ -380,7 +380,7 @@ void draw_particle(camera_t &camera, vec3f pos, uint32_t texture_index, float si
         guVecMultiply(rot_mtx, &vertex, &vertex);
         guMtxRotDeg(rot_mtx, 'y', camera.rot.y);
         guVecMultiply(rot_mtx, &vertex, &vertex);
-        
+
         // Translate the vertex
         vertex.x += pos.x;
         vertex.y += pos.y;
@@ -389,6 +389,94 @@ void draw_particle(camera_t &camera, vec3f pos, uint32_t texture_index, float si
         GX_VertexLit(vertex_property_t(vertex, TEXTURE_X(texture_index) + x * 4, TEXTURE_Y(texture_index) + y * 4), brightness);
     }
     GX_EndGroup();
+}
+
+void draw_particles(camera_t &camera, particle_t *particles, int count)
+{
+
+    // Bake vertex properties
+    Mtx44 rot_mtx;
+    vertex_property_t vertices[4];
+    for (int i = 0; i < 4; i++)
+    {
+        int x = (i == 0 || i == 3);
+        int y = (i > 1);
+        guVector vertex{(x - 0.5f), (y - 0.5f), 0};
+
+        guMtxRotDeg(rot_mtx, 'x', camera.rot.x);
+        guVecMultiply(rot_mtx, &vertex, &vertex);
+        guMtxRotDeg(rot_mtx, 'y', camera.rot.y);
+        guVecMultiply(rot_mtx, &vertex, &vertex);
+
+        vertices[i] = vertex_property_t(vertex, x << 2, y << 2);
+    }
+
+    // Draw particles on a per-type basis
+    for (int t = 0; t < 2; t++)
+    {
+        // Enumerate visible particles
+        int visible_count = 0;
+        for (int i = 0; i < count; i++)
+        {
+            particle_t &particle = particles[i];
+            if (particle.life_time && particle.type == t)
+                visible_count++;
+        }
+
+        if (visible_count == 0)
+            continue;
+
+        if (t == 0)
+        {
+            // Enable indexed colors
+            GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
+        }
+        else
+        {
+            // Enable direct colors
+            GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
+        }
+
+        use_texture(t == 0 ? blockmap_texture : particles_texture);
+
+        GX_BeginGroup(GX_QUADS, visible_count << 2);
+
+        // Draw particles
+        for (int i = 0; i < count; i++)
+        {
+            particle_t &particle = particles[i];
+            if (particle.life_time && particle.type == t)
+            {
+                for (int j = 0; j < 4; j++)
+                {
+                    vertex_property_t vertex = vertices[j];
+                    vertex.pos = vertex.pos * particle.size * (1.f / 64.f);
+                    vertex.pos = vertex.pos + particle.position;
+
+                    if (t == 0)
+                    {
+                        vertex.x_uv += particle.u;
+                        vertex.y_uv += particle.v;
+                        GX_VertexLit(vertex, particle.brightness);
+                    }
+                    else if (t == 1)
+                    {
+                        int x = (j == 0 || j == 3);
+                        int y = (j > 1);
+                        vertex.x_uv = (x << 4) + (int(particle.life_time * 16.0f / float(particle.max_life_time)) << 4);
+                        vertex.y_uv = (y << 4);
+                        vertex.color_r = particle.r;
+                        vertex.color_g = particle.g;
+                        vertex.color_b = particle.b;
+                        vertex.color_a = particle.a;
+                        GX_Vertex(vertex);
+                    }
+                }
+            }
+        }
+
+        GX_EndGroup();
+    }
 }
 
 void draw_stars()
