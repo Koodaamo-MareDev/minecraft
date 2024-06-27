@@ -5,6 +5,7 @@
 #include "block.hpp"
 #include "raycast.hpp"
 #include "threadhandler.hpp"
+#include "lock.hpp"
 #include <cmath>
 #include <sys/unistd.h>
 #include <gccore.h>
@@ -13,28 +14,19 @@
 #include <list>
 #include <cstdio>
 lwp_t __light_engine_thread_handle = (lwp_t)NULL;
-mutex_t __light_update_mutex = (mutex_t)NULL;
+mutex_t light_mutex = (mutex_t)NULL;
 bool __light_engine_init_done = false;
 bool __light_engine_busy = false;
 std::list<vec3i> pending_light_updates;
 void __update_light(vec3i coords);
 void *__light_engine_init_internal(void *);
 
-void light_lock()
-{
-    LWP_MutexLock(__light_update_mutex);
-}
-void light_unlock()
-{
-    LWP_MutexUnlock(__light_update_mutex);
-}
-
 void light_engine_init()
 {
     if (__light_engine_init_done)
         return;
     __light_engine_init_done = true;
-    LWP_MutexInit(&__light_update_mutex, false);
+    LWP_MutexInit(&light_mutex, false);
     LWP_CreateThread(&__light_engine_thread_handle, /* thread handle */
                      __light_engine_init_internal,  /* code */
                      NULL,                          /* arg pointer for thread */
@@ -68,10 +60,10 @@ void light_engine_loop()
     while (pending_light_updates.size() > 0 && __light_engine_init_done)
     {
         __light_engine_busy = true;
-        light_lock();
+        lock_t light_lock(light_mutex);
         vec3i pos = pending_light_updates.front();
         pending_light_updates.pop_front();
-        light_unlock();
+        light_lock.unlock();
         chunk_t *chunk = get_chunk_from_pos(pos, false);
         if (chunk)
         {
@@ -89,7 +81,7 @@ void light_engine_deinit()
         __light_engine_init_done = false;
         pending_light_updates.clear();
         LWP_JoinThread(__light_engine_thread_handle, NULL);
-        LWP_MutexDestroy(__light_update_mutex);
+        LWP_MutexDestroy(light_mutex);
     }
 }
 
@@ -100,9 +92,8 @@ void update_light(vec3i pos)
     chunk_t *chunk = get_chunk_from_pos(pos, false, false);
     if (!chunk)
         return;
-    light_lock();
+    lock_t light_lock(light_mutex);
     pending_light_updates.push_back(pos);
-    light_unlock();
 }
 
 /*

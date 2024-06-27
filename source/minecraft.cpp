@@ -27,6 +27,7 @@
 #include "base3d.hpp"
 #include "render.hpp"
 #include "render_gui.hpp"
+#include "lock.hpp"
 #define DEFAULT_FIFO_SIZE (256 * 1024)
 #define CLASSIC_CONTROLLER_THRESHOLD 4
 #define MAX_PARTICLES 100
@@ -731,14 +732,12 @@ void GenerateChunks(int count)
 
 void RemoveRedundantChunks(std::deque<chunk_t *> &chunks)
 {
-    while (lock_chunks())
-        threadqueue_yield();
+    lock_t chunk_lock(chunk_mutex);
     chunks.erase(
         std::remove_if(chunks.begin(), chunks.end(),
                        [](chunk_t *&c)
                        {if(!c) return true; if(!c->valid) {delete c; c = nullptr; return true;} return false; }),
         chunks.end());
-    unlock_chunks();
 }
 
 void PrepareChunkRemoval(chunk_t *chunk)

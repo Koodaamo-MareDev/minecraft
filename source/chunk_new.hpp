@@ -5,6 +5,7 @@
 #include "vec3f.hpp"
 #include "block.hpp"
 #include "entity.hpp"
+#include <ogc/mutex.h>
 #include <ogc/gu.h>
 #include <cstddef>
 #include <vector>
@@ -123,9 +124,7 @@ private:
 // 2 = +x, +z
 // 3 = -x, +z
 extern const vec3i face_offsets[];
-
-bool lock_chunks();
-bool unlock_chunks();
+extern mutex_t chunk_mutex;
 std::deque<chunk_t *> &get_chunks();
 void init_chunks();
 void deinit_chunks();

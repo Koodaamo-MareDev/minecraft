@@ -11,6 +11,7 @@
 #include "render.hpp"
 #include "raycast.hpp"
 #include "threadhandler.hpp"
+#include "lock.hpp"
 #include <tuple>
 #include <map>
 #include <vector>
@@ -35,19 +36,10 @@ void *get_aligned_pointer_32(void *ptr)
 }
 int cavegen_seed = 0;
 ImprovedNoise improved_noise;
-mutex_t __chunks_mutex;
+mutex_t chunk_mutex;
 lwp_t __chunk_generator_thread_handle = (lwp_t)NULL;
 bool __chunk_generator_init_done = false;
 void *__chunk_generator_init_internal(void *);
-
-bool lock_chunks()
-{
-    return LWP_MutexLock(__chunks_mutex);
-}
-bool unlock_chunks()
-{
-    return LWP_MutexUnlock(__chunks_mutex);
-}
 
 std::deque<chunk_t *> chunks;
 std::deque<chunk_t *> pending_chunks;
@@ -98,7 +90,7 @@ chunk_t *get_chunk(vec3i pos, bool load, bool write_cache)
     if (!retval && load)
     {
         if (chunks.size() < CHUNK_COUNT)
-            add_chunk(pos);
+        add_chunk(pos);
     }
 
     return retval;
@@ -109,13 +101,12 @@ void add_chunk(vec3i pos)
     if (pending_chunks.size() >= RENDER_DISTANCE)
         return;
 
-    while (lock_chunks())
-        threadqueue_yield();
+    lock_t chunk_lock(chunk_mutex);
+
     for (chunk_t *&m_chunk : pending_chunks)
     {
         if (m_chunk && m_chunk->x == pos.x && m_chunk->z == pos.z)
         {
-            unlock_chunks();
             return;
         }
     }
@@ -124,7 +115,6 @@ void add_chunk(vec3i pos)
     {
         if (m_chunk && m_chunk->x == pos.x && m_chunk->z == pos.z)
         {
-            unlock_chunks();
             return;
         }
     }
@@ -136,7 +126,6 @@ void add_chunk(vec3i pos)
         pending_chunks.push_back(chunk);
         std::sort(pending_chunks.begin(), pending_chunks.end(), chunk_sorter);
     }
-    unlock_chunks();
 }
 
 inline bool in_range(int x, int min, int max)
@@ -327,15 +316,14 @@ void generate_chunk()
         return;
     }
     chunk->valid = true;
-    while (lock_chunks())
-        threadqueue_yield();
+    lock_t chunk_lock(chunk_mutex);
     chunks.push_back(chunk);
     pending_chunks.erase(
         std::remove_if(pending_chunks.begin(), pending_chunks.end(),
                        [](chunk_t *&c)
                        { return !c || c->valid; }),
         pending_chunks.end());
-    unlock_chunks();
+    chunk_lock.unlock();
     chunk_t *neighbor_chunks[4];
     neighbor_chunks[0] = get_chunk(vec3i(chunk->x + 1, 0, chunk->z), false, false);
     neighbor_chunks[1] = get_chunk(vec3i(chunk->x - 1, 0, chunk->z), false, false);
@@ -359,7 +347,7 @@ void deinit_chunks()
         return;
     __chunk_generator_init_done = false;
     pending_chunks.clear();
-    LWP_MutexDestroy(__chunks_mutex);
+    LWP_MutexDestroy(chunk_mutex);
 }
 
 // create chunk
@@ -368,7 +356,7 @@ void init_chunks()
     if (__chunk_generator_init_done)
         return;
     __chunk_generator_init_done = true;
-    LWP_MutexInit(&__chunks_mutex, false);
+    LWP_MutexInit(&chunk_mutex, false);
     LWP_CreateThread(&__chunk_generator_thread_handle, /* thread handle */
                      __chunk_generator_init_internal,  /* code */
                      NULL,                             /* arg pointer for thread */
