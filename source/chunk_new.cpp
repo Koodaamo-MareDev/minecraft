@@ -89,7 +89,6 @@ chunk_t *get_chunk(vec3i pos, bool load, bool write_cache)
     }
     if (!retval && load)
     {
-        if (chunks.size() < CHUNK_COUNT)
         add_chunk(pos);
     }
 
@@ -98,7 +97,7 @@ chunk_t *get_chunk(vec3i pos, bool load, bool write_cache)
 
 void add_chunk(vec3i pos)
 {
-    if (pending_chunks.size() >= RENDER_DISTANCE)
+    if (pending_chunks.size() + chunks.size() >= CHUNK_COUNT)
         return;
 
     lock_t chunk_lock(chunk_mutex);
