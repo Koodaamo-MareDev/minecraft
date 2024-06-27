@@ -443,7 +443,11 @@ void update_block_at(vec3i pos)
     block_t *block = chunk->get_block(pos);
     if (!block)
         return;
-    block->meta |= is_fluid(block->get_blockid()) << 4; // 0x10 if fluid, 0x00 if not, see FLUID_UPDATE_REQUIRED_FLAG
+    if (is_fluid(block->get_blockid()))
+    {
+        block->meta |= FLUID_UPDATE_REQUIRED_FLAG;
+        chunk->has_fluid_updates[pos.y >> 4] = 1;
+    }
     chunk->update_height_map(pos);
     update_light(pos);
 }
@@ -994,7 +998,6 @@ int chunk_t::render_fluid(block_t *block, vec3i pos)
         int basefluid_offset = get_default_texture_index(basefluid(block_id));
         tex_off_x = TEXTURE_X(basefluid_offset) + 8;
         tex_off_y = TEXTURE_Y(basefluid_offset) + 8;
-
     }
 
     vertex_property_t topPlaneCoords[4] = {

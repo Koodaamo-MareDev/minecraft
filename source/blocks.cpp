@@ -253,8 +253,8 @@ void update_fluid(block_t *block, vec3i pos, chunk_t *near)
                 block->meta &= ~0xF;
             }
         }
-        // Level 8 -> air
-        else if (level >= 8)
+        // Max fluid level + 1 -> air
+        else if (level >= max_fluid_level + 1)
         {
             block->set_blockid(BlockID::air);
             block->meta &= ~0xF;
@@ -320,7 +320,7 @@ void update_fluid(block_t *block, vec3i pos, chunk_t *near)
                     set_fluid_level(surround, (level + 1) * (i != 0));
                     surround->meta |= FLUID_UPDATE_REQUIRED_FLAG;
                     update_block_at(pos + surrounding_offset);
-                    if(i == 0)
+                    if(i == 0 && is_flowing_fluid(block_id))
                         break;
                 }
                 else
@@ -338,10 +338,9 @@ void update_fluid(block_t *block, vec3i pos, chunk_t *near)
                             // If flowing horizontally, the surrounding fluid level will be current level + 1.
                             // If flowing downwards, the surrounding fluid level will be 0.
                             set_fluid_level(surround, (level + 1) * (i != 0));
-                            surround->meta |= FLUID_UPDATE_REQUIRED_FLAG;
                             surround->set_blockid(new_surround_id);
                             update_block_at(pos + surrounding_offset);
-                            if(i == 0)
+                            if(i == 0 && is_flowing_fluid(block_id))
                                 break;
                         }
                         else
@@ -350,6 +349,7 @@ void update_fluid(block_t *block, vec3i pos, chunk_t *near)
                             surround->meta = 0;
                             surround->set_blockid(new_surround_id);
                             update_block_at(pos + surrounding_offset);
+                            update_neighbors(pos + surrounding_offset);
                         }
                     }
                 }
