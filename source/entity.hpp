@@ -13,7 +13,7 @@ public:
     vec3f velocity;
 
     entity_t() : position(0, 0, 0), velocity(0, 0, 0) {}
-    entity_t(vec3f position, vec3f velocity, vec3f acceleration) : position(position), velocity(velocity) {}
+    entity_t(vec3f position, vec3f velocity) : position(position), velocity(velocity) {}
     entity_t(vec3f position) : position(position), velocity(0, 0, 0) {}
     virtual ~entity_t() {}
 
@@ -28,7 +28,7 @@ public:
     vec3f prev_position;
 
     aabb_entity_t() : entity_t(), aabb() {}
-    aabb_entity_t(vec3f position, vec3f velocity, vec3f acceleration, aabb_t aabb) : entity_t(position, velocity, acceleration), aabb(aabb) {}
+    aabb_entity_t(vec3f position, vec3f velocity, aabb_t aabb) : entity_t(position, velocity), aabb(aabb) {}
     aabb_entity_t(vec3f position, aabb_t aabb) : entity_t(position), aabb(aabb) {}
 
     ~aabb_entity_t() {}
