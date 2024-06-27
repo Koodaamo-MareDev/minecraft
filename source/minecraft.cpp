@@ -694,29 +694,27 @@ inline void RecalcSectionWater(chunk_t *chunk, int section)
     }
 }
 
-void GenerateAdditionalChunks(std::deque<chunk_t *> &chunks)
+void GenerateChunks(int count)
 {
-    if (chunks.size() >= CHUNK_COUNT)
+    const int start_x = (int(player_pos.x - GENERATION_DISTANCE) & ~15);
+    const int start_z = (int(player_pos.z - GENERATION_DISTANCE) & ~15);
+    const int end_x = start_x + GENERATION_DISTANCE * 2;
+    const int end_z = start_z + GENERATION_DISTANCE * 2;
+
+    int generated = 0;
+    for (int x = start_x; count && x <= end_x; x += 16)
     {
-        return;
-    }
-    for (int x = player_pos.x - GENERATION_DISTANCE; x < player_pos.x + GENERATION_DISTANCE; x += 8)
-    {
-        int distance = std::abs(x - int(player_pos.x));
-        if (distance > GENERATION_DISTANCE)
-            return;
-        for (int z = player_pos.z - GENERATION_DISTANCE; z < player_pos.z + GENERATION_DISTANCE; z += 8)
+        for (int z = start_z; count && z <= end_z; z += 16)
         {
-            distance = std::abs(z - int(player_pos.z));
-            if (distance > GENERATION_DISTANCE)
-                return;
             if (!get_chunk_from_pos(vec3i(x, 0, z), true, false))
             {
-                threadqueue_sleep();
-                return;
+                count--;
+                generated++;
             }
         }
     }
+    if (generated)
+        threadqueue_sleep();
 }
 
 void RemoveRedundantChunks(std::deque<chunk_t *> &chunks)
