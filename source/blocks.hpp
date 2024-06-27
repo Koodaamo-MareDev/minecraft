@@ -44,21 +44,25 @@ inline bool is_fluid(BlockID id)
     return id == BlockID::water || id == BlockID::flowing_water || id == BlockID::lava || id == BlockID::flowing_lava;
 }
 
+// NOTE: This function assumes that the block is a fluid.
+// Call is_fluid before calling this function.
 inline BlockID basefluid(BlockID id)
 {
-    if (id == BlockID::flowing_water || id == BlockID::water)
-        return BlockID::water;
-    if (id == BlockID::flowing_lava || id == BlockID::lava)
-        return BlockID::lava;
-    return BlockID::air;
+    // We know that all fluids have bit 0x8 set
+    // We also know that lava and flowing lava have bit 0x2 set
+    // Bit 0x1 determines if the fluid is flowing or not - 0 for flowing, 1 for still
+    // So we can just mask the bits to get the base fluid
+    // This reduces the number of branches
+
+    return static_cast<BlockID>((static_cast<uint8_t>(id) & 0x0A) | 0x01);
 }
+
+// NOTE: This function assumes that the block is a fluid.
+// Call is_fluid before calling this function.
 inline BlockID flowfluid(BlockID id)
 {
-    if (id == BlockID::flowing_water || id == BlockID::water)
-        return BlockID::flowing_water;
-    if (id == BlockID::flowing_lava || id == BlockID::lava)
-        return BlockID::flowing_lava;
-    return BlockID::air;
+    // Same as basefluid, but we clear the bit 0x1
+    return static_cast<BlockID>(static_cast<uint8_t>(id) & 0x0A);
 }
 
 inline bool is_same_fluid(BlockID id, BlockID other)
