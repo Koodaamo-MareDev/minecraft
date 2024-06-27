@@ -5,6 +5,10 @@ bool vec3i::operator==(vec3i const& a) const {
     return x == a.x && y == a.y && z == a.z;
 }
 
+bool vec3i::operator!=(vec3i const& a) const {
+    return x != a.x || y != a.y || z != a.z;
+}
+
 vec3i vec3i::operator+(vec3i const& a) const {
     return vec3i{x + a.x, y + a.y, z + a.z};
 }

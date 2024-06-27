@@ -9,6 +9,7 @@ public:
     // Constructors, member variables, and other member functions
     
     bool operator==(vec3i const& a) const;
+    bool operator!=(vec3i const& a) const;
     vec3i operator+(vec3i const& a) const;
     vec3i operator-(vec3i const& a) const;
     vec3f operator+(vec3f const& a) const;
