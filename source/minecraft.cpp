@@ -405,6 +405,12 @@ int main(int argc, char **argv)
         // Enable backface culling for terrain
         GX_SetCullMode(GX_CULL_BACK);
 
+        // Prepare the transformation matrix
+        transform_view(get_view_matrix(), guVector{0, 0, 0});
+
+        // Draw particles - for now, just draw a single particle above the spawn point
+        draw_particle(camera, vec3f(0, 68, 0), 2, 1, 255);
+
         // Draw opaque buffer
         GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
         GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_NOOP);

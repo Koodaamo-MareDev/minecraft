@@ -361,6 +361,36 @@ void transform_view_screen(Mtx view, guVector off)
     GX_LoadPosMtxImm(modelview, GX_PNMTX0);
 }
 
+void draw_particle(camera_t &camera, vec3f pos, uint32_t texture_index, float size, uint8_t brightness)
+{
+    // Enable indexed colors
+    GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
+
+    GX_BeginGroup(GX_QUADS, 4);
+    for (int i = 0; i < 4; i++)
+    {
+        int x = (i == 1 || i == 2);
+        int y = (i > 1);
+        guVector vertex{(x - 0.5f) * size, (y - 0.5f) * size, 0};
+
+        Mtx44 rot_mtx;
+
+        // Rotate the vertex
+        guMtxRotDeg(rot_mtx, 'x', camera.rot.x);
+        guVecMultiply(rot_mtx, &vertex, &vertex);
+        guMtxRotDeg(rot_mtx, 'y', camera.rot.y);
+        guVecMultiply(rot_mtx, &vertex, &vertex);
+        
+        // Translate the vertex
+        vertex.x += pos.x;
+        vertex.y += pos.y;
+        vertex.z += pos.z;
+
+        GX_VertexLit(vertex_property_t(vertex, TEXTURE_X(texture_index) + x * 4, TEXTURE_Y(texture_index) + y * 4), brightness);
+    }
+    GX_EndGroup();
+}
+
 void draw_stars()
 {
     static bool generated = false;

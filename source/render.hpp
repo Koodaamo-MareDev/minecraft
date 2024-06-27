@@ -91,7 +91,7 @@ void use_perspective(view_t view);
 
 Mtx &get_view_matrix();
 
-int render_face(vec3i pos, uint8_t face, uint32_t texture_index, chunk_t *near = nullptr, block_t* block = nullptr);
+int render_face(vec3i pos, uint8_t face, uint32_t texture_index, chunk_t *near = nullptr, block_t *block = nullptr);
 
 guVector angles_to_vector(float x, float y, float distance, guVector vec = guVector());
 
@@ -108,6 +108,8 @@ void transform_view_screen(Mtx view, guVector off);
 void draw_sky(GXColor background);
 
 GXColor get_sky_color(bool cave_darkness = true);
+
+void draw_particle(camera_t &camera, vec3f pos, uint32_t texture_index, float size, uint8_t brightness);
 
 void draw_stars();
 
