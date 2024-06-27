@@ -369,7 +369,7 @@ void draw_particle(camera_t &camera, vec3f pos, uint32_t texture_index, float si
     GX_BeginGroup(GX_QUADS, 4);
     for (int i = 0; i < 4; i++)
     {
-        int x = (i == 1 || i == 2);
+        int x = (i == 0 || i == 3);
         int y = (i > 1);
         guVector vertex{(x - 0.5f) * size, (y - 0.5f) * size, 0};
 
