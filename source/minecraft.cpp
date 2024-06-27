@@ -72,7 +72,7 @@ block_t selected_block = {BlockID::stone, 0x7F, 0, 0xF, 0xF};
 void UpdateLightDir();
 void DrawSelectedBlock(std::deque<chunk_t *> &chunks, bool transparency);
 void DrawScene(std::deque<chunk_t *> &chunks, bool transparency);
-void GenerateAdditionalChunks(std::deque<chunk_t *> &chunks);
+void GenerateChunks(int count);
 void RemoveRedundantChunks(std::deque<chunk_t *> &chunks);
 void PrepareChunkRemoval(chunk_t *chunk);
 void UpdateChunkData(frustum_t &frustum, std::deque<chunk_t *> &chunks);
@@ -930,7 +930,7 @@ void UpdateChunkVBOs(std::deque<chunk_t *> &chunks)
 void UpdateScene(frustum_t &frustum, std::deque<chunk_t *> &chunks)
 {
     if (!light_engine_busy())
-        GenerateAdditionalChunks(chunks);
+        GenerateChunks(2);
     RemoveRedundantChunks(chunks);
     EditBlocks();
     UpdateChunkData(frustum, chunks);
