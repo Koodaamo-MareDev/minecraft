@@ -574,12 +574,6 @@ void chunk_t::rebuild_vbo(int section, bool transparent)
 }
 int chunk_t::build_vbo(int section, bool transparent)
 {
-    int chunkX = this->x * 16;
-    int chunkY = section * 16;
-    int chunkZ = this->z * 16;
-    this->vbos[section].x = chunkX;
-    this->vbos[section].y = chunkY;
-    this->vbos[section].z = chunkZ;
     int quadVertexCount = pre_render_block_mesh(section, transparent);
     int triaVertexCount = pre_render_fluid_mesh(section, transparent);
     if (!quadVertexCount && !triaVertexCount)
