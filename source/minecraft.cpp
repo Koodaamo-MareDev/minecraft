@@ -661,6 +661,16 @@ void Render(guVector chunkPos, void *buffer, u32 length)
 inline void RecalcSectionWater(chunk_t *chunk, int section)
 {
     static std::vector<std::vector<vec3i>> fluid_levels(8);
+    static bool init = false;
+    if (!init)
+    {
+        for (size_t i = 0; i < fluid_levels.size(); i++)
+        {
+            std::vector<vec3i> &positions = fluid_levels[i];
+            positions.reserve(4096);
+        }
+        init = true;
+    }
 
     int chunkX = (chunk->x * 16);
     int chunkZ = (chunk->z * 16);
@@ -676,12 +686,12 @@ inline void RecalcSectionWater(chunk_t *chunk, int section)
             for (int _y = 0; _y < 16; _y++, current_pos.y++)
             {
                 block_t *block = chunk->get_block(current_pos);
-                if (block && (block->meta & FLUID_UPDATE_REQUIRED_FLAG))
+                if ((block->meta & FLUID_UPDATE_REQUIRED_FLAG))
                     fluid_levels[get_fluid_meta_level(block) & 7].push_back(current_pos);
             }
         }
     }
-
+    uint16_t curr_fluid_count = 0;
     for (size_t i = 0; i < fluid_levels.size(); i++)
     {
         std::vector<vec3i> &positions = fluid_levels[i];
@@ -689,9 +699,11 @@ inline void RecalcSectionWater(chunk_t *chunk, int section)
         {
             block_t *block = chunk->get_block(pos);
             update_fluid(block, pos);
+            curr_fluid_count++;
         }
         positions.clear();
     }
+    chunk->has_fluid_updates[section] = (curr_fluid_count != 0);
 }
 
 void GenerateChunks(int count)
@@ -807,7 +819,7 @@ void UpdateChunkData(frustum_t &frustum, std::deque<chunk_t *> &chunks)
                 vbo.z = chunk->z * 16;
                 distance = std::abs((j * 16) - player_pos.y);
                 vbo.visible = (distance <= GENERATION_DISTANCE) && distance_to_frustum(vec3f(vbo.x + 8, vbo.y + 8, vbo.z + 8), frustum) > -24;
-                if (distance <= SIMULATION_DISTANCE * 16 && tickCounter - lastWaterTick >= 8)
+                if (chunk->has_fluid_updates[j] && distance <= SIMULATION_DISTANCE * 16 && tickCounter - lastWaterTick >= 5)
                     RecalcSectionWater(chunk, j);
             }
             if (!chunk->lit_state && light_up_calls < 1)
@@ -820,7 +832,7 @@ void UpdateChunkData(frustum_t &frustum, std::deque<chunk_t *> &chunks)
             chunk->update_entities(deltaTime);
         }
     }
-    if (tickCounter - lastWaterTick >= 8)
+    if (tickCounter - lastWaterTick >= 5)
         lastWaterTick = tickCounter;
 }
 

@@ -62,6 +62,7 @@ public:
     block_t blockstates[16 * 16 * 256] = {0};
     uint8_t height_map[16 * 16] = {0};
     chunkvbo_t vbos[VERTICAL_SECTION_COUNT];
+    uint16_t fluid_count[VERTICAL_SECTION_COUNT] = {1};
     std::vector<aabb_entity_t *> entities;
 
     block_t *get_block(vec3i pos)

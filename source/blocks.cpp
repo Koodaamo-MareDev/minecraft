@@ -115,6 +115,8 @@ uint32_t get_default_texture_index(BlockID blockid)
         return 105;
     case BlockID::torch:
         return 80;
+    case BlockID::obsidian:
+        return 37;
     default:
         return int(blockid) & 0xFF;
     }
@@ -173,6 +175,25 @@ uint32_t get_face_texture_index(block_t *block, int face)
     }
 }
 
+// Returns the BlockID of the fluid that the target fluid will
+// convert to when target fluid attempts to override the original fluid.
+BlockID fluid_collision_result(BlockID original, BlockID target)
+{
+    if (is_fluid_overridable(original))
+        return target;
+    if (!is_fluid(original))
+        return original;
+    if (is_same_fluid(original, target))
+        return original;
+    if (is_flowing_fluid(original))
+        return BlockID::cobblestone;
+    if (original == BlockID::lava)
+        return BlockID::obsidian;
+    if (original == BlockID::water)
+        return BlockID::stone;
+    return BlockID::air;
+}
+
 void update_fluid(block_t *block, vec3i pos, chunk_t *near)
 {
     if (!(block->meta & FLUID_UPDATE_REQUIRED_FLAG))
@@ -194,86 +215,25 @@ void update_fluid(block_t *block, vec3i pos, chunk_t *near)
     block_t *surroundings[6] = {ny, nx, px, nz, pz, py};
     int surrounding_dirs[6] = {FACE_NY, FACE_NX, FACE_PX, FACE_NZ, FACE_PZ, FACE_PY};
 
-    for (int i = 0; i < 6; i++)
-    {
-        block_t *surrounding = surroundings[i];
-        if (surrounding)
-        {
-            BlockID surrounding_id = surrounding->get_blockid();
-            if (is_fluid(surrounding_id) && !is_same_fluid(surrounding_id, block_id))
-            {
-                bool surrounding_changed = false;
-                if (surrounding_dirs[i] != FACE_PY && basefluid(block_id) == BlockID::water)
-                {
-                    if (surrounding_id == BlockID::lava)
-                        surrounding->set_blockid(BlockID::obsidian);
-                    else
-                        surrounding->set_blockid(BlockID::cobblestone);
-                    surrounding->meta = 0;
-                    update_light(pos + face_offsets[surrounding_dirs[i]]);
-
-                    surrounding_changed = true;
-                }
-                else if (surrounding_dirs[i] == FACE_NY && basefluid(block_id) == BlockID::lava)
-                {
-                    surrounding->set_blockid(BlockID::stone);
-                    surrounding->meta = 0;
-                    update_light(pos + face_offsets[FACE_NY]);
-
-                    surrounding_changed = true;
-                }
-                else if (basefluid(block_id) == BlockID::lava)
-                {
-                    block->set_blockid(BlockID::cobblestone);
-                    block->meta = 0;
-                    update_light(pos);
-                    
-                    for (int j = 0; j < 6; j++)
-                    {
-                        block_t *other = surroundings[j];
-                        if (other && is_fluid(other->get_blockid()))
-                        {
-                            update_light(pos + face_offsets[j]);
-                            other->meta |= FLUID_UPDATE_REQUIRED_FLAG;
-                        }
-                    }
-                    return;
-                }
-                if (surrounding_changed)
-                {
-                    block_t *neighbors[6];
-                    get_neighbors(pos + face_offsets[surrounding_dirs[i]], neighbors);
-                    for (int j = 0; j < 6; j++)
-                    {
-                        block_t *other = neighbors[j];
-                        if (other && is_fluid(other->get_blockid()))
-                        {
-                            update_light(pos + face_offsets[j]);
-                            other->meta |= FLUID_UPDATE_REQUIRED_FLAG;
-                        }
-                    }
-                    return;
-                }
-            }
-        }
-    }
+    uint8_t max_fluid_level = flowfluid(block_id) == BlockID::flowing_water ? 7 : 3;
 
     if (is_flowing_fluid(block_id))
     {
         uint8_t surrounding_sources = 0;
-        uint8_t min_surrounding_level = 7;
+        uint8_t min_surrounding_level = max_fluid_level;
         for (int i = 1; i < 5; i++) // Skip negative y
         {
             block_t *surrounding = surroundings[i];
             if (surrounding)
             {
                 BlockID surround_id = surrounding->get_blockid();
-                if (is_still_fluid(surround_id))
-                {
-                    surrounding_sources++;
-                }
                 if (is_same_fluid(surround_id, block_id))
                 {
+                    if (is_still_fluid(surround_id))
+                    {
+                        if (surround_id == BlockID::water)
+                            surrounding_sources++;
+                    }
                     min_surrounding_level = std::min(get_fluid_meta_level(surrounding), min_surrounding_level);
                 }
             }
@@ -303,8 +263,11 @@ void update_fluid(block_t *block, vec3i pos, chunk_t *near)
             set_fluid_level(block, level);
     }
     level = get_fluid_meta_level(block);
+
+    BlockID flow_id = flowfluid(block_id);
+    max_fluid_level = flow_id == BlockID::flowing_water ? 7 : 3;
     //  Fluid spread:
-    if (level <= 7 && pos.y > 0)
+    if (level <= max_fluid_level && pos.y > 0)
     {
         int flow_weights[4] = {1000, 1000, 1000, 1000};
         int min_weight = 1000;
@@ -312,7 +275,7 @@ void update_fluid(block_t *block, vec3i pos, chunk_t *near)
         for (int i = 0; i < 4; i++)
         {
             vec3i offset = face_offsets[surrounding_dirs[i + 1]];
-            for (int j = 1; j <= 5; j++)
+            for (int j = 1; j <= max_fluid_level * 3 / 4; j++)
             {
                 vec3i other_pos = pos + (j * offset);
                 BlockID other_id = get_block_id_at(other_pos, BlockID::stone, near);
@@ -332,41 +295,63 @@ void update_fluid(block_t *block, vec3i pos, chunk_t *near)
 
         for (int i = 0; i < 5; i++)
         {
-            if (i != 0 && flow_weights[i - 1] != min_weight)
-                continue;
-            block_t *surrounding = surroundings[i];
-            if (surrounding)
+            if (i != 0)
             {
-                BlockID surround_id = surrounding->get_blockid();
+                // Skip horizontal flow if the level is maxed out.
+                // Skip the direction if the flow weight is not the minimum.
+                if (level >= max_fluid_level || flow_weights[i - 1] != min_weight)
+                    continue;
+            }
+            block_t *surround = surroundings[i];
+            if (surround)
+            {
+                BlockID surround_id = surround->get_blockid();
                 vec3i surrounding_offset = face_offsets[surrounding_dirs[i]];
-                if (is_fluid_overridable(surround_id))
+                uint8_t surround_level = get_fluid_meta_level(surround);
+
+                if (is_same_fluid(surround_id, block_id))
                 {
-                    int surrounding_level = get_fluid_meta_level(surrounding);
-                    if (surrounding_dirs[i] == FACE_NY)
-                    {
-                        if (surround_id != flowfluid(block_id) || surrounding_level != 0)
-                        {
-                            surrounding->meta |= FLUID_UPDATE_REQUIRED_FLAG; // FLUID_UPDATE_REQUIRED_FLAG * (2 - (std::signbit(surrounding_offset.x) | std::signbit(surrounding_offset.z)));
-                            surrounding->set_blockid(flowfluid(block_id));
-                            set_fluid_level(surrounding, 0);
-                            update_light(pos + surrounding_offset);
-                        }
+                    // Restrict flow horizontally.
+                    if (i != 0 && surround_level <= level + 1)
+                        continue;
+
+                    // If flowing horizontally, the surrounding fluid level will be current level + 1.
+                    // If flowing downwards, the surrounding fluid level will be 0.
+                    set_fluid_level(surround, (level + 1) * (i != 0));
+                    surround->meta |= FLUID_UPDATE_REQUIRED_FLAG;
+                    update_block_at(pos + surrounding_offset);
+                    if(i == 0)
                         break;
-                    }
-                    else if (level < 7)
+                }
+                else
+                {
+                    BlockID new_surround_id = fluid_collision_result(surround_id, flow_id);
+
+                    if (new_surround_id != surround_id)
                     {
-                        if (surround_id != flowfluid(block_id) || surrounding_level > level + 1)
+                        if (is_fluid(new_surround_id))
                         {
-                            surrounding->meta |= FLUID_UPDATE_REQUIRED_FLAG; // FLUID_UPDATE_REQUIRED_FLAG * (2 - (std::signbit(surrounding_offset.x) | std::signbit(surrounding_offset.z)));
-                            surrounding->set_blockid(flowfluid(block_id));
-                            set_fluid_level(surrounding, level + 1);
-                            update_light(pos + surrounding_offset);
+                            // Restrict flow horizontally.
+                            if (i != 0 && surround_level <= level + 1)
+                                continue;
+                            
+                            // If flowing horizontally, the surrounding fluid level will be current level + 1.
+                            // If flowing downwards, the surrounding fluid level will be 0.
+                            set_fluid_level(surround, (level + 1) * (i != 0));
+                            surround->meta |= FLUID_UPDATE_REQUIRED_FLAG;
+                            surround->set_blockid(new_surround_id);
+                            update_block_at(pos + surrounding_offset);
+                            if(i == 0)
+                                break;
+                        }
+                        else
+                        {
+                            // Reset meta if the result is not a fluid.
+                            surround->meta = 0;
+                            surround->set_blockid(new_surround_id);
+                            update_block_at(pos + surrounding_offset);
                         }
                     }
-                }
-                else if (surrounding_dirs[i] == FACE_NY && is_same_fluid(surround_id, block_id))
-                {
-                    break;
                 }
             }
         }
@@ -381,6 +366,10 @@ void update_fluid(block_t *block, vec3i pos, chunk_t *near)
     {
         changed = true;
         set_fluid_level(block, level);
+        
+        // Trigger fluid recalculation.
+        chunk_t *chunk = get_chunk_from_pos(pos, false, false);
+        chunk->has_fluid_updates[pos.y >> 4] = 1;
     }
     if (changed)
     {
@@ -388,13 +377,16 @@ void update_fluid(block_t *block, vec3i pos, chunk_t *near)
         {
             vec3i offset_pos = pos + face_offsets[surrounding_dirs[i]];
             chunk_t *chunk = get_chunk_from_pos(offset_pos, false, false);
-            if (chunk)
-                chunk->vbos[pos.y / 16].dirty = true;
+            if (!chunk)
+                continue;
             block_t *other = chunk->get_block(offset_pos);
             if (other)
             {
                 other->meta |= FLUID_UPDATE_REQUIRED_FLAG;
                 update_light(offset_pos);
+
+                // Trigger fluid recalculation.
+                chunk->has_fluid_updates[offset_pos.y >> 4] = 1;
             }
         }
     }
@@ -486,8 +478,6 @@ bool is_fluid_overridable(BlockID id)
     switch (id)
     {
     case BlockID::air:
-    case BlockID::flowing_water:
-    case BlockID::flowing_lava:
     case BlockID::torch:
         return true;
 
