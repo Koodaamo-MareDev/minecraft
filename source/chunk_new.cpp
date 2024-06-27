@@ -448,6 +448,15 @@ void update_block_at(vec3i pos)
     update_light(pos);
 }
 
+void update_neighbors(vec3i pos)
+{
+    for (int i = 0; i < 6; i++)
+    {
+        vec3i neighbour = pos + face_offsets[i];
+        update_block_at(neighbour);
+    }
+}
+
 void chunk_t::light_up()
 {
     if (!this->lit_state)

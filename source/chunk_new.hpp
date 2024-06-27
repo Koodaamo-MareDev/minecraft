@@ -140,4 +140,5 @@ void generate_chunk();
 void *get_aligned_pointer_32(void *ptr);
 void get_neighbors(vec3i pos, block_t **neighbors);
 void update_block_at(vec3i pos);
+void update_neighbors(vec3i pos);
 #endif

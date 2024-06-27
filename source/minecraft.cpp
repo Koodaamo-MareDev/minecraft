@@ -784,8 +784,7 @@ void EditBlocks()
                 editable_block->meta = target_blockid == BlockID::air ? 0 : selected_block.meta;
                 if (place_block)
                     update_block_at(editable_pos);
-                for (int i = 0; i < 6; i++)
-                    update_block_at(editable_pos + face_offsets[i]);
+                update_neighbors(editable_pos);
             }
         }
     }
