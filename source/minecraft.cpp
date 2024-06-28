@@ -30,6 +30,7 @@
 #include "lock.hpp"
 #include "particle.hpp"
 #include "sound.hpp"
+#include "pling_aiff.h" // Test sound
 #define DEFAULT_FIFO_SIZE (256 * 1024)
 #define CLASSIC_CONTROLLER_THRESHOLD 4
 #define MAX_PARTICLES 100
@@ -336,6 +337,10 @@ int main(int argc, char **argv)
     init_face_normals();
     PrepareTEV();
     std::deque<chunk_t *> &chunks = get_chunks();
+
+    aiff_container pling_aiff_data = aiff_container(validate_aiff(pling_aiff));
+    sound pling_sound = sound(pling_aiff_data.data);
+
     while (!isExiting)
     {
         u64 frame_start = time_get();
@@ -388,6 +393,9 @@ int main(int argc, char **argv)
         {
             update_textures();
         }
+        pling_sound.play();
+        pling_sound.position = vec3f(0, 65, 0);
+        pling_sound.update(angles_to_vector(0, yrot + 90, -1), player_pos);
 
         GetInput();
 
