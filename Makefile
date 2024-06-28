@@ -22,7 +22,7 @@ SOURCES		:=	source source/opensimplexnoise source/ported source/improvednoise so
 DATA		:=
 TEXTURES	:=	textures
 INCLUDES	:=	source/ported
-
+SOUND		:=	sound
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
@@ -35,7 +35,7 @@ LDFLAGS	=	-g $(MACHDEP) -Wl,-Map,$(notdir $@).map
 #---------------------------------------------------------------------------------
 # any extra libraries we wish to link with the project
 #---------------------------------------------------------------------------------
-LIBS	:=	-lwiiuse -lbte -lfat -logc -lm
+LIBS	:=	-lwiiuse -lbte -lfat -lasnd -logc -lm
 
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing
@@ -54,7 +54,8 @@ export OUTPUT	:=	$(CURDIR)/$(TARGET)
 
 export VPATH	:=	$(foreach dir,$(SOURCES),$(CURDIR)/$(dir)) \
 					$(foreach dir,$(DATA),$(CURDIR)/$(dir)) \
-					$(foreach dir,$(TEXTURES),$(CURDIR)/$(dir))
+					$(foreach dir,$(TEXTURES),$(CURDIR)/$(dir)) \
+					$(foreach dir,$(SOUND),$(CURDIR)/$(dir))
 
 export DEPSDIR	:=	$(CURDIR)/$(BUILD)
 
@@ -72,6 +73,7 @@ SFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.S)))
 BINFILES	:=	$(foreach dir,$(DATA),$(notdir $(wildcard $(dir)/*.*)))
 SCFFILES	:=	$(foreach dir,$(TEXTURES),$(notdir $(wildcard $(dir)/*.scf)))
 TPLFILES	:=	$(SCFFILES:.scf=.tpl)
+AIFFFILES	:=	$(foreach dir,$(SOUND),$(notdir $(wildcard $(dir)/*.aiff)))
 
 #---------------------------------------------------------------------------------
 # use CXX for linking C++ projects, CC for standard C
@@ -82,11 +84,11 @@ else
 	export LD	:=	$(CXX)
 endif
 
-export OFILES_BIN	:=	$(addsuffix .o,$(BINFILES)) $(addsuffix .o,$(TPLFILES))
+export OFILES_BIN	:=	$(addsuffix .o,$(BINFILES)) $(addsuffix .o,$(TPLFILES)) $(addsuffix .o,$(AIFFFILES))
 export OFILES_SOURCES := $(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(sFILES:.s=.o) $(SFILES:.S=.o)
 export OFILES := $(OFILES_BIN) $(OFILES_SOURCES) $(addsuffix _alpha.c,$(basename $(ALPHAMAPSRC))) $(addsuffix _rgba.c,$(basename $(LIGHTMAPSRC))) brightness_values.c
 
-export HFILES := $(addsuffix .h,$(subst .,_,$(BINFILES))) $(addsuffix .h,$(subst .,_,$(TPLFILES))) $(ALPHAMAPFILES) $(LIGHTMAPFILES) brightness_values.h
+export HFILES := $(addsuffix .h,$(subst .,_,$(BINFILES))) $(addsuffix .h,$(subst .,_,$(TPLFILES))) $(AIFFFILES) $(ALPHAMAPFILES) $(LIGHTMAPFILES) brightness_values.h
 
 #---------------------------------------------------------------------------------
 # build a list of include paths
@@ -151,6 +153,13 @@ brightness_values.h brightness_values.c :
 #---------------------------------------------------------------------------------
 	@echo $(notdir $<)
 	@$(bin2o)
+
+#---------------------------------------------------------------------------------
+%.aiff.o	%_aiff.h :	%.aiff
+#---------------------------------------------------------------------------------
+	@echo $(notdir $<)
+	@$(bin2o)
+	@python ../unconstify.py ../$(BUILD)/$(addsuffix .h,$(subst .,_,$(notdir $<)))
 
 
 -include $(DEPSDIR)/*.d

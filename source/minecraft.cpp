@@ -29,6 +29,7 @@
 #include "render_gui.hpp"
 #include "lock.hpp"
 #include "particle.hpp"
+#include "sound.hpp"
 #define DEFAULT_FIFO_SIZE (256 * 1024)
 #define CLASSIC_CONTROLLER_THRESHOLD 4
 #define MAX_PARTICLES 100
@@ -220,6 +221,7 @@ int main(int argc, char **argv)
 
     threadqueue_init();
 
+    ASND_Init();
     VIDEO_Init();
     WPAD_Init();
     rmode = VIDEO_GetPreferredMode(NULL);
