@@ -27,6 +27,7 @@ public:
     vec3f operator/(vfloat_t const &a) const;
     vec3f operator-() const;
     vec3f normalize() const;
+    float_t magnitude() const;
     vec3f(vfloat_t x, vfloat_t y, vfloat_t z) : x(x), y(y), z(z) {}
     vec3f(vfloat_t xyz) : x(xyz), y(xyz), z(xyz) {}
     vec3f() : x(0), y(0), z(0) {}

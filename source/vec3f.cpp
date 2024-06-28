@@ -52,6 +52,12 @@ vec3f vec3f::normalize() const
     }
     return vec3f(x / length, y / length, z / length);
 }
+
+float_t vec3f::magnitude() const
+{
+    return std::sqrt(x * x + y * y + z * z);
+}
+
 #if HW_RVL
 vec3f::operator guVector()
 {
