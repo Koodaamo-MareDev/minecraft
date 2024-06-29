@@ -222,7 +222,7 @@ int main(int argc, char **argv)
     void *gpfifo = NULL;
     GXColor background = get_sky_color();
 
-    threadqueue_init();
+    threadhandler_init();
 
     ASND_Init();
     VIDEO_Init();
@@ -498,7 +498,7 @@ int main(int argc, char **argv)
     printf("De-initializing light engine...\n");
     light_engine_deinit();
     printf("Notifying threads...\n");
-    threadqueue_broadcast();
+    threadhandler_broadcast();
     printf("De-initializing chunk engine...\n");
     deinit_chunks();
     printf("Exiting...");
@@ -750,7 +750,7 @@ void GenerateChunks(int count)
         }
     }
     if (generated)
-        threadqueue_sleep();
+        threadhandler_sleep();
 }
 
 void RemoveRedundantChunks(std::deque<chunk_t *> &chunks)

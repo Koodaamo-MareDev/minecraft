@@ -40,7 +40,7 @@ void *__light_engine_init_internal(void *)
     while (__light_engine_init_done)
     {
         light_engine_loop();
-        threadqueue_yield();
+        threadhandler_yield();
     }
     return NULL;
 }
@@ -70,7 +70,7 @@ void light_engine_loop()
             __update_light(pos);
         }
         if (++updates % 1000 == 0)
-            threadqueue_yield();
+            threadhandler_yield();
     }
     __light_engine_busy = false;
 }

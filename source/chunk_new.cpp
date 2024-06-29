@@ -299,7 +299,7 @@ void generate_chunk()
             }
             // Sleep every 32 slices to prevent the game from freezing
             if (y % 16 == 0)
-                threadqueue_sleep();
+                threadhandler_sleep();
         }
     }
     generate_trees(chunk);
@@ -372,7 +372,7 @@ void *__chunk_generator_init_internal(void *)
     {
         while (pending_chunks.size() == 0)
         {
-            threadqueue_sleep();
+            threadhandler_sleep();
             if (!__chunk_generator_init_done)
                 break;
         }
