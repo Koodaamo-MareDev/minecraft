@@ -75,6 +75,8 @@ block_t selected_block = {BlockID::stone, 0x7F, 0, 0xF, 0xF};
 
 particle_system_t particle_system;
 
+bool show_dirtscreen = true;
+
 void UpdateLightDir();
 void DrawSelectedBlock(std::deque<chunk_t *> &chunks, bool transparency);
 void DrawScene(std::deque<chunk_t *> &chunks, bool transparency);
@@ -469,7 +471,11 @@ int main(int argc, char **argv)
         GX_SetAlphaUpdate(GX_TRUE);
         GX_SetColorUpdate(GX_TRUE);
 
-        draw_simple_textured_quad(blockmap_texture, 16, 32, 256, 256);
+        if (show_dirtscreen)
+        {
+            int texture_index = get_default_texture_index(BlockID::dirt);
+            fill_screen_texture(blockmap_texture, viewport, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index), TEXTURE_PX(texture_index), TEXTURE_PY(texture_index));
+        }
 
         GX_DrawDone();
 
