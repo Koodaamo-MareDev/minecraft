@@ -25,6 +25,7 @@ class aabb_entity_t : public entity_t
 public:
     aabb_t aabb;
     bool on_ground = false;
+    bool jumping = false;
     vec3f prev_position;
 
     aabb_entity_t() : entity_t(), aabb() {}

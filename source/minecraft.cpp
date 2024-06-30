@@ -30,7 +30,6 @@
 #include "lock.hpp"
 #include "particle.hpp"
 #include "sound.hpp"
-#include "pling_aiff.h" // Test sound
 #define DEFAULT_FIFO_SIZE (256 * 1024)
 #define CLASSIC_CONTROLLER_THRESHOLD 4
 #define MAX_PARTICLES 100
@@ -61,6 +60,7 @@ int dropFrames = 0;
 int frameCounter = 0;
 int tickCounter = 0;
 int lastWaterTick = 0;
+float lastStepDistance = 0;
 float deltaTime = 0.0f;
 float partialTicks = 0.0f;
 
@@ -74,9 +74,12 @@ bool place_block = false;
 block_t selected_block = {BlockID::stone, 0x7F, 0, 0xF, 0xF};
 
 particle_system_t particle_system;
+sound_system_t *sound_system = nullptr;
 
 bool show_dirtscreen = true;
+bool has_loaded = false;
 
+void UpdateLoadingStatus();
 void UpdateLightDir();
 void DrawSelectedBlock(std::deque<chunk_t *> &chunks, bool transparency);
 void DrawScene(std::deque<chunk_t *> &chunks, bool transparency);
@@ -224,7 +227,6 @@ int main(int argc, char **argv)
 
     threadhandler_init();
 
-    ASND_Init();
     VIDEO_Init();
     WPAD_Init();
     rmode = VIDEO_GetPreferredMode(NULL);
@@ -277,6 +279,8 @@ int main(int argc, char **argv)
     }
     GX_CopyDisp(frameBuffer[fb], GX_TRUE);
     GX_SetDispCopyGamma(GX_GM_1_0);
+
+    GX_SetColorUpdate(GX_TRUE);
 
     // Setup the default vertex attribute table
     GX_ClearVtxDesc();
@@ -340,8 +344,7 @@ int main(int argc, char **argv)
     PrepareTEV();
     std::deque<chunk_t *> &chunks = get_chunks();
 
-    aiff_container pling_aiff_data = aiff_container(validate_aiff(pling_aiff));
-    sound pling_sound = sound(pling_aiff_data.data);
+    sound_system = new sound_system_t();
 
     while (!isExiting)
     {
@@ -395,16 +398,19 @@ int main(int argc, char **argv)
         {
             update_textures();
         }
-        pling_sound.play();
-        pling_sound.position = vec3f(0, 65, 0);
-        pling_sound.update(angles_to_vector(0, yrot + 90, -1), player_pos);
+
+        vec3f prev_player_pos = player_pos;
 
         GetInput();
+
+        // Save jumping status for later
+        bool player_jumping = false;
 
         // If the player entity exists, update camera position
         if (player)
         {
             player_pos = player->position;
+            player_jumping = player->jumping;
         }
 
         camera.position = player_pos;
@@ -416,48 +422,80 @@ int main(int argc, char **argv)
 
         UpdateScene(frustum, chunks);
 
+        if (player && (player->on_ground || player_jumping))
+        {
+            // Play step sound if the player moving on the ground
+            vec3f curr_player_pos = player_pos;
+            vec3f player_horizontal_velocity = vec3f(curr_player_pos.x - prev_player_pos.x, 0, curr_player_pos.z - prev_player_pos.z);
+            lastStepDistance += player_horizontal_velocity.magnitude();
+            if (lastStepDistance > 1.0f || player_jumping)
+            {
+                vec3f player_feet_pos = vec3f(player_pos.x, player_pos.y - 1.55f, player_pos.z);
+                block_t *block = get_block_at(vec3i(std::round(player_feet_pos.x), std::round(player_feet_pos.y), std::round(player_feet_pos.z)));
+                if (block && block->get_blockid() != BlockID::air)
+                {
+                    sound_t *sound = get_step_sound(block->get_blockid());
+                    if (sound)
+                    {
+                        sound->volume = 0.25f;
+                        sound->position = player_feet_pos;
+                        sound_system->play_sound(*sound);
+                        delete sound;
+                        lastStepDistance = 0;
+                    }
+                }
+            }
+        }
+
+        // Update the sound system
+        sound_system->update(angles_to_vector(0, yrot + 90, -1), player_pos);
+
         use_perspective(viewport);
 
-        // Enable backface culling for terrain
-        GX_SetCullMode(GX_CULL_BACK);
+        UpdateLoadingStatus();
 
-        // Prepare the transformation matrix
-        transform_view(get_view_matrix(), guVector{0, 0, 0});
+        if (!show_dirtscreen)
+        {
 
-        // Draw opaque buffer
-        GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
-        GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_NOOP);
-        GX_SetAlphaUpdate(GX_TRUE);
-        GX_SetColorUpdate(GX_TRUE);
+            // Enable backface culling for terrain
+            GX_SetCullMode(GX_CULL_BACK);
 
-        // Draw particles
-        GX_SetAlphaCompare(GX_GEQUAL, 16, GX_AOP_AND, GX_ALWAYS, 0);
-        draw_particles(camera, particle_system.particles, particle_system.size());
+            // Prepare the transformation matrix
+            transform_view(get_view_matrix(), guVector{0, 0, 0});
 
-        // Draw chunks
-        GX_SetAlphaCompare(GX_ALWAYS, 0, GX_AOP_OR, GX_ALWAYS, 0);
-        DrawScene(chunks, false);
+            // Draw opaque buffer
+            GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
+            GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_NOOP);
+            GX_SetAlphaUpdate(GX_TRUE);
 
-        // Draw transparent buffer
-        GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
-        GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_NOOP);
-        GX_SetAlphaUpdate(GX_FALSE);
-        GX_SetAlphaCompare(GX_GEQUAL, 16, GX_AOP_AND, GX_ALWAYS, 0);
-        GX_SetColorUpdate(GX_TRUE);
-        DrawScene(chunks, true);
+            // Draw particles
+            GX_SetAlphaCompare(GX_GEQUAL, 16, GX_AOP_AND, GX_ALWAYS, 0);
+            draw_particles(camera, particle_system.particles, particle_system.size());
 
-        // Draw selected block in solid mode
-        DrawSelectedBlock(chunks, false);
+            // Draw chunks
+            GX_SetAlphaCompare(GX_ALWAYS, 0, GX_AOP_OR, GX_ALWAYS, 0);
+            DrawScene(chunks, false);
 
-        // Draw selected block in transparent mode
-        DrawSelectedBlock(chunks, true);
+            // Draw transparent buffer
+            GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
+            GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_NOOP);
+            GX_SetAlphaUpdate(GX_FALSE);
+            GX_SetAlphaCompare(GX_GEQUAL, 16, GX_AOP_AND, GX_ALWAYS, 0);
+            DrawScene(chunks, true);
 
-        // Re-enable depth testing
-        GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
+            // Draw selected block in solid mode
+            DrawSelectedBlock(chunks, false);
 
-        // Draw sky
-        draw_sky(background);
+            // Draw selected block in transparent mode
+            DrawSelectedBlock(chunks, true);
 
+            // Re-enable depth testing
+            GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
+
+            // Draw sky
+            draw_sky(background);
+        }
+        GX_DrawDone();
         use_ortho(viewport);
         // Use 0 fractional bits for the position data, because we're drawing in pixel space.
         GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, 0);
@@ -469,7 +507,6 @@ int main(int argc, char **argv)
         GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
         GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_NOOP);
         GX_SetAlphaUpdate(GX_TRUE);
-        GX_SetColorUpdate(GX_TRUE);
 
         if (show_dirtscreen)
         {
@@ -501,6 +538,8 @@ int main(int argc, char **argv)
     threadhandler_broadcast();
     printf("De-initializing chunk engine...\n");
     deinit_chunks();
+    printf("De-initializing sound system...\n");
+    delete sound_system;
     printf("Exiting...");
     VIDEO_Flush();
     VIDEO_WaitVSync();
@@ -509,6 +548,43 @@ int main(int argc, char **argv)
         SYS_ResetSystem(HWButton, 0, 0);
     }
     return 0;
+}
+
+void UpdateLoadingStatus()
+{
+    bool is_loading = false;
+    if (!has_loaded)
+    {
+        // Check if a 3x3 chunk area around the player is loaded
+        vec3i player_chunk_pos = vec3i(int(player_pos.x), int(player_pos.y), int(player_pos.z));
+        for (int x = -1; x <= 1 && !is_loading; x++)
+        {
+            for (int z = -1; z <= 1 && !is_loading; z++)
+            {
+                vec3i chunk_pos = player_chunk_pos + vec3i(x * 16, 0, z * 16);
+                chunk_t *chunk = get_chunk_from_pos(chunk_pos, false, false);
+                if (!chunk)
+                {
+                    is_loading = true;
+                    break;
+                }
+                // Check if the vbos near the player are visible and dirty
+                for (int i = (player_chunk_pos.y / 16) - 1; i < (player_chunk_pos.y / 16) + 1; i++)
+                {
+                    if (chunk->vbos[i].visible && (chunk->vbos[i].dirty || chunk->vbos[i].cached_solid_buffer != chunk->vbos[i].solid_buffer || chunk->vbos[i].cached_transparent_buffer != chunk->vbos[i].transparent_buffer))
+                    {
+                        is_loading = true;
+                        break;
+                    }
+                }
+            }
+        }
+        if (!is_loading)
+        {
+            has_loaded = true;
+        }
+    }
+    show_dirtscreen = !has_loaded;
 }
 
 void GetInput()
@@ -628,6 +704,7 @@ void GetInput()
             {
                 player->velocity.y = sqrt(ENTITY_GRAVITY * 2.0f * JUMP_HEIGHT);
                 player->on_ground = false;
+                player->jumping = true;
             }
         }
     }

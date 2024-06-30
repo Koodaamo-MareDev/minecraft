@@ -34,37 +34,7 @@ class aiff_container
 {
 public:
     aiff *data = nullptr;
-    aiff_container(aiff *data)
-    {
-        if(data == nullptr)
-        {
-            return;
-        }
-        uint32_t data_address = (uint32_t)data;
-
-        // Check if the data is already aligned to 32 bytes
-        if ((data_address & 31) == 0)
-        {
-            this->data = data;
-        }
-        else
-        {
-            // Align data to 32 bytes - this might cut off the last few bytes of the sound data
-            uint32_t aligned_address = (data_address + 31) & ~31;
-
-            // Move the data to the aligned address
-            this->data = (aiff *)aligned_address;
-            std::memmove(this->data, data, 8 + data->chunk_size);
-
-            // Fix the chunk size
-            uint32_t new_chunk_size = data->chunk_size + aligned_address - data_address;
-            this->data->chunk_size = new_chunk_size;
-
-            // Fix and align the sound data chunk size
-            uint32_t new_sound_data_chunk_size = data->sound_data.chunk_size + aligned_address - data_address;
-            this->data->sound_data.chunk_size = new_sound_data_chunk_size & ~31;
-        }
-    }
+    aiff_container(uint8_t *raw_data);
 };
 
 aiff *validate_aiff(uint8_t *data);

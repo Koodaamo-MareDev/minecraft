@@ -1175,10 +1175,11 @@ void chunk_t::update_entities(float dt)
         entity->apply_friction(0.85f);
     }
 
-    // Update the entities' positions for the next frame
+    // Update the entities' positions and reset jump status for the next frame
     for (aabb_entity_t *&entity : entities)
     {
         entity->prev_position = entity->position;
+        entity->jumping = false;
     }
 
     // Get a list of entities that are out of bounds while iterating

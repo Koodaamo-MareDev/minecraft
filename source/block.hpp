@@ -16,6 +16,19 @@
 #define FACE_PZ 5
 #define RENDER_FLAG_VISIBLE 6
 
+enum SoundType
+{
+    none,
+    dirt,
+    grass,
+    sand,
+    wood,
+    stone,
+    glass,
+    metal,
+    cloth,
+};
+
 struct blockproperties_t
 {
     BlockID id = BlockID::air;
@@ -29,8 +42,9 @@ struct blockproperties_t
     uint8_t fluid_decay = 0;
     BlockID base_fluid = BlockID::air;
     BlockID flow_fluid = BlockID::air;
+    SoundType sound = SoundType::none;
 
-    blockproperties_t(BlockID id = BlockID::air, uint8_t default_state = 0, uint8_t texture_index = 0, uint8_t opacity = 0, uint8_t transparent = 0, uint8_t luminance = 0, uint8_t is_solid = 0, uint8_t is_fluid = 0, uint8_t fluid_decay = 0, BlockID base_fluid = BlockID::air, BlockID flow_fluid = BlockID::air)
+    blockproperties_t(BlockID id = BlockID::air, uint8_t default_state = 0, uint8_t texture_index = 0, uint8_t opacity = 0, uint8_t transparent = 0, uint8_t luminance = 0, uint8_t is_solid = 0, uint8_t is_fluid = 0, uint8_t fluid_decay = 0, BlockID base_fluid = BlockID::air, BlockID flow_fluid = BlockID::air, SoundType sound = SoundType::none)
     {
         this->id = id;
         this->default_state = default_state;
@@ -43,6 +57,7 @@ struct blockproperties_t
         this->fluid_decay = fluid_decay;
         this->base_fluid = base_fluid;
         this->flow_fluid = flow_fluid;
+        this->sound = sound;
     }
 };
 
@@ -117,5 +132,7 @@ public:
 };
 
 extern blockproperties_t block_properties[256];
+class sound_t;
+sound_t* get_step_sound(BlockID block_id);
 
 #endif

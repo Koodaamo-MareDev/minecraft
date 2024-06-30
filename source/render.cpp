@@ -647,7 +647,6 @@ void draw_sky(GXColor background)
     GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_NOOP);
     GX_SetAlphaUpdate(GX_TRUE);
     GX_SetAlphaCompare(GX_ALWAYS, 0, GX_AOP_OR, GX_ALWAYS, 0);
-    GX_SetColorUpdate(GX_TRUE);
 
     // Here we use 0 fractional bits for the position data, because we're drawing large objects.
     GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, 0);
