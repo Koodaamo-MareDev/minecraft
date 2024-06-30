@@ -1039,7 +1039,7 @@ void UpdateScene(frustum_t &frustum, std::deque<chunk_t *> &chunks)
     particle.velocity = vec3f(JavaLCGFloat() - .5f, JavaLCGFloat() - .25f, JavaLCGFloat() - .5f) * 10;
     particle.life_time = particle.max_life_time = 60;
     particle.physics = PPHYSIC_FLAG_ALL;
-    particle.type = 0; // Block particle
+    particle.type = PTYPE_BLOCK_BREAK; // Block particle
     particle.size = 16;
     particle.brightness = 0xFF;
     particle.u = 32;
@@ -1051,7 +1051,7 @@ void UpdateScene(frustum_t &frustum, std::deque<chunk_t *> &chunks)
     particle.velocity = vec3f(JavaLCGFloat() - .5f, JavaLCGFloat() - .25f, JavaLCGFloat() - .5f) * 10;
     particle.life_time = particle.max_life_time = 60;
     particle.physics = 0;
-    particle.type = 1; // Colored particle
+    particle.type = PTYPE_TINY_SMOKE; // Colored particle
     particle.size = 16;
     particle.brightness = 0xFF;
     particle.r = rand() & 0xFF;

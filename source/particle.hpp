@@ -7,6 +7,10 @@
 
 #define PPHYSIC_FLAG_ALL 0xFF
 
+#define PTYPE_BLOCK_BREAK 0
+#define PTYPE_TINY_SMOKE 1
+
+#define PTYPE_MAX 2
 
 #include "entity.hpp"
 

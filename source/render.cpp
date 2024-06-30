@@ -412,7 +412,7 @@ void draw_particles(camera_t &camera, particle_t *particles, int count)
     }
 
     // Draw particles on a per-type basis
-    for (int t = 0; t < 2; t++)
+    for (int t = 0; t < PTYPE_MAX; t++)
     {
         // Enumerate visible particles
         int visible_count = 0;
@@ -426,12 +426,12 @@ void draw_particles(camera_t &camera, particle_t *particles, int count)
         if (visible_count == 0)
             continue;
 
-        if (t == 0)
+        if (t == PTYPE_BLOCK_BREAK)
         {
             // Enable indexed colors
             GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
         }
-        else
+        else if (t == PTYPE_TINY_SMOKE)
         {
             // Enable direct colors
             GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
@@ -453,13 +453,13 @@ void draw_particles(camera_t &camera, particle_t *particles, int count)
                     vertex.pos = vertex.pos * particle.size * (1.f / 64.f);
                     vertex.pos = vertex.pos + particle.position;
 
-                    if (t == 0)
+                    if (t == PTYPE_BLOCK_BREAK)
                     {
                         vertex.x_uv += particle.u;
                         vertex.y_uv += particle.v;
                         GX_VertexLit(vertex, particle.brightness);
                     }
-                    else if (t == 1)
+                    else if (t == PTYPE_TINY_SMOKE)
                     {
                         int x = (j == 0 || j == 3);
                         int y = (j > 1);
