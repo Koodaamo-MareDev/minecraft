@@ -1,7 +1,7 @@
 #ifndef _BLOCK_ID_HPP_
 #define _BLOCK_ID_HPP_
 
-enum BlockID
+enum class BlockID
 {
     air = 0,
     stone,
@@ -34,7 +34,6 @@ enum BlockID
     detector_rail,
     sticky_piston,
     cobweb,
-    tallgrass, // dead shrub, grass, fern
     deadbush,
     piston,
     piston_head,

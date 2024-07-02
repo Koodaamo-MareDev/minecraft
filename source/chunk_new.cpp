@@ -1,5 +1,5 @@
 #include "chunk_new.hpp"
-#include "block.hpp"
+#include "blocks.hpp"
 #include "texturedefs.h"
 #include "vec3i.hpp"
 #include "blocks.hpp"
@@ -968,7 +968,7 @@ int chunk_t::render_fluid(block_t *block, vec3i pos)
     // If surrounded by 3, the water texture is flowing to the 1 other direction
     // If surrounded by 4, the water texture is still
 
-    uint8_t texture_offset = get_default_texture_index(flowfluid(block_id));
+    uint8_t texture_offset = block_properties[uint8_t(flowfluid(block_id))].m_texture_index;
 
     uint32_t texture_start_x = TEXTURE_X(texture_offset);
     uint32_t texture_start_y = TEXTURE_Y(texture_offset);
@@ -995,7 +995,7 @@ int chunk_t::render_fluid(block_t *block, vec3i pos)
     {
         cos_angle = 8;
         sin_angle = 0;
-        int basefluid_offset = get_default_texture_index(basefluid(block_id));
+        int basefluid_offset = texture_offset = block_properties[uint8_t(basefluid(block_id))].m_texture_index;
         tex_off_x = TEXTURE_X(basefluid_offset) + 8;
         tex_off_y = TEXTURE_Y(basefluid_offset) + 8;
     }

@@ -31,21 +31,22 @@ void particle_t::update(float dt)
     }
 
     // Used for collision detection
-    vec3i old_pos = vec3i(position.x + 0.5f, position.y + 0.5f, position.z + 0.5f);
+    vec3i old_pos = vec3i(std::round(position.x), std::round(position.y), std::round(position.z));
 
     // Update position
     position = position + velocity * dt;
 
     // Check if the particle has moved
-    vec3i new_pos = vec3i(position.x + 0.5f, position.y + 0.5f, position.z + 0.5f);
-    if (old_pos != new_pos)
+    vec3i new_pos = vec3i(std::round(position.x), std::round(position.y), std::round(position.z));
+
+    // Get the block at the particle's position
+    block_t *block = get_block_at(new_pos);
+    if (block)
     {
-        // Get the block at the particle's position
-        block_t *block = get_block_at(new_pos);
-        if (block)
+        if (old_pos != new_pos)
         {
             // Check if the block is solid
-            if ((physics & PPHYSIC_FLAG_COLLIDE) && get_block_opacity(block->get_blockid()) > 1)
+            if ((physics & PPHYSIC_FLAG_COLLIDE) && block_properties[block->id].m_opacity > 1)
             {
                 // Place the particle on the surface of the block
                 vec3f old_vel = velocity;
@@ -59,7 +60,7 @@ void particle_t::update(float dt)
                     velocity.x = old_vel.x;
 
                 if (old_pos.y > new_pos.y)
-                    position.y = old_pos.y - 0.5f;
+                    position.y = old_pos.y - .5f;
                 else if (old_pos.y < new_pos.y)
                     position.y = old_pos.y - 1.5f;
                 else
@@ -72,10 +73,16 @@ void particle_t::update(float dt)
                 else
                     velocity.z = old_vel.z;
             }
-            else
-            {
-                brightness = block->light;
-            }
+        }
+    }
+    new_pos = vec3i(std::round(position.x), std::round(position.y), std::round(position.z));
+    block = get_block_at(new_pos);
+    if (block)
+    {
+        brightness = block->light;
+        if (block_properties[block->id].m_opacity > 1)
+        {
+            life_time = 0;
         }
     }
 

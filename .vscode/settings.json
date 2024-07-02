@@ -58,9 +58,13 @@
         "thread": "cpp",
         "cinttypes": "cpp",
         "queue": "cpp",
-        "map": "cpp"
+        "map": "cpp",
+        "ogcsys.h": "c",
+        "network.h": "c",
+        "gcsd.h": "c"
     },
     "[javascript]": {
         "editor.maxTokenizationLineLength": 25000
-    }
+    },
+    "C_Cpp.inlayHints.parameterNames.enabled": true
 }

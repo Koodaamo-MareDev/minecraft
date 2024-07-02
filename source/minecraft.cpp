@@ -71,7 +71,7 @@ float prev_left_shoulder = 0;
 float prev_right_shoulder = 0;
 bool destroy_block = false;
 bool place_block = false;
-block_t selected_block = {BlockID::stone, 0x7F, 0, 0xF, 0xF};
+block_t selected_block = {uint8_t(BlockID::stone), 0x7F, 0, 0xF, 0xF};
 
 particle_system_t particle_system;
 sound_system_t *sound_system = nullptr;
@@ -319,6 +319,8 @@ int main(int argc, char **argv)
         viewport.far        // Far clipping plane
     };
     fatInitDefault();
+    chdir("/apps/minecraft/resources/");
+
     printf("Render resolution: %f,%f, Widescreen: %s\n", viewport.width, viewport.height, viewport.widescreen ? "Yes" : "No");
     light_engine_init();
     printf("Initialized basics.\n");
@@ -434,15 +436,11 @@ int main(int argc, char **argv)
                 block_t *block = get_block_at(vec3i(std::round(player_feet_pos.x), std::round(player_feet_pos.y), std::round(player_feet_pos.z)));
                 if (block && block->get_blockid() != BlockID::air)
                 {
-                    sound_t *sound = get_step_sound(block->get_blockid());
-                    if (sound)
-                    {
-                        sound->volume = 0.25f;
-                        sound->position = player_feet_pos;
-                        sound_system->play_sound(*sound);
-                        delete sound;
-                        lastStepDistance = 0;
-                    }
+                    sound_t sound = get_step_sound(block->get_blockid());
+                    sound.volume = 0.15f;
+                    sound.position = player_feet_pos;
+                    sound_system->play_sound(sound);
+                    lastStepDistance = 0;
                 }
             }
         }
@@ -643,7 +641,7 @@ void GetInput()
                 // Decrease the selected block id by 1 unless we're at the lowest block id already
                 if (selected_block.id > 0)
                 {
-                    selected_block.id = BlockID(selected_block.id - 1);
+                    selected_block.id = selected_block.id - 1;
                 }
                 else
                 {
@@ -659,7 +657,7 @@ void GetInput()
                 // Increase the selected block id by 1 unless we're at the highest block id already
                 if (selected_block.id < 255)
                 {
-                    selected_block.id = BlockID(selected_block.id + 1);
+                    selected_block.id = selected_block.id + 1;
                 }
                 else
                 {
@@ -880,11 +878,57 @@ void EditBlocks()
             block_t *editable_block = get_block_at(editable_pos);
             if (editable_block)
             {
+                BlockID old_blockid = editable_block->get_blockid();
                 editable_block->set_blockid(target_blockid);
                 editable_block->meta = target_blockid == BlockID::air ? 0 : selected_block.meta;
                 if (place_block)
                     update_block_at(editable_pos);
                 update_neighbors(editable_pos);
+
+                if (destroy_block)
+                {
+                    // Add block particles
+
+                    int texture_index = get_default_texture_index(old_blockid);
+
+                    particle_t particle;
+                    particle.max_life_time = 60;
+                    particle.physics = PPHYSIC_FLAG_ALL;
+                    particle.type = PTYPE_BLOCK_BREAK;
+                    particle.size = 8;
+                    particle.brightness = 0xFF;
+                    int u = TEXTURE_X(texture_index);
+                    int v = TEXTURE_Y(texture_index);
+                    for (int i = 0; i < 64; i++)
+                    {
+                        // Randomize the particle position and velocity
+                        particle.position = vec3f(editable_pos.x, editable_pos.y, editable_pos.z) + vec3f(JavaLCGFloat() - .5f, JavaLCGFloat() - .5f, JavaLCGFloat() - .5f);
+                        particle.velocity = vec3f(JavaLCGFloat() - .5f, JavaLCGFloat() - .25f, JavaLCGFloat() - .5f) * 7.5;
+
+                        // Randomize the particle texture coordinates
+                        particle.u = u + ((rand() & 3) << 2);
+                        particle.v = v + ((rand() & 3) << 2);
+
+                        // Randomize the particle life time by up to 10 ticks
+                        particle.life_time = particle.max_life_time - (rand() % 10);
+
+                        particle_system.add_particle(particle);
+                    }
+
+                    sound_t sound = get_break_sound(old_blockid);
+                    sound.volume = 0.4f;
+                    sound.pitch = 0.8f;
+                    sound.position = vec3f(editable_pos.x, editable_pos.y, editable_pos.z);
+                    sound_system->play_sound(sound);
+                }
+                else
+                {
+                    sound_t sound = get_mine_sound(target_blockid);
+                    sound.volume = 0.4f;
+                    sound.pitch = 0.8f;
+                    sound.position = vec3f(editable_pos.x, editable_pos.y, editable_pos.z);
+                    sound_system->play_sound(sound);
+                }
             }
         }
     }
@@ -1032,33 +1076,6 @@ void UpdateScene(frustum_t &frustum, std::deque<chunk_t *> &chunks)
     EditBlocks();
     UpdateChunkData(frustum, chunks);
     UpdateChunkVBOs(chunks);
-
-    // Add a block particle
-    particle_t particle;
-    particle.position = vec3f(JavaLCGFloat() - .5f, 65.f + JavaLCGFloat() - .5f, JavaLCGFloat() - .5f);
-    particle.velocity = vec3f(JavaLCGFloat() - .5f, JavaLCGFloat() - .25f, JavaLCGFloat() - .5f) * 10;
-    particle.life_time = particle.max_life_time = 60;
-    particle.physics = PPHYSIC_FLAG_ALL;
-    particle.type = PTYPE_BLOCK_BREAK; // Block particle
-    particle.size = 16;
-    particle.brightness = 0xFF;
-    particle.u = 32;
-    particle.v = 0;
-    particle_system.add_particle(particle);
-
-    // Add a colored particle
-    particle.position = vec3f(JavaLCGFloat() - .5f, 65.f + JavaLCGFloat() - .5f, JavaLCGFloat() - .5f);
-    particle.velocity = vec3f(JavaLCGFloat() - .5f, JavaLCGFloat() - .25f, JavaLCGFloat() - .5f) * 10;
-    particle.life_time = particle.max_life_time = 60;
-    particle.physics = 0;
-    particle.type = PTYPE_TINY_SMOKE; // Colored particle
-    particle.size = 16;
-    particle.brightness = 0xFF;
-    particle.r = rand() & 0xFF;
-    particle.g = rand() & 0xFF;
-    particle.b = rand() & 0xFF;
-    particle.a = 0xFF;
-    particle_system.add_particle(particle);
 
     // Update the particle system
     particle_system.update(deltaTime);

@@ -4,7 +4,6 @@
 #include <stdint.h>
 #include <cmath>
 #include "block_id.hpp"
-#include "blocks.hpp"
 #include "aabb.hpp"
 #include "vec3f.hpp"
 
@@ -16,7 +15,9 @@
 #define FACE_PZ 5
 #define RENDER_FLAG_VISIBLE 6
 
-enum SoundType
+#define BLOCKPROP(A, B) block_properties[uint8_t(A)].B
+
+enum class SoundType
 {
     none,
     dirt,
@@ -31,35 +32,120 @@ enum SoundType
 
 struct blockproperties_t
 {
-    BlockID id = BlockID::air;
-    uint8_t default_state = 0;
-    uint8_t texture_index = 0;
-    uint8_t opacity = 0;
-    uint8_t transparent = 0;
-    uint8_t luminance = 0;
-    uint8_t is_solid = 0;
-    uint8_t is_fluid = 0;
-    uint8_t fluid_decay = 0;
-    BlockID base_fluid = BlockID::air;
-    BlockID flow_fluid = BlockID::air;
-    SoundType sound = SoundType::none;
+    BlockID m_id = BlockID::air;
+    uint8_t m_default_state = 0;
+    uint8_t m_texture_index = 0;
+    uint8_t m_opacity = 15;
+    uint8_t m_transparent = 0;
+    uint8_t m_luminance = 0;
+    uint8_t m_solid = 1;
+    uint8_t m_fluid = 0;
+    uint8_t m_fluid_decay = 0;
+    BlockID m_base_fluid = BlockID::air;
+    BlockID m_flow_fluid = BlockID::air;
+    SoundType m_sound_type = SoundType::none;
+    uint8_t m_fall = 0;
 
-    blockproperties_t(BlockID id = BlockID::air, uint8_t default_state = 0, uint8_t texture_index = 0, uint8_t opacity = 0, uint8_t transparent = 0, uint8_t luminance = 0, uint8_t is_solid = 0, uint8_t is_fluid = 0, uint8_t fluid_decay = 0, BlockID base_fluid = BlockID::air, BlockID flow_fluid = BlockID::air, SoundType sound = SoundType::none)
+    // FIXME: This is a temporary constructor replacement as the inlay hints are otherwise not visible.
+    blockproperties_t &set(uint8_t default_state, uint8_t texture_index, uint8_t opacity, uint8_t transparent, uint8_t luminance, uint8_t is_solid, uint8_t is_fluid, uint8_t fluid_decay, BlockID base_fluid, BlockID flow_fluid, SoundType sound)
     {
-        this->id = id;
-        this->default_state = default_state;
-        this->texture_index = texture_index;
-        this->opacity = opacity;
-        this->transparent = transparent;
-        this->luminance = luminance;
-        this->is_solid = is_solid;
-        this->is_fluid = is_fluid;
-        this->fluid_decay = fluid_decay;
-        this->base_fluid = base_fluid;
-        this->flow_fluid = flow_fluid;
-        this->sound = sound;
+        this->state(default_state);
+        this->texture(texture_index);
+        this->opacity(opacity);
+        this->transparent(transparent);
+        this->luminance(luminance);
+        this->solid(is_solid);
+        this->fluid(is_fluid);
+        this->fluid_decay(fluid_decay);
+        this->base_fluid(base_fluid);
+        this->flow_fluid(flow_fluid);
+        this->sound(sound);
+        return *this;
     }
+
+    // Have setters for each property
+    blockproperties_t &id(BlockID value)
+    {
+        this->m_id = value;
+        return *this;
+    }
+
+    blockproperties_t &state(uint8_t value)
+    {
+        this->m_default_state = value;
+        return *this;
+    }
+
+    blockproperties_t &texture(uint8_t value)
+    {
+        this->m_texture_index = value;
+        return *this;
+    }
+
+    blockproperties_t &opacity(uint8_t value)
+    {
+        this->m_opacity = value;
+        return *this;
+    }
+
+    blockproperties_t &transparent(uint8_t value)
+    {
+        this->m_transparent = value;
+        return *this;
+    }
+
+    blockproperties_t &luminance(uint8_t value)
+    {
+        this->m_luminance = value;
+        return *this;
+    }
+
+    blockproperties_t &solid(bool value)
+    {
+        this->m_solid = value;
+        return *this;
+    }
+
+    blockproperties_t &fluid(bool value)
+    {
+        this->m_fluid = value;
+        return *this;
+    }
+
+    blockproperties_t &fluid_decay(uint8_t value) // Probably going to be removed
+    {
+        this->m_fluid_decay = value;
+        return *this;
+    }
+
+    blockproperties_t &base_fluid(BlockID value)
+    {
+        this->m_base_fluid = value;
+        return *this;
+    }
+
+    blockproperties_t &flow_fluid(BlockID value)
+    {
+        this->m_flow_fluid = value;
+        return *this;
+    }
+
+    blockproperties_t &sound(SoundType value)
+    {
+        this->m_sound_type = value;
+        return *this;
+    }
+
+    blockproperties_t &fall(bool value)
+    {
+        this->m_fall = value;
+        return *this;
+    }
+
+    blockproperties_t() {}
 };
+
+extern blockproperties_t block_properties[256];
 
 class block_t
 {
@@ -107,19 +193,19 @@ public:
     void set_blockid(BlockID value)
     {
         this->id = uint8_t(value);
-        this->set_visibility(value != BlockID::air && !is_fluid(value));
+        this->set_visibility(value != BlockID::air && !BLOCKPROP(value, m_fluid));
     }
 
     int8_t get_cast_skylight()
     {
-        int8_t opacity = get_block_opacity(get_blockid());
+        int8_t opacity = BLOCKPROP(id, m_opacity);
         int8_t cast_light = int8_t(sky_light) - std::max(opacity, int8_t(1));
         return std::max(cast_light, int8_t(0));
     }
 
     int8_t get_cast_blocklight()
     {
-        int8_t opacity = get_block_opacity(get_blockid());
+        int8_t opacity = BLOCKPROP(id, m_opacity);
         int8_t cast_light = int8_t(block_light) - std::max(opacity, int8_t(1));
         return std::max(cast_light, int8_t(0));
     }
@@ -130,9 +216,5 @@ public:
         return aabb_t(pos + vec3f(0, 0, 0), pos + vec3f(1, 1, 1));
     }
 };
-
-extern blockproperties_t block_properties[256];
-class sound_t;
-sound_t* get_step_sound(BlockID block_id);
 
 #endif

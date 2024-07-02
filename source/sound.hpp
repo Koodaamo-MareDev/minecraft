@@ -4,9 +4,11 @@
 #include "vec3f.hpp"
 #include "aiff.hpp"
 #include "render.hpp"
+#include "oggplayer/oggplayer.h"
 #include <ogc/gu.h>
 #include <cmath>
 #include <asndlib.h>
+#include <string>
 
 class sound_t
 {
@@ -33,6 +35,7 @@ class sound_system_t
 {
 public:
     sound_t sounds[15];
+    int frames_to_next_music = 0;
 
     sound_system_t();
     ~sound_system_t();
@@ -40,6 +43,9 @@ public:
     void update(vec3f head_right, vec3f head_position);
 
     void play_sound(sound_t sound);
+
+    void play_music(std::string filename);
+
 };
 
 #endif

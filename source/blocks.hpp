@@ -4,6 +4,8 @@
 #include <cstddef>
 #include "block_id.hpp"
 #include "vec3i.hpp"
+#include "sounds.hpp"
+#include "sound.hpp"
 
 #define FLUID_UPDATE_REQUIRED_FLAG 0x10
 #define FLOAT_TO_FLUIDMETA(A) (int(roundf((A)*8)))
@@ -29,45 +31,41 @@ bool is_fluid_overridable(BlockID id);
 float get_percent_air(int fluid_level);
 float get_fluid_height(vec3i pos, BlockID block_type, chunk_t *near = nullptr);
 
+sound_t get_step_sound(BlockID block_id);
+sound_t get_mine_sound(BlockID block_id);
+sound_t get_break_sound(BlockID block_id);
+
 inline bool is_flowing_fluid(BlockID id)
 {
-    return id == BlockID::flowing_water || id == BlockID::flowing_lava;
+    return id != BlockID::air && block_properties[static_cast<uint8_t>(id)].m_flow_fluid == id;
 }
 
 inline bool is_still_fluid(BlockID id)
 {
-    return id == BlockID::water || id == BlockID::lava;
+    return id != BlockID::air && block_properties[static_cast<uint8_t>(id)].m_base_fluid == id;
 }
 
 inline bool is_fluid(BlockID id)
 {
-    return id == BlockID::water || id == BlockID::flowing_water || id == BlockID::lava || id == BlockID::flowing_lava;
+    return block_properties[static_cast<uint8_t>(id)].m_fluid;
 }
 
 // NOTE: This function assumes that the block is a fluid.
 // Call is_fluid before calling this function.
 inline BlockID basefluid(BlockID id)
 {
-    // We know that all fluids have bit 0x8 set
-    // We also know that lava and flowing lava have bit 0x2 set
-    // Bit 0x1 determines if the fluid is flowing or not - 0 for flowing, 1 for still
-    // So we can just mask the bits to get the base fluid
-    // This reduces the number of branches
-
-    return static_cast<BlockID>((static_cast<uint8_t>(id) & 0x0A) | 0x01);
+    return block_properties[static_cast<uint8_t>(id)].m_base_fluid;
 }
 
 // NOTE: This function assumes that the block is a fluid.
 // Call is_fluid before calling this function.
 inline BlockID flowfluid(BlockID id)
 {
-    // Same as basefluid, but we clear the bit 0x1
-    return static_cast<BlockID>(static_cast<uint8_t>(id) & 0x0A);
+    return block_properties[static_cast<uint8_t>(id)].m_flow_fluid;
 }
 
 inline bool is_same_fluid(BlockID id, BlockID other)
 {
-    return is_fluid(id) && is_fluid(other) && basefluid(id) == basefluid(other);
+    return is_fluid(id) && basefluid(id) == basefluid(other);
 }
-
 #endif

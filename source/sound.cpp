@@ -1,5 +1,6 @@
 #include "sound.hpp"
-
+#include "timers.hpp"
+#include "sounds.hpp"
 sound_t::sound_t(aiff_container &aiff_data)
 {
     set_aiff_data(aiff_data);
@@ -23,7 +24,7 @@ void sound_t::play()
     if (first_unused < 1)
         return;
     voice = first_unused;
-    ASND_SetVoice(first_unused, VOICE_MONO_16BIT, 16000, 0, aiff_data->sound_data.sound_data, aiff_data->sound_data.chunk_size, 255, 255, nullptr);
+    ASND_SetVoice(first_unused, VOICE_MONO_16BIT, 16000 * pitch, 0, aiff_data->sound_data.sound_data, aiff_data->sound_data.chunk_size, 255, 255, nullptr);
     ASND_PauseVoice(first_unused, 0);
 }
 
@@ -115,10 +116,25 @@ void sound_system_t::update(vec3f head_right, vec3f head_position)
     {
         sounds[i].update(head_right, head_position);
     }
+    if (StatusOgg() != OGG_STATUS_RUNNING)
+    {
+        frames_to_next_music--;
+    }
+    else
+    {
+        frames_to_next_music = (10 * 60 * 60) + (rand() % (10 * 60 * 60)); // 10 minutes to 20 minutes
+    }
+
+    if (frames_to_next_music <= 0)
+    {
+        play_music(get_random_music(music_files));
+    }
 }
 
 void sound_system_t::play_sound(sound_t sound)
 {
+    if (!sound.valid)
+        return;
     for (int i = 0; i < 15; i++)
     {
         sound_t &s = sounds[i];
@@ -129,4 +145,27 @@ void sound_system_t::play_sound(sound_t sound)
             return;
         }
     }
+}
+
+void sound_system_t::play_music(std::string filename)
+{
+    // Ensure that the filename is not empty
+    if (filename.empty())
+        return;
+
+    // Ensure that the file exists
+    FILE *file = fopen(filename.c_str(), "rb");
+    if (!file)
+        return;
+    fclose(file);
+
+    // Check if the Ogg player is already running
+    if (StatusOgg() == OGG_STATUS_RUNNING)
+    {
+        // Don't play the music if music is already playing
+        return;
+    }
+
+    // Play the music file once
+    PlayOggFile(filename.c_str(), 0, OGG_ONE_TIME);
 }
