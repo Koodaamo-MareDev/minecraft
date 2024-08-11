@@ -4,7 +4,6 @@
 #include "blocks.hpp"
 #include "block.hpp"
 #include "raycast.hpp"
-#include "threadhandler.hpp"
 #include "lock.hpp"
 #include <cmath>
 #include <sys/unistd.h>
@@ -40,7 +39,6 @@ void *__light_engine_init_internal(void *)
     while (__light_engine_init_done)
     {
         light_engine_loop();
-        threadhandler_yield();
     }
     return NULL;
 }
@@ -68,11 +66,12 @@ void light_engine_loop()
         if (chunk)
         {
             __update_light(pos);
+            if (++updates % 1000 == 0)
+                usleep(1);
         }
-        if (++updates % 1000 == 0)
-            threadhandler_yield();
     }
     __light_engine_busy = false;
+    usleep(100);
 }
 void light_engine_deinit()
 {

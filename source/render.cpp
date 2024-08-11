@@ -1,4 +1,5 @@
 #include "render.hpp"
+#include "blocks.hpp"
 
 #include "white_tpl.h"
 #include "clouds_tpl.h"
@@ -6,6 +7,8 @@
 #include "moon_tpl.h"
 #include "blockmap_tpl.h"
 #include "particles_tpl.h"
+#include "icons_tpl.h"
+#include "container_tpl.h"
 
 const GXColor sky_color = {0x88, 0xBB, 0xFF, 0xFF};
 
@@ -15,6 +18,8 @@ GXTexObj sun_texture;
 GXTexObj moon_texture;
 GXTexObj blockmap_texture;
 GXTexObj particles_texture;
+GXTexObj icons_texture;
+GXTexObj container_texture;
 
 // Animated textures
 water_texanim_t water_still_anim;
@@ -40,6 +45,10 @@ void init_textures()
     init_texture(moon_texture, moon_tpl, moon_tpl_size);
     init_texture(particles_texture, particles_tpl, particles_tpl_size);
     init_texture(blockmap_texture, blockmap_tpl, blockmap_tpl_size);
+    init_texture(icons_texture, icons_tpl, icons_tpl_size);
+    init_texture(container_texture, container_tpl, container_tpl_size);
+
+    GX_InitTexObjWrapMode(&clouds_texture, GX_REPEAT, GX_REPEAT);
 
     // Animated textures
 
@@ -124,6 +133,7 @@ void use_perspective(view_t view)
 }
 
 static Mtx view_mtx;
+Mtx active_mtx;
 Mtx &get_view_matrix()
 {
     static bool view_mtx_init = false;
@@ -139,24 +149,77 @@ Mtx &get_view_matrix()
     return view_mtx;
 }
 
-uint8_t face_brightness_values[] = {
-    153, 153, 127, 255, 204, 204};
-inline uint8_t get_face_brightness(uint8_t face)
+uint8_t smooth_light(vec3i pos, uint8_t face_index, vec3i vertex_off, chunk_t *near, block_t *block, uint8_t &lighting)
 {
-    return face_brightness_values[face];
-}
-extern uint8_t light_map[256];
-inline uint8_t get_face_light_index(vec3i pos, uint8_t face, chunk_t *near, block_t *default_block = nullptr)
-{
-    vec3i other = pos + face_offsets[face];
-    block_t *other_block = get_block_at(other, near);
-    if (!other_block)
+    vec3i face = pos + face_offsets[face_index];
+    uint8_t total = 1;
+    block_t *face_block = get_block_at(face, near);
+    if (!face_block)
+        face_block = block;
+    uint8_t block_light = face_block->block_light;
+    uint8_t sky_light = face_block->sky_light;
+
+    vec3i vertex_offA(0, 0, 0);
+    vec3i vertex_offB(0, 0, 0);
+
+    switch (face_index)
     {
-        if (default_block)
-            return default_block->light;
-        return 255;
+    case FACE_NX:
+    case FACE_PX:
+    {
+        vertex_offA = vec3i(0, vertex_off.y, 0);
+        vertex_offB = vec3i(0, 0, vertex_off.z);
+        break;
     }
-    return other_block->light;
+    case FACE_NY:
+    case FACE_PY:
+    {
+        vertex_offA = vec3i(vertex_off.x, 0, 0);
+        vertex_offB = vec3i(0, 0, vertex_off.z);
+        break;
+    }
+    case FACE_NZ:
+    case FACE_PZ:
+    {
+        vertex_offA = vec3i(vertex_off.x, 0, 0);
+        vertex_offB = vec3i(0, vertex_off.y, 0);
+        break;
+    }
+    break;
+    default:
+        break;
+    }
+    block_t *blockA = get_block_at(face + vertex_offA, near);
+    block_t *blockB = get_block_at(face + vertex_offB, near);
+    uint8_t count = 0;
+    if (blockA && properties(blockA->id).m_transparent)
+    {
+        block_light += blockA->block_light;
+        sky_light += blockA->sky_light;
+        total++;
+        count++;
+    }
+    if (blockB && properties(blockB->id).m_transparent)
+    {
+        block_light += blockB->block_light;
+        sky_light += blockB->sky_light;
+        total++;
+        count++;
+    }
+    if (count < 2)
+    {
+        block_t *blockC = get_block_at(face + vertex_off, near);
+        if (blockC && properties(blockC->id).m_transparent)
+        {
+            block_light += blockC->block_light;
+            sky_light += blockC->sky_light;
+            total++;
+            count++;
+        }
+    }
+
+    lighting = (block_light / total) | ((sky_light / total) << 4);
+    return 3 - count;
 }
 
 int render_face(vec3i pos, uint8_t face, uint32_t texture_index, chunk_t *near, block_t *block)
@@ -173,43 +236,68 @@ int render_face(vec3i pos, uint8_t face, uint32_t texture_index, chunk_t *near, 
     if (!block)
         block = get_block_at(pos, near);
     uint8_t lighting = get_face_light_index(pos, face, near, block);
+    uint8_t ao = 0;
     switch (face)
     {
-    case 0:
-        GX_VertexLit({vertex_pos + vec3f{-.5, -.5, -.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, face);
-        GX_VertexLit({vertex_pos + vec3f{-.5, 0.5, -.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, face);
-        GX_VertexLit({vertex_pos + vec3f{-.5, 0.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, face);
-        GX_VertexLit({vertex_pos + vec3f{-.5, -.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, face);
+    case FACE_NX:
+        ao = smooth_light(pos, face, vec3i(0, -1, -1), near, block, lighting);
+        GX_VertexLit({vertex_pos + vec3f{-.5, -.5, -.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, face << ao);
+        ao = smooth_light(pos, face, vec3i(0, 1, -1), near, block, lighting);
+        GX_VertexLit({vertex_pos + vec3f{-.5, 0.5, -.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, face << ao);
+        ao = smooth_light(pos, face, vec3i(0, 1, 1), near, block, lighting);
+        GX_VertexLit({vertex_pos + vec3f{-.5, 0.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, face << ao);
+        ao = smooth_light(pos, face, vec3i(0, -1, 1), near, block, lighting);
+        GX_VertexLit({vertex_pos + vec3f{-.5, -.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, face << ao);
         break;
-    case 1:
-        GX_VertexLit({vertex_pos + vec3f{0.5, -.5, 0.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, face);
-        GX_VertexLit({vertex_pos + vec3f{0.5, 0.5, 0.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, face);
-        GX_VertexLit({vertex_pos + vec3f{0.5, 0.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, face);
-        GX_VertexLit({vertex_pos + vec3f{0.5, -.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, face);
+    case FACE_PX:
+        ao = smooth_light(pos, face, vec3i(0, -1, 1), near, block, lighting);
+        GX_VertexLit({vertex_pos + vec3f{0.5, -.5, 0.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, face << ao);
+        ao = smooth_light(pos, face, vec3i(0, 1, 1), near, block, lighting);
+        GX_VertexLit({vertex_pos + vec3f{0.5, 0.5, 0.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, face << ao);
+        ao = smooth_light(pos, face, vec3i(0, 1, -1), near, block, lighting);
+        GX_VertexLit({vertex_pos + vec3f{0.5, 0.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, face << ao);
+        ao = smooth_light(pos, face, vec3i(0, -1, -1), near, block, lighting);
+        GX_VertexLit({vertex_pos + vec3f{0.5, -.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, face << ao);
         break;
-    case 2:
-        GX_VertexLit({vertex_pos + vec3f{-.5, -.5, -.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, face);
-        GX_VertexLit({vertex_pos + vec3f{-.5, -.5, 0.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, face);
-        GX_VertexLit({vertex_pos + vec3f{0.5, -.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, face);
-        GX_VertexLit({vertex_pos + vec3f{0.5, -.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, face);
+    case FACE_NY:
+        ao = smooth_light(pos, face, vec3i(-1, 0, -1), near, block, lighting);
+        GX_VertexLit({vertex_pos + vec3f{-.5, -.5, -.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, face << ao);
+        ao = smooth_light(pos, face, vec3i(-1, 0, 1), near, block, lighting);
+        GX_VertexLit({vertex_pos + vec3f{-.5, -.5, 0.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, face << ao);
+        ao = smooth_light(pos, face, vec3i(1, 0, 1), near, block, lighting);
+        GX_VertexLit({vertex_pos + vec3f{0.5, -.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, face << ao);
+        ao = smooth_light(pos, face, vec3i(1, 0, -1), near, block, lighting);
+        GX_VertexLit({vertex_pos + vec3f{0.5, -.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, face << ao);
         break;
-    case 3:
-        GX_VertexLit({vertex_pos + vec3f{0.5, 0.5, -.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, face);
-        GX_VertexLit({vertex_pos + vec3f{0.5, 0.5, 0.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, face);
-        GX_VertexLit({vertex_pos + vec3f{-.5, 0.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, face);
-        GX_VertexLit({vertex_pos + vec3f{-.5, 0.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, face);
+    case FACE_PY:
+        ao = smooth_light(pos, face, vec3i(1, 0, -1), near, block, lighting);
+        GX_VertexLit({vertex_pos + vec3f{0.5, 0.5, -.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, face << ao);
+        ao = smooth_light(pos, face, vec3i(1, 0, 1), near, block, lighting);
+        GX_VertexLit({vertex_pos + vec3f{0.5, 0.5, 0.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, face << ao);
+        ao = smooth_light(pos, face, vec3i(-1, 0, 1), near, block, lighting);
+        GX_VertexLit({vertex_pos + vec3f{-.5, 0.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, face << ao);
+        ao = smooth_light(pos, face, vec3i(-1, 0, -1), near, block, lighting);
+        GX_VertexLit({vertex_pos + vec3f{-.5, 0.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, face << ao);
         break;
-    case 4:
-        GX_VertexLit({vertex_pos + vec3f{0.5, -.5, -.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, face);
-        GX_VertexLit({vertex_pos + vec3f{0.5, 0.5, -.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, face);
-        GX_VertexLit({vertex_pos + vec3f{-.5, 0.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, face);
-        GX_VertexLit({vertex_pos + vec3f{-.5, -.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, face);
+    case FACE_NZ:
+        ao = smooth_light(pos, face, vec3i(1, -1, 0), near, block, lighting);
+        GX_VertexLit({vertex_pos + vec3f{0.5, -.5, -.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, face << ao);
+        ao = smooth_light(pos, face, vec3i(1, 1, 0), near, block, lighting);
+        GX_VertexLit({vertex_pos + vec3f{0.5, 0.5, -.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, face << ao);
+        ao = smooth_light(pos, face, vec3i(-1, 1, 0), near, block, lighting);
+        GX_VertexLit({vertex_pos + vec3f{-.5, 0.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, face << ao);
+        ao = smooth_light(pos, face, vec3i(-1, -1, 0), near, block, lighting);
+        GX_VertexLit({vertex_pos + vec3f{-.5, -.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, face << ao);
         break;
-    case 5:
-        GX_VertexLit({vertex_pos + vec3f{-.5, -.5, 0.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, face);
-        GX_VertexLit({vertex_pos + vec3f{-.5, 0.5, 0.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, face);
-        GX_VertexLit({vertex_pos + vec3f{0.5, 0.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, face);
-        GX_VertexLit({vertex_pos + vec3f{0.5, -.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, face);
+    case FACE_PZ:
+        ao = smooth_light(pos, face, vec3i(-1, -1, 0), near, block, lighting);
+        GX_VertexLit({vertex_pos + vec3f{-.5, -.5, 0.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, face << ao);
+        ao = smooth_light(pos, face, vec3i(-1, 1, 0), near, block, lighting);
+        GX_VertexLit({vertex_pos + vec3f{-.5, 0.5, 0.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, face << ao);
+        ao = smooth_light(pos, face, vec3i(1, 1, 0), near, block, lighting);
+        GX_VertexLit({vertex_pos + vec3f{0.5, 0.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, face << ao);
+        ao = smooth_light(pos, face, vec3i(1, -1, 0), near, block, lighting);
+        GX_VertexLit({vertex_pos + vec3f{0.5, -.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, face << ao);
         break;
     default:
         break;
@@ -217,12 +305,48 @@ int render_face(vec3i pos, uint8_t face, uint32_t texture_index, chunk_t *near, 
     return 4;
 }
 
-guVector angles_to_vector(float x, float y, float distance, guVector vec)
+void render_single_block(block_t &selected_block, bool transparency)
 {
-    vec.x += cos(DegToRad(x)) * sin(DegToRad(y)) * distance;
-    vec.y += -sin(DegToRad(x)) * distance;
-    vec.z += cos(DegToRad(x)) * cos(DegToRad(y)) * distance;
-    return vec;
+    std::deque<chunk_t *> &chunks = get_chunks();
+    if (chunks.size() == 0)
+        return;
+
+    // Precalculate the vertex count. Set position to Y = -16 to render "outside the world"
+    int vertexCount = chunks[0]->pre_render_block(&selected_block, vec3i(0, -16, 0), transparency);
+
+    // Start drawing the block
+    GX_BeginGroup(GX_QUADS, vertexCount);
+
+    // Render the block. Set position to Y = -16 to render "outside the world"
+    chunks[0]->render_block(&selected_block, vec3i(0, -16, 0), transparency);
+
+    // End the group
+    GX_EndGroup();
+}
+
+void render_single_item(uint32_t texture_index, bool transparency)
+{
+    vec3f vertex_pos = vec3f(0, 0, 0);
+    GX_BeginGroup(GX_QUADS, 4);
+    // Render the selected block.
+    GX_VertexLit({vertex_pos + vec3f(0.5, -.5, -.5), TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, 0xFF, FACE_PY);
+    GX_VertexLit({vertex_pos + vec3f(0.5, 0.5, -.5), TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, 0xFF, FACE_PY);
+    GX_VertexLit({vertex_pos + vec3f(-.5, 0.5, -.5), TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, 0xFF, FACE_PY);
+    GX_VertexLit({vertex_pos + vec3f(-.5, -.5, -.5), TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, 0xFF, FACE_PY);
+    // End the group
+    GX_EndGroup();
+}
+
+// Assuming a right-handed coordinate system and that the angles are in degrees. X = pitch, Y = yaw
+vec3f angles_to_vector(float x, float y)
+{
+    vec3f result;
+    float x_rad = M_DTOR * x;
+    float y_rad = M_DTOR * y;
+    result.x = -std::cos(x_rad) * std::sin(y_rad);
+    result.y = std::sin(x_rad);
+    result.z = -std::cos(x_rad) * std::cos(y_rad);
+    return result;
 }
 
 // Function to calculate the signed distance from a point to a frustum plane
@@ -258,14 +382,14 @@ frustum_t calculate_frustum(camera_t &camera)
     float half_fov = camera.fov * 0.5f;
 
     // Calculate forward vector
-    guVector forward = angles_to_vector(camera.rot.x, camera.rot.y, -1);
+    guVector forward = angles_to_vector(camera.rot.x, camera.rot.y);
     guVector backward = vec3f() - forward;
 
     // Calculate the 4 perspective frustum planes (not near and far)
-    guVector right_vec = angles_to_vector(camera.rot.x, camera.rot.y + 90 + half_fov, 1);
-    guVector left_vec = angles_to_vector(camera.rot.x, camera.rot.y - 90 - half_fov, 1);
-    guVector up_vec = angles_to_vector(camera.rot.x + 90 + half_fov, camera.rot.y, 1);
-    guVector down_vec = angles_to_vector(camera.rot.x - 90 - half_fov, camera.rot.y, 1);
+    guVector right_vec = angles_to_vector(camera.rot.x, camera.rot.y + 90 + half_fov);
+    guVector left_vec = angles_to_vector(camera.rot.x, camera.rot.y - 90 - half_fov);
+    guVector up_vec = angles_to_vector(camera.rot.x + 90 + half_fov, camera.rot.y);
+    guVector down_vec = angles_to_vector(camera.rot.x - 90 - half_fov, camera.rot.y);
 
     // Calculate points on the near and far planes
     guVector near_center = camera.position + (vec3f(forward) * (camera.near));
@@ -298,10 +422,23 @@ frustum_t calculate_frustum(camera_t &camera)
     frustum.planes[5].direction = backward;
     frustum.planes[5].distance = guVecDotProduct(&backward, &far_center);
 
+    // Normalize the plane equations
+    for (int i = 0; i < 6; ++i)
+    {
+        plane_t &plane = frustum.planes[i];
+        vfloat_t length = 1.f / std::sqrt(plane.direction.x * plane.direction.x +
+                                          plane.direction.y * plane.direction.y +
+                                          plane.direction.z * plane.direction.z);
+        plane.direction.x *= length;
+        plane.direction.y *= length;
+        plane.direction.z *= length;
+        plane.distance *= length;
+    }
+
     return frustum;
 }
 
-void transform_view(Mtx view, guVector chunkPos)
+void transform_view(Mtx view, guVector chunkPos, bool load)
 {
     Mtx model, modelview;
     Mtx offset;
@@ -340,7 +477,9 @@ void transform_view(Mtx view, guVector chunkPos)
     guMtxConcat(roty, rotx, model);
     guMtxInverse(model, model);
     guMtxConcat(model, view, modelview);
-    GX_LoadPosMtxImm(modelview, GX_PNMTX0);
+    guMtxCopy(modelview, active_mtx);
+    if (load)
+        GX_LoadPosMtxImm(modelview, GX_PNMTX0);
 }
 
 void transform_view_screen(Mtx view, guVector off)
@@ -439,6 +578,9 @@ void draw_particles(camera_t &camera, particle_t *particles, int count)
 
         use_texture(t == 0 ? blockmap_texture : particles_texture);
 
+        // Use floats for vertex positions
+        GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_F32, 0);
+
         GX_BeginGroup(GX_QUADS, visible_count << 2);
 
         // Draw particles
@@ -457,25 +599,29 @@ void draw_particles(camera_t &camera, particle_t *particles, int count)
                     {
                         vertex.x_uv += particle.u;
                         vertex.y_uv += particle.v;
-                        GX_VertexLit(vertex, particle.brightness);
+                        GX_VertexLitF(vertex, particle.brightness);
                     }
                     else if (t == PTYPE_TINY_SMOKE)
                     {
                         int x = (j == 0 || j == 3);
                         int y = (j > 1);
+                        float brightness_value = ((particle.brightness & 0xF) | (particle.brightness >> 4)) * 0.0625f + 0.0625f;
                         vertex.x_uv = (x << 4) + (int(particle.life_time * 16.0f / float(particle.max_life_time)) << 4);
                         vertex.y_uv = (y << 4);
-                        vertex.color_r = particle.r;
-                        vertex.color_g = particle.g;
-                        vertex.color_b = particle.b;
+                        vertex.color_r = particle.r * brightness_value;
+                        vertex.color_g = particle.g * brightness_value;
+                        vertex.color_b = particle.b * brightness_value;
                         vertex.color_a = particle.a;
-                        GX_Vertex(vertex);
+                        GX_VertexF(vertex);
                     }
                 }
             }
         }
 
         GX_EndGroup();
+
+        // Restore default vertex format
+        GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, BASE3D_POS_FRAC_BITS);
     }
 }
 
@@ -535,7 +681,7 @@ void draw_stars()
     {
         GX_BeginGroup(GX_QUADS, 780 << 2);
         for (int i = 0; i < (780 << 2); i++)
-            GX_Vertex(vertex_property_t(vertices[i], 0, 0, brightness_level, brightness_level, brightness_level, brightness_level));
+            GX_Vertex(vertex_property_t(vertices[i ^ 3], 0, 0, brightness_level, brightness_level, brightness_level, brightness_level));
         GX_EndGroup();
     }
 }
@@ -599,14 +745,16 @@ GXColor get_sky_color(bool cave_darkness)
 }
 void draw_sky(GXColor background)
 {
-    // The normals of the sky elements are inverted. Fix this by disabling backface culling
-    GX_SetCullMode(GX_CULL_NONE);
+    // Enable z-buffering
+    GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
 
     // Disable fog
     GX_SetFog(GX_FOG_NONE, RENDER_DISTANCE * 0.67f * 16 - 16, RENDER_DISTANCE * 0.67f * 16 - 8, CAMERA_NEAR, CAMERA_FAR, background);
 
     // Use additive blending
     GX_SetBlendMode(GX_BM_BLEND, GX_BL_ONE, GX_BL_ONE, GX_LO_NOOP);
+    GX_SetAlphaUpdate(GX_FALSE);
+    GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_FALSE);
 
     use_texture(white_texture);
 
@@ -625,19 +773,19 @@ void draw_sky(GXColor background)
     // Draw sun
     use_texture(sun_texture);
     GX_BeginGroup(GX_QUADS, 4);
-    GX_Vertex(vertex_property_t(vec3f(-size, +dist, -size), 0, 0));
-    GX_Vertex(vertex_property_t(vec3f(+size, +dist, -size), BASE3D_UV_FRAC, 0));
-    GX_Vertex(vertex_property_t(vec3f(+size, +dist, +size), BASE3D_UV_FRAC, BASE3D_UV_FRAC));
     GX_Vertex(vertex_property_t(vec3f(-size, +dist, +size), 0, BASE3D_UV_FRAC));
+    GX_Vertex(vertex_property_t(vec3f(+size, +dist, +size), BASE3D_UV_FRAC, BASE3D_UV_FRAC));
+    GX_Vertex(vertex_property_t(vec3f(+size, +dist, -size), BASE3D_UV_FRAC, 0));
+    GX_Vertex(vertex_property_t(vec3f(-size, +dist, -size), 0, 0));
     GX_EndGroup();
 
     // Draw moon
     use_texture(moon_texture);
     GX_BeginGroup(GX_QUADS, 4);
-    GX_Vertex(vertex_property_t(vec3f(-size, -dist, +size), 0, BASE3D_UV_FRAC));
-    GX_Vertex(vertex_property_t(vec3f(+size, -dist, +size), BASE3D_UV_FRAC, BASE3D_UV_FRAC));
-    GX_Vertex(vertex_property_t(vec3f(+size, -dist, -size), BASE3D_UV_FRAC, 0));
     GX_Vertex(vertex_property_t(vec3f(-size, -dist, -size), 0, 0));
+    GX_Vertex(vertex_property_t(vec3f(+size, -dist, -size), BASE3D_UV_FRAC, 0));
+    GX_Vertex(vertex_property_t(vec3f(+size, -dist, +size), BASE3D_UV_FRAC, BASE3D_UV_FRAC));
+    GX_Vertex(vertex_property_t(vec3f(-size, -dist, +size), 0, BASE3D_UV_FRAC));
     GX_EndGroup();
 
     // Enable fog but place it further away.
@@ -647,6 +795,7 @@ void draw_sky(GXColor background)
     GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_NOOP);
     GX_SetAlphaUpdate(GX_TRUE);
     GX_SetAlphaCompare(GX_ALWAYS, 0, GX_AOP_OR, GX_ALWAYS, 0);
+    GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_FALSE);
 
     // Here we use 0 fractional bits for the position data, because we're drawing large objects.
     GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, 0);

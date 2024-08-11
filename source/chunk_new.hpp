@@ -41,11 +41,12 @@ public:
     void *cached_solid_buffer = nullptr;
     void *cached_transparent_buffer = nullptr;
 
-    float player_taxicab_distance() {
+    float player_taxicab_distance()
+    {
         return std::abs(this->x - player_pos.x) + std::abs(this->y - player_pos.y) + std::abs(this->z - player_pos.z);
     }
 
-    bool operator< (chunkvbo_t& other)
+    bool operator<(chunkvbo_t &other)
     {
         return this->player_taxicab_distance() < other.player_taxicab_distance();
     }
@@ -66,29 +67,30 @@ public:
     uint8_t has_fluid_updates[VERTICAL_SECTION_COUNT] = {1};
     std::vector<aabb_entity_t *> entities;
 
-    block_t *get_block(vec3i pos)
+    block_t *get_block(const vec3i &pos)
     {
         return &this->blockstates[(pos.x & 0xF) | ((pos.y & 0xFF) << 8) | ((pos.z & 0xF) << 4)];
     }
 
-    void set_block(vec3i pos, BlockID block_id)
+    void set_block(const vec3i &pos, BlockID block_id)
     {
         this->blockstates[(pos.x & 0xF) | ((pos.y & 0xFF) << 8) | ((pos.z & 0xF) << 4)].set_blockid(block_id);
     }
 
-    void replace_air(vec3i position, BlockID id)
+    void replace_air(const vec3i &position, BlockID id)
     {
         block_t *block = this->get_block(position);
         if (block->get_blockid() != BlockID::air)
             return;
         block->set_blockid(id);
     }
-    
-    float player_taxicab_distance() {
+
+    float player_taxicab_distance()
+    {
         return std::abs(this->x - player_pos.x) + std::abs(this->z - player_pos.z);
     }
 
-    bool operator< (chunk_t& other)
+    bool operator<(chunk_t &other)
     {
         return this->player_taxicab_distance() < other.player_taxicab_distance();
     }
@@ -101,16 +103,21 @@ public:
     void destroy_vbo(int section, unsigned char which);
     void rebuild_vbo(int section, bool transparent);
     int build_vbo(int section, bool transparent);
-    int render_fluid(block_t *block, vec3i pos);
+    int render_fluid(block_t *block, const vec3i &pos);
     void prepare_render();
     int pre_render_fluid_mesh(int section, bool transparent);
     int render_fluid_mesh(int section, bool transparent, int vertexCount);
     int pre_render_block_mesh(int section, bool transparent);
     int render_block_mesh(int section, bool transparent, int vertexCount);
-    int render_block(block_t *block, vec3i pos, bool transparent);
-    int render_torch(block_t *block, vec3i pos);
+    int pre_render_block(block_t *block, const vec3i &pos, bool transparent);
+    int render_block(block_t *block, const vec3i &pos, bool transparent);
+    int render_special(block_t *block, const vec3i &pos);
+    int render_flat_ground(block_t *block, const vec3i &pos);
+    int render_torch(block_t *block, const vec3i &pos);
+    int render_cross(block_t *block, const vec3i &pos);
+    int render_slab(block_t *block, const vec3i &pos);
 
-    void update_entities(float dt);
+    void update_entities();
 
     uint32_t size();
     chunk_t()
@@ -130,15 +137,16 @@ void init_chunks();
 void deinit_chunks();
 void print_chunk_status();
 bool has_pending_chunks();
-BlockID get_block_id_at(vec3i position, BlockID default_id = BlockID::air, chunk_t *near = nullptr);
-block_t *get_block_at(vec3i vec, chunk_t *near = nullptr);
+BlockID get_block_id_at(const vec3i &position, BlockID default_id = BlockID::air, chunk_t *near = nullptr);
+block_t *get_block_at(const vec3i &vec, chunk_t *near = nullptr);
 vec3i block_to_chunk_pos(vec3i pos);
-chunk_t *get_chunk_from_pos(vec3i pos, bool load, bool write_cache = true);
-chunk_t *get_chunk(vec3i pos, bool load, bool write_cache = true);
+chunk_t *get_chunk_from_pos(const vec3i &pos, bool load, bool write_cache = true);
+chunk_t *get_chunk(const vec3i &pos, bool load, bool write_cache = true);
 void add_chunk(vec3i pos);
 void generate_chunk();
 void *get_aligned_pointer_32(void *ptr);
-void get_neighbors(vec3i pos, block_t **neighbors);
-void update_block_at(vec3i pos);
-void update_neighbors(vec3i pos);
+void get_neighbors(const vec3i &pos, block_t **neighbors, chunk_t *near = nullptr);
+void update_block_at(const vec3i &pos);
+void update_neighbors(const vec3i &pos);
+vec3f get_fluid_direction(block_t *block, vec3i pos);
 #endif

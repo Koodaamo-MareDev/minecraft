@@ -17,17 +17,17 @@ bool is_face_transparent(uint8_t texture_index)
 
 bool is_solid(BlockID block_id)
 {
-    return block_id != BlockID::air && !is_fluid(block_id) && !is_face_transparent(get_default_texture_index(block_id));
+    return block_properties[uint8_t(block_id)].m_solid;
 }
 
 uint8_t get_block_luminance(BlockID block_id)
 {
-    return block_properties[int(block_id)].m_luminance;
+    return block_properties[uint8_t(block_id)].m_luminance;
 }
 
 uint32_t get_default_texture_index(BlockID blockid)
 {
-    return block_properties[int(blockid)].m_texture_index;
+    return block_properties[uint8_t(blockid)].m_texture_index;
 }
 
 uint32_t get_face_texture_index(block_t *block, int face)
@@ -51,12 +51,20 @@ uint32_t get_face_texture_index(block_t *block, int face)
         case FACE_PX:
         case FACE_NZ:
         case FACE_PZ:
-            return 3;
+            return 202;
         case FACE_NY:
             return 2;
         case FACE_PY:
-            return 1;
+            return 203;
         }
+    }
+    case BlockID::leaves:
+    {
+        if (!block->meta)
+            return 186;
+        else if (block->meta == 1)
+            return 235;
+        return 219;
     }
     case BlockID::wood:
     { // log
@@ -69,6 +77,29 @@ uint32_t get_face_texture_index(block_t *block, int face)
             return 20;
         }
     }
+    case BlockID::tnt:
+    {
+        if (face == FACE_NY)
+            return 10;
+        if (face == FACE_PY)
+            return 9;
+        return 8;
+    }
+    case BlockID::bookshelf:
+    {
+        if (face == FACE_NY || face == FACE_PY)
+            return 4;
+        return 35;
+    }
+    case BlockID::chest:
+    {
+        int block_direction = (block->meta) & 0x03;
+        if (face == FACE_NY || face == FACE_PY)
+            return 25;
+        if (face == directionmap[block_direction])
+            return 27;
+        return 26;
+    }
     case BlockID::dispenser:
     {
         int block_direction = (block->meta) & 0x03;
@@ -77,6 +108,37 @@ uint32_t get_face_texture_index(block_t *block, int face)
         if (face == directionmap[block_direction])
             return 46;
         return 45;
+    }
+    case BlockID::double_stone_slab:
+    case BlockID::stone_slab:
+    {
+        if (face == FACE_NY || face == FACE_PY)
+            return 6;
+        return 5;
+    }
+    case BlockID::crafting_table:
+    {
+        if (face == FACE_NY)
+            return 4;
+        if (face == FACE_PY)
+            return 43;
+        if (face == FACE_NX || face == FACE_PX)
+            return 59;
+        return 60;
+    }
+    case BlockID::piston:
+    case BlockID::sticky_piston:
+    {
+        int block_direction = (block->meta) & 0x07;
+        bool sticky = (block->meta & 0x08) != 0;
+        if (block_direction == face)
+            return sticky ? 107 : 106;
+        else if (block_direction == (face ^ 1))
+            return 109;
+        else if ((block_direction & ~1) == FACE_NY)
+            return 172 + (block_direction & 1);
+        else
+            return 188 + ((face & 1) ^ ((face & ~1) == FACE_NY));
     }
     default:
         return get_default_texture_index(blockid);
@@ -381,19 +443,48 @@ bool is_fluid_overridable(BlockID id)
     }
 }
 
+void default_aabb(const vec3i &pos, block_t *block, const aabb_t &other, std::vector<aabb_t> &aabb_list)
+{
+    aabb_t aabb;
+    aabb.min = vec3f(pos.x, pos.y, pos.z);
+    aabb.max = aabb.min + vec3f(1, 1, 1);
+    if (aabb.intersects(other))
+        aabb_list.push_back(aabb);
+}
+
+void slab_aabb(const vec3i &pos, block_t *block, const aabb_t &other, std::vector<aabb_t> &aabb_list)
+{
+    aabb_t aabb;
+
+    aabb.min = vec3f(pos.x, pos.y, pos.z);
+    aabb.max = aabb.min + vec3f(1, 1, 1);
+
+    if ((block->meta & 1))
+    {
+        aabb.min.y += 0.5;
+    }
+    else if (!(block->meta & 2))
+    {
+        aabb.max.y -= 0.5;
+    }
+
+    if (aabb.intersects(other))
+        aabb_list.push_back(aabb);
+}
+
 blockproperties_t block_properties[256] = {
-    blockproperties_t().id(BlockID::air).opacity(0).solid(false).transparent(true),
+    blockproperties_t().id(BlockID::air).opacity(0).solid(false).transparent(true).collision(CollisionType::none).valid_item(false),
     blockproperties_t().id(BlockID::stone).texture(0).sound(SoundType::stone),
     blockproperties_t().id(BlockID::grass).texture(1).sound(SoundType::grass),
     blockproperties_t().id(BlockID::dirt).texture(2).sound(SoundType::dirt),
     blockproperties_t().id(BlockID::cobblestone).texture(16).sound(SoundType::stone),
     blockproperties_t().id(BlockID::planks).texture(4).sound(SoundType::wood),
-    blockproperties_t().id(BlockID::sapling).texture(15).opacity(0).solid(false).transparent(true),
-    blockproperties_t().id(BlockID::bedrock).texture(17).sound(SoundType::stone),
-    blockproperties_t().id(BlockID::flowing_water).texture(206).fluid(true).base_fluid(BlockID::water).flow_fluid(BlockID::flowing_water).opacity(1).solid(false).transparent(true),
-    blockproperties_t().id(BlockID::water).texture(205).fluid(true).base_fluid(BlockID::water).flow_fluid(BlockID::flowing_water).opacity(1).solid(false).transparent(true),
-    blockproperties_t().id(BlockID::flowing_lava).texture(238).fluid(true).base_fluid(BlockID::lava).flow_fluid(BlockID::flowing_lava).opacity(0).luminance(15).solid(false),
-    blockproperties_t().id(BlockID::lava).texture(237).fluid(true).base_fluid(BlockID::lava).flow_fluid(BlockID::flowing_lava).opacity(0).luminance(15).solid(false),
+    blockproperties_t().id(BlockID::sapling).texture(15).sound(SoundType::grass).opacity(0).solid(false).transparent(true).render_type(RenderType::cross).collision(CollisionType::none),
+    blockproperties_t().id(BlockID::bedrock).texture(17).sound(SoundType::stone).blast_resistance(-1),
+    blockproperties_t().id(BlockID::flowing_water).texture(206).fluid(true).base_fluid(BlockID::water).flow_fluid(BlockID::flowing_water).opacity(1).solid(false).transparent(true).render_type(RenderType::special).collision(CollisionType::fluid).blast_resistance(-1),
+    blockproperties_t().id(BlockID::water).texture(205).fluid(true).base_fluid(BlockID::water).flow_fluid(BlockID::flowing_water).opacity(1).solid(false).transparent(true).render_type(RenderType::special).collision(CollisionType::fluid).blast_resistance(-1),
+    blockproperties_t().id(BlockID::flowing_lava).texture(238).fluid(true).base_fluid(BlockID::lava).flow_fluid(BlockID::flowing_lava).opacity(0).luminance(15).solid(false).render_type(RenderType::special).collision(CollisionType::fluid).blast_resistance(-1),
+    blockproperties_t().id(BlockID::lava).texture(237).fluid(true).base_fluid(BlockID::lava).flow_fluid(BlockID::flowing_lava).opacity(0).luminance(15).solid(false).render_type(RenderType::special).collision(CollisionType::fluid).blast_resistance(-1),
     blockproperties_t().id(BlockID::sand).texture(18).sound(SoundType::sand).fall(true),
     blockproperties_t().id(BlockID::gravel).texture(19).sound(SoundType::dirt).fall(true),
     blockproperties_t().id(BlockID::gold_ore).texture(32).sound(SoundType::stone),
@@ -408,35 +499,35 @@ blockproperties_t block_properties[256] = {
     blockproperties_t().id(BlockID::dispenser).texture(46).sound(SoundType::stone),
     blockproperties_t().id(BlockID::sandstone).texture(176).sound(SoundType::stone),
     blockproperties_t().id(BlockID::note_block).texture(74).sound(SoundType::wood),
-    blockproperties_t().id(BlockID::bed).texture(135).opacity(0).sound(SoundType::stone),
-    blockproperties_t().id(BlockID::golden_rail).texture(163).opacity(0).transparent(true).solid(false).sound(SoundType::metal),
-    blockproperties_t().id(BlockID::detector_rail).texture(179).opacity(0).transparent(true).solid(false).sound(SoundType::metal),
-    blockproperties_t().id(BlockID::sticky_piston).texture(106).solid(false).sound(SoundType::stone),
-    blockproperties_t().id(BlockID::cobweb).texture(11).solid(false).opacity(0).transparent(true).sound(SoundType::stone),
-    blockproperties_t().id(BlockID::deadbush).texture(55).solid(false).opacity(0).transparent(true).sound(SoundType::grass),
-    blockproperties_t().id(BlockID::piston).texture(108).solid(false).sound(SoundType::stone),
-    blockproperties_t().id(BlockID::piston_head).texture(107).solid(false).sound(SoundType::stone),
+    blockproperties_t().id(BlockID::bed).texture(134).transparent(true).solid(false).opacity(0).sound(SoundType::stone).render_type(RenderType::special).valid_item(false),
+    blockproperties_t().id(BlockID::golden_rail).texture(163).opacity(0).transparent(true).solid(false).sound(SoundType::metal).render_type(RenderType::flat_ground).collision(CollisionType::none),
+    blockproperties_t().id(BlockID::detector_rail).texture(179).opacity(0).transparent(true).solid(false).sound(SoundType::metal).render_type(RenderType::flat_ground).collision(CollisionType::none),
+    blockproperties_t().id(BlockID::sticky_piston).state(0x0B).texture(106).solid(false).sound(SoundType::stone),
+    blockproperties_t().id(BlockID::cobweb).texture(11).solid(false).opacity(0).transparent(true).sound(SoundType::stone).render_type(RenderType::cross).collision(CollisionType::none),
+    blockproperties_t().id(BlockID::deadbush).texture(55).solid(false).opacity(0).transparent(true).sound(SoundType::grass).render_type(RenderType::cross).collision(CollisionType::none),
+    blockproperties_t().id(BlockID::piston).state(3).texture(108).solid(false).sound(SoundType::stone),
+    blockproperties_t().id(BlockID::piston_head).texture(107).solid(false).sound(SoundType::stone).valid_item(false),
     blockproperties_t().id(BlockID::wool).texture(64).sound(SoundType::cloth),
-    blockproperties_t().id(BlockID::piston_extension).texture(0).solid(false).sound(SoundType::stone),
-    blockproperties_t().id(BlockID::dandelion).texture(13).solid(false).opacity(0).transparent(true).sound(SoundType::grass),
-    blockproperties_t().id(BlockID::rose).texture(12).solid(false).opacity(0).transparent(true).sound(SoundType::grass),
-    blockproperties_t().id(BlockID::brown_mushroom).texture(29).solid(false).opacity(0).transparent(true).sound(SoundType::grass),
-    blockproperties_t().id(BlockID::red_mushroom).texture(28).solid(false).opacity(0).transparent(true).sound(SoundType::grass),
+    blockproperties_t().id(BlockID::piston_extension).texture(0).solid(false).sound(SoundType::stone).valid_item(false),
+    blockproperties_t().id(BlockID::dandelion).texture(13).solid(false).opacity(0).transparent(true).sound(SoundType::grass).render_type(RenderType::cross).collision(CollisionType::none),
+    blockproperties_t().id(BlockID::rose).texture(12).solid(false).opacity(0).transparent(true).sound(SoundType::grass).render_type(RenderType::cross).collision(CollisionType::none),
+    blockproperties_t().id(BlockID::brown_mushroom).texture(29).solid(false).opacity(0).transparent(true).sound(SoundType::grass).render_type(RenderType::cross).collision(CollisionType::none),
+    blockproperties_t().id(BlockID::red_mushroom).texture(28).solid(false).opacity(0).transparent(true).sound(SoundType::grass).render_type(RenderType::cross).collision(CollisionType::none),
     blockproperties_t().id(BlockID::gold_block).texture(23).sound(SoundType::metal),
     blockproperties_t().id(BlockID::iron_block).texture(22).sound(SoundType::metal),
     blockproperties_t().id(BlockID::double_stone_slab).texture(6).sound(SoundType::stone),
-    blockproperties_t().id(BlockID::stone_slab).texture(6).sound(SoundType::stone),
+    blockproperties_t().id(BlockID::stone_slab).texture(6).opacity(0).solid(false).transparent(true).sound(SoundType::stone).aabb(slab_aabb).render_type(RenderType::slab),
     blockproperties_t().id(BlockID::bricks).texture(7).sound(SoundType::stone),
     blockproperties_t().id(BlockID::tnt).texture(8).sound(SoundType::grass),
     blockproperties_t().id(BlockID::bookshelf).texture(35).sound(SoundType::wood),
     blockproperties_t().id(BlockID::mossy_cobblestone).texture(36).sound(SoundType::stone),
-    blockproperties_t().id(BlockID::obsidian).texture(37).sound(SoundType::stone),
-    blockproperties_t().id(BlockID::torch).texture(80).solid(false).opacity(0).transparent(true).luminance(14).sound(SoundType::wood),
+    blockproperties_t().id(BlockID::obsidian).texture(37).sound(SoundType::stone).blast_resistance(-1),
+    blockproperties_t().id(BlockID::torch).texture(80).solid(false).opacity(0).transparent(true).luminance(14).sound(SoundType::wood).render_type(RenderType::special).collision(CollisionType::none),
     blockproperties_t().id(BlockID::fire).texture(31).solid(false).opacity(0).transparent(true).luminance(15).sound(SoundType::cloth),
-    blockproperties_t().id(BlockID::mob_spawner).texture(65).solid(false).sound(SoundType::metal),
+    blockproperties_t().id(BlockID::mob_spawner).texture(65).solid(false).opacity(0).transparent(true).sound(SoundType::metal),
     blockproperties_t().id(BlockID::oak_stairs).texture(4).solid(false).sound(SoundType::wood),
     blockproperties_t().id(BlockID::chest).texture(27).sound(SoundType::wood),
-    blockproperties_t().id(BlockID::redstone_wire).texture(164).solid(false).opacity(0).transparent(true).sound(SoundType::stone),
+    blockproperties_t().id(BlockID::redstone_wire).texture(164).solid(false).opacity(0).transparent(true).sound(SoundType::stone).render_type(RenderType::flat_ground).valid_item(false).collision(CollisionType::none),
     blockproperties_t().id(BlockID::diamond_ore).texture(50).sound(SoundType::stone),
     blockproperties_t().id(BlockID::diamond_block).texture(24).sound(SoundType::metal),
 
@@ -467,11 +558,16 @@ sound_t get_step_sound(BlockID block_id)
         sound = sound_t(get_random_sound(wood_sounds));
         break;
     case SoundType::stone:
+    case SoundType::metal: // The metal sound is the same as stone with a different pitch.
         sound = sound_t(get_random_sound(stone_sounds));
         break;
     default:
         break;
     }
+    sound.volume = 0.15f;
+
+    if (properties.m_sound_type == SoundType::metal)
+        sound.pitch = 1.5f;
 
     return sound;
 }
@@ -501,11 +597,15 @@ sound_t get_mine_sound(BlockID block_id)
         sound = sound_t(get_random_sound(wood_sounds));
         break;
     case SoundType::stone:
+    case SoundType::metal: // The metal sound is the same as stone with a different pitch.
         sound = sound_t(get_random_sound(stone_sounds));
         break;
     default:
         break;
     }
+
+    if (properties.m_sound_type == SoundType::metal)
+        sound.pitch = 1.5f;
 
     return sound;
 }
@@ -535,11 +635,15 @@ sound_t get_break_sound(BlockID block_id)
         sound = sound_t(get_random_sound(wood_sounds));
         break;
     case SoundType::stone:
+    case SoundType::metal: // The metal sound is the same as stone with a different pitch.
         sound = sound_t(get_random_sound(stone_sounds));
         break;
     default:
         break;
     }
+
+    if (properties.m_sound_type == SoundType::metal)
+        sound.pitch = 1.5f;
 
     return sound;
 }

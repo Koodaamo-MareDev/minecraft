@@ -24,8 +24,8 @@ void sound_t::play()
     if (first_unused < 1)
         return;
     voice = first_unused;
-    ASND_SetVoice(first_unused, VOICE_MONO_16BIT, 16000 * pitch, 0, aiff_data->sound_data.sound_data, aiff_data->sound_data.chunk_size, 255, 255, nullptr);
-    ASND_PauseVoice(first_unused, 0);
+    ASND_SetVoice(voice, VOICE_MONO_16BIT, 16000 * pitch, 0, aiff_data->sound_data.sound_data, aiff_data->sound_data.chunk_size, left, right, nullptr);
+    ASND_PauseVoice(voice, 0);
 }
 
 void sound_t::pause()
@@ -96,7 +96,10 @@ void sound_t::update(vec3f head_right, vec3f head_position)
     int right_volume = 255 - std::max(0, pan);
     int left_volume = 255 + std::min(0, pan);
 
-    ASND_ChangeVolumeVoice(voice, left_volume * clamped_distance, right_volume * clamped_distance);
+    this->left = left_volume * clamped_distance;
+    this->right = right_volume * clamped_distance;
+
+    ASND_ChangeVolumeVoice(voice, left, right);
 }
 
 sound_system_t::sound_system_t()
@@ -112,6 +115,8 @@ sound_system_t::~sound_system_t()
 
 void sound_system_t::update(vec3f head_right, vec3f head_position)
 {
+    this->head_position = head_position;
+    this->head_right = head_right;
     for (int i = 0; i < 15; i++)
     {
         sounds[i].update(head_right, head_position);
@@ -142,6 +147,7 @@ void sound_system_t::play_sound(sound_t sound)
         {
             s = sound;
             s.play();
+            s.update(head_right, head_position);
             return;
         }
     }

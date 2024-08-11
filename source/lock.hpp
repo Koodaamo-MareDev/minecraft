@@ -3,6 +3,7 @@
 
 #include <ogc/lwp.h>
 #include <ogc/mutex.h>
+#include <unistd.h>
 
 class lock_t
 {
@@ -13,8 +14,8 @@ private:
 public:
     void lock()
     {
-        while (LWP_MutexLock(mutex))
-            LWP_YieldThread();
+        while (LWP_MutexTryLock(mutex))
+            usleep(1);
     }
 
     lock_t(mutex_t mutex) : mutex(mutex)

@@ -36,6 +36,8 @@ std::vector<aiff_container> stone_sounds({aiff_container(stone1_aiff),
                                           aiff_container(stone3_aiff),
                                           aiff_container(stone4_aiff)});
 
+aiff_container explode_sound(explode_aiff);
+
 aiff_container &get_random_sound(std::vector<aiff_container> &sounds)
 {
     return sounds[rand() % sounds.size()];

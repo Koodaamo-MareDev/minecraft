@@ -9,10 +9,12 @@
 #include "render.hpp"
 #include "base3d.hpp"
 
-int draw_textured_quad(GXTexObj &texture, int32_t x, int32_t y, int32_t w, int32_t h, uint32_t u1, uint32_t v1, uint32_t u2, uint32_t v2);
+constexpr float GUI_DEFAULT_SCALE = 1.0f / BASE3D_POS_FRAC;
 
-int fill_screen_texture(GXTexObj &texture, view_t& view, int32_t u1, int32_t v1, int32_t u2, int32_t v2);
+int draw_textured_quad(GXTexObj &texture, int32_t x, int32_t y, int32_t w, int32_t h, uint32_t u1, uint32_t v1, uint32_t u2, uint32_t v2, float scale = GUI_DEFAULT_SCALE);
 
-int draw_simple_textured_quad(GXTexObj &texture, int32_t x, int32_t y, int32_t w, int32_t h);
+int fill_screen_texture(GXTexObj &texture, view_t& view, int32_t u1, int32_t v1, int32_t u2, int32_t v2, float scale = GUI_DEFAULT_SCALE);
+
+int draw_simple_textured_quad(GXTexObj &texture, int32_t x, int32_t y, int32_t w, int32_t h, float scale = GUI_DEFAULT_SCALE);
 
 #endif

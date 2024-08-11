@@ -27,11 +27,12 @@ extern guVector player_pos;
 extern float xrot, yrot;
 extern int tickCounter;
 extern float partialTicks;
+extern Mtx active_mtx;
 
 struct plane_t
 {
     vec3f direction;
-    float distance;
+    vfloat_t distance;
 };
 
 struct frustum_t
@@ -41,12 +42,12 @@ struct frustum_t
 
 struct camera_t
 {
-    vec3f rot;
-    vec3f position; // Camera position
-    float fov;      // Field of view angle
-    float aspect;   // Aspect ratio
-    float near;     // Near clipping plane
-    float far;      // Far clipping plane
+    vec3f rot;       // Camera rotation (in degrees)
+    vec3f position;  // Camera position
+    vfloat_t fov;    // Field of view (in degrees)
+    vfloat_t aspect; // Aspect ratio
+    vfloat_t near;   // Near clipping plane
+    vfloat_t far;    // Far clipping plane
 };
 
 struct view_t
@@ -74,6 +75,19 @@ struct view_t
     }
 };
 
+inline uint8_t get_face_light_index(vec3i pos, uint8_t face, chunk_t *near, block_t *default_block = nullptr)
+{
+    vec3i other = pos + face_offsets[face];
+    block_t *other_block = get_block_at(other, near);
+    if (!other_block)
+    {
+        if (default_block)
+            return default_block->light;
+        return 255;
+    }
+    return other_block->light;
+}
+
 void init_texture(GXTexObj &texture, void *data_src, uint32_t data_len);
 
 void init_textures();
@@ -94,7 +108,11 @@ Mtx &get_view_matrix();
 
 int render_face(vec3i pos, uint8_t face, uint32_t texture_index, chunk_t *near = nullptr, block_t *block = nullptr);
 
-guVector angles_to_vector(float x, float y, float distance, guVector vec = guVector());
+void render_single_block(block_t &selected_block, bool transparency);
+
+void render_single_item(uint32_t texture_index, bool transparency);
+
+vec3f angles_to_vector(float x, float y);
 
 float distance_to_plane(const vec3f &point, const frustum_t &frustum, int planeIndex);
 
@@ -102,7 +120,7 @@ float distance_to_frustum(const vec3f &point, const frustum_t &frustum);
 
 frustum_t calculate_frustum(camera_t &camera);
 
-void transform_view(Mtx view, guVector chunkPos);
+void transform_view(Mtx view, guVector chunkPos, bool load = true);
 
 void transform_view_screen(Mtx view, guVector off);
 

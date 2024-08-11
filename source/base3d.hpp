@@ -43,30 +43,25 @@ public:
     vertex_property_t(vec3f pos = vec3f(0, 0, 0), uint32_t x_uv = 0, uint32_t y_uv = 0, uint8_t color_r = 255, uint8_t color_g = 255, uint8_t color_b = 255, uint8_t color_a = 255, uint8_t index = 0) : pos(pos), x_uv(x_uv), y_uv(y_uv), color_r(color_r), color_g(color_g), color_b(color_b), color_a(color_a), index(index) {}
 };
 
-#define MAKEVEC(V) (guVector{std::sqrt(1-(V*V)), -V, 0})
+#define MAKEVEC(V) (guVector{std::sqrt(1 - ((V) * (V))), -(V), 0})
 
 extern float face_normals[];
 extern bool base3d_is_drawing;
 extern uint16_t __group_vtxcount;
 inline void init_face_normals()
 {
-    guVector vecs[] = {
-        MAKEVEC(0.8f),
-        MAKEVEC(0.8f),
-        MAKEVEC(0.5f),
-        MAKEVEC(1.0f),
-        MAKEVEC(0.6f),
-        MAKEVEC(0.6f)};
-    guVector *vec = vecs;
-    float* elem = face_normals;
-    for (int i = 0; i < 6; i++, vec++)
+    constexpr float normal_scale = 1.0f;
+    float multipliers[] = {0.8f, 0.8f, 0.5f, 1.0f, 0.6f, 0.6f};
+    float *elem = face_normals;
+    for (int i = 0; i < 24; i++)
     {
-        //guVecNormalize(vec);
-        *(elem++) = vec->x;
-        *(elem++) = vec->y;
-        *(elem++) = vec->z;
+        float multiplier = (multipliers[i % 6] * 1.f - (0.025f * int(i / 6))) * normal_scale;
+        guVector vec = MAKEVEC(multiplier);
+        *(elem++) = vec.x;
+        *(elem++) = vec.y;
+        *(elem++) = vec.z;
     }
-    GX_SetArray(GX_VA_NRM, face_normals, 3*sizeof(float));
+    GX_SetArray(GX_VA_NRM, face_normals, 3 * sizeof(float));
 }
 
 inline void GX_BeginGroup(uint8_t primitive, uint16_t vtxcount = 0)
@@ -84,7 +79,7 @@ inline uint16_t GX_EndGroup()
     return __group_vtxcount;
 }
 
-inline void GX_Vertex(vertex_property_t vert, uint8_t face = FACE_PY)
+inline void GX_Vertex(vertex_property_t vert, uint8_t face = 6)
 {
     ++__group_vtxcount;
     if (!base3d_is_drawing)
@@ -96,13 +91,37 @@ inline void GX_Vertex(vertex_property_t vert, uint8_t face = FACE_PY)
     GX_TexCoord2f32(uv_invscale * vert.x_uv, uv_invscale * vert.y_uv);
 }
 
-inline void GX_VertexLit(vertex_property_t vert, uint8_t light, uint8_t face = FACE_PY)
+inline void GX_VertexLit(vertex_property_t vert, uint8_t light, uint8_t face = 6)
 {
     ++__group_vtxcount;
     if (!base3d_is_drawing)
         return;
     constexpr float uv_invscale = 1. / BASE3D_UV_FRAC;
     GX_Position3s16(BASE3D_POS_FRAC * vert.pos.x, BASE3D_POS_FRAC * vert.pos.y, BASE3D_POS_FRAC * vert.pos.z);
+    GX_Normal1x8(face);
+    GX_Color1x8(light);
+    GX_TexCoord2f32(uv_invscale * vert.x_uv, uv_invscale * vert.y_uv);
+}
+
+inline void GX_VertexF(vertex_property_t vert, uint8_t face = 6)
+{
+    ++__group_vtxcount;
+    if (!base3d_is_drawing)
+        return;
+    constexpr float uv_invscale = 1. / BASE3D_UV_FRAC;
+    GX_Position3f32(vert.pos.x, vert.pos.y, vert.pos.z);
+    GX_Normal1x8(face);
+    GX_Color4u8(vert.color_r, vert.color_g, vert.color_b, vert.color_a);
+    GX_TexCoord2f32(uv_invscale * vert.x_uv, uv_invscale * vert.y_uv);
+}
+
+inline void GX_VertexLitF(vertex_property_t vert, uint8_t light, uint8_t face = 6)
+{
+    ++__group_vtxcount;
+    if (!base3d_is_drawing)
+        return;
+    constexpr float uv_invscale = 1. / BASE3D_UV_FRAC;
+    GX_Position3f32(vert.pos.x, vert.pos.y, vert.pos.z);
     GX_Normal1x8(face);
     GX_Color1x8(light);
     GX_TexCoord2f32(uv_invscale * vert.x_uv, uv_invscale * vert.y_uv);

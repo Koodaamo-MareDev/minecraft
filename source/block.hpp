@@ -3,9 +3,12 @@
 
 #include <stdint.h>
 #include <cmath>
+#include <vector>
+#include <functional>
 #include "block_id.hpp"
 #include "aabb.hpp"
 #include "vec3f.hpp"
+#include "vec3i.hpp"
 
 #define FACE_NX 0
 #define FACE_PX 1
@@ -15,9 +18,7 @@
 #define FACE_PZ 5
 #define RENDER_FLAG_VISIBLE 6
 
-#define BLOCKPROP(A, B) block_properties[uint8_t(A)].B
-
-enum class SoundType
+enum class SoundType : uint8_t
 {
     none,
     dirt,
@@ -30,21 +31,76 @@ enum class SoundType
     cloth,
 };
 
+enum class RenderType : uint8_t
+{
+    full,
+    cross,
+    flat_ground,
+    slab,
+    special,
+};
+
+enum class CollisionType : uint8_t
+{
+    none,
+    solid,
+    fluid,
+    slab,
+
+};
+class block_t;
+
+void default_aabb(const vec3i &pos, block_t *block, const aabb_t &other, std::vector<aabb_t> &aabb_list);
+void slab_aabb(const vec3i &pos, block_t *block, const aabb_t &other, std::vector<aabb_t> &aabb_list);
+
 struct blockproperties_t
 {
     BlockID m_id = BlockID::air;
     uint8_t m_default_state = 0;
     uint8_t m_texture_index = 0;
     uint8_t m_opacity = 15;
-    uint8_t m_transparent = 0;
     uint8_t m_luminance = 0;
-    uint8_t m_solid = 1;
-    uint8_t m_fluid = 0;
     uint8_t m_fluid_decay = 0;
     BlockID m_base_fluid = BlockID::air;
     BlockID m_flow_fluid = BlockID::air;
     SoundType m_sound_type = SoundType::none;
-    uint8_t m_fall = 0;
+    RenderType m_render_type = RenderType::full;
+    CollisionType m_collision = CollisionType::solid;
+    float_t m_slipperiness = 0.6f;
+    float_t m_blast_resistance = 0.5f;
+
+    union
+    {
+        struct
+        {
+            uint8_t m_fall : 1;
+            uint8_t m_transparent : 1;
+            uint8_t m_solid : 1;
+            uint8_t m_fluid : 1;
+            uint8_t m_valid_item : 1;
+        };
+        uint8_t m_flags;
+    };
+
+    std::function<void(const vec3i &, block_t *, const aabb_t &, std::vector<aabb_t> &)> m_aabb;
+
+    bool intersects(const vec3i &pos, block_t *block, const aabb_t &other)
+    {
+        std::vector<aabb_t> aabb_list;
+        m_aabb(pos, block, other, aabb_list);
+        return aabb_list.size() > 0;
+    }
+
+    blockproperties_t()
+    {
+        // Set bit fields to default values
+        m_fall = 0;
+        m_transparent = 0;
+        m_solid = 1;
+        m_fluid = 0;
+        m_valid_item = 1;
+        m_aabb = default_aabb;
+    }
 
     // FIXME: This is a temporary constructor replacement as the inlay hints are otherwise not visible.
     blockproperties_t &set(uint8_t default_state, uint8_t texture_index, uint8_t opacity, uint8_t transparent, uint8_t luminance, uint8_t is_solid, uint8_t is_fluid, uint8_t fluid_decay, BlockID base_fluid, BlockID flow_fluid, SoundType sound)
@@ -142,10 +198,54 @@ struct blockproperties_t
         return *this;
     }
 
-    blockproperties_t() {}
+    blockproperties_t &render_type(RenderType value)
+    {
+        this->m_render_type = value;
+        return *this;
+    }
+
+    blockproperties_t &valid_item(bool value)
+    {
+        this->m_valid_item = value;
+        return *this;
+    }
+
+    blockproperties_t &collision(CollisionType value)
+    {
+        this->m_collision = value;
+        return *this;
+    }
+
+    blockproperties_t &slipperiness(float_t value)
+    {
+        this->m_slipperiness = value;
+        return *this;
+    }
+
+    blockproperties_t &blast_resistance(float_t value)
+    {
+        this->m_blast_resistance = value;
+        return *this;
+    }
+
+    blockproperties_t &aabb(std::function<void(const vec3i &, block_t *, const aabb_t &, std::vector<aabb_t> &)> aabb_func)
+    {
+        this->m_aabb = aabb_func;
+        return *this;
+    }
 };
 
 extern blockproperties_t block_properties[256];
+
+inline blockproperties_t &properties(BlockID id)
+{
+    return block_properties[uint8_t(id)];
+}
+
+inline blockproperties_t &properties(uint8_t id)
+{
+    return block_properties[id];
+}
 
 class block_t
 {
@@ -163,6 +263,7 @@ public:
 
         uint8_t light;
     };
+    uint8_t ambient_occlusion = 0;
 
     BlockID get_blockid()
     {
@@ -193,27 +294,31 @@ public:
     void set_blockid(BlockID value)
     {
         this->id = uint8_t(value);
-        this->set_visibility(value != BlockID::air && !BLOCKPROP(value, m_fluid));
+        this->set_visibility(value != BlockID::air && !properties(value).m_fluid);
     }
 
     int8_t get_cast_skylight()
     {
-        int8_t opacity = BLOCKPROP(id, m_opacity);
+        int8_t opacity = properties(id).m_opacity;
         int8_t cast_light = int8_t(sky_light) - std::max(opacity, int8_t(1));
         return std::max(cast_light, int8_t(0));
     }
 
     int8_t get_cast_blocklight()
     {
-        int8_t opacity = BLOCKPROP(id, m_opacity);
+        int8_t opacity = properties(id).m_opacity;
         int8_t cast_light = int8_t(block_light) - std::max(opacity, int8_t(1));
         return std::max(cast_light, int8_t(0));
     }
 
-    aabb_t get_aabb(vec3i pos)
+    void get_aabb(const vec3i &pos, const aabb_t &other, std::vector<aabb_t> &aabb_list)
     {
-        // TODO: Implement per-block AABBs
-        return aabb_t(pos + vec3f(0, 0, 0), pos + vec3f(1, 1, 1));
+        properties(id).m_aabb(pos, this, other, aabb_list);
+    }
+
+    bool intersects(const aabb_t &other, const vec3i &pos)
+    {
+        return properties(id).intersects(pos, this, other);
     }
 };
 

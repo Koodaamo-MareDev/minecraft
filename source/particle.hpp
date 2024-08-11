@@ -28,7 +28,8 @@ public:
     // For example, the color of the particle or the UV coordinates of the texture
     // Alternatively, the data union can be used to store a pointer to a custom data structure
     // The behavior of the data union is determined by the type of the particle
-    union {
+    union
+    {
         struct
         {
             uint8_t r;
@@ -37,8 +38,9 @@ public:
             uint8_t a;
         };
         uint8_t color[4];
-        void* data;
-        struct {
+        void *data;
+        struct
+        {
             uint16_t u;
             uint16_t v;
         };
@@ -48,7 +50,7 @@ public:
 
     ~particle_t() {}
 
-    void update(float dt) override;
+    void update(float dt);
 };
 
 class particle_system_t

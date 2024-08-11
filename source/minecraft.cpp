@@ -10,7 +10,6 @@
 #include <ogc/lwp_watchdog.h>
 #include <fat.h>
 #include <ogc/conf.h>
-#include "threadhandler.hpp"
 #include "chunk_new.hpp"
 #include "block.hpp"
 #include "blocks.hpp"
@@ -28,19 +27,17 @@
 #include "render.hpp"
 #include "render_gui.hpp"
 #include "lock.hpp"
+#include "asynclib.hpp"
 #include "particle.hpp"
 #include "sound.hpp"
 #define DEFAULT_FIFO_SIZE (256 * 1024)
 #define CLASSIC_CONTROLLER_THRESHOLD 4
 #define MAX_PARTICLES 100
-#define LOOKAROUND_SENSITIVITY 360
+#define LOOKAROUND_SENSITIVITY 180.0f
 #define MOVEMENT_SPEED 15
 #define JUMP_HEIGHT 1.25f
 #define DIRECTIONAL_LIGHT GX_ENABLE
 
-bool debug_spritesheet = false;
-lwp_t main_thread;
-lwpq_t __thread_queue;
 f32 xrot = 0.0f;
 f32 yrot = 0.0f;
 aabb_entity_t *player = nullptr;
@@ -48,24 +45,28 @@ guVector player_pos = {0.F, 80.0F, 0.F};
 void *frameBuffer[2] = {NULL, NULL};
 static GXRModeObj *rmode = NULL;
 
-void *outline = nullptr;
-u32 outline_len = 0;
-
 bool draw_block_outline = false;
-vec3i raycast_block;
-vec3i raycast_block_face;
+vec3i raycast_pos;
+vec3i raycast_face;
+std::vector<aabb_t> block_bounds;
 
 int dropFrames = 0;
 
 int frameCounter = 0;
 int tickCounter = 0;
+int lastEntityTick = 0;
 int lastWaterTick = 0;
+int fluidUpdateCount = 0;
 float lastStepDistance = 0;
 float deltaTime = 0.0f;
 float partialTicks = 0.0f;
 
 uint32_t total_chunks_size = 0;
 
+u32 wiimote_down = 0;
+u32 wiimote_held = 0;
+float wiimote_x = 0;
+float wiimote_z = 0;
 int shoulder_btn_frame_counter = 0;
 float prev_left_shoulder = 0;
 float prev_right_shoulder = 0;
@@ -76,12 +77,16 @@ block_t selected_block = {uint8_t(BlockID::stone), 0x7F, 0, 0xF, 0xF};
 particle_system_t particle_system;
 sound_system_t *sound_system = nullptr;
 
+bool inventory_visible = false;
 bool show_dirtscreen = true;
 bool has_loaded = false;
 
+float fog_depth_multiplier = 1.0f;
+
 void UpdateLoadingStatus();
 void UpdateLightDir();
-void DrawSelectedBlock(std::deque<chunk_t *> &chunks, bool transparency);
+void DrawInventory(view_t &view);
+void DrawSelectedBlock();
 void DrawScene(std::deque<chunk_t *> &chunks, bool transparency);
 void GenerateChunks(int count);
 void RemoveRedundantChunks(std::deque<chunk_t *> &chunks);
@@ -132,62 +137,26 @@ void LightMapBlend(const uint8_t *src0, const uint8_t *src1, uint8_t *dst, uint8
         *(dst++) = ((*(src0++) * int(inv_factor)) + ((*(src1++) * int(factor)))) / 255;
     }
 }
-void AlphaBlend(unsigned char *src, unsigned char *dst, int width, int height, int row)
-{
-    int index = 0;
-    int src_alpha;
-    int one_minus_src_alpha;
-    for (int i = 0; i < height; i++, index += row)
-    {
-        for (int j = 0; j < width; j++)
-        {
-            int off = index + (j << 2);
-            src_alpha = (int)(src[off + 3]) & 0xFF;
-            if (src_alpha == 0xFF)
-            {
-                dst[off + 0] = src[off + 0];
-                dst[off + 1] = src[off + 1];
-                dst[off + 2] = src[off + 2];
-                continue;
-            }
-            else if (!src_alpha)
-            {
-                continue;
-            }
-            one_minus_src_alpha = 0xFF - src_alpha;
-            dst[off + 0] = (char)((((((int)(src[off + 0]) & 0xFF) * src_alpha) + ((int)(dst[off + 0]) & 0xFF) * one_minus_src_alpha) / 0xFF) & 0xFF);
-            dst[off + 1] = (char)((((((int)(src[off + 1]) & 0xFF) * src_alpha) + ((int)(dst[off + 1]) & 0xFF) * one_minus_src_alpha) / 0xFF) & 0xFF);
-            dst[off + 2] = (char)((((((int)(src[off + 2]) & 0xFF) * src_alpha) + ((int)(dst[off + 2]) & 0xFF) * one_minus_src_alpha) / 0xFF) & 0xFF);
-        }
-    }
-}
 
 float flerp(float a, float b, float f)
 {
     return a + f * (b - a);
 }
 
-void PrepareOutline()
+void DrawOutline(aabb_t &aabb)
 {
-    size_t len = (VERTEX_ATTR_LENGTH_DIRECTCOLOR * 24) + 3 + 32;
-    if ((len & 31) != 0)
-    {
-        len += 32;
-        len &= ~31;
-    }
-    void *ret = memalign(32, len);
-    if (!ret)
-        return;
-    GX_SetLineWidth(24, 0);
-    GX_BeginDispList(ret, len);
     GX_BeginGroup(GX_LINES, 24);
+
+    vec3f min = aabb.min;
+    vec3f size = aabb.max - aabb.min;
+
     for (int i = 0; i < 2; i++)
     {
         for (int j = 0; j < 2; j++)
         {
             for (int k = 0; k < 2; k++)
             {
-                GX_Vertex(vertex_property_t(vec3f(k, i, j), 0, 0, 0, 0, 0));
+                GX_Vertex(vertex_property_t(min + vec3f(size.x * k, size.y * i, size.z * j), 0, 0, 0, 0, 0, 191));
             }
         }
     }
@@ -197,7 +166,7 @@ void PrepareOutline()
         {
             for (int k = 0; k < 2; k++)
             {
-                GX_Vertex(vertex_property_t(vec3f(i, k, j), 0, 0, 0, 0, 0));
+                GX_Vertex(vertex_property_t(min + vec3f(size.x * i, size.y * k, size.z * j), 0, 0, 0, 0, 0, 191));
             }
         }
     }
@@ -207,14 +176,11 @@ void PrepareOutline()
         {
             for (int k = 0; k < 2; k++)
             {
-                GX_Vertex(vertex_property_t(vec3f(i, j, k), 0, 0, 0, 0, 0));
+                GX_Vertex(vertex_property_t(min + vec3f(size.x * i, size.y * j, size.z * k), 0, 0, 0, 0, 0, 191));
             }
         }
     }
     GX_EndGroup();
-    outline_len = GX_EndDispList();
-    DCInvalidateRange(ret, len);
-    outline = ret;
 }
 
 int main(int argc, char **argv)
@@ -225,8 +191,7 @@ int main(int argc, char **argv)
     void *gpfifo = NULL;
     GXColor background = get_sky_color();
 
-    threadhandler_init();
-
+    async_lib::init();
     VIDEO_Init();
     WPAD_Init();
     rmode = VIDEO_GetPreferredMode(NULL);
@@ -323,25 +288,18 @@ int main(int argc, char **argv)
 
     printf("Render resolution: %f,%f, Widescreen: %s\n", viewport.width, viewport.height, viewport.widescreen ? "Yes" : "No");
     light_engine_init();
-    printf("Initialized basics.\n");
-    VIDEO_Flush();
-    VIDEO_WaitVSync();
     srand(gettime());
-    printf("Initialized rng.\n");
-    VIDEO_Flush();
-    VIDEO_WaitVSync();
     init_chunks();
     printf("Initialized chunks.\n");
     VIDEO_Flush();
     VIDEO_WaitVSync();
     GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
-    PrepareOutline();
     GX_SetZCompLoc(GX_FALSE);
+    GX_SetLineWidth(16, GX_VTXFMT0);
     player_pos.x = 0;
     player_pos.y = -1000;
     player_pos.z = 0;
     VIDEO_SetPostRetraceCallback(&RenderDone);
-    main_thread = LWP_GetSelf();
     init_face_normals();
     PrepareTEV();
     std::deque<chunk_t *> &chunks = get_chunks();
@@ -361,34 +319,34 @@ int main(int argc, char **argv)
         background = get_sky_color();
         GX_SetCopyClear(background, 0x00FFFFFF);
 
+        fog_depth_multiplier = flerp(fog_depth_multiplier, std::min(std::max(player_pos.y, 24.f) / 48.f, 1.0f), 0.05f);
+
         // Enable fog
-        use_fog(true, viewport, background, GENERATION_DISTANCE * 0.5f - 8, GENERATION_DISTANCE * 0.5f);
+        use_fog(true, viewport, background, fog_depth_multiplier * (GENERATION_DISTANCE * 0.5f - 8), fog_depth_multiplier * (GENERATION_DISTANCE * 0.5f));
 
         if (player_pos.y < -999)
         {
-            player_pos.y = skycast(vec3i(int(player_pos.x), 0, int(player_pos.z))) + 2;
+            int y = skycast(vec3i(0, 0, 0)) + 3;
 
-            if (player_pos.y > -999)
+            if (y > -999)
             {
                 // Check if the player entity exists
                 if (player)
                 {
                     // Update the player entity's position
-                    player->position = player_pos;
-                    player->update_aabb();
+                    player->set_position(player_pos);
                 }
                 else
                 {
                     // Add the player to the chunks
-                    vec3i player_chunk_pos = vec3i(int(player_pos.x), int(player_pos.y), int(player_pos.z));
-                    chunk_t *player_chunk = get_chunk_from_pos(player_chunk_pos, false, false);
+                    chunk_t *player_chunk = get_chunk_from_pos(vec3i(0, 0, 0), false, false);
                     if (player_chunk)
                     {
-                        player = new aabb_entity_t();
-                        player->position = player_pos;
-                        player->prev_position = player_pos;
-                        vec3f player_view_offset = vec3f(-.5f, -.5f, -.5f);
-                        player->set_bounds(aabb_t(vec3f(-0.3f, -1.5f, -0.3f) - player_view_offset, vec3f(0.3f, 0.3f, 0.3f) - player_view_offset));
+                        player = new aabb_entity_t(0.6, 1.8);
+                        player->local = true;
+                        player->y_offset = 1.62;
+                        player->y_size = 0;
+                        player->set_position(vec3f(0.5, y, 0.5));
                         player_chunk->entities.push_back(player);
                     }
                 }
@@ -401,52 +359,34 @@ int main(int argc, char **argv)
             update_textures();
         }
 
-        vec3f prev_player_pos = player_pos;
-
         GetInput();
 
-        // Save jumping status for later
-        bool player_jumping = false;
+        for (int i = lastEntityTick, count = 0; i < tickCounter && count < 10; i++, count++)
+        {
+            for (chunk_t *&chunk : chunks)
+            {
+                // Update the entities in the chunk
+                chunk->update_entities();
+            }
+            wiimote_down = 0;
+            wiimote_held = 0;
+        }
+        lastEntityTick = tickCounter;
 
-        // If the player entity exists, update camera position
         if (player)
         {
-            player_pos = player->position;
-            player_jumping = player->jumping;
+            // Update the sound system
+            sound_system->update(angles_to_vector(0, yrot + 90), player->get_position(std::fmod(partialTicks, 1)));
+            player_pos = player->get_position(std::fmod(partialTicks, 1)) - vec3f(0.5, 0.5, 0.5);
+            camera.position = player_pos;
+            camera.rot.x = xrot;
+            camera.rot.y = yrot;
         }
-
-        camera.position = player_pos;
-        camera.rot.x = xrot;
-        camera.rot.y = yrot;
 
         // Construct the view frustum matrix from the camera
         frustum_t frustum = calculate_frustum(camera);
 
         UpdateScene(frustum, chunks);
-
-        if (player && (player->on_ground || player_jumping))
-        {
-            // Play step sound if the player moving on the ground
-            vec3f curr_player_pos = player_pos;
-            vec3f player_horizontal_velocity = vec3f(curr_player_pos.x - prev_player_pos.x, 0, curr_player_pos.z - prev_player_pos.z);
-            lastStepDistance += player_horizontal_velocity.magnitude();
-            if (lastStepDistance > 1.0f || player_jumping)
-            {
-                vec3f player_feet_pos = vec3f(player_pos.x, player_pos.y - 1.55f, player_pos.z);
-                block_t *block = get_block_at(vec3i(std::round(player_feet_pos.x), std::round(player_feet_pos.y), std::round(player_feet_pos.z)));
-                if (block && block->get_blockid() != BlockID::air)
-                {
-                    sound_t sound = get_step_sound(block->get_blockid());
-                    sound.volume = 0.15f;
-                    sound.position = player_feet_pos;
-                    sound_system->play_sound(sound);
-                    lastStepDistance = 0;
-                }
-            }
-        }
-
-        // Update the sound system
-        sound_system->update(angles_to_vector(0, yrot + 90, -1), player_pos);
 
         use_perspective(viewport);
 
@@ -481,25 +421,22 @@ int main(int argc, char **argv)
             GX_SetAlphaCompare(GX_GEQUAL, 16, GX_AOP_AND, GX_ALWAYS, 0);
             DrawScene(chunks, true);
 
-            // Draw selected block in solid mode
-            DrawSelectedBlock(chunks, false);
-
-            // Draw selected block in transparent mode
-            DrawSelectedBlock(chunks, true);
-
-            // Re-enable depth testing
-            GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
+            // Draw selected block
+            DrawSelectedBlock();
 
             // Draw sky
             draw_sky(background);
         }
-        GX_DrawDone();
+
         use_ortho(viewport);
         // Use 0 fractional bits for the position data, because we're drawing in pixel space.
         GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, 0);
 
         // Disable fog
         use_fog(false, viewport, background, 0, 0);
+
+        // Enable direct colors
+        GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
 
         // Draw GUI elements
         GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
@@ -511,6 +448,16 @@ int main(int argc, char **argv)
             int texture_index = get_default_texture_index(BlockID::dirt);
             fill_screen_texture(blockmap_texture, viewport, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index), TEXTURE_PX(texture_index), TEXTURE_PY(texture_index));
         }
+        else if (!inventory_visible)
+        {
+            // Draw crosshair
+            int crosshair_x = int(viewport.width - 32) >> 1;
+            int crosshair_y = int(viewport.height - 32) >> 1;
+
+            draw_textured_quad(icons_texture, crosshair_x, crosshair_y, 32, 32, 0, 0, 16, 16);
+        }
+        else
+            DrawInventory(viewport);
 
         GX_DrawDone();
 
@@ -532,8 +479,6 @@ int main(int argc, char **argv)
     }
     printf("De-initializing light engine...\n");
     light_engine_deinit();
-    printf("Notifying threads...\n");
-    threadhandler_broadcast();
     printf("De-initializing chunk engine...\n");
     deinit_chunks();
     printf("De-initializing sound system...\n");
@@ -588,149 +533,237 @@ void UpdateLoadingStatus()
 void GetInput()
 {
     WPAD_ScanPads();
-    u32 wiimote1_down = WPAD_ButtonsDown(0);
-    u32 wiimote1_held = WPAD_ButtonsHeld(0);
-    if ((wiimote1_down & (WPAD_BUTTON_HOME | WPAD_CLASSIC_BUTTON_HOME)))
+    static u32 prev_nunchuk_held = 0;
+    u32 raw_wiimote_down = WPAD_ButtonsDown(0);
+    u32 raw_wiimote_held = WPAD_ButtonsHeld(0);
+    if ((raw_wiimote_down & (WPAD_BUTTON_HOME | WPAD_CLASSIC_BUTTON_HOME)))
         isExiting = true;
-    if ((wiimote1_down & WPAD_BUTTON_1))
+    if ((raw_wiimote_down & WPAD_BUTTON_1))
     {
         printf("PRIM_CHUNK_MEMORY: %d B\n", total_chunks_size);
         printf("TICK: %d, WATER: %d\n", tickCounter, lastWaterTick);
+        printf("SPEED: %f, %f\n", wiimote_x, wiimote_z);
     }
-    if ((wiimote1_down & WPAD_BUTTON_2))
+    if ((raw_wiimote_down & WPAD_BUTTON_2))
     {
         tickCounter += 6000;
     }
 
     expansion_t expansion;
     WPAD_Expansion(0, &expansion);
-    if (expansion.type == WPAD_EXP_CLASSIC)
+    vec3f left_stick(0, 0, 0);
+    vec3f right_stick(0, 0, 0);
+    float sensitivity = LOOKAROUND_SENSITIVITY;
+    if (expansion.type == WPAD_EXP_NONE || expansion.type == WPAD_EXP_UNKNOWN)
     {
-        int x = expansion.classic.rjs.pos.x;
-        int y = expansion.classic.rjs.pos.y;
-        y -= expansion.classic.rjs.center.y;
-        x -= expansion.classic.rjs.center.x;
-        if (std::abs(x) > CLASSIC_CONTROLLER_THRESHOLD)
-        {
-            yrot -= (float(x) / (expansion.classic.rjs.max.x - expansion.classic.rjs.min.x)) * LOOKAROUND_SENSITIVITY * deltaTime;
-        }
-        if (std::abs(y) > CLASSIC_CONTROLLER_THRESHOLD)
-        {
-            xrot += (float(y) / (expansion.classic.rjs.max.y - expansion.classic.rjs.min.y)) * LOOKAROUND_SENSITIVITY * deltaTime;
-        }
+        return;
+    }
+    else if (expansion.type == WPAD_EXP_NUNCHUK)
+    {
+        // Get the left stick position from the D-pad
+        left_stick = vec3f(0, 0, 0);
 
-        if (!((wiimote1_held & WPAD_CLASSIC_BUTTON_FULL_L) || (wiimote1_held & WPAD_CLASSIC_BUTTON_FULL_R)))
-            shoulder_btn_frame_counter = -1;
-        else
-            shoulder_btn_frame_counter++;
+        u32 nunchuk_held = expansion.nunchuk.btns_held;
+        u32 nunchuk_down = expansion.nunchuk.btns_held & ~prev_nunchuk_held;
+        prev_nunchuk_held = nunchuk_held;
 
-        place_block = false;
-        destroy_block = false;
-        if (shoulder_btn_frame_counter >= 0)
+        u32 new_raw_wiimote_down = 0;
+        u32 new_raw_wiimote_held = 0;
+
+        if ((raw_wiimote_held & WPAD_BUTTON_LEFT))
+            left_stick.x--;
+        if ((raw_wiimote_held & WPAD_BUTTON_RIGHT))
+            left_stick.x++;
+        if ((raw_wiimote_held & WPAD_BUTTON_UP))
+            left_stick.y++;
+        if ((raw_wiimote_held & WPAD_BUTTON_DOWN))
+            left_stick.y--;
+
+        if (left_stick.magnitude() > 0.001)
+            left_stick = left_stick.normalize();
+
+        // Map the Wiimote and Nunchuck buttons to the Classic Controller buttons
+        if ((nunchuk_held & NUNCHUK_BUTTON_C))
+            new_raw_wiimote_held |= WPAD_CLASSIC_BUTTON_X;
+        if ((raw_wiimote_held & WPAD_BUTTON_A))
+            new_raw_wiimote_held |= WPAD_CLASSIC_BUTTON_B;
+        if ((nunchuk_held & NUNCHUK_BUTTON_Z))
+            new_raw_wiimote_held |= WPAD_CLASSIC_BUTTON_FULL_L;
+        if ((raw_wiimote_held & WPAD_BUTTON_B))
+            new_raw_wiimote_held |= WPAD_CLASSIC_BUTTON_FULL_R;
+        if ((raw_wiimote_held & WPAD_BUTTON_MINUS))
+            new_raw_wiimote_held |= WPAD_CLASSIC_BUTTON_ZL;
+        if ((raw_wiimote_held & WPAD_BUTTON_PLUS))
+            new_raw_wiimote_held |= WPAD_CLASSIC_BUTTON_ZR;
+
+        if ((nunchuk_down & NUNCHUK_BUTTON_C))
+            new_raw_wiimote_down |= WPAD_CLASSIC_BUTTON_X;
+        if ((raw_wiimote_down & WPAD_BUTTON_A))
+            new_raw_wiimote_down |= WPAD_CLASSIC_BUTTON_B;
+        if ((nunchuk_down & NUNCHUK_BUTTON_Z))
+            new_raw_wiimote_down |= WPAD_CLASSIC_BUTTON_FULL_L;
+        if ((raw_wiimote_down & WPAD_BUTTON_B))
+            new_raw_wiimote_down |= WPAD_CLASSIC_BUTTON_FULL_R;
+        if ((raw_wiimote_down & WPAD_BUTTON_MINUS))
+            new_raw_wiimote_down |= WPAD_CLASSIC_BUTTON_ZL;
+        if ((raw_wiimote_down & WPAD_BUTTON_PLUS))
+            new_raw_wiimote_down |= WPAD_CLASSIC_BUTTON_ZR;
+
+        raw_wiimote_down = new_raw_wiimote_down;
+        raw_wiimote_held = new_raw_wiimote_held;
+        right_stick.x = float(int(expansion.nunchuk.js.pos.x) - int(expansion.nunchuk.js.center.x)) * 2 / (int(expansion.nunchuk.js.max.x) - 2 - int(expansion.nunchuk.js.min.x));
+        right_stick.y = float(int(expansion.nunchuk.js.pos.y) - int(expansion.nunchuk.js.center.y)) * 2 / (int(expansion.nunchuk.js.max.y) - 2 - int(expansion.nunchuk.js.min.y));
+    }
+    else if (expansion.type == WPAD_EXP_CLASSIC)
+    {
+        right_stick.x = float(int(expansion.classic.rjs.pos.x) - int(expansion.classic.rjs.center.x)) * 2 / (int(expansion.classic.rjs.max.x) - 2 - int(expansion.classic.rjs.min.x));
+        right_stick.y = float(int(expansion.classic.rjs.pos.y) - int(expansion.classic.rjs.center.y)) * 2 / (int(expansion.classic.rjs.max.y) - 2 - int(expansion.classic.rjs.min.y));
+        left_stick.x = float(int(expansion.classic.ljs.pos.x) - int(expansion.classic.ljs.center.x)) * 2 / (int(expansion.classic.ljs.max.x) - 2 - int(expansion.classic.ljs.min.x));
+        left_stick.y = float(int(expansion.classic.ljs.pos.y) - int(expansion.classic.ljs.center.y)) * 2 / (int(expansion.classic.ljs.max.y) - 2 - int(expansion.classic.ljs.min.y));
+    }
+
+    if (left_stick.magnitude() < 0.1)
+    {
+        left_stick.x = 0;
+        left_stick.y = 0;
+    }
+
+    if (right_stick.magnitude() < 0.1)
+    {
+        right_stick.x = 0;
+        right_stick.y = 0;
+    }
+
+    inventory_visible ^= (raw_wiimote_down & WPAD_CLASSIC_BUTTON_X) != 0;
+
+    if (!inventory_visible)
+    {
+        float target_x = left_stick.x * sin(DegToRad(yrot + 90));
+        float target_z = left_stick.x * cos(DegToRad(yrot + 90));
+        target_x -= left_stick.y * sin(DegToRad(yrot));
+        target_z -= left_stick.y * cos(DegToRad(yrot));
+
+        yrot -= right_stick.x * deltaTime * sensitivity;
+        xrot += right_stick.y * deltaTime * sensitivity;
+
+        if (yrot > 360.f)
+            yrot -= 360.f;
+        if (yrot < 0)
+            yrot += 360.f;
+        if (xrot > 90.f)
+            xrot = 90.f;
+        if (xrot < -90.f)
+            xrot = -90.f;
+
+        wiimote_x = target_x;
+        wiimote_z = target_z;
+
+        wiimote_down |= raw_wiimote_down;
+        wiimote_held |= raw_wiimote_held;
+    } // If the inventory is visible, don't allow the player to move
+    else
+    {
+        wiimote_x = 0;
+        wiimote_z = 0;
+        return;
+    }
+
+    if (!((raw_wiimote_held & WPAD_CLASSIC_BUTTON_FULL_L) || (raw_wiimote_held & WPAD_CLASSIC_BUTTON_FULL_R)))
+        shoulder_btn_frame_counter = -1;
+    else
+        shoulder_btn_frame_counter++;
+
+    place_block = false;
+    destroy_block = false;
+    if (shoulder_btn_frame_counter >= 0)
+    {
+        // repeats buttons every 10 frames
+        if ((raw_wiimote_held & WPAD_CLASSIC_BUTTON_FULL_L) && ((raw_wiimote_down & WPAD_CLASSIC_BUTTON_FULL_L) || shoulder_btn_frame_counter % 10 == 0))
+            place_block = true;
+        if ((raw_wiimote_held & WPAD_CLASSIC_BUTTON_FULL_R) && ((raw_wiimote_down & WPAD_CLASSIC_BUTTON_FULL_R) || shoulder_btn_frame_counter % 10 == 0))
+            place_block = !(destroy_block = true);
+    }
+    if (raw_wiimote_down & WPAD_CLASSIC_BUTTON_ZL)
+    {
+        do
         {
-            // repeats buttons every 10 frames
-            if ((wiimote1_held & WPAD_CLASSIC_BUTTON_FULL_L) && ((wiimote1_down & WPAD_CLASSIC_BUTTON_FULL_L) || shoulder_btn_frame_counter % 10 == 0))
-                place_block = true;
-            if ((wiimote1_held & WPAD_CLASSIC_BUTTON_FULL_R) && ((wiimote1_down & WPAD_CLASSIC_BUTTON_FULL_R) || shoulder_btn_frame_counter % 10 == 0))
-                place_block = !(destroy_block = true);
-        }
-        if (wiimote1_down & WPAD_CLASSIC_BUTTON_ZL)
-        {
-            do
+            // Decrease the selected block id by 1 unless we're at the lowest block id already
+            if (selected_block.id > 0)
             {
-                // Decrease the selected block id by 1 unless we're at the lowest block id already
-                if (selected_block.id > 0)
-                {
-                    selected_block.id = selected_block.id - 1;
-                }
-                else
-                {
-                    break; // Break out of the loop if we're at the lowest block id
-                }
-                // If the selected block is air, don't allow the player to select it
-            } while (BlockID(selected_block.id) == BlockID::air);
-        }
-        if (wiimote1_down & WPAD_CLASSIC_BUTTON_ZR)
-        {
-            do
+                selected_block.id--;
+            }
+            else
             {
-                // Increase the selected block id by 1 unless we're at the highest block id already
-                if (selected_block.id < 255)
-                {
-                    selected_block.id = selected_block.id + 1;
-                }
-                else
-                {
-                    break; // Break out of the loop if we're at the highest block id
-                }
-                // If the selected block is air, don't allow the player to select it
-            } while (BlockID(selected_block.id) == BlockID::air);
-        }
-        if (selected_block.get_blockid() == BlockID::air)
-            selected_block.set_blockid(BlockID::stone);
-        x = expansion.classic.ljs.pos.x;
-        y = expansion.classic.ljs.pos.y;
-        y -= expansion.classic.ljs.center.y;
-        x -= expansion.classic.ljs.center.x;
-        float target_x = 0;
-        float target_z = 0;
-
-        if (std::abs(x) > CLASSIC_CONTROLLER_THRESHOLD)
+                break; // Break out of the loop if we're at the lowest block id
+            }
+            // If the selected block is air, don't allow the player to select it
+        } while (!properties(selected_block.id).m_valid_item);
+        selected_block.meta = properties(selected_block.id).m_default_state;
+    }
+    if (raw_wiimote_down & WPAD_CLASSIC_BUTTON_ZR)
+    {
+        do
         {
-            target_x += (float(x) / (expansion.classic.ljs.max.x - expansion.classic.ljs.min.x)) * sin(DegToRad(yrot + 90));
-            target_z += (float(x) / (expansion.classic.ljs.max.x - expansion.classic.ljs.min.x)) * cos(DegToRad(yrot + 90));
-        }
-        if (std::abs(y) > CLASSIC_CONTROLLER_THRESHOLD)
-        {
-            target_x -= (float(y) / (expansion.classic.ljs.max.y - expansion.classic.ljs.min.y)) * sin(DegToRad(yrot));
-            target_z -= (float(y) / (expansion.classic.ljs.max.y - expansion.classic.ljs.min.y)) * cos(DegToRad(yrot));
-        }
+            // Increase the selected block id by 1 unless we're at the highest block id already
+            if (selected_block.id < 255)
+            {
+                selected_block.id++;
+            }
+            else
+            {
+                break; // Break out of the loop if we're at the highest block id
+            }
+            // If the selected block is air, don't allow the player to select it
+        } while (!properties(selected_block.id).m_valid_item);
+        selected_block.meta = properties(selected_block.id).m_default_state;
+    }
+    if (selected_block.get_blockid() == BlockID::air)
+        selected_block.set_blockid(BlockID::stone);
 
-        // Multiply the joystick input by the player's movement speed
-        target_x *= MOVEMENT_SPEED;
-        target_z *= MOVEMENT_SPEED;
-
-        // Check if the player entity exists
+    if ((raw_wiimote_down & WPAD_CLASSIC_BUTTON_LEFT))
+    {
         if (player)
         {
-            // Update the player entity's velocity
-            player->velocity.x = flerp(player->velocity.x, target_x, deltaTime * 5);
-            player->velocity.z = flerp(player->velocity.z, target_z, deltaTime * 5);
-
-            // If the player is on the ground, allow them to jump
-            if ((wiimote1_held & WPAD_CLASSIC_BUTTON_B) && player->on_ground)
+            vec3i block_pos;
+            vec3i face;
+            if (raycast(vec3f(player_pos.x + .5, player_pos.y + .5, player_pos.z + .5), angles_to_vector(xrot, yrot), 128, &block_pos, &face))
             {
-                player->velocity.y = sqrt(ENTITY_GRAVITY * 2.0f * JUMP_HEIGHT);
-                player->on_ground = false;
-                player->jumping = true;
+                block_pos = block_pos + face;
+                vec3f pos = vec3f(block_pos.x, block_pos.y, block_pos.z) + vec3f(0.5, 0.5, 0.5);
+                explode(pos, 3, player->chunk);
+
+                sound_t sound(explode_sound);
+                sound.position = pos;
+                sound.volume = 0.5;
+                sound.pitch = 0.8;
+                sound_system->play_sound(sound);
+
+                particle_t particle;
+                particle.max_life_time = 80;
+                particle.physics = PPHYSIC_FLAG_COLLIDE;
+                particle.type = PTYPE_TINY_SMOKE;
+                particle.brightness = 0xFF;
+                particle.velocity = vec3f(0, 0.5, 0);
+                particle.a = 0xFF;
+                for (int i = 0; i < 64; i++)
+                {
+                    // Randomize the particle position and velocity
+                    particle.position = pos + vec3f(JavaLCGFloat() - .5f, JavaLCGFloat() - .5f, JavaLCGFloat() - .5f) * 10.2;
+
+                    // Randomize the particle life time by up to 10 ticks
+                    particle.life_time = particle.max_life_time - (rand() % 20) - 20;
+
+                    // Randomize the particle size
+                    particle.size = rand() % 64 + 64;
+
+                    // Randomize the particle color
+                    particle.r = particle.g = particle.b = rand() % 63 + 192;
+
+                    particle_system.add_particle(particle);
+                }
             }
         }
     }
-    if (yrot > 360.f)
-        yrot -= 360.f;
-    if (yrot < 0)
-        yrot += 360.f;
-    if (xrot > 90.f)
-        xrot = 90.f;
-    if (xrot < -90.f)
-        xrot = -90.f;
-}
-
-void GetLookMtx(Mtx &mtx)
-{
-    guVector axis; // Axis to rotate on
-    Mtx rotx;
-    Mtx roty;
-    // Rotate by view
-    axis.x = 1;
-    axis.y = 0;
-    axis.z = 0;
-    guMtxRotAxisDeg(rotx, &axis, xrot);
-    axis.x = 0;
-    axis.y = 1;
-    axis.z = 0;
-    guMtxRotAxisDeg(roty, &axis, yrot);
-    guMtxConcat(rotx, roty, mtx);
 }
 
 // TODO: Finish fake lighting
@@ -797,7 +830,8 @@ inline void RecalcSectionWater(chunk_t *chunk, int section)
         for (vec3i pos : positions)
         {
             block_t *block = chunk->get_block(pos);
-            update_fluid(block, pos);
+            if ((basefluid(block->get_blockid()) != BlockID::lava || fluidUpdateCount % 6 == 0))
+                update_fluid(block, pos);
             curr_fluid_count++;
         }
         positions.clear();
@@ -824,18 +858,15 @@ void GenerateChunks(int count)
             }
         }
     }
-    if (generated)
-        threadhandler_sleep();
 }
 
 void RemoveRedundantChunks(std::deque<chunk_t *> &chunks)
 {
-    lock_t chunk_lock(chunk_mutex);
-    chunks.erase(
-        std::remove_if(chunks.begin(), chunks.end(),
-                       [](chunk_t *&c)
-                       {if(!c) return true; if(!c->valid) {delete c; c = nullptr; return true;} return false; }),
-        chunks.end());
+    WRAP_ASYNC_FUNC(chunk_mutex, chunks.erase(
+                                     std::remove_if(chunks.begin(), chunks.end(),
+                                                    [](chunk_t *&c)
+                                                    {if(!c) return true; if(!c->valid) {delete c; c = nullptr; return true;} return false; }),
+                                     chunks.end()));
 }
 
 void PrepareChunkRemoval(chunk_t *chunk)
@@ -866,22 +897,66 @@ void PrepareChunkRemoval(chunk_t *chunk)
 
 void EditBlocks()
 {
-    guVector forward = angles_to_vector(xrot, yrot, -1);
+    guVector forward = angles_to_vector(xrot, yrot);
 
-    draw_block_outline = raycast(vec3d{player_pos.x - .5, player_pos.y - .5, player_pos.z - .5}, vec3d{forward.x, forward.y, forward.z}, 4, &raycast_block, &raycast_block_face);
+    draw_block_outline = raycast_precise(vec3f(player_pos.x + .5, player_pos.y + .5, player_pos.z + .5), vec3f(forward.x, forward.y, forward.z), 4, &raycast_pos, &raycast_face, block_bounds);
     if (draw_block_outline)
     {
-        BlockID target_blockid = destroy_block ? BlockID::air : selected_block.get_blockid();
+        BlockID new_blockid = destroy_block ? BlockID::air : selected_block.get_blockid();
         if (destroy_block || place_block)
         {
-            vec3i editable_pos = destroy_block ? (raycast_block) : (raycast_block + raycast_block_face);
+            block_t *targeted_block = get_block_at(raycast_pos);
+            vec3i editable_pos = destroy_block ? (raycast_pos) : (raycast_pos + raycast_face);
             block_t *editable_block = get_block_at(editable_pos);
             if (editable_block)
             {
                 BlockID old_blockid = editable_block->get_blockid();
-                editable_block->set_blockid(target_blockid);
-                editable_block->meta = target_blockid == BlockID::air ? 0 : selected_block.meta;
-                if (place_block)
+                BlockID targeted_blockid = targeted_block->get_blockid();
+                // Handle slab placement
+                if (properties(new_blockid).m_render_type == RenderType::slab)
+                {
+                    bool same_as_target = targeted_block->get_blockid() == new_blockid;
+
+                    uint8_t new_meta = raycast_face.y == -1 ? 1 : 0;
+                    new_meta ^= same_as_target;
+
+                    if (raycast_face.y != 0 && (new_meta ^ 1) == (targeted_block->meta & 1) && same_as_target)
+                    {
+                        targeted_block->set_blockid(BlockID(uint8_t(new_blockid) - 1));
+                        targeted_block->meta = 0;
+                    }
+                    else if (old_blockid == new_blockid)
+                    {
+                        editable_block->set_blockid(BlockID(uint8_t(new_blockid) - 1));
+                        editable_block->meta = 0;
+                    }
+                    else
+                    {
+                        editable_block->set_blockid(new_blockid);
+                        if (raycast_face.y == 0 && properties(targeted_blockid).m_render_type == RenderType::slab)
+                            editable_block->meta = targeted_block->meta;
+                        else if (raycast_face.y == 0)
+                            editable_block->meta = new_meta;
+                        else
+                            editable_block->meta = new_meta ^ same_as_target;
+                    }
+                }
+                else
+                {
+                    place_block &= old_blockid == BlockID::air || properties(old_blockid).m_fluid;
+                    if (!destroy_block && place_block)
+                    {
+                        editable_block->meta = new_blockid == BlockID::air ? 0 : selected_block.meta;
+                        editable_block->set_blockid(new_blockid);
+                    }
+                }
+                if (destroy_block)
+                {
+                    editable_block->meta = new_blockid == BlockID::air ? 0 : selected_block.meta;
+                    editable_block->set_blockid(new_blockid);
+                }
+
+                if (place_block || destroy_block)
                     update_block_at(editable_pos);
                 update_neighbors(editable_pos);
 
@@ -917,15 +992,15 @@ void EditBlocks()
 
                     sound_t sound = get_break_sound(old_blockid);
                     sound.volume = 0.4f;
-                    sound.pitch = 0.8f;
+                    sound.pitch *= 0.8f;
                     sound.position = vec3f(editable_pos.x, editable_pos.y, editable_pos.z);
                     sound_system->play_sound(sound);
                 }
-                else
+                else if (place_block)
                 {
-                    sound_t sound = get_mine_sound(target_blockid);
+                    sound_t sound = get_mine_sound(new_blockid);
                     sound.volume = 0.4f;
-                    sound.pitch = 0.8f;
+                    sound.pitch *= 0.8f;
                     sound.position = vec3f(editable_pos.x, editable_pos.y, editable_pos.z);
                     sound_system->play_sound(sound);
                 }
@@ -945,8 +1020,8 @@ void UpdateChunkData(frustum_t &frustum, std::deque<chunk_t *> &chunks)
     {
         if (chunk && chunk->valid)
         {
-            float distance = std::max(std::abs((chunk->x * 16) - player_pos.x), std::abs((chunk->z * 16) - player_pos.z));
-            if (distance > RENDER_DISTANCE * 16)
+            float hdistance = std::max(std::abs((chunk->x * 16 + 8) - player_pos.x), std::abs((chunk->z * 16 + 8) - player_pos.z));
+            if (hdistance > RENDER_DISTANCE * 16)
             {
                 PrepareChunkRemoval(chunk);
                 continue;
@@ -959,23 +1034,23 @@ void UpdateChunkData(frustum_t &frustum, std::deque<chunk_t *> &chunks)
                 vbo.x = chunk->x * 16;
                 vbo.y = j * 16;
                 vbo.z = chunk->z * 16;
-                distance = std::abs((j * 16) - player_pos.y);
-                vbo.visible = (distance <= GENERATION_DISTANCE) && distance_to_frustum(vec3f(vbo.x + 8, vbo.y + 8, vbo.z + 8), frustum) > -24;
-                if (chunk->has_fluid_updates[j] && distance <= SIMULATION_DISTANCE * 16 && tickCounter - lastWaterTick >= 5)
+                float vdistance = std::max(hdistance, std::abs((vbo.y + 8) - player_pos.y));
+                vbo.visible = (vdistance <= std::max(RENDER_DISTANCE * 16 * fog_depth_multiplier, 16.0f)); // && distance_to_frustum(vec3f(vbo.x + 8, vbo.y + 8, vbo.z + 8), frustum) < 0;
+                if (chunk->has_fluid_updates[j] && vdistance <= SIMULATION_DISTANCE * 16 && tickCounter - lastWaterTick >= 5)
                     RecalcSectionWater(chunk, j);
             }
-            if (!chunk->lit_state && light_up_calls < 1)
+            if (!chunk->lit_state && light_up_calls < 5)
             {
                 light_up_calls++;
                 chunk->light_up();
             }
-
-            // Update the entities in the chunk
-            chunk->update_entities(deltaTime);
         }
     }
     if (tickCounter - lastWaterTick >= 5)
+    {
         lastWaterTick = tickCounter;
+        fluidUpdateCount++;
+    }
 }
 
 bool SortVBOs(chunkvbo_t *&a, chunkvbo_t *&b)
@@ -1071,14 +1146,14 @@ void UpdateChunkVBOs(std::deque<chunk_t *> &chunks)
 void UpdateScene(frustum_t &frustum, std::deque<chunk_t *> &chunks)
 {
     if (!light_engine_busy())
-        GenerateChunks(2);
+        GenerateChunks(1);
     RemoveRedundantChunks(chunks);
     EditBlocks();
     UpdateChunkData(frustum, chunks);
     UpdateChunkVBOs(chunks);
 
     // Update the particle system
-    particle_system.update(deltaTime);
+    particle_system.update(0.025);
 
     // Calculate chunk memory usage
     total_chunks_size = 0;
@@ -1088,8 +1163,98 @@ void UpdateScene(frustum_t &frustum, std::deque<chunk_t *> &chunks)
     }
 }
 
-void DrawSelectedBlock(std::deque<chunk_t *> &chunks, bool transparency)
+void DrawInventory(view_t &viewport)
 {
+    std::deque<chunk_t *> &chunks = get_chunks();
+    if (chunks.size() == 0)
+        return;
+
+    // Disable depth testing for GUI elements
+    GX_SetZMode(GX_TRUE, GX_ALWAYS, GX_TRUE);
+
+    // Prepare position matrix for rendering GUI elements
+    Mtx tmp_matrix;
+    guMtxIdentity(tmp_matrix);
+    Mtx inventory_matrix;
+    guMtxIdentity(inventory_matrix);
+    Mtx inventory_flat_matrix;
+    guMtxIdentity(inventory_flat_matrix);
+
+    guMtxRotDeg(tmp_matrix, 'x', 202.5F);
+    guMtxConcat(inventory_matrix, tmp_matrix, inventory_matrix);
+
+    guMtxRotDeg(tmp_matrix, 'y', 45.0F);
+    guMtxConcat(inventory_matrix, tmp_matrix, inventory_matrix);
+
+    guMtxScaleApply(inventory_matrix, inventory_matrix, 0.65, 0.65, 0.65f);
+    guMtxTransApply(inventory_matrix, inventory_matrix, viewport.width * 0.5f, viewport.height * 0.5f, -10.0f);
+
+    guMtxScaleApply(inventory_flat_matrix, inventory_flat_matrix, 1.0f, 1.0f, 1.0f);
+    guMtxTransApply(inventory_flat_matrix, inventory_flat_matrix, viewport.width * 0.5f, viewport.height * 0.5f, -10.0f);
+
+    GX_LoadPosMtxImm(inventory_flat_matrix, GX_PNMTX0);
+
+    // Disable backface culling for the inventory background
+    GX_SetCullMode(GX_CULL_NONE);
+
+    // Enable direct colors
+    GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
+
+    // Draw the inventory background
+    draw_simple_textured_quad(container_texture, -176, -220, 512, 512);
+
+    // Enable backface culling for blocks
+    GX_SetCullMode(GX_CULL_BACK);
+
+    // Enable indexed colors
+    GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
+
+    // Draw the blocks in the inventory
+    use_texture(blockmap_texture);
+    block_t template_block = {0x00, 0x7F, 0, 0xF, 0xF};
+    for (int i = 0; i < 54; i++)
+    {
+        // Calculate the position of the block in the inventory
+        int x = i % 9;
+        int y = i / 9;
+        int x_offset = 36 * (x - 4);
+        int y_offset = 36 * (y - 4) - 24;
+
+        // Set the block id of the template block
+        do
+        {
+            template_block.id++;
+        } while (!properties(template_block.id).m_valid_item);
+
+        template_block.meta = block_properties[template_block.id].m_default_state;
+        RenderType render_type = properties(template_block.id).m_render_type;
+        if (!properties(template_block.id).m_fluid && (render_type == RenderType::full || render_type == RenderType::slab))
+        {
+            // Translate the block to the correct position
+            guMtxCopy(inventory_matrix, tmp_matrix);
+            guMtxTransApply(tmp_matrix, tmp_matrix, x_offset, y_offset, 0.0f);
+            GX_LoadPosMtxImm(tmp_matrix, GX_PNMTX0);
+
+            // Draw the block
+            render_single_block(template_block, false);
+            render_single_block(template_block, true);
+        }
+        else
+        {
+            guMtxCopy(inventory_flat_matrix, tmp_matrix);
+            guMtxTransApply(tmp_matrix, tmp_matrix, x_offset, y_offset, 0.0f);
+            GX_LoadPosMtxImm(tmp_matrix, GX_PNMTX0);
+
+            int texture_index = get_default_texture_index(BlockID(template_block.id));
+            render_single_item(texture_index, false);
+            render_single_item(texture_index, true);
+        }
+    }
+}
+
+void DrawSelectedBlock()
+{
+    std::deque<chunk_t *> &chunks = get_chunks();
     if (chunks.size() == 0)
         return;
     // Get the block at the player's position
@@ -1111,37 +1276,14 @@ void DrawSelectedBlock(std::deque<chunk_t *> &chunks, bool transparency)
     GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
 
     // Specify the selected block offset
-    // 6.75 comes from the -10 offset in the render_block function
-    // It's -10 & 0x0F = 6, subtracting 0.75 as an offset.
-    guVector selectedBlockPos = guVector{+.85f, -6.75f, -1.f};
+    vec3f selectedBlockPos = vec3f(+.85f, -0.75f, -1.f);
 
     // Transform the selected block position
     transform_view_screen(get_view_matrix(), selectedBlockPos);
 
-    // Precalculate the vertex count
-    GX_BeginGroup(GX_QUADS, 0);
-
-    // Precalculate the vertex count. Set position to Y = -10 to render "outside the world"
-    int vertexCount = chunks[0]->render_block(&selected_block, vec3i(0, -10, 0), transparency);
-
-    // Get the vertex count
-    int endGroup = GX_EndGroup();
-
-    // Check if the vertex count is correct
-    if (endGroup != vertexCount)
-    {
-        printf("Vertex count mismatch: %d != %d\n", endGroup, vertexCount);
-        return;
-    }
-
     // Draw the selected block
-    GX_BeginGroup(GX_QUADS, vertexCount);
-
-    // Render the selected block. Set position to Y = -10 to render "outside the world"
-    chunks[0]->render_block(&selected_block, vec3i(0, -10, 0), transparency);
-
-    // End the group
-    GX_EndGroup();
+    render_single_block(selected_block, false);
+    render_single_block(selected_block, true);
 }
 
 void DrawScene(std::deque<chunk_t *> &chunks, bool transparency)
@@ -1201,26 +1343,37 @@ void DrawScene(std::deque<chunk_t *> &chunks, bool transparency)
     GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
 
     // Draw block outlines
-    if (!transparency && outline && draw_block_outline)
+    if (!transparency && draw_block_outline)
     {
         GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
-        guVector outlinePos = guVector();
-        outlinePos.x = raycast_block.x - .5;
-        outlinePos.y = raycast_block.y - .5;
-        outlinePos.z = raycast_block.z - .5;
-        Render(outlinePos, outline, outline_len);
+        vec3f outline_pos = raycast_pos - vec3f(0.5, 0.5, 0.5);
 
-        // Draw debug spritesheet
-        if (debug_spritesheet)
+        vec3f towards_camera = vec3f(player_pos) - outline_pos;
+        towards_camera.normalize();
+        towards_camera = towards_camera * 0.002;
+
+        vec3f b_min = vec3f(raycast_pos.x, raycast_pos.y, raycast_pos.z) + vec3f(1.0, 1.0, 1.0);
+        vec3f b_max = vec3f(raycast_pos.x, raycast_pos.y, raycast_pos.z);
+        for (aabb_t &bounds : block_bounds)
         {
-            transform_view(get_view_matrix(), outlinePos);
-            GX_BeginGroup(GX_QUADS, 4);
-            GX_Vertex(vertex_property_t(vec3f(-2.0f, 1.1f, -2.0f), 0, 0));
-            GX_Vertex(vertex_property_t(vec3f(2.0f, 1.1f, -2.0f), 128, 0));
-            GX_Vertex(vertex_property_t(vec3f(2.0f, 1.1f, 2.0f), 128, 128));
-            GX_Vertex(vertex_property_t(vec3f(-2.0f, 1.1f, 2.0f), 0, 128));
-            GX_EndGroup();
+            b_min.x = std::min(bounds.min.x, b_min.x);
+            b_min.y = std::min(bounds.min.y, b_min.y);
+            b_min.z = std::min(bounds.min.z, b_min.z);
+
+            b_max.x = std::max(bounds.max.x, b_max.x);
+            b_max.y = std::max(bounds.max.y, b_max.y);
+            b_max.z = std::max(bounds.max.z, b_max.z);
         }
+        vec3f floor_b_min = vec3f(std::floor(b_min.x), std::floor(b_min.y), std::floor(b_min.z));
+
+        aabb_t block_outer_bounds;
+        block_outer_bounds.min = b_min - floor_b_min;
+        block_outer_bounds.max = b_max - floor_b_min;
+
+        transform_view(get_view_matrix(), floor_b_min + towards_camera - vec3f(0.5, 0.5, 0.5));
+
+        // Draw the block outline
+        DrawOutline(block_outer_bounds);
     }
 }
 void PrepareTEV()
