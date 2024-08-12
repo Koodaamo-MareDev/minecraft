@@ -324,8 +324,8 @@ void generate_chunk()
                     block->set_blockid(y >= 10 ? BlockID::air : BlockID::lava);
             }
         }
-        usleep(100);
     }
+    usleep(100);
     generate_trees(chunk);
 
     // Reset chunk heightmap for further use.
