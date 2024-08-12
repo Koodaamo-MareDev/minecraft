@@ -79,7 +79,7 @@ inline uint16_t GX_EndGroup()
     return __group_vtxcount;
 }
 
-inline void GX_Vertex(vertex_property_t vert, uint8_t face = 6)
+inline void GX_Vertex(const vertex_property_t &vert, uint8_t face = 3)
 {
     ++__group_vtxcount;
     if (!base3d_is_drawing)
@@ -91,7 +91,7 @@ inline void GX_Vertex(vertex_property_t vert, uint8_t face = 6)
     GX_TexCoord2f32(uv_invscale * vert.x_uv, uv_invscale * vert.y_uv);
 }
 
-inline void GX_VertexLit(vertex_property_t vert, uint8_t light, uint8_t face = 6)
+inline void GX_VertexLit(const vertex_property_t &vert, uint8_t light, uint8_t face = 3)
 {
     ++__group_vtxcount;
     if (!base3d_is_drawing)
@@ -103,7 +103,7 @@ inline void GX_VertexLit(vertex_property_t vert, uint8_t light, uint8_t face = 6
     GX_TexCoord2f32(uv_invscale * vert.x_uv, uv_invscale * vert.y_uv);
 }
 
-inline void GX_VertexF(vertex_property_t vert, uint8_t face = 6)
+inline void GX_VertexF(const vertex_property_t &vert, uint8_t face = 3)
 {
     ++__group_vtxcount;
     if (!base3d_is_drawing)
@@ -115,7 +115,7 @@ inline void GX_VertexF(vertex_property_t vert, uint8_t face = 6)
     GX_TexCoord2f32(uv_invscale * vert.x_uv, uv_invscale * vert.y_uv);
 }
 
-inline void GX_VertexLitF(vertex_property_t vert, uint8_t light, uint8_t face = 6)
+inline void GX_VertexLitF(const vertex_property_t &vert, uint8_t light, uint8_t face = 3)
 {
     ++__group_vtxcount;
     if (!base3d_is_drawing)
