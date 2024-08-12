@@ -263,7 +263,6 @@ public:
 
         uint8_t light;
     };
-    uint8_t ambient_occlusion = 0;
 
     BlockID get_blockid()
     {
