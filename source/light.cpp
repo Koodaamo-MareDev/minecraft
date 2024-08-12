@@ -16,7 +16,7 @@ lwp_t __light_engine_thread_handle = (lwp_t)NULL;
 mutex_t light_mutex = (mutex_t)NULL;
 bool __light_engine_init_done = false;
 bool __light_engine_busy = false;
-std::list<vec3i> pending_light_updates;
+std::deque<vec3i> pending_light_updates;
 void __update_light(vec3i coords);
 void *__light_engine_init_internal(void *);
 
