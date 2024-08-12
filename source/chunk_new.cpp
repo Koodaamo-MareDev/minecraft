@@ -601,7 +601,7 @@ void chunk_t::rebuild_vbo(int section, bool transparent)
 }
 int chunk_t::build_vbo(int section, bool transparent)
 {
-#define OLD_VBOSYSTEM
+//#define OLD_VBOSYSTEM
 #ifdef OLD_VBOSYSTEM
     int quadVertexCount = pre_render_block_mesh(section, transparent);
     int triaVertexCount = pre_render_fluid_mesh(section, transparent);
