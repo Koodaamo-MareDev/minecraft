@@ -151,6 +151,8 @@ Mtx &get_view_matrix()
 
 uint8_t smooth_light(vec3i pos, uint8_t face_index, vec3i vertex_off, chunk_t *near, block_t *block, uint8_t &lighting)
 {
+    if (pos.y < 0 || pos.y > 255)
+        return 0;
     vec3i face = pos + face_offsets[face_index];
     uint8_t total = 1;
     block_t *face_block = get_block_at(face, near);
@@ -192,34 +194,51 @@ uint8_t smooth_light(vec3i pos, uint8_t face_index, vec3i vertex_off, chunk_t *n
     block_t *blockA = get_block_at(face + vertex_offA, near);
     block_t *blockB = get_block_at(face + vertex_offB, near);
     uint8_t count = 0;
-    if (blockA && properties(blockA->id).m_transparent)
+    if (blockA)
     {
-        block_light += blockA->block_light;
-        sky_light += blockA->sky_light;
-        total++;
-        count++;
-    }
-    if (blockB && properties(blockB->id).m_transparent)
-    {
-        block_light += blockB->block_light;
-        sky_light += blockB->sky_light;
-        total++;
-        count++;
-    }
-    if (count < 2)
-    {
-        block_t *blockC = get_block_at(face + vertex_off, near);
-        if (blockC && properties(blockC->id).m_transparent)
+        if (properties(blockA->id).m_solid)
         {
-            block_light += blockC->block_light;
-            sky_light += blockC->sky_light;
-            total++;
             count++;
         }
+        else
+        {
+            total++;
+            block_light += blockA->block_light;
+            sky_light += blockA->sky_light;
+        }
     }
-
+    if (blockB)
+    {
+        if (properties(blockB->id).m_solid)
+        {
+            count++;
+        }
+        else
+        {
+            total++;
+            block_light += blockB->block_light;
+            sky_light += blockB->sky_light;
+        }
+    }
+    block_t *blockC = get_block_at(face + vertex_off, near);
+    if (blockC)
+    {
+        if (properties(blockC->id).m_solid)
+        {
+            if (count < 2)
+                count++;
+            else
+                count = 3;
+        }
+        else
+        {
+            total++;
+            block_light += blockC->block_light;
+            sky_light += blockC->sky_light;
+        }
+    }
     lighting = (block_light / total) | ((sky_light / total) << 4);
-    return 3 - count;
+    return count * 6;
 }
 
 int render_face(vec3i pos, uint8_t face, uint32_t texture_index, chunk_t *near, block_t *block)
@@ -235,69 +254,138 @@ int render_face(vec3i pos, uint8_t face, uint32_t texture_index, chunk_t *near, 
     vec3f vertex_pos(local_pos.x, local_pos.y, local_pos.z);
     if (!block)
         block = get_block_at(pos, near);
-    uint8_t lighting = get_face_light_index(pos, face, near, block);
-    uint8_t ao = 0;
+    uint8_t light_val = get_face_light_index(pos, face, near, block);
+    uint8_t ao[4] = {0, 0, 0, 0};
+    uint8_t lighting[4] = {light_val, light_val, light_val, light_val};
+    vertex_property_t vertices[4];
+    uint8_t index = 0;
     switch (face)
     {
     case FACE_NX:
-        ao = smooth_light(pos, face, vec3i(0, -1, -1), near, block, lighting);
-        GX_VertexLit({vertex_pos + vec3f{-.5, -.5, -.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, face << ao);
-        ao = smooth_light(pos, face, vec3i(0, 1, -1), near, block, lighting);
-        GX_VertexLit({vertex_pos + vec3f{-.5, 0.5, -.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, face << ao);
-        ao = smooth_light(pos, face, vec3i(0, 1, 1), near, block, lighting);
-        GX_VertexLit({vertex_pos + vec3f{-.5, 0.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, face << ao);
-        ao = smooth_light(pos, face, vec3i(0, -1, 1), near, block, lighting);
-        GX_VertexLit({vertex_pos + vec3f{-.5, -.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, face << ao);
+        ao[index] = smooth_light(pos, face, vec3i(0, -1, -1), near, block, lighting[index]);
+        vertices[index] = {vertex_pos + vec3f{-.5, -.5, -.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)};
+        index++;
+        ao[index] = smooth_light(pos, face, vec3i(0, 1, -1), near, block, lighting[index]);
+        vertices[index] = {vertex_pos + vec3f{-.5, 0.5, -.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)};
+        index++;
+        ao[index] = smooth_light(pos, face, vec3i(0, 1, 1), near, block, lighting[index]);
+        vertices[index] = {vertex_pos + vec3f{-.5, 0.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)};
+        index++;
+        ao[index] = smooth_light(pos, face, vec3i(0, -1, 1), near, block, lighting[index]);
+        vertices[index] = {vertex_pos + vec3f{-.5, -.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)};
+        index = (ao[0] + ao[3] > ao[1] + ao[2]);
+        GX_VertexLit(vertices[index], lighting[index], face + ao[index]);
+        index++;
+        GX_VertexLit(vertices[index], lighting[index], face + ao[index]);
+        index++;
+        GX_VertexLit(vertices[index & 3], lighting[index & 3], face + ao[index & 3]);
+        index++;
+        GX_VertexLit(vertices[index & 3], lighting[index & 3], face + ao[index & 3]);
         break;
     case FACE_PX:
-        ao = smooth_light(pos, face, vec3i(0, -1, 1), near, block, lighting);
-        GX_VertexLit({vertex_pos + vec3f{0.5, -.5, 0.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, face << ao);
-        ao = smooth_light(pos, face, vec3i(0, 1, 1), near, block, lighting);
-        GX_VertexLit({vertex_pos + vec3f{0.5, 0.5, 0.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, face << ao);
-        ao = smooth_light(pos, face, vec3i(0, 1, -1), near, block, lighting);
-        GX_VertexLit({vertex_pos + vec3f{0.5, 0.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, face << ao);
-        ao = smooth_light(pos, face, vec3i(0, -1, -1), near, block, lighting);
-        GX_VertexLit({vertex_pos + vec3f{0.5, -.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, face << ao);
+        ao[index] = smooth_light(pos, face, vec3i(0, -1, 1), near, block, lighting[index]);
+        vertices[index] = {vertex_pos + vec3f{0.5, -.5, 0.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)};
+        index++;
+        ao[index] = smooth_light(pos, face, vec3i(0, 1, 1), near, block, lighting[index]);
+        vertices[index] = {vertex_pos + vec3f{0.5, 0.5, 0.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)};
+        index++;
+        ao[index] = smooth_light(pos, face, vec3i(0, 1, -1), near, block, lighting[index]);
+        vertices[index] = {vertex_pos + vec3f{0.5, 0.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)};
+        index++;
+        ao[index] = smooth_light(pos, face, vec3i(0, -1, -1), near, block, lighting[index]);
+        vertices[index] = {vertex_pos + vec3f{0.5, -.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)};
+        index = (ao[0] + ao[3] > ao[1] + ao[2]);
+        GX_VertexLit(vertices[index], lighting[index], face + ao[index]);
+        index++;
+        GX_VertexLit(vertices[index], lighting[index], face + ao[index]);
+        index++;
+        GX_VertexLit(vertices[index & 3], lighting[index & 3], face + ao[index & 3]);
+        index++;
+        GX_VertexLit(vertices[index & 3], lighting[index & 3], face + ao[index & 3]);
         break;
     case FACE_NY:
-        ao = smooth_light(pos, face, vec3i(-1, 0, -1), near, block, lighting);
-        GX_VertexLit({vertex_pos + vec3f{-.5, -.5, -.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, face << ao);
-        ao = smooth_light(pos, face, vec3i(-1, 0, 1), near, block, lighting);
-        GX_VertexLit({vertex_pos + vec3f{-.5, -.5, 0.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, face << ao);
-        ao = smooth_light(pos, face, vec3i(1, 0, 1), near, block, lighting);
-        GX_VertexLit({vertex_pos + vec3f{0.5, -.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, face << ao);
-        ao = smooth_light(pos, face, vec3i(1, 0, -1), near, block, lighting);
-        GX_VertexLit({vertex_pos + vec3f{0.5, -.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, face << ao);
+        ao[index] = smooth_light(pos, face, vec3i(-1, 0, -1), near, block, lighting[index]);
+        vertices[index] = {vertex_pos + vec3f{-.5, -.5, -.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)};
+        index++;
+        ao[index] = smooth_light(pos, face, vec3i(-1, 0, 1), near, block, lighting[index]);
+        vertices[index] = {vertex_pos + vec3f{-.5, -.5, 0.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)};
+        index++;
+        ao[index] = smooth_light(pos, face, vec3i(1, 0, 1), near, block, lighting[index]);
+        vertices[index] = {vertex_pos + vec3f{0.5, -.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)};
+        index++;
+        ao[index] = smooth_light(pos, face, vec3i(1, 0, -1), near, block, lighting[index]);
+        vertices[index] = {vertex_pos + vec3f{0.5, -.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)};
+        index = (ao[0] + ao[3] > ao[1] + ao[2]);
+        GX_VertexLit(vertices[index], lighting[index], face + ao[index]);
+        index++;
+        GX_VertexLit(vertices[index], lighting[index], face + ao[index]);
+        index++;
+        GX_VertexLit(vertices[index & 3], lighting[index & 3], face + ao[index & 3]);
+        index++;
+        GX_VertexLit(vertices[index & 3], lighting[index & 3], face + ao[index & 3]);
         break;
     case FACE_PY:
-        ao = smooth_light(pos, face, vec3i(1, 0, -1), near, block, lighting);
-        GX_VertexLit({vertex_pos + vec3f{0.5, 0.5, -.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, face << ao);
-        ao = smooth_light(pos, face, vec3i(1, 0, 1), near, block, lighting);
-        GX_VertexLit({vertex_pos + vec3f{0.5, 0.5, 0.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, face << ao);
-        ao = smooth_light(pos, face, vec3i(-1, 0, 1), near, block, lighting);
-        GX_VertexLit({vertex_pos + vec3f{-.5, 0.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, face << ao);
-        ao = smooth_light(pos, face, vec3i(-1, 0, -1), near, block, lighting);
-        GX_VertexLit({vertex_pos + vec3f{-.5, 0.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, face << ao);
+        ao[index] = smooth_light(pos, face, vec3i(1, 0, -1), near, block, lighting[index]);
+        vertices[index] = {vertex_pos + vec3f{0.5, 0.5, -.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)};
+        index++;
+        ao[index] = smooth_light(pos, face, vec3i(1, 0, 1), near, block, lighting[index]);
+        vertices[index] = {vertex_pos + vec3f{0.5, 0.5, 0.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)};
+        index++;
+        ao[index] = smooth_light(pos, face, vec3i(-1, 0, 1), near, block, lighting[index]);
+        vertices[index] = {vertex_pos + vec3f{-.5, 0.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)};
+        index++;
+        ao[index] = smooth_light(pos, face, vec3i(-1, 0, -1), near, block, lighting[index]);
+        vertices[index] = {vertex_pos + vec3f{-.5, 0.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)};
+        index = (ao[0] + ao[3] > ao[1] + ao[2]);
+        GX_VertexLit(vertices[index], lighting[index], face + ao[index]);
+        index++;
+        GX_VertexLit(vertices[index], lighting[index], face + ao[index]);
+        index++;
+        GX_VertexLit(vertices[index & 3], lighting[index & 3], face + ao[index & 3]);
+        index++;
+        GX_VertexLit(vertices[index & 3], lighting[index & 3], face + ao[index & 3]);
         break;
     case FACE_NZ:
-        ao = smooth_light(pos, face, vec3i(1, -1, 0), near, block, lighting);
-        GX_VertexLit({vertex_pos + vec3f{0.5, -.5, -.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, face << ao);
-        ao = smooth_light(pos, face, vec3i(1, 1, 0), near, block, lighting);
-        GX_VertexLit({vertex_pos + vec3f{0.5, 0.5, -.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, face << ao);
-        ao = smooth_light(pos, face, vec3i(-1, 1, 0), near, block, lighting);
-        GX_VertexLit({vertex_pos + vec3f{-.5, 0.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, face << ao);
-        ao = smooth_light(pos, face, vec3i(-1, -1, 0), near, block, lighting);
-        GX_VertexLit({vertex_pos + vec3f{-.5, -.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, face << ao);
+        ao[index] = smooth_light(pos, face, vec3i(1, -1, 0), near, block, lighting[index]);
+        vertices[index] = {vertex_pos + vec3f{0.5, -.5, -.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)};
+        index++;
+        ao[index] = smooth_light(pos, face, vec3i(1, 1, 0), near, block, lighting[index]);
+        vertices[index] = {vertex_pos + vec3f{0.5, 0.5, -.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)};
+        index++;
+        ao[index] = smooth_light(pos, face, vec3i(-1, 1, 0), near, block, lighting[index]);
+        vertices[index] = {vertex_pos + vec3f{-.5, 0.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)};
+        index++;
+        ao[index] = smooth_light(pos, face, vec3i(-1, -1, 0), near, block, lighting[index]);
+        vertices[index] = {vertex_pos + vec3f{-.5, -.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)};
+        index = (ao[0] + ao[3] > ao[1] + ao[2]);
+        GX_VertexLit(vertices[index], lighting[index], face + ao[index]);
+        index++;
+        GX_VertexLit(vertices[index], lighting[index], face + ao[index]);
+        index++;
+        GX_VertexLit(vertices[index & 3], lighting[index & 3], face + ao[index & 3]);
+        index++;
+        GX_VertexLit(vertices[index & 3], lighting[index & 3], face + ao[index & 3]);
         break;
     case FACE_PZ:
-        ao = smooth_light(pos, face, vec3i(-1, -1, 0), near, block, lighting);
-        GX_VertexLit({vertex_pos + vec3f{-.5, -.5, 0.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, face << ao);
-        ao = smooth_light(pos, face, vec3i(-1, 1, 0), near, block, lighting);
-        GX_VertexLit({vertex_pos + vec3f{-.5, 0.5, 0.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, face << ao);
-        ao = smooth_light(pos, face, vec3i(1, 1, 0), near, block, lighting);
-        GX_VertexLit({vertex_pos + vec3f{0.5, 0.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, face << ao);
-        ao = smooth_light(pos, face, vec3i(1, -1, 0), near, block, lighting);
-        GX_VertexLit({vertex_pos + vec3f{0.5, -.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, face << ao);
+        ao[index] = smooth_light(pos, face, vec3i(-1, -1, 0), near, block, lighting[index]);
+        vertices[index] = {vertex_pos + vec3f{-.5, -.5, 0.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)};
+        index++;
+        ao[index] = smooth_light(pos, face, vec3i(-1, 1, 0), near, block, lighting[index]);
+        vertices[index] = {vertex_pos + vec3f{-.5, 0.5, 0.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)};
+        index++;
+        ao[index] = smooth_light(pos, face, vec3i(1, 1, 0), near, block, lighting[index]);
+        vertices[index] = {vertex_pos + vec3f{0.5, 0.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)};
+        index++;
+        ao[index] = smooth_light(pos, face, vec3i(1, -1, 0), near, block, lighting[index]);
+        vertices[index] = {vertex_pos + vec3f{0.5, -.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)};
+        index = (ao[0] + ao[3] > ao[1] + ao[2]);
+        GX_VertexLit(vertices[index], lighting[index], face + ao[index]);
+        index++;
+        GX_VertexLit(vertices[index], lighting[index], face + ao[index]);
+        index++;
+        GX_VertexLit(vertices[index & 3], lighting[index & 3], face + ao[index & 3]);
+        index++;
+        GX_VertexLit(vertices[index & 3], lighting[index & 3], face + ao[index & 3]);
         break;
     default:
         break;
