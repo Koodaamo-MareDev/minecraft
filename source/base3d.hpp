@@ -55,7 +55,7 @@ inline void init_face_normals()
     float *elem = face_normals;
     for (int i = 0; i < 24; i++)
     {
-        float multiplier = (multipliers[i % 6] * 1.f - (0.025f * int(i / 6))) * normal_scale;
+        float multiplier = (multipliers[i % 6] * (1.f - (0.25f * int(i / 6)))) * normal_scale;
         guVector vec = MAKEVEC(multiplier);
         *(elem++) = vec.x;
         *(elem++) = vec.y;
