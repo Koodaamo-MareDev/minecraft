@@ -8,6 +8,7 @@
 #include "chunk_new.hpp"
 #include "blocks.hpp"
 #include "ported/JavaRandom.hpp"
+#include "maths.hpp"
 
 template <typename T>
 inline int sgn(T val)
@@ -61,18 +62,6 @@ inline int skycast(vec3i pos, chunk_t *chunk = nullptr)
     if (!block)
         return -9999;
     return pos.y;
-}
-
-inline float Q_rsqrt(float number)
-{
-    union
-    {
-        float f;
-        uint32_t i;
-    } conv = {.f = number};
-    conv.i = 0x5f3759df - (conv.i >> 1);
-    conv.f *= 1.5F - (number * 0.5F * conv.f * conv.f);
-    return conv.f;
 }
 
 inline bool raycast(

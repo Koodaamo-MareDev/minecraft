@@ -1,11 +1,13 @@
 #ifndef IMPROVED_NOISE_HPP
 #define IMPROVED_NOISE_HPP
 
+#include <unistd.h>
 #include <cstdint>
 #include <cmath>
 #include <functional>
 #include "../vec3f.hpp"
 #include "../ported/JavaRandom.hpp"
+#include "../perlinnoise.h"
 
 // Adapted from Ken Perlin's Improved Noise reference implementation:
 // https://cs.nyu.edu/~perlin/noise/
@@ -44,6 +46,13 @@ class ImprovedNoise
 public:
     inline void Init(uint32_t seed)
     {
+        srandom(seed);
+
+        // Precompute the inverse of 0-255
+        for (int i = 1; i < 256; i++)
+            inv_u8[i] = 1.0f / i;
+
+/*
         // Ensure the seed is not zero as the XOR Shift PRNG will not work with it
         uint32_t x = seed ? seed : 1;
 
@@ -63,10 +72,7 @@ public:
         // Duplicate the permutation vector for faster indexing
         for (int i = 0; i < 256; i++)
             permutation[256 + i] = permutation[i];
-
-        // Precompute the inverse of 0-255
-        for (int i = 1; i < 256; i++)
-            inv_u8[i] = 1.0f / i;
+*/
     }
     inline float fade(float t) { return t * t * t * (t * (t * 6 - 15) + 10); }
     inline float lerp(float t, float a, float b) { return a + t * (b - a); }
@@ -79,8 +85,17 @@ public:
         return ((h & 1) ? -u : u) + ((h & 2) ? -v : v);
     }
 
+    inline float GetNoise(float x, float z)
+    {
+        float pos[2] = {x, z};
+        return noise2(pos);
+    }
+
     inline float GetNoise(float x, float y, float z)
     {
+        float pos[3] = {x, y, z};
+        return noise3(pos);
+/*
 #define FASTFLOOR(x) (((x) > 0) ? ((int)x) : ((int)x - 1))
         int X = FASTFLOOR(x) & 255, // FIND UNIT CUBE THAT
             Y = FASTFLOOR(y) & 255, // CONTAINS POINT.
@@ -103,6 +118,7 @@ public:
                                  grad(permutation[BA + 1], x - 1, y, z - 1)), // OF CUBE
                          lerp(u, grad(permutation[AB + 1], x, y - 1, z - 1),
                               grad(permutation[BB + 1], x - 1, y - 1, z - 1))));
+*/
     }
     template <typename T>
     typename std::enable_if<std::is_integral<T>::value, void>::type GetNoiseSet(const vec3i &pos, const vec3i &size, float frequency, uint8_t octaves, T *out)
@@ -110,6 +126,25 @@ public:
         float amplitude = (1 << (sizeof(T) << 3)) - 1;
         float inv_frequency = 1.0f / frequency;
         float half_amplitude = amplitude * 0.5f;
+
+        if(size.y == 1)
+        {
+            float _z = pos.z * inv_frequency;
+            for (int32_t i = 0; i < size.z; i++, _z += inv_frequency)
+            {
+                float _x = pos.x * inv_frequency;
+                for (int32_t k = 0; k < size.x; k++, _x += inv_frequency)
+                {
+                    float val = 0;
+                    for (uint8_t l = 0, octave_multiplier = 1; l < octaves; l++, octave_multiplier <<= 1)
+                    {
+                        val += GetNoise(_x * octave_multiplier, _z * octave_multiplier) * inv_u8[octave_multiplier];
+                    }
+                    *(out++) = T(half_amplitude + (half_amplitude * val));
+                }
+            }
+            return;
+        }
 
         float _y = pos.y * inv_frequency;
         for (int32_t j = 0; j < size.y; j++, _y += inv_frequency)
@@ -137,7 +172,24 @@ public:
         T amplitude = 1.0f;
         T inv_frequency = 1.0f / frequency;
         T half_amplitude = amplitude * 0.5f;
-
+        if(size.y == 1)
+        {
+            float _z = pos.z * inv_frequency;
+            for (int32_t i = 0; i < size.z; i++, _z += inv_frequency)
+            {
+                float _x = pos.x * inv_frequency;
+                for (int32_t k = 0; k < size.x; k++, _x += inv_frequency)
+                {
+                    float val = 0;
+                    for (uint8_t l = 0, octave_multiplier = 1; l < octaves; l++, octave_multiplier <<= 1)
+                    {
+                        val += GetNoise(_x * octave_multiplier, _z * octave_multiplier) * inv_u8[octave_multiplier];
+                    }
+                    *(out++) = T(half_amplitude + (half_amplitude * val));
+                }
+            }
+            return;
+        }
         T _y = pos.y * inv_frequency;
         for (int32_t j = 0; j < size.y; j++, _y += inv_frequency)
         {
