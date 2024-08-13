@@ -473,11 +473,15 @@ void update_block_at(const vec3i &pos)
         block->meta |= FLUID_UPDATE_REQUIRED_FLAG;
         chunk->has_fluid_updates[pos.y >> 4] = 1;
     }
-    if (prop.m_fall && get_block_id_at(pos + vec3i(0, -1, 0), BlockID::stone, chunk) == BlockID::air)
+    if (prop.m_fall)
     {
-        chunk->entities.push_back(new falling_block_entity_t(*block, pos));
-        block->set_blockid(BlockID::air);
-        block->meta = 0;
+        BlockID block_below = get_block_id_at(pos + vec3i(0, -1, 0), BlockID::stone, chunk);
+        if(block_below == BlockID::air || properties(block_below).m_fluid)
+        {
+            chunk->entities.push_back(new falling_block_entity_t(*block, pos));
+            block->set_blockid(BlockID::air);
+            block->meta = 0;
+        }
     }
     chunk->update_height_map(pos);
     update_light(pos);
