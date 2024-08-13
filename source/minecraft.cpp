@@ -1330,6 +1330,7 @@ void DrawScene(std::deque<chunk_t *> &chunks, bool transparency)
                         Render(chunkPos, vbo.cached_solid_buffer, vbo.cached_solid_buffer_length);
                     }
                 }
+                chunk->render_entities(partialTicks);
             }
         }
     }
