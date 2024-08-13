@@ -43,6 +43,8 @@
 
 #include "explode_aiff.h"
 
+#include "fuse_aiff.h"
+
 extern std::vector<aiff_container> pling_sounds;
 extern std::vector<aiff_container> cloth_sounds;
 extern std::vector<aiff_container> glass_sounds;
@@ -55,6 +57,8 @@ extern std::vector<aiff_container> stone_sounds;
 extern std::vector<std::string> music_files;
 
 extern aiff_container explode_sound;
+
+extern aiff_container fuse_sound;
 
 aiff_container& get_random_sound(std::vector<aiff_container> &sounds);
 

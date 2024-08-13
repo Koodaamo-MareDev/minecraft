@@ -83,6 +83,7 @@ bool has_loaded = false;
 
 float fog_depth_multiplier = 1.0f;
 
+void CreateExplosion(vec3f pos, float power, chunk_t* near);
 void UpdateLoadingStatus();
 void UpdateLightDir();
 void DrawInventory(view_t &view);
@@ -730,37 +731,7 @@ void GetInput()
             {
                 block_pos = block_pos + face;
                 vec3f pos = vec3f(block_pos.x, block_pos.y, block_pos.z) + vec3f(0.5, 0.5, 0.5);
-                explode(pos, 3, player->chunk);
-
-                sound_t sound(explode_sound);
-                sound.position = pos;
-                sound.volume = 0.5;
-                sound.pitch = 0.8;
-                sound_system->play_sound(sound);
-
-                particle_t particle;
-                particle.max_life_time = 80;
-                particle.physics = PPHYSIC_FLAG_COLLIDE;
-                particle.type = PTYPE_TINY_SMOKE;
-                particle.brightness = 0xFF;
-                particle.velocity = vec3f(0, 0.5, 0);
-                particle.a = 0xFF;
-                for (int i = 0; i < 64; i++)
-                {
-                    // Randomize the particle position and velocity
-                    particle.position = pos + vec3f(JavaLCGFloat() - .5f, JavaLCGFloat() - .5f, JavaLCGFloat() - .5f) * 10.2;
-
-                    // Randomize the particle life time by up to 10 ticks
-                    particle.life_time = particle.max_life_time - (rand() % 20) - 20;
-
-                    // Randomize the particle size
-                    particle.size = rand() % 64 + 64;
-
-                    // Randomize the particle color
-                    particle.r = particle.g = particle.b = rand() % 63 + 192;
-
-                    particle_system.add_particle(particle);
-                }
+                CreateExplosion(pos, 3, get_chunk_from_pos(block_pos, false, false));
             }
         }
     }
@@ -910,6 +881,7 @@ void EditBlocks()
             block_t *editable_block = get_block_at(editable_pos);
             if (editable_block)
             {
+                block_t old_block = *editable_block;
                 BlockID old_blockid = editable_block->get_blockid();
                 BlockID targeted_blockid = targeted_block->get_blockid();
                 // Handle slab placement
@@ -995,6 +967,11 @@ void EditBlocks()
                     sound.pitch *= 0.8f;
                     sound.position = vec3f(editable_pos.x, editable_pos.y, editable_pos.z);
                     sound_system->play_sound(sound);
+
+                    if (old_blockid == BlockID::tnt)
+                    {
+                        get_chunk_from_pos(editable_pos, false)->entities.push_back(new exploding_block_entity_t(old_block, editable_pos, 80));
+                    }
                 }
                 else if (place_block)
                 {
@@ -1011,6 +988,46 @@ void EditBlocks()
     // Clear the place/destroy block flags to prevent placing blocks immediately.
     place_block = false;
     destroy_block = false;
+}
+
+void PlaySound(sound_t sound)
+{
+    sound_system->play_sound(sound);
+}
+
+void CreateExplosion(vec3f pos, float power, chunk_t* near)
+{
+    explode(pos, power, near);
+
+    sound_t sound(explode_sound);
+    sound.position = pos;
+    sound.volume = 0.5;
+    sound.pitch = 0.8;
+    sound_system->play_sound(sound);
+
+    particle_t particle;
+    particle.max_life_time = 80;
+    particle.physics = PPHYSIC_FLAG_COLLIDE;
+    particle.type = PTYPE_TINY_SMOKE;
+    particle.brightness = 0xFF;
+    particle.velocity = vec3f(0, 0.5, 0);
+    particle.a = 0xFF;
+    for (int i = 0; i < 64; i++)
+    {
+        // Randomize the particle position and velocity
+        particle.position = pos + vec3f(JavaLCGFloat() - .5f, JavaLCGFloat() - .5f, JavaLCGFloat() - .5f) * 10.2;
+
+        // Randomize the particle life time by up to 10 ticks
+        particle.life_time = particle.max_life_time - (rand() % 20) - 20;
+
+        // Randomize the particle size
+        particle.size = rand() % 64 + 64;
+
+        // Randomize the particle color
+        particle.r = particle.g = particle.b = rand() % 63 + 192;
+
+        particle_system.add_particle(particle);
+    }
 }
 
 void UpdateChunkData(frustum_t &frustum, std::deque<chunk_t *> &chunks)
@@ -1335,6 +1352,7 @@ void DrawScene(std::deque<chunk_t *> &chunks, bool transparency)
                         Render(chunkPos, vbo.cached_transparent_buffer, vbo.cached_transparent_buffer_length);
                     }
                 }
+                chunk->render_entities(partialTicks);
             }
         }
     }

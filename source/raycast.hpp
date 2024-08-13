@@ -462,6 +462,10 @@ inline void explode_raycast(vec3f origin, vec3f direction, float intensity, chun
                 intensity -= (blast_resistance + 0.3) * 0.3;
                 if (intensity <= 0)
                     break;
+                if (block->get_blockid() == BlockID::tnt)
+                {
+                    get_chunk_from_pos(block_pos, false)->entities.push_back(new exploding_block_entity_t(*block, block_pos, rand() % 20 + 10));
+                }
                 block->set_blockid(BlockID::air);
                 block->meta = 0;
                 update_block_at(block_pos);

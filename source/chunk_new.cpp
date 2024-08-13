@@ -251,7 +251,7 @@ void generate_chunk()
 
     static float chunk_noise_set[9];
     static float noise_set[4096];
-    //static uint8_t cellular_noise[4096];
+    // static uint8_t cellular_noise[4096];
 
     vec3i noise_block_pos(x_offset, 512, z_offset);
     vec3f noise_pos(x_offset - 1, 384, z_offset - 1);
@@ -467,10 +467,17 @@ void update_block_at(const vec3i &pos)
     block_t *block = chunk->get_block(pos);
     if (!block)
         return;
-    if (properties(block->id).m_fluid)
+    blockproperties_t prop = properties(block->id);
+    if (prop.m_fluid)
     {
         block->meta |= FLUID_UPDATE_REQUIRED_FLAG;
         chunk->has_fluid_updates[pos.y >> 4] = 1;
+    }
+    if (prop.m_fall && get_block_id_at(pos + vec3i(0, -1, 0), BlockID::stone, chunk) == BlockID::air)
+    {
+        chunk->entities.push_back(new falling_block_entity_t(*block, pos));
+        block->set_blockid(BlockID::air);
+        block->meta = 0;
     }
     chunk->update_height_map(pos);
     update_light(pos);
@@ -601,7 +608,7 @@ void chunk_t::rebuild_vbo(int section, bool transparent)
 }
 int chunk_t::build_vbo(int section, bool transparent)
 {
-//#define OLD_VBOSYSTEM
+// #define OLD_VBOSYSTEM
 #ifdef OLD_VBOSYSTEM
     int quadVertexCount = pre_render_block_mesh(section, transparent);
     int triaVertexCount = pre_render_fluid_mesh(section, transparent);
@@ -1440,7 +1447,7 @@ void chunk_t::update_entities()
     for (aabb_entity_t *&entity : entities)
     {
         vec3i entity_pos = vec3i(int(entity->position.x), int(entity->position.y), int(entity->position.z));
-        if (entity_pos.x < this->x * 16 || entity_pos.x >= (this->x + 1) * 16 || entity_pos.z < this->z * 16 || entity_pos.z >= (this->z + 1) * 16)
+        if (entity->can_remove() || entity_pos.x < this->x * 16 || entity_pos.x >= (this->x + 1) * 16 || entity_pos.z < this->z * 16 || entity_pos.z >= (this->z + 1) * 16)
         {
             out_of_bounds.push_back(entity);
         }
@@ -1459,16 +1466,24 @@ void chunk_t::update_entities()
         chunk_t *new_chunk = get_chunk_from_pos(entity_pos, false, false);
 
         // Check if the chunk is loaded
-        if (new_chunk)
+        if (!entity->can_remove() && new_chunk)
         {
             entity->chunk = new_chunk;
             new_chunk->entities.push_back(entity);
         }
         else
         {
-            // If the chunk is not loaded, delete the entity
+            // If the chunk is not loaded or entity is dead, delete the entity
             delete entity;
         }
+    }
+}
+
+void chunk_t::render_entities(float partial_ticks)
+{
+    for (aabb_entity_t *&entity : entities)
+    {
+        entity->render(partial_ticks);
     }
 }
 
@@ -1477,7 +1492,8 @@ uint32_t chunk_t::size()
     uint32_t base_size = sizeof(chunk_t);
     for (int i = 0; i < VERTICAL_SECTION_COUNT; i++)
         base_size += this->vbos[i].cached_solid_buffer_length + this->vbos[i].cached_transparent_buffer_length + sizeof(chunkvbo_t);
-    base_size += this->entities.size() * (sizeof(aabb_entity_t *) + sizeof(aabb_entity_t));
+    for (aabb_entity_t *&entity : entities)
+        base_size += entity->size();
     return base_size;
 }
 

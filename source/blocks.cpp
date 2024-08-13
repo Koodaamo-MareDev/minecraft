@@ -531,6 +531,9 @@ blockproperties_t block_properties[256] = {
     blockproperties_t().id(BlockID::diamond_ore).texture(50).sound(SoundType::stone),
     blockproperties_t().id(BlockID::diamond_block).texture(24).sound(SoundType::metal),
 
+    // Reserved for a fully white block.
+    blockproperties_t().id(BlockID::reserved).texture(0).solid(false).opacity(0).transparent(true).luminance(15).sound(SoundType::cloth),
+
 };
 
 sound_t get_step_sound(BlockID block_id)

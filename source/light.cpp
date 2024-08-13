@@ -68,6 +68,7 @@ void light_engine_loop()
             __update_light(pos);
             if (++updates % 1000 == 0)
                 usleep(1);
+            --chunk->light_update_count;
         }
     }
     __light_engine_busy = false;
@@ -91,6 +92,7 @@ void update_light(vec3i pos)
     chunk_t *chunk = get_chunk_from_pos(pos, false, false);
     if (!chunk)
         return;
+    ++chunk->light_update_count;
     lock_t light_lock(light_mutex);
     pending_light_updates.push_back(pos);
 }

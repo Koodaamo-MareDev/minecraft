@@ -110,6 +110,8 @@ int render_face(vec3i pos, uint8_t face, uint32_t texture_index, chunk_t *near =
 
 void render_single_block(block_t &selected_block, bool transparency);
 
+void render_single_block_at(block_t &selected_block, vec3i pos, bool transparency);
+
 void render_single_item(uint32_t texture_index, bool transparency);
 
 vec3f angles_to_vector(float x, float y);

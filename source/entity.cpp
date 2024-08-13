@@ -1,8 +1,8 @@
 #include "entity.hpp"
+#include "raycast.hpp"
 #include "chunk_new.hpp"
+#include "render.hpp"
 #include "blocks.hpp"
-#include "sound.hpp"
-
 extern sound_system_t *sound_system;
 extern float wiimote_x;
 extern float wiimote_z;
@@ -13,13 +13,31 @@ bool aabb_entity_t::collides(aabb_entity_t *other)
     return aabb.intersects(other->aabb);
 }
 
+bool aabb_entity_t::can_remove()
+{
+    if (local)
+        return false;
+    if (!chunk)
+        return true;
+    vec3f entity_pos = get_position(0);
+    if (entity_pos.y < 0)
+        return true;
+    if (entity_pos.y > 255)
+        return false;
+    vec3i int_pos = vec3i(std::floor(entity_pos.x), std::floor(entity_pos.y), std::floor(entity_pos.z));
+    chunk_t *curr_chunk = get_chunk_from_pos(int_pos, false);
+    chunkvbo_t &vbo = curr_chunk->vbos[int_pos.y >> 4];
+    if (vbo.dirty || curr_chunk->light_update_count || vbo.cached_solid_buffer != vbo.solid_buffer || vbo.cached_transparent_buffer != vbo.transparent_buffer)
+        return false;
+    return dead;
+}
+
 void aabb_entity_t::resolve_collision(aabb_entity_t *b)
 {
     vec3f push = aabb.push_out(b->aabb);
 
     // Add velocity to separate the entities
-    this->velocity = this->velocity + push * 10.0f;
-    b->velocity = b->velocity - push * 10.0f;
+    this->velocity = this->velocity + push * 0.5;
 }
 
 void aabb_entity_t::set_position(vec3f pos)
@@ -70,7 +88,7 @@ void aabb_entity_t::tick()
         velocity.x += wiimote_x * 0.02;
         velocity.z += wiimote_z * 0.02;
 
-        if ((wiimote_held & WPAD_CLASSIC_BUTTON_B))
+        if (local && (wiimote_held & WPAD_CLASSIC_BUTTON_B))
             velocity.y += 0.04;
         velocity = velocity + (fluid_velocity.normalize() * 0.004);
 
@@ -91,7 +109,7 @@ void aabb_entity_t::tick()
     }
     else
     {
-        BlockID block_at_feet = get_block_at(vec3i(std::floor(position.x), std::floor(aabb.min.y) - 1, std::floor(position.z)), chunk)->get_blockid();
+        BlockID block_at_feet = get_block_id_at(vec3i(std::floor(position.x), std::floor(aabb.min.y) - 1, std::floor(position.z)), BlockID::air, chunk);
         vfloat_t h_friction = 0.91;
         if (on_ground)
         {
@@ -117,30 +135,38 @@ void aabb_entity_t::tick()
         }
         check_collisions();
 
-        velocity.y -= 0.08;
+        if (!drag_phase)
+            velocity.y -= gravity;
+
         velocity.y *= 0.98;
+
+        if (drag_phase)
+            velocity.y -= gravity;
+
         velocity.x *= h_friction;
         velocity.z *= h_friction;
     }
-
-    // Play step sound if the entity is moving on the ground or when it jumps
-    vec3f player_horizontal_velocity = position - prev_position;
-    last_step_distance += player_horizontal_velocity.magnitude();
-    if (last_step_distance > 1.5f || jumping)
+    if (walk_sound)
     {
-        vec3f feet_pos(position.x, aabb.min.y - 0.001, position.z);
-        vec3i feet_block_pos = vec3i(std::floor(feet_pos.x), std::floor(feet_pos.y), std::floor(feet_pos.z));
-        block_t *block_at_feet = get_block_at(feet_block_pos, chunk);
-        feet_block_pos.y--;
-        block_t *block_below_feet = get_block_at(feet_block_pos, chunk);
-        if (block_below_feet && block_below_feet->get_blockid() != BlockID::air)
+        // Play step sound if the entity is moving on the ground or when it jumps
+        vec3f player_horizontal_velocity = position - prev_position;
+        last_step_distance += player_horizontal_velocity.magnitude();
+        if (last_step_distance > 1.5f || jumping)
         {
-            if (!block_at_feet || !properties(block_at_feet->get_blockid()).m_fluid)
+            vec3f feet_pos(position.x, aabb.min.y - 0.001, position.z);
+            vec3i feet_block_pos = vec3i(std::floor(feet_pos.x), std::floor(feet_pos.y), std::floor(feet_pos.z));
+            block_t *block_at_feet = get_block_at(feet_block_pos, chunk);
+            feet_block_pos.y--;
+            block_t *block_below_feet = get_block_at(feet_block_pos, chunk);
+            if (block_below_feet && block_below_feet->get_blockid() != BlockID::air)
             {
-                sound_t sound = get_step_sound(block_at_feet->get_blockid());
-                sound.position = feet_pos;
-                sound_system->play_sound(sound);
-                last_step_distance = 0;
+                if (!block_at_feet || !properties(block_at_feet->get_blockid()).m_fluid)
+                {
+                    sound_t sound = get_step_sound(block_at_feet->get_blockid());
+                    sound.position = feet_pos;
+                    sound_system->play_sound(sound);
+                    last_step_distance = 0;
+                }
             }
         }
     }
@@ -237,4 +263,121 @@ void aabb_entity_t::check_collisions()
         velocity.y = 0;
     if (new_velocity.z != old_velocity.z)
         velocity.z = 0;
+}
+
+falling_block_entity_t::falling_block_entity_t(block_t block_state, const vec3i &position) : aabb_entity_t(0.999f, 0.999f), block_state(block_state)
+{
+    aabb_entity_t(0.999f, 0.999f);
+    chunk = get_chunk_from_pos(position, false);
+    set_position(vec3f(position.x, position.y, position.z) + vec3f(0.5, 0, 0.5));
+    this->walk_sound = false;
+    this->drag_phase = true;
+    this->gravity = 0.04;
+    if (!chunk)
+        dead = true;
+}
+void falling_block_entity_t::tick()
+{
+    if (dead)
+        return;
+    aabb_entity_t::tick();
+    if (on_ground)
+    {
+        dead = true; // Mark for removal
+        vec3f current_pos = get_position(0);
+        vec3i int_pos = vec3i(std::floor(current_pos.x), std::floor(current_pos.y), std::floor(current_pos.z));
+        block_t *block = get_block_at(int_pos, chunk);
+        if (block)
+        {
+            *block = this->block_state;
+            block->set_blockid(block->get_blockid()); // Update the block
+            update_block_at(int_pos);
+        }
+        set_position(vec3f(int_pos.x, int_pos.y, int_pos.z) + vec3f(0.5, 0, 0.5));
+    }
+}
+
+void falling_block_entity_t::render(float partial_ticks)
+{
+    if (!chunk)
+        return;
+
+    // Prepare the block state
+    vec3i int_pos = vec3i(std::floor(position.x), std::floor(position.y), std::floor(position.z));
+    block_t *block_at_pos = chunk->get_block(int_pos);
+    if (block_at_pos && !properties(block_at_pos->id).m_solid)
+        block_state.light = block_at_pos->light;
+    block_state.visibility_flags = 0x7F;
+
+    // Draw the selected block
+    if (on_ground)
+    {
+        // Prepare the transformation matrix
+        vec3f chunk_pos = vec3f(int_pos.x & ~0xF, int_pos.y & ~0xF, int_pos.z & ~0xF);
+        transform_view(get_view_matrix(), chunk_pos);
+        render_single_block_at(block_state, int_pos, false);
+        render_single_block_at(block_state, int_pos, true);
+    }
+    else
+    {
+        // Prepare the transformation matrix
+        transform_view(get_view_matrix(), get_position(partial_ticks) - vec3f(0.5, 0, 0.5));
+        render_single_block(block_state, false);
+        render_single_block(block_state, true);
+    }
+}
+
+void PlaySound(sound_t sound); // in minecraft.cpp
+void CreateExplosion(vec3f pos, float power, chunk_t *near); // in minecraft.cpp
+
+exploding_block_entity_t::exploding_block_entity_t(block_t block_state, const vec3i &position, uint16_t fuse) : falling_block_entity_t(block_state, position), fuse(fuse)
+{
+    falling_block_entity_t(block_state, position);
+    this->velocity = vec3f(JavaLCGDouble() * 0.04 - 0.02, 0.2, JavaLCGDouble() * 0.04 - 0.02);
+    sound_t sound(fuse_sound);
+    sound.position = get_position(0);
+    sound.volume = 0.5;
+    sound.pitch = 1.0;
+    PlaySound(sound);
+}
+
+void exploding_block_entity_t::tick()
+{
+    if (dead)
+        return;
+
+    aabb_entity_t::tick();
+    if (on_ground)
+    {
+    }
+    --fuse;
+    if (!fuse)
+    {
+        dead = true;
+        CreateExplosion(position, 3, chunk);
+    }
+}
+
+void exploding_block_entity_t::render(float partial_ticks)
+{
+    if (!chunk)
+        return;
+
+    // Prepare the block state
+    vec3i int_pos = vec3i(std::floor(position.x), std::floor(position.y), std::floor(position.z));
+    block_t *block_at_pos = chunk->get_block(int_pos);
+    if (block_at_pos && !properties(block_at_pos->id).m_solid)
+        block_state.light = block_at_pos->light;
+    block_state.visibility_flags = 0x7F;
+
+    // Draw the selected block
+    transform_view(get_view_matrix(), get_position(partial_ticks) - vec3f(0.5, 0, 0.5));
+
+    if ((fuse / 5) % 2 == 1)
+        use_texture(white_texture);
+
+    render_single_block(block_state, false);
+    render_single_block(block_state, true);
+
+    use_texture(blockmap_texture);
 }

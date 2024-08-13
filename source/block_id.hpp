@@ -129,7 +129,8 @@ enum class BlockID
     lit_redstone_lamp,
     double_wooden_slab,
     wooden_slab,
-    cocoa
+    cocoa,
+    reserved
 };
 
 

@@ -65,6 +65,7 @@ public:
     uint8_t height_map[16 * 16] = {0};
     chunkvbo_t vbos[VERTICAL_SECTION_COUNT];
     uint8_t has_fluid_updates[VERTICAL_SECTION_COUNT] = {1};
+    uint32_t light_update_count = 0;
     std::vector<aabb_entity_t *> entities;
 
     block_t *get_block(const vec3i &pos)
@@ -118,6 +119,8 @@ public:
     int render_slab(block_t *block, const vec3i &pos);
 
     void update_entities();
+
+    void render_entities(float partial_ticks);
 
     uint32_t size();
     chunk_t()
