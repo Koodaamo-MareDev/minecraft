@@ -97,15 +97,14 @@ public:
     }
 
     void update_height_map(vec3i pos);
-    void recalculate();
     void light_up();
-    void recalculate_section(int section);
+    void recalculate_visibility(block_t *block, vec3i pos);
+    void recalculate_section_visibility(int section);
     void build_all_vbos();
     void destroy_vbo(int section, unsigned char which);
     void rebuild_vbo(int section, bool transparent);
     int build_vbo(int section, bool transparent);
     int render_fluid(block_t *block, const vec3i &pos);
-    void prepare_render();
     int pre_render_fluid_mesh(int section, bool transparent);
     int render_fluid_mesh(int section, bool transparent, int vertexCount);
     int pre_render_block_mesh(int section, bool transparent);
@@ -151,5 +150,5 @@ void *get_aligned_pointer_32(void *ptr);
 void get_neighbors(const vec3i &pos, block_t **neighbors, chunk_t *near = nullptr);
 void update_block_at(const vec3i &pos);
 void update_neighbors(const vec3i &pos);
-vec3f get_fluid_direction(block_t *block, vec3i pos);
+vec3f get_fluid_direction(block_t *block, vec3i pos, chunk_t* chunk = nullptr);
 #endif

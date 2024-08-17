@@ -34,6 +34,7 @@ enum class SoundType : uint8_t
 enum class RenderType : uint8_t
 {
     full,
+    full_special,
     cross,
     flat_ground,
     slab,

@@ -5,6 +5,7 @@
 #include "block.hpp"
 #include "raycast.hpp"
 #include "lock.hpp"
+#include "timers.hpp"
 #include <cmath>
 #include <sys/unistd.h>
 #include <gccore.h>
@@ -16,7 +17,7 @@ lwp_t __light_engine_thread_handle = (lwp_t)NULL;
 mutex_t light_mutex = (mutex_t)NULL;
 bool __light_engine_init_done = false;
 bool __light_engine_busy = false;
-std::deque<vec3i> pending_light_updates;
+std::deque<std::pair<vec3i, chunk_t *>> pending_light_updates;
 void __update_light(vec3i coords);
 void *__light_engine_init_internal(void *);
 
@@ -55,24 +56,27 @@ void light_engine_update()
 void light_engine_loop()
 {
     int updates = 0;
+    uint64_t start = time_get();
     while (pending_light_updates.size() > 0 && __light_engine_init_done)
     {
         __light_engine_busy = true;
-        lock_t light_lock(light_mutex);
-        vec3i pos = pending_light_updates.front();
+        std::pair<vec3i, chunk_t *> e = pending_light_updates.front();
         pending_light_updates.pop_front();
-        light_lock.unlock();
-        chunk_t *chunk = get_chunk_from_pos(pos, false);
+        vec3i pos = e.first;
+        chunk_t *chunk = e.second;
         if (chunk)
         {
             __update_light(pos);
-            if (++updates % 1000 == 0)
-                usleep(1);
             --chunk->light_update_count;
+            if ((++updates & 1023) == 0)
+            {
+                if (time_diff_us(start, time_get()) > 100)
+                    usleep(1000);
+            }
         }
     }
     __light_engine_busy = false;
-    usleep(100);
+    usleep(1000);
 }
 void light_engine_deinit()
 {
@@ -85,16 +89,12 @@ void light_engine_deinit()
     }
 }
 
-void update_light(vec3i pos)
+void update_light(vec3i pos, chunk_t *chunk)
 {
-    if (pos.y > 255 || pos.y < 0)
-        return;
-    chunk_t *chunk = get_chunk_from_pos(pos, false, false);
-    if (!chunk)
+    if (!chunk || pos.y > 255 || pos.y < 0)
         return;
     ++chunk->light_update_count;
-    lock_t light_lock(light_mutex);
-    pending_light_updates.push_back(pos);
+    pending_light_updates.push_back(std::make_pair(pos, chunk));
 }
 
 /*
@@ -140,13 +140,13 @@ void __update_light(vec3i coords)
         block_t *block = chunk->get_block(pos);
 
         uint8_t new_skylight = 0;
-        uint8_t new_blocklight = get_block_luminance(block->get_blockid());
+        uint8_t new_blocklight = properties(block->id).m_luminance;
 
         if (pos.y >= chunk->height_map[map_index])
             new_skylight = 0xF;
 
         block_t *neighbors[6];
-        get_neighbors(pos, neighbors);
+        get_neighbors(pos, neighbors, chunk);
         int8_t opacity = get_block_opacity(block->get_blockid());
         if (opacity != 15)
         {

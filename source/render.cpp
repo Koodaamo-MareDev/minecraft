@@ -374,18 +374,17 @@ const vec3i cube_vertices16[6][4] = {
     },
 };
 
-
 int render_face(vec3i pos, uint8_t face, uint32_t texture_index, chunk_t *near, block_t *block)
 {
     if (!base3d_is_drawing || face >= 6)
     {
+        static vertex_property_t tmp;
         // This is just a dummy call to GX_Vertex to keep buffer size up to date.
         for (int i = 0; i < 4; i++)
-            GX_VertexLit(vertex_property_t(), 0, 0);
+            GX_VertexLit(tmp, 0, 0);
         return 4;
     }
-    vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
-    vec3i vertex_pos(local_pos.x << BASE3D_POS_FRAC_BITS, local_pos.y << BASE3D_POS_FRAC_BITS, local_pos.z << BASE3D_POS_FRAC_BITS);
+    vec3i vertex_pos((pos.x & 0xF) << BASE3D_POS_FRAC_BITS, (pos.y & 0xF) << BASE3D_POS_FRAC_BITS, (pos.z & 0xF) << BASE3D_POS_FRAC_BITS);
     if (!block)
         block = get_block_at(pos, near);
     uint8_t light_val = get_face_light_index(pos, face, near, block);
@@ -393,137 +392,25 @@ int render_face(vec3i pos, uint8_t face, uint32_t texture_index, chunk_t *near, 
     uint8_t lighting[4] = {light_val, light_val, light_val, light_val};
     vertex_property16_t vertices[4];
     uint8_t index = 0;
-    switch (face)
-    {
-    case FACE_NX:
-        smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], ao[index]);
-        vertices[index] = {vertex_pos + cube_vertices16[face][index], TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)};
-        index++;
-        smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], ao[index]);
-        vertices[index] = {vertex_pos + cube_vertices16[face][index], TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)};
-        index++;
-        smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], ao[index]);
-        vertices[index] = {vertex_pos + cube_vertices16[face][index], TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)};
-        index++;
-        smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], ao[index]);
-        vertices[index] = {vertex_pos + cube_vertices16[face][index], TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)};
-        index = (ao[0] + ao[3] > ao[1] + ao[2]);
-        GX_VertexLit16(vertices[index], lighting[index], face + ao[index]);
-        index++;
-        GX_VertexLit16(vertices[index], lighting[index], face + ao[index]);
-        index++;
-        GX_VertexLit16(vertices[index & 3], lighting[index & 3], face + ao[index & 3]);
-        index++;
-        GX_VertexLit16(vertices[index & 3], lighting[index & 3], face + ao[index & 3]);
-        break;
-    case FACE_PX:
-        smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], ao[index]);
-        vertices[index] = {vertex_pos + cube_vertices16[face][index], TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)};
-        index++;
-        smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], ao[index]);
-        vertices[index] = {vertex_pos + cube_vertices16[face][index], TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)};
-        index++;
-        smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], ao[index]);
-        vertices[index] = {vertex_pos + cube_vertices16[face][index], TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)};
-        index++;
-        smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], ao[index]);
-        vertices[index] = {vertex_pos + cube_vertices16[face][index], TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)};
-        index = (ao[0] + ao[3] > ao[1] + ao[2]);
-        GX_VertexLit16(vertices[index], lighting[index], face + ao[index]);
-        index++;
-        GX_VertexLit16(vertices[index], lighting[index], face + ao[index]);
-        index++;
-        GX_VertexLit16(vertices[index & 3], lighting[index & 3], face + ao[index & 3]);
-        index++;
-        GX_VertexLit16(vertices[index & 3], lighting[index & 3], face + ao[index & 3]);
-        break;
-    case FACE_NY:
-        smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], ao[index]);
-        vertices[index] = {vertex_pos + cube_vertices16[face][index], TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)};
-        index++;
-        smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], ao[index]);
-        vertices[index] = {vertex_pos + cube_vertices16[face][index], TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)};
-        index++;
-        smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], ao[index]);
-        vertices[index] = {vertex_pos + cube_vertices16[face][index], TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)};
-        index++;
-        smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], ao[index]);
-        vertices[index] = {vertex_pos + cube_vertices16[face][index], TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)};
-        index = (ao[0] + ao[3] > ao[1] + ao[2]);
-        GX_VertexLit16(vertices[index], lighting[index], face + ao[index]);
-        index++;
-        GX_VertexLit16(vertices[index], lighting[index], face + ao[index]);
-        index++;
-        GX_VertexLit16(vertices[index & 3], lighting[index & 3], face + ao[index & 3]);
-        index++;
-        GX_VertexLit16(vertices[index & 3], lighting[index & 3], face + ao[index & 3]);
-        break;
-    case FACE_PY:
-        smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], ao[index]);
-        vertices[index] = {vertex_pos + cube_vertices16[face][index], TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)};
-        index++;
-        smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], ao[index]);
-        vertices[index] = {vertex_pos + cube_vertices16[face][index], TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)};
-        index++;
-        smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], ao[index]);
-        vertices[index] = {vertex_pos + cube_vertices16[face][index], TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)};
-        index++;
-        smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], ao[index]);
-        vertices[index] = {vertex_pos + cube_vertices16[face][index], TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)};
-        index = (ao[0] + ao[3] > ao[1] + ao[2]);
-        GX_VertexLit16(vertices[index], lighting[index], face + ao[index]);
-        index++;
-        GX_VertexLit16(vertices[index], lighting[index], face + ao[index]);
-        index++;
-        GX_VertexLit16(vertices[index & 3], lighting[index & 3], face + ao[index & 3]);
-        index++;
-        GX_VertexLit16(vertices[index & 3], lighting[index & 3], face + ao[index & 3]);
-        break;
-    case FACE_NZ:
-        smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], ao[index]);
-        vertices[index] = {vertex_pos + cube_vertices16[face][index], TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)};
-        index++;
-        smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], ao[index]);
-        vertices[index] = {vertex_pos + cube_vertices16[face][index], TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)};
-        index++;
-        smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], ao[index]);
-        vertices[index] = {vertex_pos + cube_vertices16[face][index], TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)};
-        index++;
-        smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], ao[index]);
-        vertices[index] = {vertex_pos + cube_vertices16[face][index], TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)};
-        index = (ao[0] + ao[3] > ao[1] + ao[2]);
-        GX_VertexLit16(vertices[index], lighting[index], face + ao[index]);
-        index++;
-        GX_VertexLit16(vertices[index], lighting[index], face + ao[index]);
-        index++;
-        GX_VertexLit16(vertices[index & 3], lighting[index & 3], face + ao[index & 3]);
-        index++;
-        GX_VertexLit16(vertices[index & 3], lighting[index & 3], face + ao[index & 3]);
-        break;
-    case FACE_PZ:
-        smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], ao[index]);
-        vertices[index] = {vertex_pos + cube_vertices16[face][index], TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)};
-        index++;
-        smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], ao[index]);
-        vertices[index] = {vertex_pos + cube_vertices16[face][index], TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)};
-        index++;
-        smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], ao[index]);
-        vertices[index] = {vertex_pos + cube_vertices16[face][index], TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)};
-        index++;
-        smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], ao[index]);
-        vertices[index] = {vertex_pos + cube_vertices16[face][index], TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)};
-        index = (ao[0] + ao[3] > ao[1] + ao[2]);
-        GX_VertexLit16(vertices[index], lighting[index], face + ao[index]);
-        index++;
-        GX_VertexLit16(vertices[index], lighting[index], face + ao[index]);
-        index++;
-        GX_VertexLit16(vertices[index & 3], lighting[index & 3], face + ao[index & 3]);
-        index++;
-        GX_VertexLit16(vertices[index & 3], lighting[index & 3], face + ao[index & 3]);
-        break;
-    default:
-        break;
-    }
+    smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], ao[index]);
+    vertices[index] = {vertex_pos + cube_vertices16[face][index], TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)};
+    index++;
+    smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], ao[index]);
+    vertices[index] = {vertex_pos + cube_vertices16[face][index], TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)};
+    index++;
+    smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], ao[index]);
+    vertices[index] = {vertex_pos + cube_vertices16[face][index], TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)};
+    index++;
+    smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], ao[index]);
+    vertices[index] = {vertex_pos + cube_vertices16[face][index], TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)};
+    index = (ao[0] + ao[3] > ao[1] + ao[2]);
+    GX_VertexLit16(vertices[index], lighting[index], face + ao[index]);
+    index = (index + 1) & 3;
+    GX_VertexLit16(vertices[index], lighting[index], face + ao[index]);
+    index = (index + 1) & 3;
+    GX_VertexLit16(vertices[index], lighting[index], face + ao[index]);
+    index = (index + 1) & 3;
+    GX_VertexLit16(vertices[index], lighting[index], face + ao[index]);
     return 4;
 }
 

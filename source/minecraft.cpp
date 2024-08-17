@@ -83,7 +83,7 @@ bool has_loaded = false;
 
 float fog_depth_multiplier = 1.0f;
 
-void CreateExplosion(vec3f pos, float power, chunk_t* near);
+void CreateExplosion(vec3f pos, float power, chunk_t *near);
 void UpdateLoadingStatus();
 void UpdateLightDir();
 void DrawInventory(view_t &view);
@@ -995,7 +995,7 @@ void PlaySound(sound_t sound)
     sound_system->play_sound(sound);
 }
 
-void CreateExplosion(vec3f pos, float power, chunk_t* near)
+void CreateExplosion(vec3f pos, float power, chunk_t *near)
 {
     explode(pos, power, near);
 
@@ -1051,8 +1051,8 @@ void UpdateChunkData(frustum_t &frustum, std::deque<chunk_t *> &chunks)
                 vbo.x = chunk->x * 16;
                 vbo.y = j * 16;
                 vbo.z = chunk->z * 16;
-                float vdistance = std::max(hdistance, std::abs((vbo.y + 8) - player_pos.y));
-                vbo.visible = (vdistance <= std::max(RENDER_DISTANCE * 16 * fog_depth_multiplier, 16.0f)); // && distance_to_frustum(vec3f(vbo.x + 8, vbo.y + 8, vbo.z + 8), frustum) < 0;
+                float vdistance = std::abs(vbo.y - player_pos.y);
+                vbo.visible = (vdistance <= std::max(RENDER_DISTANCE * 12 * fog_depth_multiplier, 16.0f)) && (hdistance <= std::max(RENDER_DISTANCE * 16 * fog_depth_multiplier, 16.0f));
                 if (chunk->has_fluid_updates[j] && vdistance <= SIMULATION_DISTANCE * 16 && tickCounter - lastWaterTick >= 5)
                     RecalcSectionWater(chunk, j);
             }
@@ -1109,14 +1109,14 @@ void UpdateChunkVBOs(std::deque<chunk_t *> &chunks)
             }
         }
         std::sort(vbos_to_rebuild.begin(), vbos_to_rebuild.end(), SortVBOs);
-        uint32_t max_vbo_updates = 2;
+        uint32_t max_vbo_updates = 1;
         for (chunkvbo_t *vbo_ptr : vbos_to_rebuild)
         {
             chunkvbo_t &vbo = *vbo_ptr;
             int vbo_i = vbo.y >> 4;
             chunk_t *chunk = get_chunk_from_pos(vec3i(vbo.x, 0, vbo.z), false);
             vbo.dirty = false;
-            chunk->recalculate_section(vbo_i);
+            chunk->recalculate_section_visibility(vbo_i);
             chunk->build_vbo(vbo_i, false);
             chunk->build_vbo(vbo_i, true);
             vbos_to_update.push_back(vbo_ptr);
@@ -1245,7 +1245,7 @@ void DrawInventory(view_t &viewport)
 
         template_block.meta = block_properties[template_block.id].m_default_state;
         RenderType render_type = properties(template_block.id).m_render_type;
-        if (!properties(template_block.id).m_fluid && (render_type == RenderType::full || render_type == RenderType::slab))
+        if (!properties(template_block.id).m_fluid && (render_type == RenderType::full || render_type == RenderType::full_special || render_type == RenderType::slab))
         {
             // Translate the block to the correct position
             guMtxCopy(inventory_matrix, tmp_matrix);

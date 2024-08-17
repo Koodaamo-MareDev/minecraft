@@ -425,14 +425,6 @@ block_t *get_block_at(const vec3i &position, chunk_t *near)
     return chunk->get_block(position);
 }
 
-void chunk_t::recalculate()
-{
-    for (int i = 0; i < VERTICAL_SECTION_COUNT; i++)
-    {
-        this->recalculate_section(i);
-    }
-}
-
 void chunk_t::update_height_map(vec3i pos)
 {
     pos.x &= 15;
@@ -465,8 +457,6 @@ void update_block_at(const vec3i &pos)
     if (!chunk)
         return;
     block_t *block = chunk->get_block(pos);
-    if (!block)
-        return;
     blockproperties_t prop = properties(block->id);
     if (prop.m_fluid)
     {
@@ -476,7 +466,7 @@ void update_block_at(const vec3i &pos)
     if (prop.m_fall)
     {
         BlockID block_below = get_block_id_at(pos + vec3i(0, -1, 0), BlockID::stone, chunk);
-        if(block_below == BlockID::air || properties(block_below).m_fluid)
+        if (block_below == BlockID::air || properties(block_below).m_fluid)
         {
             chunk->entities.push_back(new falling_block_entity_t(*block, pos));
             block->set_blockid(BlockID::air);
@@ -484,7 +474,7 @@ void update_block_at(const vec3i &pos)
         }
     }
     chunk->update_height_map(pos);
-    update_light(pos);
+    update_light(pos, chunk);
 }
 
 void update_neighbors(const vec3i &pos)
@@ -512,14 +502,14 @@ void chunk_t::light_up()
                 this->height_map[(x << 4) | z] = end_y + 1;
                 for (int y = 255; y > end_y; y--)
                     this->get_block(vec3i(x, y, z))->sky_light = 15;
-                update_light(vec3i(chunkX + x, end_y + 1, chunkZ + z));
+                update_light(vec3i(chunkX + x, end_y + 1, chunkZ + z), this);
 
                 // Update block lights
                 for (int y = 0; y < end_y; y++)
                 {
                     if (get_block_luminance(this->get_block(vec3i(x, y, z))->get_blockid()))
                     {
-                        update_light(vec3i(chunkX + x, y, chunkZ + z));
+                        update_light(vec3i(chunkX + x, y, chunkZ + z), this);
                     }
                 }
             }
@@ -528,20 +518,36 @@ void chunk_t::light_up()
     }
 }
 
-// recalculates the blockstates of a section
-void chunk_t::recalculate_section(int section)
+void chunk_t::recalculate_visibility(block_t *block, vec3i pos)
 {
-
-    int chunkX = this->x * 16;
-    int chunkZ = this->z * 16;
-    int chunkY = section * 16;
-
-    vec3i chunk_pos = {chunkX, chunkY, chunkZ};
-
-    block_t *block = this->get_block(vec3i(0, chunk_pos.y, 0)); // Gets the first block of the section
-
     block_t *neighbors[6];
+    get_neighbors(pos, neighbors, this);
+    uint8_t visibility = 0x40;
+    for (int i = 0; i < 6; i++)
+    {
+        block_t *other_block = neighbors[i];
+        if (!other_block || !other_block->get_visibility())
+        {
+            visibility |= 1 << i;
+            continue;
+        }
 
+        if (other_block->id != block->id || !is_face_transparent(get_face_texture_index(block, i)))
+        {
+            RenderType other_rt = properties(other_block->id).m_render_type;
+            visibility |= ((other_rt != RenderType::full && other_rt != RenderType::full_special) || is_face_transparent(get_face_texture_index(other_block, i ^ 1))) << i;
+        }
+    }
+    block->visibility_flags = visibility;
+}
+
+// recalculates the blockstates of a section
+void chunk_t::recalculate_section_visibility(int section)
+{
+    //u64 start = time_get();
+    vec3i chunk_pos(this->x * 16, section * 16, this->z * 16);
+
+    block_t *block = this->get_block(chunk_pos); // Gets the first block of the section
     for (int y = 0; y < 16; y++)
     {
         for (int z = 0; z < 16; z++)
@@ -549,30 +555,13 @@ void chunk_t::recalculate_section(int section)
             for (int x = 0; x < 16; x++, block++)
             {
                 if (!block->get_visibility())
-                {
                     continue;
-                }
-                vec3i local_pos(x, y, z);
-                get_neighbors(chunk_pos + local_pos, neighbors, this);
-                uint8_t visibility = 0x40;
-                for (int i = 0; i < 6; i++)
-                {
-                    block_t *other_block = neighbors[i];
-                    if (!other_block || !other_block->get_visibility())
-                    {
-                        visibility |= 1 << i;
-                        continue;
-                    }
-
-                    if (other_block->id != block->id || !is_face_transparent(get_face_texture_index(block, i)))
-                    {
-                        visibility |= (properties(other_block->id).m_render_type != RenderType::full || is_face_transparent(get_face_texture_index(other_block, i ^ 1))) << i;
-                    }
-                }
-                block->visibility_flags = visibility;
+                vec3i pos = vec3i(x, y, z);
+                this->recalculate_visibility(block, chunk_pos + pos);
             }
         }
     }
+    //printf("Recalculated visibility in %lld us\n", time_diff_us(start, time_get()));
 }
 
 void chunk_t::destroy_vbo(int section, unsigned char which)
@@ -946,8 +935,13 @@ inline int DrawVerticalQuad(vertex_property_t p0, vertex_property_t p1, vertex_p
 
 void get_neighbors(const vec3i &pos, block_t **neighbors, chunk_t *near)
 {
-    for (int x = 0; x < 6; x++)
-        neighbors[x] = get_block_at(pos + face_offsets[x], near);
+
+    if (((pos.x + 1) & 15) <= 1 || ((pos.z + 1) & 15) <= 1 || ((pos.y + 1) & 255) <= 1 || !near)
+        for (int x = 0; x < 6; x++)
+            neighbors[x] = get_block_at(pos + face_offsets[x], near);
+    else
+        for (int x = 0; x < 6; x++)
+            neighbors[x] = near->get_block(pos + face_offsets[x]);
 }
 
 int chunk_t::pre_render_block(block_t *block, const vec3i &pos, bool transparent)
@@ -1000,10 +994,21 @@ int chunk_t::render_block(block_t *block, const vec3i &pos, bool transparent)
         }
     }
     int vertexCount = 0;
-    for (uint8_t face = 0; face < 6; face++)
+    if (properties(block->id).m_render_type == RenderType::full_special)
     {
-        if (block->get_opacity(face))
-            vertexCount += render_face(pos, face, get_face_texture_index(block, face), this, block);
+        for (uint8_t face = 0; face < 6; face++)
+        {
+            if (block->get_opacity(face))
+                vertexCount += render_face(pos, face, get_face_texture_index(block, face), this, block);
+        }
+    }
+    else
+    {
+        for (uint8_t face = 0; face < 6; face++)
+        {
+            if (block->get_opacity(face))
+                vertexCount += render_face(pos, face, properties(block->id).m_texture_index, this, block);
+        }
     }
     return vertexCount;
 }
@@ -1201,7 +1206,7 @@ int chunk_t::render_torch(block_t *block, const vec3i &pos)
     return 20;
 }
 
-vec3f get_fluid_direction(block_t *block, vec3i pos)
+vec3f get_fluid_direction(block_t *block, vec3i pos, chunk_t* chunk)
 {
 
     BlockID block_id = block->get_blockid();
@@ -1320,7 +1325,7 @@ int chunk_t::render_fluid(block_t *block, const vec3i &pos)
     if (!is_same_fluid(block_id, neighbor_ids[FACE_NY]) && (!is_solid(neighbor_ids[FACE_NY]) || properties(neighbor_ids[FACE_NY]).m_transparent))
         faceCount += DrawHorizontalQuad(bottomPlaneCoords[0], bottomPlaneCoords[1], bottomPlaneCoords[2], bottomPlaneCoords[3], neighbors[FACE_NY] ? neighbors[FACE_NY]->light : light);
 
-    vec3f direction = get_fluid_direction(block, pos);
+    vec3f direction = get_fluid_direction(block, pos, this);
     float angle = -1000;
     float cos_angle = 8;
     float sin_angle = 0;
@@ -1404,12 +1409,6 @@ int chunk_t::render_fluid(block_t *block, const vec3i &pos)
     if (!is_same_fluid(block_id, neighbor_ids[FACE_PX]) && (!is_solid(neighbor_ids[FACE_PX]) || properties(neighbor_ids[FACE_NY]).m_transparent))
         faceCount += DrawVerticalQuad(sideCoords[0], sideCoords[1], sideCoords[2], sideCoords[3], neighbors[FACE_PX]->light);
     return faceCount * 3;
-}
-
-void chunk_t::prepare_render()
-{
-    this->recalculate();
-    this->build_all_vbos();
 }
 
 void chunk_t::update_entities()

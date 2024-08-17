@@ -12,6 +12,6 @@ void light_engine_init();
 void light_engine_deinit();
 void light_engine_loop();
 void light_engine_update();
-void update_light(vec3i pos);
+void update_light(vec3i pos, chunk_t* chunk);
 
 #endif

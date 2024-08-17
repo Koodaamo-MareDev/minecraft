@@ -480,8 +480,7 @@ inline void explode(vec3f position, float power, chunk_t *near)
         return;
 
     // I suppose the float bits of the position vector are enough to generate a seed random enough
-    uint64_t seed = *(uint64_t*)(&position.x) ^ *(uint64_t*)(&position.y) ^ *(uint64_t*)(&position.z);
-    JavaLCGInit(seed);
+    JavaLCGInit(rand());
 
     for (int x = -8; x <= 8; x++)
     {
