@@ -474,6 +474,14 @@ inline void explode_raycast(vec3f origin, vec3f direction, float intensity, chun
 inline void explode(vec3f position, float power, chunk_t *near)
 {
     vec3f dir;
+    block_t *center_block = get_block_at(vec3i(int(position.x), int(position.y), int(position.z)), near);
+    power -= (properties(center_block->id).m_blast_resistance + 0.3) * 0.3;
+    if (power <= 0)
+        return;
+
+    // I suppose the float bits of the position vector are enough to generate a seed random enough
+    uint64_t seed = *(uint64_t*)(&position.x) ^ *(uint64_t*)(&position.y) ^ *(uint64_t*)(&position.z);
+    JavaLCGInit(seed);
 
     for (int x = -8; x <= 8; x++)
     {

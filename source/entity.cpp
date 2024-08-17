@@ -85,11 +85,14 @@ void aabb_entity_t::tick()
     {
         float old_y = position.y;
 
-        velocity.x += wiimote_x * 0.02;
-        velocity.z += wiimote_z * 0.02;
+        if (local)
+        {
+            velocity.x += wiimote_x * 0.02;
+            velocity.z += wiimote_z * 0.02;
 
-        if (local && (wiimote_held & WPAD_CLASSIC_BUTTON_B))
-            velocity.y += 0.04;
+            if ((wiimote_held & WPAD_CLASSIC_BUTTON_B))
+                velocity.y += 0.04;
+        }
         velocity = velocity + (fluid_velocity.normalize() * 0.004);
 
         check_collisions();
@@ -327,7 +330,7 @@ void falling_block_entity_t::render(float partial_ticks)
     }
 }
 
-void PlaySound(sound_t sound); // in minecraft.cpp
+void PlaySound(sound_t sound);                               // in minecraft.cpp
 void CreateExplosion(vec3f pos, float power, chunk_t *near); // in minecraft.cpp
 
 exploding_block_entity_t::exploding_block_entity_t(block_t block_state, const vec3i &position, uint16_t fuse) : falling_block_entity_t(block_state, position), fuse(fuse)
@@ -354,7 +357,7 @@ void exploding_block_entity_t::tick()
     if (!fuse)
     {
         dead = true;
-        CreateExplosion(position, 3, chunk);
+        CreateExplosion(position + vec3i(0, 0.5625, 0), 3, chunk);
     }
 }
 
