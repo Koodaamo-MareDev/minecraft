@@ -337,11 +337,16 @@ exploding_block_entity_t::exploding_block_entity_t(block_t block_state, const ve
 {
     falling_block_entity_t(block_state, position);
     this->velocity = vec3f(JavaLCGDouble() * 0.04 - 0.02, 0.2, JavaLCGDouble() * 0.04 - 0.02);
-    sound_t sound(fuse_sound);
-    sound.position = get_position(0);
-    sound.volume = 0.5;
-    sound.pitch = 1.0;
-    PlaySound(sound);
+
+    // Play the fuse sound if there is a long enough fuse
+    if (fuse > 45)
+    {
+        sound_t sound(fuse_sound);
+        sound.position = get_position(0);
+        sound.volume = 0.5;
+        sound.pitch = 1.0;
+        PlaySound(sound);
+    }
 }
 
 void exploding_block_entity_t::tick()
