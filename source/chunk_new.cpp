@@ -544,7 +544,6 @@ void chunk_t::recalculate_visibility(block_t *block, vec3i pos)
 // recalculates the blockstates of a section
 void chunk_t::recalculate_section_visibility(int section)
 {
-    //u64 start = time_get();
     vec3i chunk_pos(this->x * 16, section * 16, this->z * 16);
 
     block_t *block = this->get_block(chunk_pos); // Gets the first block of the section
@@ -561,7 +560,6 @@ void chunk_t::recalculate_section_visibility(int section)
             }
         }
     }
-    //printf("Recalculated visibility in %lld us\n", time_diff_us(start, time_get()));
 }
 
 void chunk_t::destroy_vbo(int section, unsigned char which)
@@ -785,6 +783,7 @@ int chunk_t::build_vbo(int section, bool transparent)
         this->vbos[section].solid_buffer = displist_vbo;
         this->vbos[section].solid_buffer_length = displist_size;
     }
+    DCFlushRange(displist_vbo, displist_size);
 #endif
     return (0);
 }
@@ -1206,7 +1205,7 @@ int chunk_t::render_torch(block_t *block, const vec3i &pos)
     return 20;
 }
 
-vec3f get_fluid_direction(block_t *block, vec3i pos, chunk_t* chunk)
+vec3f get_fluid_direction(block_t *block, vec3i pos, chunk_t *chunk)
 {
 
     BlockID block_id = block->get_blockid();
