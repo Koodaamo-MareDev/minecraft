@@ -239,51 +239,6 @@ void smooth_light(const vec3i &pos, uint8_t face_index, const vec3i &vertex_off,
     if (total > 1)
         lighting = (block_light / total) | ((sky_light / total) << 4);
 }
-
-const vec3f cube_vertices[6][4] = {
-    {
-        // FACE_NX
-        vec3f{-.5, -.5, -.5},
-        vec3f{-.5, 0.5, -.5},
-        vec3f{-.5, 0.5, 0.5},
-        vec3f{-.5, -.5, 0.5},
-    },
-    {
-        // FACE_PX
-        vec3f{0.5, -.5, 0.5},
-        vec3f{0.5, 0.5, 0.5},
-        vec3f{0.5, 0.5, -.5},
-        vec3f{0.5, -.5, -.5},
-    },
-    {
-        // FACE_NY
-        vec3f{-.5, -.5, -.5},
-        vec3f{-.5, -.5, 0.5},
-        vec3f{0.5, -.5, 0.5},
-        vec3f{0.5, -.5, -.5},
-    },
-    {
-        // FACE_PY
-        vec3f{0.5, 0.5, -.5},
-        vec3f{0.5, 0.5, 0.5},
-        vec3f{-.5, 0.5, 0.5},
-        vec3f{-.5, 0.5, -.5},
-    },
-    {
-        // FACE_NZ
-        vec3f{0.5, -.5, -.5},
-        vec3f{0.5, 0.5, -.5},
-        vec3f{-.5, 0.5, -.5},
-        vec3f{-.5, -.5, -.5},
-    },
-    {
-        // FACE_PZ
-        vec3f{-.5, -.5, 0.5},
-        vec3f{-.5, 0.5, 0.5},
-        vec3f{0.5, 0.5, 0.5},
-        vec3f{0.5, -.5, 0.5},
-    },
-};
 const vec3i cube_vertex_offsets[6][4] = {
     {
         // FACE_NX
