@@ -320,7 +320,7 @@ int main(int argc, char **argv)
         background = get_sky_color();
         GX_SetCopyClear(background, 0x00FFFFFF);
 
-        fog_depth_multiplier = flerp(fog_depth_multiplier, std::min(std::max(player_pos.y, 24.f) / 48.f, 1.0f), 0.05f);
+        fog_depth_multiplier = flerp(fog_depth_multiplier, std::min(std::max(player_pos.y, 24.f) / 36.f, 1.0f), 0.05f);
 
         // Enable fog
         use_fog(true, viewport, background, fog_depth_multiplier * (GENERATION_DISTANCE * 0.5f - 8), fog_depth_multiplier * (GENERATION_DISTANCE * 0.5f));
