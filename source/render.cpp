@@ -224,7 +224,7 @@ void smooth_light(const vec3i &pos, uint8_t face_index, const vec3i &vertex_off,
     {
         if (properties(blockC->id).m_opacity == 15)
         {
-            if (amb_occ < 2)
+            if (amb_occ < 12)
                 amb_occ += 6;
             else
                 amb_occ = 18;
