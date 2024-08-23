@@ -12,6 +12,7 @@
 #include "raycast.hpp"
 #include "lock.hpp"
 #include "asynclib.hpp"
+#include "ported/MapGenCaves.hpp"
 #include <tuple>
 #include <map>
 #include <vector>
@@ -302,29 +303,33 @@ void generate_chunk()
         }
     }
     // Carve caves
-    block_t *block = &chunk->blockstates[256];
-    for (int y = 1; y <= max_height;)
-    {
-        uint8_t slice_amount = 8;
-        noise_block_pos.y = y;
-        noise_size.y = slice_amount;
-        float *noise_set_ptr = noise_set;
-        improved_noise.GetNoiseSet(vec3f(noise_block_pos.x, noise_block_pos.y, noise_block_pos.z), noise_size, 12, 1, noise_set);
+    JavaLCGInit(cavegen_seed);
+    int64_t off_x = (JavaLCG() / 2L) * 2L + 1L;
+    int64_t off_z = (JavaLCG() / 2L) * 2L + 1L;
 
-        // uint8_t *noise_set_ptr = cellular_noise;
-        // improved_noise.GetCellularNoiseSet(noise_block_pos, vec3i(16, slice_amount, 16), cellular_noise, cavegen_seed);
-        for (int s = 0; s < slice_amount; s++, y++)
+    static BlockID carved[16 * 16 * 256];
+
+    block_t *block = chunk->blockstates;
+    for (int32_t i = 0; i < 16 * 16 * 256; i++, block++)
+    {
+        carved[i] = block->get_blockid();
+    }
+
+    for (int32_t curr_x = chunk->x - MapGenCaves::max_off; curr_x <= chunk->x + MapGenCaves::max_off; ++curr_x)
+    {
+        for (int32_t curr_z = chunk->z - MapGenCaves::max_off; curr_z <= chunk->z + MapGenCaves::max_off; ++curr_z)
         {
-            for (int i = 0; i < 256; i++, block++, noise_set_ptr++)
-            {
-                uint8_t height = chunk->height_map[i];
-                if (y > height || block->get_blockid() != BlockID::stone)
-                    continue;
-                if (*noise_set_ptr < 0.375 && (height > 63 || abs(height - y) > 2))
-                    block->set_blockid(y >= 10 ? BlockID::air : BlockID::lava);
-            }
+            JavaLCGInit(((int64_t)curr_x * off_x + (int64_t)curr_z * off_z) ^ cavegen_seed);
+            MapGenCaves::gen_node(curr_x, curr_z, chunk->x, chunk->z, carved);
         }
     }
+
+    block = chunk->blockstates;
+    for (int32_t i = 0; i < 16 * 16 * 256; i++, block++)
+    {
+        block->set_blockid(carved[i]);
+    }
+
     usleep(100);
     generate_trees(chunk);
 

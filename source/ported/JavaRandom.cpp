@@ -9,6 +9,14 @@ void JavaLCGInit(int64_t seed)
 {
     SeedJavaLCG = (seed ^ AJavaLCG) & MaxJavaLCG;
 }
+void JavaLCGSetState(int64_t seed)
+{
+    SeedJavaLCG = seed;
+}
+int64_t JavaLCGGetState()
+{
+    return SeedJavaLCG;
+}
 int64_t JavaLCG()
 {
     SeedJavaLCG = (AJavaLCG * SeedJavaLCG + CJavaLCG) & MaxJavaLCG;
@@ -20,5 +28,27 @@ float JavaLCGFloat()
 }
 double JavaLCGDouble()
 {
-    return (((long)(JavaLCG() >> 26) << 27) + (JavaLCG() >> 21)) * JavaDoubleUnit;
+    return (((int64_t)(JavaLCG() >> 26) << 27) + (JavaLCG() >> 21)) * JavaDoubleUnit;
+}
+
+int32_t JavaLCGNext(int32_t bits)
+{
+    return (int32_t)(uint64_t(JavaLCG()) >> (48 - bits));
+}
+
+int32_t JavaLCGIntN(int32_t n)
+{
+    if (n <= 0)
+        return 0;
+
+    if ((n & -n) == n) // i.e., n is a power of 2
+        return (int32_t)((n * (int64_t)JavaLCGNext(31)) >> 31);
+
+    int32_t bits, val;
+    do
+    {
+        bits = JavaLCGNext(31);
+        val = bits % n;
+    } while (bits - val + (n - 1) < 0);
+    return val;
 }
