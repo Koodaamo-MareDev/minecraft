@@ -292,9 +292,11 @@ void falling_block_entity_t::tick()
         block_t *block = get_block_at(int_pos, chunk);
         if (block)
         {
+            // Update the block
             *block = this->block_state;
-            block->set_blockid(block->get_blockid()); // Update the block
+            block->set_blockid(block->get_blockid());
             update_block_at(int_pos);
+            update_neighbors(int_pos);
         }
         set_position(vec3f(int_pos.x, int_pos.y, int_pos.z) + vec3f(0.5, 0, 0.5));
     }
