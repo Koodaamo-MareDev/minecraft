@@ -66,6 +66,7 @@ vec3i block_to_chunk_pos(vec3i pos)
     pos.z &= ~0xF;
     pos.x /= 16;
     pos.z /= 16;
+    pos.y = 0;
     return pos;
 }
 

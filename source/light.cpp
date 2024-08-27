@@ -18,7 +18,7 @@ mutex_t light_mutex = (mutex_t)NULL;
 bool __light_engine_init_done = false;
 bool __light_engine_busy = false;
 std::deque<std::pair<vec3i, chunk_t *>> pending_light_updates;
-void __update_light(vec3i coords);
+void __update_light(std::pair<vec3i, chunk_t*>);
 void *__light_engine_init_internal(void *);
 
 void light_engine_init()
@@ -60,13 +60,12 @@ void light_engine_loop()
     while (pending_light_updates.size() > 0 && __light_engine_init_done)
     {
         __light_engine_busy = true;
-        std::pair<vec3i, chunk_t *> e = pending_light_updates.front();
+        std::pair<vec3i, chunk_t *> update = pending_light_updates.front();
         pending_light_updates.pop_front();
-        vec3i pos = e.first;
-        chunk_t *chunk = e.second;
+        chunk_t *chunk = update.second;
         if (chunk)
         {
-            __update_light(pos);
+            __update_light(update);
             --chunk->light_update_count;
             if ((++updates & 1023) == 0)
             {
@@ -114,12 +113,13 @@ static inline int8_t MAX_I8(int8_t a, int8_t b)
  *  faster than any other implementation that I could find online.
  */
 
-void __update_light(vec3i coords)
+void __update_light(std::pair<vec3i, chunk_t *> update)
 {
-    static std::deque<vec3i> light_updates;
+    static std::deque<std::pair<vec3i, chunk_t *>> light_updates;
 
-    light_updates.push_back(coords);
+    vec3i coords = update.first;
 
+    light_updates.push_back(update);
     while (light_updates.size() > 0)
     {
         if (!__light_engine_init_done)
@@ -127,14 +127,18 @@ void __update_light(vec3i coords)
             light_updates.clear();
             return;
         }
-        vec3i pos = light_updates.back();
+        std::pair item = light_updates.back();
+        vec3i pos = item.first;
+        chunk_t *chunk = item.second;
         light_updates.pop_back();
 
         if (pos.y > 255 || pos.y < 0)
             continue;
-        chunk_t *chunk = get_chunk_from_pos(pos, false, false);
         if (!chunk)
+        {
             continue;
+        }
+        vec3i chunk_pos = block_to_chunk_pos(pos);
         int map_index = ((pos.x & 15) << 4) | (pos.z & 15);
 
         block_t *block = chunk->get_block(pos);
@@ -168,7 +172,14 @@ void __update_light(vec3i coords)
             for (int i = 0; i < 6; i++)
             {
                 if (neighbors[i])
-                    light_updates.push_back(pos + face_offsets[i]);
+                {
+                    std::pair<vec3i, chunk_t *> update = std::make_pair(pos + face_offsets[i], chunk);
+                    if (block_to_chunk_pos(update.first) != chunk_pos)
+                    {
+                        update.second = get_chunk_from_pos(update.first, false, false);
+                    }
+                    light_updates.push_back(update);
+                }
             }
         }
         chunk->vbos[(pos.y >> 4) & 15].dirty = true;
