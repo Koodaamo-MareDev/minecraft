@@ -80,6 +80,7 @@ public:
 class falling_block_entity_t : public aabb_entity_t
 {
 public:
+    uint16_t fall_time = 0;
     block_t block_state;
     falling_block_entity_t(block_t block_state, const vec3i &position);
 

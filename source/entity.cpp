@@ -3,6 +3,7 @@
 #include "chunk_new.hpp"
 #include "render.hpp"
 #include "blocks.hpp"
+#include "light.hpp"
 extern sound_system_t *sound_system;
 extern float wiimote_x;
 extern float wiimote_z;
@@ -283,6 +284,11 @@ void falling_block_entity_t::tick()
 {
     if (dead)
         return;
+    if(!fall_time)
+    {
+        update_neighbors(vec3i(std::floor(position.x), std::floor(position.y), std::floor(position.z)));
+    }
+    fall_time++;
     aabb_entity_t::tick();
     if (on_ground)
     {
@@ -308,14 +314,14 @@ void falling_block_entity_t::render(float partial_ticks)
         return;
 
     // Prepare the block state
-    vec3i int_pos = vec3i(std::floor(position.x), std::floor(position.y), std::floor(position.z));
+    vec3i int_pos = vec3i(std::floor(position.x), std::floor(position.y + 0.5), std::floor(position.z));
     block_t *block_at_pos = chunk->get_block(int_pos);
-    if (block_at_pos && !properties(block_at_pos->id).m_solid)
+    if (!chunk->light_update_count && fall_time && block_at_pos && !properties(block_at_pos->id).m_solid)
         block_state.light = block_at_pos->light;
     block_state.visibility_flags = 0x7F;
 
     // Draw the selected block
-    if (on_ground)
+    if (on_ground || fall_time <= 1)
     {
         // Prepare the transformation matrix
         vec3f chunk_pos = vec3f(int_pos.x & ~0xF, int_pos.y & ~0xF, int_pos.z & ~0xF);
@@ -374,9 +380,9 @@ void exploding_block_entity_t::render(float partial_ticks)
         return;
 
     // Prepare the block state
-    vec3i int_pos = vec3i(std::floor(position.x), std::floor(position.y), std::floor(position.z));
+    vec3i int_pos = vec3i(std::floor(position.x), std::floor(position.y + 0.5f), std::floor(position.z));
     block_t *block_at_pos = chunk->get_block(int_pos);
-    if (block_at_pos && !properties(block_at_pos->id).m_solid)
+    if (!chunk->light_update_count && block_at_pos && !properties(block_at_pos->id).m_solid)
         block_state.light = block_at_pos->light;
     block_state.visibility_flags = 0x7F;
 
