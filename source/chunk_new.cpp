@@ -251,12 +251,12 @@ void generate_chunk()
     uint8_t max_height = 0;
 
     static float chunk_noise_set[9];
-    static float noise_set[4096];
-    // static uint8_t cellular_noise[4096];
+    static float terrain_noise[4096];
+    static float sand_noise[256];
 
     vec3i noise_block_pos(x_offset, 512, z_offset);
     vec3f noise_pos(x_offset - 1, 384, z_offset - 1);
-    improved_noise.GetNoiseSet(noise_pos, vec3i(3, 1, 3), 128, 1, chunk_noise_set);
+    improved_noise.GetNoiseSet(noise_pos, vec3i(2, 1, 2), 128, 1, chunk_noise_set);
     float avg_chunk_noise = (chunk_noise_set[0] + chunk_noise_set[1] + chunk_noise_set[2] + chunk_noise_set[3]) * 0.25;
     noise_pos.x++;
     noise_pos.z++;
@@ -265,33 +265,56 @@ void generate_chunk()
     // it's used for storing the noise value for later parts of the
     // terrain generation, like the altitude of trees and caves.
     vec3i noise_size(16, 1, 16);
-    improved_noise.GetNoiseSet(noise_pos, noise_size, 32, 2, noise_set);
+
+    JavaLCGInit(cavegen_seed);
+    int32_t off_x = JavaLCGIntN(0xFFFFF);
+    int32_t off_z = JavaLCGIntN(0xFFFFF);
+    vec3i sand_off(off_x, 0, off_z);
+
+    improved_noise.GetNoiseSet(noise_pos, noise_size, 32, 2, terrain_noise);
+    usleep(1000);
+    improved_noise.GetNoiseSet(noise_pos + sand_off, noise_size, 24, 1, sand_noise);
 
     index = 0;
     for (int z = 0; z < 16; z++)
     {
-        for (int x = 0; x < 16; x++)
+        for (int x = 0; x < 16; x++, index++)
         {
             vfloat_t dist = avg_chunk_noise < 0.005 ? 1.0 - (((z - 8) * (z - 8) + (x - 8) * (x - 8)) * 0.00025 - avg_chunk_noise) : 0.0;
 
-            uint8_t height = uint8_t((dist + noise_set[index]) * 32) + 48;
-            chunk->height_map[index++] = height;
+            uint8_t height = uint8_t((dist + terrain_noise[index]) * 32) + 48;
+            chunk->height_map[index] = height;
             max_height = std::max(height, max_height);
-            for (int y = 0; y < 64 || y <= height; y++)
+            bool generate_sand = sand_noise[index] > 0.5;
+            for (int y = std::max(63, int(height)); y >= 0; y--)
             {
                 BlockID id = BlockID::air;
-                // Coat with grass
+                // Coat with grass (or sand if near sea level)
                 if (y == height)
-                    id = BlockID::grass;
-                // Add some dirt
+                {
+                    id = height < 63 ? BlockID::dirt : BlockID::grass;
+                    if (generate_sand && in_range(y, 59, 64))
+                        id = BlockID::sand;
+                    else
+                        generate_sand = false;
+                }
+                // Add some dirt (or sand if near sea level)
                 else if (in_range(y, height - 2, height - 1))
+                {
                     id = BlockID::dirt;
+                    if (generate_sand && in_range(height, 59, 64))
+                        id = BlockID::sand;
+                }
                 // Place water
                 else if (height < 63 && in_range(y, height + 1, 63))
                     id = BlockID::water;
-                // Place stone
+                // Place stone or sandstone
                 else if (in_range(y, 5, height - 3))
+                {
                     id = BlockID::stone;
+                    if (generate_sand && in_range(y, height - 4, height - 3))
+                        id = BlockID::sandstone;
+                }
                 // Randomize bedrock
                 else if (in_range(y, 1, 4))
                     id = (fastrand() & 1) ? BlockID::bedrock : BlockID::stone;
@@ -304,8 +327,8 @@ void generate_chunk()
     }
     // Carve caves
     JavaLCGInit(cavegen_seed);
-    int64_t off_x = (JavaLCG() / 2L) * 2L + 1L;
-    int64_t off_z = (JavaLCG() / 2L) * 2L + 1L;
+    off_x = (JavaLCG() / 2L) * 2L + 1L;
+    off_z = (JavaLCG() / 2L) * 2L + 1L;
 
     static BlockID carved[16 * 16 * 256];
 
