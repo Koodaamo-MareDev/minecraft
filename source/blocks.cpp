@@ -85,6 +85,14 @@ uint32_t get_face_texture_index(block_t *block, int face)
             return 9;
         return 8;
     }
+    case BlockID::sandstone:
+    {
+        if (face == FACE_NY)
+            return 208;
+        if (face == FACE_PY)
+            return 176;
+        return 192;
+    }
     case BlockID::bookshelf:
     {
         if (face == FACE_NY || face == FACE_PY)
