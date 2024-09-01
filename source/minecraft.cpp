@@ -426,24 +426,26 @@ int main(int argc, char **argv)
             // Prepare the transformation matrix
             transform_view(get_view_matrix(), guVector{0, 0, 0});
 
-            // Draw opaque buffer
+            // Prepare opaque rendering parameters
             GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
             GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_NOOP);
             GX_SetAlphaUpdate(GX_TRUE);
 
             // Draw particles
-            GX_SetAlphaCompare(GX_GEQUAL, 16, GX_AOP_AND, GX_ALWAYS, 0);
+            GX_SetAlphaCompare(GX_GEQUAL, 1, GX_AOP_AND, GX_ALWAYS, 0);
             draw_particles(camera, particle_system.particles, particle_system.size());
 
             // Draw chunks
             GX_SetAlphaCompare(GX_ALWAYS, 0, GX_AOP_OR, GX_ALWAYS, 0);
             DrawScene(chunks, false);
 
-            // Draw transparent buffer
+            // Prepare transparent rendering parameters
             GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
             GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_NOOP);
             GX_SetAlphaUpdate(GX_FALSE);
-            GX_SetAlphaCompare(GX_GEQUAL, 16, GX_AOP_AND, GX_ALWAYS, 0);
+
+            // Draw chunks
+            GX_SetAlphaCompare(GX_GEQUAL, 1, GX_AOP_AND, GX_ALWAYS, 0);
             DrawScene(chunks, true);
 
             // Draw selected block
