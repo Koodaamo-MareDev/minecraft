@@ -96,7 +96,7 @@ void aabb_entity_t::tick()
         }
         velocity = velocity + (fluid_velocity.normalize() * 0.004);
 
-        check_collisions();
+        move_and_check_collisions();
 
         if (water_movement)
             velocity = velocity * 0.8;
@@ -137,14 +137,15 @@ void aabb_entity_t::tick()
         {
             velocity.y = 0.42;
         }
-        check_collisions();
+        move_and_check_collisions();
 
-        if (!drag_phase)
+        // Gravity can be applied in different phases - before or after applying friction
+        if (drag_phase == drag_phase_t::before_friction)
             velocity.y -= gravity;
 
         velocity.y *= 0.98;
 
-        if (drag_phase)
+        if (drag_phase == drag_phase_t::after_friction)
             velocity.y -= gravity;
 
         velocity.x *= h_friction;
@@ -225,7 +226,7 @@ bool aabb_entity_t::is_colliding_fluid(const aabb_t &aabb)
     return false;
 }
 
-void aabb_entity_t::check_collisions()
+void aabb_entity_t::move_and_check_collisions()
 {
     horizontal_collision = false;
     vec3f old_velocity = velocity;
@@ -275,7 +276,7 @@ falling_block_entity_t::falling_block_entity_t(block_t block_state, const vec3i 
     chunk = get_chunk_from_pos(position, false);
     set_position(vec3f(position.x, position.y, position.z) + vec3f(0.5, 0, 0.5));
     this->walk_sound = false;
-    this->drag_phase = true;
+    this->drag_phase = drag_phase_t::after_friction;
     this->gravity = 0.04;
     if (!chunk)
         dead = true;

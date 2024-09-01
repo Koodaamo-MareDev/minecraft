@@ -26,6 +26,11 @@ public:
 class aabb_entity_t : public entity_t
 {
 public:
+    enum class drag_phase_t : bool
+    {
+        before_friction = false,
+        after_friction = true,
+    };
     aabb_t aabb;
     vec3f prev_position = vec3f(0, 0, 0);
     vfloat_t width = 0;
@@ -41,7 +46,7 @@ public:
     bool horizontal_collision = false;
     bool walk_sound = true;
     bool dead = false;
-    bool drag_phase = false; // false = before acceleration, true = after acceleration
+    drag_phase_t drag_phase = drag_phase_t::before_friction;
     uint8_t light_level = 0;
 
     aabb_entity_t(float width, float height) : entity_t(), width(width), height(height) {}
@@ -69,7 +74,7 @@ public:
 
     bool is_colliding_fluid(const aabb_t &aabb);
 
-    void check_collisions();
+    void move_and_check_collisions();
 
     vec3f get_position(vfloat_t partial_ticks)
     {
@@ -105,7 +110,6 @@ public:
     virtual void tick();
 
     virtual void render(float partial_ticks);
-    
 };
 
 #endif
