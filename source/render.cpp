@@ -655,7 +655,7 @@ void draw_particles(camera_t &camera, particle_t *particles, int count)
         if (visible_count == 0)
             continue;
 
-        if (t == PTYPE_BLOCK_BREAK)
+        if (t == PTYPE_BLOCK_BREAK || t == PTYPE_GENERIC)
         {
             // Enable indexed colors
             GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
@@ -682,7 +682,7 @@ void draw_particles(camera_t &camera, particle_t *particles, int count)
                 for (int j = 0; j < 4; j++)
                 {
                     vertex_property_t vertex = vertices[j];
-                    vertex.pos = vertex.pos * particle.size * (1.f / 64.f);
+                    vertex.pos = vertex.pos * (particle.size / 64.f);
                     vertex.pos = vertex.pos + particle.position;
 
                     if (t == PTYPE_BLOCK_BREAK)
@@ -703,6 +703,14 @@ void draw_particles(camera_t &camera, particle_t *particles, int count)
                         vertex.color_b = particle.b * brightness_value;
                         vertex.color_a = particle.a;
                         GX_VertexF(vertex);
+                    }
+                    else if (t == PTYPE_GENERIC)
+                    {
+                        int x = (j == 0 || j == 3);
+                        int y = (j > 1);
+                        vertex.x_uv = (x << 4) + particle.u;
+                        vertex.y_uv = (y << 4) + particle.v;
+                        GX_VertexLitF(vertex, particle.brightness);
                     }
                 }
             }

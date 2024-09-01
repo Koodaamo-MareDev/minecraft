@@ -9,8 +9,9 @@
 
 #define PTYPE_BLOCK_BREAK 0
 #define PTYPE_TINY_SMOKE 1
+#define PTYPE_GENERIC 2
 
-#define PTYPE_MAX 2
+#define PTYPE_MAX 3
 
 #include "entity.hpp"
 
