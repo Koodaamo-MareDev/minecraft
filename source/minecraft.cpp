@@ -1333,9 +1333,6 @@ void DrawSelectedBlock()
         selected_block.light = 0xFF;
     }
 
-    // Disable depth testing
-    GX_SetZMode(GX_TRUE, GX_ALWAYS, GX_TRUE);
-
     // Enable indexed colors
     GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
 
@@ -1345,8 +1342,12 @@ void DrawSelectedBlock()
     // Transform the selected block position
     transform_view_screen(get_view_matrix(), selectedBlockPos);
 
-    // Draw the selected block
+    // Draw the opaque pass
+    GX_SetZMode(GX_TRUE, GX_ALWAYS, GX_TRUE);
     render_single_block(selected_block, false);
+
+    // Draw the transparent pass
+    GX_SetZMode(GX_FALSE, GX_ALWAYS, GX_TRUE);
     render_single_block(selected_block, true);
 }
 
