@@ -41,6 +41,8 @@
 #include "stone3_aiff.h"
 #include "stone4_aiff.h"
 
+#include "splash_aiff.h"
+
 #include "explode_aiff.h"
 
 #include "fuse_aiff.h"
@@ -55,6 +57,8 @@ extern std::vector<aiff_container> wood_sounds;
 extern std::vector<aiff_container> stone_sounds;
 
 extern std::vector<std::string> music_files;
+
+extern aiff_container splash_sound;
 
 extern aiff_container explode_sound;
 

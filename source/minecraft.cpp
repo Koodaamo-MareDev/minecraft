@@ -1040,6 +1040,11 @@ void PlaySound(sound_t sound)
     sound_system->play_sound(sound);
 }
 
+void AddParticle(const particle_t &particle)
+{
+    particle_system.add_particle(particle);
+}
+
 void CreateExplosion(vec3f pos, float power, chunk_t *near)
 {
     explode(pos, power, near);

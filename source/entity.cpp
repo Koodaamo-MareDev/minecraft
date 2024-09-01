@@ -4,10 +4,15 @@
 #include "render.hpp"
 #include "blocks.hpp"
 #include "light.hpp"
-extern sound_system_t *sound_system;
+#include "particle.hpp"
+#include "maths.hpp"
 extern float wiimote_x;
 extern float wiimote_z;
 extern u32 wiimote_held;
+
+void PlaySound(sound_t sound);                               // in minecraft.cpp
+void AddParticle(const particle_t &particle);                // in minecraft.cpp
+void CreateExplosion(vec3f pos, float power, chunk_t *near); // in minecraft.cpp
 
 bool aabb_entity_t::collides(aabb_entity_t *other)
 {
@@ -28,7 +33,7 @@ bool aabb_entity_t::can_remove()
     vec3i int_pos = vec3i(std::floor(entity_pos.x), std::floor(entity_pos.y), std::floor(entity_pos.z));
     chunk_t *curr_chunk = get_chunk_from_pos(int_pos, false);
     chunkvbo_t &vbo = curr_chunk->vbos[int_pos.y >> 4];
-    if (vbo.dirty || curr_chunk->light_update_count || vbo.cached_solid_buffer != vbo.solid_buffer || vbo.cached_transparent_buffer != vbo.transparent_buffer)
+    if (vbo.dirty || curr_chunk->light_update_count || vbo.cached_solid != vbo.solid || vbo.cached_transparent != vbo.transparent)
         return false;
     return dead;
 }
@@ -81,6 +86,67 @@ void aabb_entity_t::tick()
                     lava_movement = true;
             }
         }
+    }
+    if (water_movement)
+    {
+        if (!in_water)
+        {
+            float impact = 0.2 / Q_rsqrt_d(velocity.x * velocity.x * 0.2 + velocity.y * velocity.y + velocity.z * velocity.z * 0.2);
+            if (impact > 1.0)
+                impact = 1.0;
+
+            sound_t sound = splash_sound;
+            sound.position = position;
+            sound.pitch = 0.6 + JavaLCGFloat() * 0.8;
+            sound.volume = impact;
+            PlaySound(sound);
+
+            particle_t particle;
+            particle.life_time = particle.max_life_time = 80;
+            particle.physics = PPHYSIC_FLAG_COLLIDE;
+            particle.type = PTYPE_GENERIC;
+            particle.brightness = 0xFF;
+
+            particle.size = 8;
+
+            // Set the particle texture coordinates
+            particle.u = 0;
+            particle.v = 32;
+            for (int i = 0; i < 1 + width * 20; i++)
+            {
+                // Randomize the particle position and velocity
+                particle.position = position + vec3f(JavaLCGFloat() * 2 - 1, 0, JavaLCGFloat() * 2 - 1) * width - vec3f(0.5, 0.5, 0.5);
+                particle.position.y = std::floor(aabb.min.y + 1);
+                particle.velocity = velocity;
+                particle.velocity.y -= 0.2 * JavaLCGFloat();
+
+                // Randomize life time
+                particle.life_time = particle.max_life_time - (rand() % 20);
+
+                AddParticle(particle);
+            }
+            particle.physics |= PPHYSIC_FLAG_GRAVITY;
+            particle.v = 16;
+
+            for (int i = 0; i < 1 + width * 20; i++)
+            {
+                particle.u = JavaLCGIntN(4) + 3;
+                // Randomize the particle position and velocity
+                particle.position = position + vec3f(JavaLCGFloat() * 2 - 1, 0, JavaLCGFloat() * 2 - 1) * width - vec3f(0.5, 0.5, 0.5);
+                particle.position.y = std::floor(aabb.min.y + 1);
+                particle.velocity = velocity;
+
+                // Randomize life time
+                particle.life_time = particle.max_life_time - (rand() % 20);
+
+                AddParticle(particle);
+            }
+        }
+        in_water = true;
+    }
+    else
+    {
+        in_water = false;
     }
     if (water_movement || lava_movement)
     {
@@ -155,10 +221,10 @@ void aabb_entity_t::tick()
     {
         // Play step sound if the entity is moving on the ground or when it jumps
         vec3f player_horizontal_velocity = position - prev_position;
-        last_step_distance += player_horizontal_velocity.magnitude();
-        if (last_step_distance > 1.5f || jumping)
+        last_step_distance += player_horizontal_velocity.magnitude() * 0.6;
+        if ((on_ground && jumping) || last_step_distance > 1)
         {
-            vec3f feet_pos(position.x, aabb.min.y - 0.001, position.z);
+            vec3f feet_pos(position.x, aabb.min.y - 0.5, position.z);
             vec3i feet_block_pos = vec3i(std::floor(feet_pos.x), std::floor(feet_pos.y), std::floor(feet_pos.z));
             block_t *block_at_feet = get_block_at(feet_block_pos, chunk);
             feet_block_pos.y--;
@@ -169,7 +235,7 @@ void aabb_entity_t::tick()
                 {
                     sound_t sound = get_step_sound(block_at_feet->get_blockid());
                     sound.position = feet_pos;
-                    sound_system->play_sound(sound);
+                    PlaySound(sound);
                     last_step_distance = 0;
                 }
             }
@@ -285,7 +351,7 @@ void falling_block_entity_t::tick()
 {
     if (dead)
         return;
-    if(!fall_time)
+    if (!fall_time)
     {
         update_neighbors(vec3i(std::floor(position.x), std::floor(position.y), std::floor(position.z)));
     }
@@ -338,9 +404,6 @@ void falling_block_entity_t::render(float partial_ticks)
         render_single_block(block_state, true);
     }
 }
-
-void PlaySound(sound_t sound);                               // in minecraft.cpp
-void CreateExplosion(vec3f pos, float power, chunk_t *near); // in minecraft.cpp
 
 exploding_block_entity_t::exploding_block_entity_t(block_t block_state, const vec3i &position, uint16_t fuse) : falling_block_entity_t(block_state, position), fuse(fuse)
 {

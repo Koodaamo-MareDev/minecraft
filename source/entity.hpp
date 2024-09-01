@@ -42,6 +42,7 @@ public:
     chunk_t *chunk = nullptr;
     bool local = false;
     bool on_ground = false;
+    bool in_water = false;
     bool jumping = false;
     bool horizontal_collision = false;
     bool walk_sound = true;
