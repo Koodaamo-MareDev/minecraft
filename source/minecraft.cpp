@@ -314,6 +314,9 @@ int main(int argc, char **argv)
 
     sound_system = new sound_system_t();
 
+    bool in_fluid = false;
+    bool in_lava = false;
+
     while (!isExiting)
     {
         u64 frame_start = time_get();
@@ -332,9 +335,6 @@ int main(int argc, char **argv)
         GX_SetCopyClear(background, 0x00FFFFFF);
 
         fog_depth_multiplier = flerp(fog_depth_multiplier, std::min(std::max(player_pos.y, 24.f) / 36.f, 1.0f), 0.05f);
-
-        // Enable fog
-        use_fog(true, viewport, background, fog_depth_multiplier * (GENERATION_DISTANCE * 0.5f - 8), fog_depth_multiplier * (GENERATION_DISTANCE * 0.5f));
 
         if (player_pos.y < -999)
         {
@@ -364,6 +364,17 @@ int main(int argc, char **argv)
                 }
             }
         }
+        // Enable fog
+        if (in_fluid)
+        {
+            background = in_lava ? GXColor{0xFF, 0, 0, 0xFF} : GXColor{0, 0, 0xFF, 0xFF};
+            GX_SetCopyClear(background, 0x00FFFFFF);
+            float fog_multiplier = in_lava ? 0.05f : 0.6f;
+            use_fog(true, viewport, background, fog_depth_multiplier * fog_multiplier * (GENERATION_DISTANCE * 0.5f - 8), fog_depth_multiplier * fog_multiplier * (GENERATION_DISTANCE * 0.5f));
+        }
+        else
+            use_fog(true, viewport, background, fog_depth_multiplier * (GENERATION_DISTANCE * 0.5f - 8), fog_depth_multiplier * (GENERATION_DISTANCE * 0.5f));
+
         UpdateLightDir();
 
         if (frameCounter % 3 == 0)
@@ -437,7 +448,8 @@ int main(int argc, char **argv)
             DrawSelectedBlock();
 
             // Draw sky
-            draw_sky(background);
+            if (!in_fluid)
+                draw_sky(background);
         }
 
         use_ortho(viewport);
@@ -471,6 +483,17 @@ int main(int argc, char **argv)
         else
             DrawInventory(viewport);
 
+        if (player)
+        {
+            vec3i block_pos = vec3i(std::floor(player->position.x), std::floor(player->aabb.min.y + player->y_offset), std::floor(player->position.z));
+            block_t *block = get_block_at(block_pos);
+            in_fluid = false;
+            if (block && properties(block->id).m_fluid && block_pos.y + 2 - get_fluid_height(block_pos, block->get_blockid(), player->chunk) >= player->aabb.min.y + player->y_offset)
+            {
+                in_fluid = true;
+                in_lava = properties(block->id).m_base_fluid == BlockID::lava;
+            }
+        }
         GX_DrawDone();
 
         GX_CopyDisp(frameBuffer[fb], GX_TRUE);
