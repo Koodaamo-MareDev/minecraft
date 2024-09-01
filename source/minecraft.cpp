@@ -74,6 +74,8 @@ u32 wiimote_down = 0;
 u32 wiimote_held = 0;
 float wiimote_x = 0;
 float wiimote_z = 0;
+float wiimote_rx = 0;
+float wiimote_ry = 0;
 int shoulder_btn_frame_counter = 0;
 float prev_left_shoulder = 0;
 float prev_right_shoulder = 0;
@@ -467,6 +469,16 @@ int main(int argc, char **argv)
         GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_NOOP);
         GX_SetAlphaUpdate(GX_TRUE);
 
+        static vec3f pan_underwater_texture(0, 0, 0);
+        pan_underwater_texture = pan_underwater_texture + vec3f(wiimote_rx * 0.25, wiimote_ry * 0.25, 0.0);
+        pan_underwater_texture.x = std::fmod(pan_underwater_texture.x, viewport.width);
+        pan_underwater_texture.y = std::fmod(pan_underwater_texture.y, viewport.height);
+        if (in_fluid && !in_lava)
+        {
+            draw_textured_quad(underwater_texture, pan_underwater_texture.x - viewport.width, pan_underwater_texture.y - viewport.height, viewport.width * 3, viewport.height * 3, 0, 0, 48, 48);
+            draw_textured_quad(vignette_texture, 0, 0, viewport.width, viewport.height, 0, 0, 256, 256);
+        }
+        draw_textured_quad(vignette_texture, 0, 0, viewport.width, viewport.height, 0, 0, 256, 256);
         if (show_dirtscreen)
         {
             int texture_index = get_default_texture_index(BlockID::dirt);
@@ -549,7 +561,7 @@ void UpdateLoadingStatus()
                 // Check if the vbos near the player are visible and dirty
                 for (int i = (player_chunk_pos.y / 16) - 1; i < (player_chunk_pos.y / 16) + 1; i++)
                 {
-                    if (chunk->vbos[i].visible && (chunk->vbos[i].dirty || chunk->vbos[i].cached_solid_buffer != chunk->vbos[i].solid_buffer || chunk->vbos[i].cached_transparent_buffer != chunk->vbos[i].transparent_buffer))
+                    if (chunk->vbos[i].visible && (chunk->vbos[i].dirty || chunk->vbos[i].cached_solid != chunk->vbos[i].solid || chunk->vbos[i].cached_transparent != chunk->vbos[i].transparent))
                     {
                         is_loading = true;
                         break;
@@ -695,6 +707,9 @@ void GetInput()
 
         wiimote_down |= raw_wiimote_down;
         wiimote_held |= raw_wiimote_held;
+
+        wiimote_rx = right_stick.x;
+        wiimote_ry = right_stick.y;
     } // If the inventory is visible, don't allow the player to move
     else
     {
@@ -876,28 +891,24 @@ void RemoveRedundantChunks(std::deque<chunk_t *> &chunks)
 
 void PrepareChunkRemoval(chunk_t *chunk)
 {
-    chunk->valid = false;
     for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
     {
         chunkvbo_t &vbo = chunk->vbos[j];
         vbo.visible = false;
-        vbo.solid_buffer = nullptr;
-        vbo.solid_buffer_length = 0;
-        vbo.transparent_buffer = nullptr;
-        vbo.transparent_buffer_length = 0;
-        if (vbo.cached_solid_buffer && vbo.cached_solid_buffer_length)
+
+        if (vbo.solid && vbo.solid != vbo.cached_solid)
         {
-            free(vbo.cached_solid_buffer);
-            vbo.cached_solid_buffer = nullptr;
-            vbo.cached_solid_buffer_length = 0;
+            vbo.solid.clear();
         }
-        if (vbo.cached_transparent_buffer && vbo.cached_transparent_buffer_length)
+        if (vbo.transparent && vbo.transparent != vbo.cached_transparent)
         {
-            free(vbo.cached_transparent_buffer);
-            vbo.cached_transparent_buffer = nullptr;
-            vbo.cached_transparent_buffer_length = 0;
+            vbo.transparent.clear();
         }
+
+        vbo.cached_solid.clear();
+        vbo.cached_transparent.clear();
     }
+    chunk->valid = false;
 }
 
 void EditBlocks()
@@ -1117,17 +1128,22 @@ void UpdateChunkVBOs(std::deque<chunk_t *> &chunks)
     {
         for (chunk_t *&chunk : chunks)
         {
-            if (chunk && chunk->valid)
+            if (chunk && chunk->valid && !chunk->light_update_count)
             {
                 // Check if chunk has other chunks around it.
                 bool surrounding = true;
-                for (int i = 0; surrounding && i < 6; i++)
+                for (int i = 0; i < 6; i++)
                 {
                     // Skip the top and bottom faces
-                    if (face_offsets->y)
-                        continue;
-                    // Check if the surrounding chunk exists
-                    surrounding &= get_chunk(vec3i(chunk->x, 0, chunk->z) + face_offsets[i], false) != nullptr;
+                    if (i == 2)
+                        i = 4;
+                    // Check if the surrounding chunk exists and has no lighting updates pending
+                    chunk_t *surrounding_chunk = get_chunk(vec3i(chunk->x + face_offsets[i].x, 0, chunk->z + face_offsets[i].z), false);
+                    if (!surrounding_chunk || surrounding_chunk->light_update_count)
+                    {
+                        surrounding = false;
+                        break;
+                    }
                 }
                 // If the chunk has no surrounding chunks, skip it.
                 if (!surrounding)
@@ -1165,29 +1181,21 @@ void UpdateChunkVBOs(std::deque<chunk_t *> &chunks)
         for (chunkvbo_t *vbo_ptr : vbos_to_update)
         {
             chunkvbo_t &vbo = *vbo_ptr;
-            if (vbo.solid_buffer != vbo.cached_solid_buffer)
+            if (vbo.solid != vbo.cached_solid)
             {
-                // Free the old buffer if it exists
-                if (vbo.cached_solid_buffer && vbo.cached_solid_buffer_length)
-                {
-                    free(vbo.cached_solid_buffer);
-                }
+                // Clear the cached buffer
+                vbo.cached_solid.clear();
 
-                // Update the cached buffer
-                vbo.cached_solid_buffer = vbo.solid_buffer;
-                vbo.cached_solid_buffer_length = vbo.solid_buffer_length;
+                // Set the cached buffer to the new buffer
+                vbo.cached_solid = vbo.solid;
             }
-            if (vbo.transparent_buffer != vbo.cached_transparent_buffer)
+            if (vbo.transparent != vbo.cached_transparent)
             {
-                // Free the old buffer if it exists
-                if (vbo.cached_transparent_buffer && vbo.cached_transparent_buffer_length)
-                {
-                    free(vbo.cached_transparent_buffer);
-                }
+                // Clear the cached buffer
+                vbo.cached_transparent.clear();
 
-                // Update the cached buffer
-                vbo.cached_transparent_buffer = vbo.transparent_buffer;
-                vbo.cached_transparent_buffer_length = vbo.transparent_buffer_length;
+                // Set the cached buffer to the new buffer
+                vbo.cached_transparent = vbo.transparent;
             }
         }
         vbos_to_update.clear();
@@ -1359,9 +1367,9 @@ void DrawScene(std::deque<chunk_t *> &chunks, bool transparency)
                         continue;
 
                     guVector chunkPos = {(f32)chunk->x * 16, (f32)j * 16, (f32)chunk->z * 16};
-                    if (vbo.cached_solid_buffer && vbo.cached_solid_buffer_length)
+                    if (vbo.cached_solid)
                     {
-                        Render(chunkPos, vbo.cached_solid_buffer, vbo.cached_solid_buffer_length);
+                        Render(chunkPos, vbo.cached_solid.buffer, vbo.cached_solid.length);
                     }
                 }
                 chunk->render_entities(partialTicks);
@@ -1382,9 +1390,9 @@ void DrawScene(std::deque<chunk_t *> &chunks, bool transparency)
                         continue;
 
                     guVector chunkPos = {(f32)chunk->x * 16, (f32)j * 16, (f32)chunk->z * 16};
-                    if (vbo.cached_transparent_buffer && vbo.cached_transparent_buffer_length)
+                    if (vbo.cached_transparent)
                     {
-                        Render(chunkPos, vbo.cached_transparent_buffer, vbo.cached_transparent_buffer_length);
+                        Render(chunkPos, vbo.cached_transparent.buffer, vbo.cached_transparent.length);
                     }
                 }
                 chunk->render_entities(partialTicks);

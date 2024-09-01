@@ -595,19 +595,14 @@ void chunk_t::destroy_vbo(int section, unsigned char which)
 {
     if (!which)
         return;
+    chunkvbo_t &vbo = this->vbos[section];
     if ((which & VBO_SOLID))
     {
-        if (this->vbos[section].solid_buffer)
-            free(this->vbos[section].solid_buffer);
-        this->vbos[section].solid_buffer = nullptr;
-        this->vbos[section].solid_buffer_length = 0;
+        vbo.solid.clear();
     }
     if ((which & VBO_TRANSPARENT))
     {
-        if (this->vbos[section].transparent_buffer)
-            free(this->vbos[section].transparent_buffer);
-        this->vbos[section].transparent_buffer = nullptr;
-        this->vbos[section].transparent_buffer_length = 0;
+        vbo.transparent.clear();
     }
 }
 
@@ -628,6 +623,7 @@ void chunk_t::rebuild_vbo(int section, bool transparent)
 }
 int chunk_t::build_vbo(int section, bool transparent)
 {
+    chunkvbo_t &vbo = this->vbos[section];
 // #define OLD_VBOSYSTEM
 #ifdef OLD_VBOSYSTEM
     int quadVertexCount = pre_render_block_mesh(section, transparent);
@@ -636,13 +632,11 @@ int chunk_t::build_vbo(int section, bool transparent)
     {
         if (transparent)
         {
-            this->vbos[section].transparent_buffer = nullptr;
-            this->vbos[section].transparent_buffer_length = 0;
+            vbo.transparent.clear();
         }
         else
         {
-            this->vbos[section].solid_buffer = nullptr;
-            this->vbos[section].solid_buffer_length = 0;
+            vbo.solid.clear();
         }
         return (0);
     }
@@ -703,13 +697,13 @@ int chunk_t::build_vbo(int section, bool transparent)
 
     if (transparent)
     {
-        this->vbos[section].transparent_buffer = displist_vbo;
-        this->vbos[section].transparent_buffer_length = preciseMemory;
+        vbo.transparent.buffer = displist_vbo;
+        vbo.transparent.length = preciseMemory;
     }
     else
     {
-        this->vbos[section].solid_buffer = displist_vbo;
-        this->vbos[section].solid_buffer_length = preciseMemory;
+        vbo.solid.buffer = displist_vbo;
+        vbo.solid.length = preciseMemory;
     }
 #else
     static uint8_t vbo_buffer[64000 * VERTEX_ATTR_LENGTH] __attribute__((aligned(32)));
@@ -744,13 +738,11 @@ int chunk_t::build_vbo(int section, bool transparent)
     {
         if (transparent)
         {
-            this->vbos[section].transparent_buffer = nullptr;
-            this->vbos[section].transparent_buffer_length = 0;
+            vbo.transparent.clear();
         }
         else
         {
-            this->vbos[section].solid_buffer = nullptr;
-            this->vbos[section].solid_buffer_length = 0;
+            vbo.solid.clear();
         }
         return (0);
     }
@@ -804,13 +796,13 @@ int chunk_t::build_vbo(int section, bool transparent)
 
     if (transparent)
     {
-        this->vbos[section].transparent_buffer = displist_vbo;
-        this->vbos[section].transparent_buffer_length = displist_size;
+        vbo.transparent.buffer = displist_vbo;
+        vbo.transparent.length = displist_size;
     }
     else
     {
-        this->vbos[section].solid_buffer = displist_vbo;
-        this->vbos[section].solid_buffer_length = displist_size;
+        vbo.solid.buffer = displist_vbo;
+        vbo.solid.length = displist_size;
     }
     DCFlushRange(displist_vbo, displist_size);
 #endif
@@ -1522,7 +1514,7 @@ uint32_t chunk_t::size()
 {
     uint32_t base_size = sizeof(chunk_t);
     for (int i = 0; i < VERTICAL_SECTION_COUNT; i++)
-        base_size += this->vbos[i].cached_solid_buffer_length + this->vbos[i].cached_transparent_buffer_length + sizeof(chunkvbo_t);
+        base_size += this->vbos[i].cached_solid.length + this->vbos[i].cached_transparent.length + sizeof(chunkvbo_t);
     for (aabb_entity_t *&entity : entities)
         base_size += entity->size();
     return base_size;

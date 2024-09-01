@@ -9,6 +9,8 @@
 #include "particles_tpl.h"
 #include "icons_tpl.h"
 #include "container_tpl.h"
+#include "underwater_tpl.h"
+#include "vignette_tpl.h"
 
 const GXColor sky_color = {0x88, 0xBB, 0xFF, 0xFF};
 
@@ -20,6 +22,8 @@ GXTexObj blockmap_texture;
 GXTexObj particles_texture;
 GXTexObj icons_texture;
 GXTexObj container_texture;
+GXTexObj underwater_texture;
+GXTexObj vignette_texture;
 
 // Animated textures
 water_texanim_t water_still_anim;
@@ -47,8 +51,12 @@ void init_textures()
     init_texture(blockmap_texture, blockmap_tpl, blockmap_tpl_size);
     init_texture(icons_texture, icons_tpl, icons_tpl_size);
     init_texture(container_texture, container_tpl, container_tpl_size);
+    init_texture(underwater_texture, underwater_tpl, underwater_tpl_size);
+    init_texture(vignette_texture, vignette_tpl, vignette_tpl_size);
 
     GX_InitTexObjWrapMode(&clouds_texture, GX_REPEAT, GX_REPEAT);
+    GX_InitTexObjWrapMode(&underwater_texture, GX_REPEAT, GX_REPEAT);
+    GX_InitTexObjFilterMode(&vignette_texture, GX_LINEAR, GX_LINEAR);
 
     // Animated textures
 

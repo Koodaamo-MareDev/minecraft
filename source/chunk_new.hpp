@@ -24,6 +24,46 @@
 
 extern guVector player_pos;
 
+class vbo_buffer_t
+{
+public:
+    void *buffer;
+    uint32_t length;
+
+    vbo_buffer_t() : buffer(nullptr), length(0)
+    {
+    }
+
+    vbo_buffer_t(void *buffer, uint32_t length) : buffer(buffer), length(length)
+    {
+    }
+
+    bool operator==(vbo_buffer_t &other)
+    {
+        return this->buffer == other.buffer && this->length == other.length;
+    }
+
+    bool operator!=(vbo_buffer_t &other)
+    {
+        return this->buffer != other.buffer || this->length != other.length;
+    }
+
+    operator bool()
+    {
+        return this->buffer != nullptr && this->length > 0;
+    }
+
+    void clear()
+    {
+        if (this->buffer)
+        {
+            free(this->buffer);
+            this->buffer = nullptr;
+        }
+        this->length = 0;
+    }
+};
+
 class chunkvbo_t
 {
 public:
@@ -32,14 +72,13 @@ public:
     int32_t x = 0;
     uint8_t y = 0;
     int32_t z = 0;
-    uint32_t solid_buffer_length = 0;
-    uint32_t transparent_buffer_length = 0;
-    void *solid_buffer = nullptr;
-    void *transparent_buffer = nullptr;
-    uint32_t cached_solid_buffer_length = 0;
-    uint32_t cached_transparent_buffer_length = 0;
-    void *cached_solid_buffer = nullptr;
-    void *cached_transparent_buffer = nullptr;
+    vbo_buffer_t solid;
+    vbo_buffer_t cached_solid;
+    vbo_buffer_t transparent;
+    vbo_buffer_t cached_transparent;
+
+    bool has_solid_fluid = false;
+    bool has_transparent_fluid = false;
 
     float player_taxicab_distance()
     {
