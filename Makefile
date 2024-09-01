@@ -64,7 +64,7 @@ export DEPSDIR	:=	$(CURDIR)/$(BUILD)
 #---------------------------------------------------------------------------------
 ALPHAMAPSRC	:=	blockmap.png
 ALPHAMAPFILES	:=	$(ALPHAMAPSRC:.png=_alpha.h)
-LIGHTMAPSRC	:=	light_day.png light_night.png
+LIGHTMAPSRC	:=	light_day.png light_night.png light_day_mono.png light_night_mono.png
 LIGHTMAPFILES	:=	$(LIGHTMAPSRC:.png=_rgba.h)
 CFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
 CPPFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))

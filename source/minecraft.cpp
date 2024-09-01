@@ -13,8 +13,6 @@
 #include "chunk_new.hpp"
 #include "block.hpp"
 #include "blocks.hpp"
-#include "light_day_rgba.h"
-#include "light_night_rgba.h"
 #include "brightness_values.h"
 #include "vec3i.hpp"
 #include "vec3d.hpp"
@@ -30,6 +28,15 @@
 #include "asynclib.hpp"
 #include "particle.hpp"
 #include "sound.hpp"
+
+#ifdef MONO_LIGHTING
+#include "light_day_mono_rgba.h"
+#include "light_night_mono_rgba.h"
+#else
+#include "light_day_rgba.h"
+#include "light_night_rgba.h"
+#endif
+
 #define DEFAULT_FIFO_SIZE (256 * 1024)
 #define CLASSIC_CONTROLLER_THRESHOLD 4
 #define MAX_PARTICLES 100
@@ -314,7 +321,11 @@ int main(int argc, char **argv)
         if (HWButton != -1)
             break;
         GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, BASE3D_POS_FRAC_BITS);
+#ifdef MONO_LIGHTING
+        LightMapBlend(light_day_mono_rgba, light_night_mono_rgba, light_map, 255 - uint8_t(sky_multiplier * 255));
+#else
         LightMapBlend(light_day_rgba, light_night_rgba, light_map, 255 - uint8_t(sky_multiplier * 255));
+#endif
         GX_SetArray(GX_VA_CLR0, light_map, 4 * sizeof(u8));
         GX_InvVtxCache();
         background = get_sky_color();
