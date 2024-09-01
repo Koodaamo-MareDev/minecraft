@@ -632,11 +632,11 @@ int chunk_t::build_vbo(int section, bool transparent)
     {
         if (transparent)
         {
-            vbo.transparent.clear();
+            vbo.transparent.detach();
         }
         else
         {
-            vbo.solid.clear();
+            vbo.solid.detach();
         }
         return (0);
     }
@@ -738,11 +738,11 @@ int chunk_t::build_vbo(int section, bool transparent)
     {
         if (transparent)
         {
-            vbo.transparent.clear();
+            vbo.transparent.detach();
         }
         else
         {
-            vbo.solid.clear();
+            vbo.solid.detach();
         }
         return (0);
     }

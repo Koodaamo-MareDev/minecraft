@@ -53,6 +53,14 @@ public:
         return this->buffer != nullptr && this->length > 0;
     }
 
+    // Detach the buffer from the object without freeing it
+    void detach()
+    {
+        this->buffer = nullptr;
+        this->length = 0;
+    }
+
+    // Free the buffer and set the object to an empty state
     void clear()
     {
         if (this->buffer)
@@ -189,5 +197,5 @@ void *get_aligned_pointer_32(void *ptr);
 void get_neighbors(const vec3i &pos, block_t **neighbors, chunk_t *near = nullptr);
 void update_block_at(const vec3i &pos);
 void update_neighbors(const vec3i &pos);
-vec3f get_fluid_direction(block_t *block, vec3i pos, chunk_t* chunk = nullptr);
+vec3f get_fluid_direction(block_t *block, vec3i pos, chunk_t *chunk = nullptr);
 #endif
