@@ -1181,7 +1181,7 @@ void UpdateChunkVBOs(std::deque<chunk_t *> &chunks)
     }
     // Update cached buffers when no vbos need to be rebuilt.
     // This ensures that the buffers are updated synchronously.
-    if (vbos_to_rebuild.size() == 0)
+    if (vbos_to_rebuild.size() == 0 || vbos_to_update.size() >= 6)
     {
         for (chunkvbo_t *vbo_ptr : vbos_to_update)
         {
