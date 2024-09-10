@@ -11,8 +11,11 @@
 #include "container_tpl.h"
 #include "underwater_tpl.h"
 #include "vignette_tpl.h"
+#include "creeper_tpl.h"
 
 const GXColor sky_color = {0x88, 0xBB, 0xFF, 0xFF};
+
+std::stack<mtx34_t> matrix_stack;
 
 GXTexObj white_texture;
 GXTexObj clouds_texture;
@@ -24,6 +27,7 @@ GXTexObj icons_texture;
 GXTexObj container_texture;
 GXTexObj underwater_texture;
 GXTexObj vignette_texture;
+GXTexObj creeper_texture;
 
 // Animated textures
 water_texanim_t water_still_anim;
@@ -53,6 +57,7 @@ void init_textures()
     init_texture(container_texture, container_tpl, container_tpl_size);
     init_texture(underwater_texture, underwater_tpl, underwater_tpl_size);
     init_texture(vignette_texture, vignette_tpl, vignette_tpl_size);
+    init_texture(creeper_texture, creeper_tpl, creeper_tpl_size);
 
     GX_InitTexObjWrapMode(&clouds_texture, GX_REPEAT, GX_REPEAT);
     GX_InitTexObjWrapMode(&underwater_texture, GX_REPEAT, GX_REPEAT);
@@ -155,6 +160,23 @@ Mtx &get_view_matrix()
         view_mtx_init = true;
     }
     return view_mtx;
+}
+
+void pop_matrix()
+{
+    if (matrix_stack.size() > 0)
+    {
+        mtx34_t mtx = matrix_stack.top();
+        matrix_stack.pop();
+        memcpy(active_mtx, mtx.mtx, sizeof(Mtx));
+    }
+}
+
+void push_matrix()
+{
+    mtx34_t mtx;
+    memcpy(mtx.mtx, active_mtx, sizeof(Mtx));
+    matrix_stack.push(mtx);
 }
 
 void smooth_light(const vec3i &pos, uint8_t face_index, const vec3i &vertex_off, chunk_t *near, block_t *block, uint8_t &lighting, uint8_t &amb_occ)
@@ -528,7 +550,7 @@ frustum_t calculate_frustum(camera_t &camera)
     return frustum;
 }
 
-void transform_view(Mtx view, guVector chunkPos, bool load)
+void transform_view(Mtx view, guVector world_pos, guVector object_scale, bool load)
 {
     Mtx model, modelview;
     Mtx offset;
@@ -547,7 +569,7 @@ void transform_view(Mtx view, guVector chunkPos, bool load)
     guMtxIdentity(rotx);
 
     // Position the chunks on the screen
-    guMtxTrans(offset, -chunkPos.x, -chunkPos.y, -chunkPos.z);
+    guMtxTrans(offset, -world_pos.x, -world_pos.y, -world_pos.z);
     guMtxTrans(posmtx, player_pos.x, player_pos.y, player_pos.z);
 
     // Rotate view

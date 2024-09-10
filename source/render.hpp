@@ -11,6 +11,7 @@
 #include "base3d.hpp"
 #include "particle.hpp"
 
+#include <stack>
 #include <cstdint>
 #include <algorithm>
 #include <cmath>
@@ -28,6 +29,17 @@ extern float xrot, yrot;
 extern int tickCounter;
 extern float partialTicks;
 extern Mtx active_mtx;
+
+struct mtx34_t
+{
+    Mtx mtx;
+    mtx34_t()
+    {
+        guMtxIdentity(mtx);
+    }
+};
+
+extern std::stack<mtx34_t> matrix_stack;
 
 struct plane_t
 {
@@ -106,6 +118,10 @@ void use_perspective(view_t view);
 
 Mtx &get_view_matrix();
 
+void pop_matrix();
+
+void push_matrix();
+
 int render_face(vec3i pos, uint8_t face, uint32_t texture_index, chunk_t *near = nullptr, block_t *block = nullptr);
 
 void render_single_block(block_t &selected_block, bool transparency);
@@ -122,7 +138,7 @@ float distance_to_frustum(const vec3f &point, const frustum_t &frustum);
 
 frustum_t calculate_frustum(camera_t &camera);
 
-void transform_view(Mtx view, guVector chunkPos, bool load = true);
+void transform_view(Mtx view, guVector world_pos, guVector object_scale = guVector{1, 1, 1}, bool load = true);
 
 void transform_view_screen(Mtx view, guVector off);
 
