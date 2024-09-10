@@ -13,6 +13,7 @@
 #include "lock.hpp"
 #include "asynclib.hpp"
 #include "ported/MapGenCaves.hpp"
+#include "model.hpp"
 #include <tuple>
 #include <map>
 #include <vector>
@@ -1504,10 +1505,20 @@ void chunk_t::update_entities()
 
 void chunk_t::render_entities(float partial_ticks)
 {
+    static creeper_model_t creeper_model;
+    static bool initialized = false;
+    if (!initialized)
+    {
+        memcpy(&creeper_model.texture, &creeper_texture, sizeof(creeper_texture));
+        initialized = true;
+    }
     for (aabb_entity_t *&entity : entities)
     {
         entity->render(partial_ticks);
     }
+    transform_view(get_view_matrix(), vec3f(x * 16 + 8, 96, z * 16 + 8), vec3f(1), false);
+    creeper_model.draw(partial_ticks);
+    use_texture(blockmap_texture);
 }
 
 uint32_t chunk_t::size()

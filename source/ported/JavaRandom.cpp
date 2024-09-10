@@ -52,3 +52,17 @@ int32_t JavaLCGIntN(int32_t n)
     } while (bits - val + (n - 1) < 0);
     return val;
 }
+
+int JavaHashCode(const std::string &value)
+{
+    int h = 0;
+    int len = value.size();
+    if (h == 0 && len > 0)
+    {
+        for (int i = 0; i < len; i++)
+        {
+            h = 31 * h + value[i];
+        }
+    }
+    return h;
+}

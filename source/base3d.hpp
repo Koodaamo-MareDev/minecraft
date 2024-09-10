@@ -26,14 +26,15 @@
 #define TEXTURE_PY(y) (TEXTURE_Y(y) + UV_SCALE)
 
 #define VERTEX_ATTR_LENGTH (3 * sizeof(int16_t) + 1 * sizeof(uint8_t) + 1 * sizeof(uint8_t) + 2 * sizeof(float_t))
+#define VERTEX_ATTR_LENGTH_FLOATPOS (3 * sizeof(float_t) + 1 * sizeof(uint8_t) + 1 * sizeof(uint8_t) + 2 * sizeof(float_t))
 #define VERTEX_ATTR_LENGTH_DIRECTCOLOR (3 * sizeof(int16_t) + 1 * sizeof(uint8_t) + 4 * sizeof(uint8_t) + 2 * sizeof(float_t))
 
 class vertex_property_t
 {
 public:
     vec3f pos = vec3f(0, 0, 0);
-    uint32_t x_uv = 0;
-    uint32_t y_uv = 0;
+    float x_uv = 0;
+    float y_uv = 0;
     uint8_t color_r = 255;
     uint8_t color_g = 255;
     uint8_t color_b = 255;
