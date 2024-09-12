@@ -95,7 +95,7 @@ void modelbox_t::draw()
         push_matrix();
         if (pos.sqr_magnitude() > 0)
         {
-            guMtxTransApply(active_mtx, active_mtx, pos.x / 16, pos.y / 16, pos.z / 16);
+            guMtxApplyTrans(active_mtx, active_mtx, pos.x / 16, pos.y / 16, pos.z / 16);
         }
         if (rot.sqr_magnitude() > 0)
         {
