@@ -555,6 +555,7 @@ void transform_view(Mtx view, guVector world_pos, guVector object_scale, bool lo
     Mtx model, modelview;
     Mtx offset;
     Mtx posmtx;
+    Mtx scalemtx;
     Mtx rotx;
     Mtx roty;
     Mtx rotz;
@@ -564,6 +565,7 @@ void transform_view(Mtx view, guVector world_pos, guVector object_scale, bool lo
     guMtxIdentity(model);
     guMtxIdentity(offset);
     guMtxIdentity(posmtx);
+    guMtxIdentity(scalemtx);
     guMtxIdentity(rotz);
     guMtxIdentity(roty);
     guMtxIdentity(rotx);
@@ -571,6 +573,9 @@ void transform_view(Mtx view, guVector world_pos, guVector object_scale, bool lo
     // Position the chunks on the screen
     guMtxTrans(offset, -world_pos.x, -world_pos.y, -world_pos.z);
     guMtxTrans(posmtx, player_pos.x, player_pos.y, player_pos.z);
+
+    // Scale the object
+    guMtxScale(scalemtx, object_scale.x, object_scale.y, object_scale.z);
 
     // Rotate view
     axis.x = 1;
@@ -583,6 +588,7 @@ void transform_view(Mtx view, guVector world_pos, guVector object_scale, bool lo
     guMtxRotAxisDeg(roty, &axis, yrot);
 
     // Apply matrices
+    guMtxConcat(scalemtx, posmtx, posmtx);
     guMtxConcat(posmtx, offset, offset);
     guMtxConcat(offset, rotz, rotz);
     guMtxConcat(rotz, roty, roty);
