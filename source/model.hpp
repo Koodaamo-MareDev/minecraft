@@ -44,6 +44,7 @@ public:
 class model_t
 {
 public:
+    vec3f pos = vec3f(0, 0, 0);
     GXTexObj texture;
     std::vector<modelbox_t *> boxes;
     model_t() {}

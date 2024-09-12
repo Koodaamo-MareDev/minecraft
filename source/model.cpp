@@ -124,6 +124,7 @@ void modelbox_t::draw()
 void model_t::draw(float ticks)
 {
     use_texture(texture);
+    transform_view(get_view_matrix(), vec3f(player_pos) * 2 - pos, vec3f(1, 1, 1), false);
     for (auto &box : boxes)
     {
         box->draw();

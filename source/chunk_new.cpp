@@ -1516,7 +1516,10 @@ void chunk_t::render_entities(float partial_ticks)
     {
         entity->render(partial_ticks);
     }
-    transform_view(get_view_matrix(), vec3f(x * 16 + 8, 96, z * 16 + 8), vec3f(1), false);
+    creeper_model.pos.x = x * 16;
+    creeper_model.pos.y = 74;
+    creeper_model.pos.z += partial_ticks * 0.001;
+    creeper_model.pos.z = std::fmod(creeper_model.pos.z, 16.) + z * 16 + (z <= 0 ? 16 : 0);
     creeper_model.draw(partial_ticks);
     use_texture(blockmap_texture);
 }
