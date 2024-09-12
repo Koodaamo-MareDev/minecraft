@@ -1447,8 +1447,54 @@ void DrawScene(std::deque<chunk_t *> &chunks, bool transparency)
 }
 void PrepareTEV()
 {
-    GX_SetNumTevStages(1);
+
+    GX_SetNumTevStages(3);
     GX_SetTexCoordGen(GX_TEXCOORD0, GX_TG_MTX2x4, GX_TG_TEX0, GX_IDENTITY);
+
+    // Stage 0 handles the basics like texture mapping and lighting
+
+    // Set the TEV stage 0 to use the texture coordinates and the texture map
     GX_SetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
-    GX_SetTevOp(GX_TEVSTAGE0, GX_MODULATE);
+
+    // Set the alpha sources to the texture alpha and the rasterized alpha
+    GX_SetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_TEXA, GX_CA_RASA, GX_CA_ZERO);
+    GX_SetTevAlphaOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
+
+    // Set the color sources to the texture color and the rasterized color
+    GX_SetTevColorIn(GX_TEVSTAGE0, GX_CC_ZERO, GX_CC_TEXC, GX_CC_RASC, GX_CC_ZERO);
+    GX_SetTevColorOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
+
+    // Stage 1 handles blending the texture with a constant color additively
+
+    // Set the TEV stage 1 to use the texture coordinates and the texture map
+    GX_SetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+
+    // Keep the alpha as it was from the previous stage
+    GX_SetTevAlphaIn(GX_TEVSTAGE1, GX_CA_APREV, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO);
+    GX_SetTevAlphaOp(GX_TEVSTAGE1, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
+
+    // Set the constant color to black
+    GX_SetTevKColor(GX_KCOLOR0, (GXColor){0, 0, 0, 255});
+    GX_SetTevKColorSel(GX_TEVSTAGE1, GX_TEV_KCSEL_K0);
+
+    // Additive blending
+    GX_SetTevColorIn(GX_TEVSTAGE1, GX_CC_CPREV, GX_CC_ZERO, GX_CC_ZERO, GX_CC_KONST);
+    GX_SetTevColorOp(GX_TEVSTAGE1, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
+
+    // Stage 2 handles the final color output by multiplying the stage 1 color with the constant color
+
+    // Set the TEV stage 2 to use the texture coordinates and the texture map
+    GX_SetTevOrder(GX_TEVSTAGE2, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+
+    // Keep the alpha as it was from the previous stage
+    GX_SetTevAlphaIn(GX_TEVSTAGE2, GX_CA_APREV, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO);
+    GX_SetTevAlphaOp(GX_TEVSTAGE2, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
+
+    // Set the constant color to white
+    GX_SetTevKColor(GX_KCOLOR1, (GXColor){255, 255, 255, 255});
+    GX_SetTevKColorSel(GX_TEVSTAGE2, GX_TEV_KCSEL_K1);
+
+    // Multiply the color from the previous stage with the constant color
+    GX_SetTevColorIn(GX_TEVSTAGE2, GX_CC_ZERO, GX_CC_CPREV, GX_CC_KONST, GX_CC_ZERO);
+    GX_SetTevColorOp(GX_TEVSTAGE2, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
 }
