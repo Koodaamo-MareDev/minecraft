@@ -57,6 +57,14 @@ modelbox_t::modelbox_t(vec3f pivot, vec3f size, uint16_t uv_off_x, uint16_t uv_o
     // Create display list
     display_list = memalign(32, buffer_size);
 
+    if (!display_list)
+    {
+        display_list_size = 0;
+        return;
+    }
+
+    DCInvalidateRange(display_list, buffer_size);
+
     GX_BeginDispList(display_list, buffer_size);
 
     GX_BeginGroup(GX_QUADS, 24);
@@ -70,12 +78,12 @@ modelbox_t::modelbox_t(vec3f pivot, vec3f size, uint16_t uv_off_x, uint16_t uv_o
 
     uint32_t vtxcount = GX_EndGroup();
     display_list_size = GX_EndDispList();
-    if (!display_list || !display_list_size || vtxcount != 24)
+    if (!display_list_size || vtxcount != 24)
     {
-        if (display_list)
-            free(display_list);
+        free(display_list);
         display_list = nullptr;
         display_list_size = 0;
+        return;
     }
 
     DCFlushRange(display_list, display_list_size);
