@@ -33,8 +33,8 @@ class vertex_property_t
 {
 public:
     vec3f pos = vec3f(0, 0, 0);
-    float x_uv = 0;
-    float y_uv = 0;
+    vfloat_t x_uv = 0;
+    vfloat_t y_uv = 0;
     uint8_t color_r = 255;
     uint8_t color_g = 255;
     uint8_t color_b = 255;
@@ -111,7 +111,7 @@ inline void GX_VertexLit(const vertex_property_t &vert, uint8_t light, uint8_t f
     ++__group_vtxcount;
     if (!base3d_is_drawing)
         return;
-    constexpr float uv_invscale = 1. / BASE3D_UV_FRAC;
+    constexpr vfloat_t uv_invscale = 1. / BASE3D_UV_FRAC;
     GX_Position3s16(BASE3D_POS_FRAC * vert.pos.x, BASE3D_POS_FRAC * vert.pos.y, BASE3D_POS_FRAC * vert.pos.z);
     GX_Normal1x8(face);
     GX_Color1x8(light);
@@ -123,7 +123,7 @@ inline void GX_Vertex16(const vertex_property16_t &vert, uint8_t face = 3)
     ++__group_vtxcount;
     if (!base3d_is_drawing)
         return;
-    constexpr float uv_invscale = 1. / BASE3D_UV_FRAC;
+    constexpr vfloat_t uv_invscale = 1. / BASE3D_UV_FRAC;
     GX_Position3s16(vert.pos.x, vert.pos.y, vert.pos.z);
     GX_Normal1x8(face);
     GX_Color4u8(vert.color_r, vert.color_g, vert.color_b, vert.color_a);
