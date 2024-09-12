@@ -146,6 +146,14 @@ void draw_sky(GXColor background);
 
 GXColor get_sky_color(bool cave_darkness = true);
 
+void set_color_add(GXColor color);
+
+GXColor get_color_add();
+
+void set_color_multiply(GXColor color);
+
+GXColor get_color_multiply();
+
 void draw_particle(camera_t &camera, vec3f pos, uint32_t texture_index, float size, uint8_t brightness);
 
 void draw_particles(camera_t &camera, particle_t *particles, int count);

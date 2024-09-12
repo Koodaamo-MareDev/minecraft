@@ -15,6 +15,9 @@
 
 const GXColor sky_color = {0x88, 0xBB, 0xFF, 0xFF};
 
+GXColor color_multiply = {0xFF, 0xFF, 0xFF, 0xFF};
+GXColor color_add = {0, 0, 0, 0};
+
 std::stack<mtx34_t> matrix_stack;
 
 GXTexObj white_texture;
@@ -868,6 +871,24 @@ GXColor get_sky_color(bool cave_darkness)
     float sky_multiplier = get_sky_multiplier();
     float brightness = elevation_brightness * sky_multiplier;
     return GXColor{uint8_t(sky_color.r * brightness), uint8_t(sky_color.g * brightness), uint8_t(sky_color.b * brightness), 0xFF};
+}
+void set_color_add(GXColor color)
+{
+    color_add = color;
+    GX_SetTevKColor(GX_KCOLOR0, color);
+}
+GXColor get_color_add()
+{
+    return color_add;
+}
+void set_color_multiply(GXColor color)
+{
+    color_multiply = color;
+    GX_SetTevKColor(GX_KCOLOR1, color);
+}
+GXColor get_color_multiply()
+{
+    return color_multiply;
 }
 void draw_sky(GXColor background)
 {
