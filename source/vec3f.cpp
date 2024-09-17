@@ -1,5 +1,6 @@
 #include "vec3f.hpp"
 #include "vec3i.hpp" // Include the necessary header for vec3i if needed
+#include "maths.hpp"
 
 #if HW_RVL
 #include "ogc/gx.h"
@@ -49,17 +50,17 @@ vec3f vec3f::operator%(vfloat_t const &a)
 }
 vec3f vec3f::normalize() const
 {
-    vfloat_t length = std::sqrt(x * x + y * y + z * z);
+    vfloat_t length = Q_rsqrt_d(x * x + y * y + z * z);
     if (length == 0)
     {
         return vec3f(0, 0, 0);
     }
-    return vec3f(x / length, y / length, z / length);
+    return vec3f(x * length, y * length, z * length);
 }
 
 vfloat_t vec3f::magnitude() const
 {
-    return std::sqrt(x * x + y * y + z * z);
+    return Q_sqrt_d(x * x + y * y + z * z);
 }
 
 vfloat_t vec3f::sqr_magnitude() const

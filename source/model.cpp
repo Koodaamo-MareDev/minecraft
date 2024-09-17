@@ -88,7 +88,7 @@ modelbox_t::modelbox_t(vec3f pivot, vec3f size, uint16_t uv_off_x, uint16_t uv_o
 
     DCFlushRange(display_list, display_list_size);
 }
-void modelbox_t::draw()
+void modelbox_t::render()
 {
     if (display_list && display_list_size)
     {
@@ -121,12 +121,12 @@ void modelbox_t::draw()
     }
 }
 
-void model_t::draw(float ticks)
+void model_t::render(float ticks)
 {
     use_texture(texture);
-    transform_view(get_view_matrix(), vec3f(player_pos) * 2 - pos, vec3f(1, 1, 1), false);
+    transform_view(get_view_matrix(), vec3f(player_pos) * 2 - pos, vec3f(1), rot, false);
     for (auto &box : boxes)
     {
-        box->draw();
+        box->render();
     }
 }

@@ -1505,23 +1505,17 @@ void chunk_t::update_entities()
 
 void chunk_t::render_entities(float partial_ticks)
 {
-    static creeper_model_t creeper_model;
-    static bool initialized = false;
-    if (!initialized)
-    {
-        memcpy(&creeper_model.texture, &creeper_texture, sizeof(creeper_texture));
-        initialized = true;
-    }
     for (aabb_entity_t *&entity : entities)
     {
         entity->render(partial_ticks);
     }
-    creeper_model.pos.x = x * 16;
-    creeper_model.pos.y = 74;
-    creeper_model.pos.z += partial_ticks * 0.001;
-    creeper_model.pos.z = std::fmod(creeper_model.pos.z, 16.) + z * 16 + (z <= 0 ? 16 : 0);
-    creeper_model.draw(partial_ticks);
+
+    // Restore default texture
     use_texture(blockmap_texture);
+
+    // Restore default colors
+    GX_SetTevKColor(GX_KCOLOR0, (GXColor){0, 0, 0, 255});
+    GX_SetTevKColor(GX_KCOLOR1, (GXColor){255, 255, 255, 255});
 }
 
 uint32_t chunk_t::size()

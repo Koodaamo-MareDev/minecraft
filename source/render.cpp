@@ -464,6 +464,20 @@ vec3f angles_to_vector(float x, float y)
     return result;
 }
 
+// Assuming a right-handed coordinate system and that the angles are in degrees. X = pitch, Y = yaw
+vec3f vector_to_angles(const vec3f &vec)
+{
+    vec3f result;
+    result.x = std::asin(-vec.y);
+    result.y = std::atan2(vec.x, vec.z);
+
+    // Convert to degrees
+    result.x /= M_DTOR;
+    result.y /= M_DTOR;
+
+    return result;
+}
+
 // Function to calculate the signed distance from a point to a frustum plane
 float distance_to_plane(const vec3f &point, const frustum_t &frustum, int planeIndex)
 {
@@ -553,7 +567,7 @@ frustum_t calculate_frustum(camera_t &camera)
     return frustum;
 }
 
-void transform_view(Mtx view, guVector world_pos, guVector object_scale, bool load)
+void transform_view(Mtx view, guVector world_pos, guVector object_scale, guVector object_rot, bool load)
 {
     Mtx model, modelview;
     Mtx offset;
@@ -562,6 +576,9 @@ void transform_view(Mtx view, guVector world_pos, guVector object_scale, bool lo
     Mtx rotx;
     Mtx roty;
     Mtx rotz;
+    Mtx objrotx;
+    Mtx objroty;
+    Mtx objrotz;
     guVector axis; // Axis to rotate on
 
     // Reset matrices
@@ -580,6 +597,20 @@ void transform_view(Mtx view, guVector world_pos, guVector object_scale, bool lo
     // Scale the object
     guMtxScale(scalemtx, object_scale.x, object_scale.y, object_scale.z);
 
+    // Rotate object
+    axis.x = 0;
+    axis.y = 0;
+    axis.z = 1;
+    guMtxRotAxisDeg(objrotz, &axis, -object_rot.z);
+    axis.x = 0;
+    axis.y = 1;
+    axis.z = 0;
+    guMtxRotAxisDeg(objroty, &axis, -object_rot.y);
+    axis.x = 1;
+    axis.y = 0;
+    axis.z = 0;
+    guMtxRotAxisDeg(objrotx, &axis, -object_rot.x);
+
     // Rotate view
     axis.x = 1;
     axis.y = 0;
@@ -591,6 +622,9 @@ void transform_view(Mtx view, guVector world_pos, guVector object_scale, bool lo
     guMtxRotAxisDeg(roty, &axis, yrot);
 
     // Apply matrices
+    guMtxConcat(objrotz, objroty, objroty);
+    guMtxConcat(objroty, objrotx, objrotx);
+    guMtxConcat(objrotx, scalemtx, scalemtx);
     guMtxConcat(scalemtx, posmtx, posmtx);
     guMtxConcat(posmtx, offset, offset);
     guMtxConcat(offset, rotz, rotz);
@@ -871,6 +905,10 @@ GXColor get_sky_color(bool cave_darkness)
     float sky_multiplier = get_sky_multiplier();
     float brightness = elevation_brightness * sky_multiplier;
     return GXColor{uint8_t(sky_color.r * brightness), uint8_t(sky_color.g * brightness), uint8_t(sky_color.b * brightness), 0xFF};
+}
+GXColor get_lightmap_color(uint8_t light)
+{
+    return *(GXColor *)&light_map[uint32_t(light) << 2];
 }
 void set_color_add(GXColor color)
 {

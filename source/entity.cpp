@@ -6,9 +6,13 @@
 #include "light.hpp"
 #include "particle.hpp"
 #include "maths.hpp"
+#include "pathfinding.hpp"
 extern float wiimote_x;
 extern float wiimote_z;
 extern u32 wiimote_held;
+extern aabb_entity_t *player;
+
+pathfinding_t pathfinder;
 
 void PlaySound(sound_t sound);                               // in minecraft.cpp
 void AddParticle(const particle_t &particle);                // in minecraft.cpp
@@ -32,6 +36,8 @@ bool aabb_entity_t::can_remove()
         return false;
     vec3i int_pos = vec3i(std::floor(entity_pos.x), std::floor(entity_pos.y), std::floor(entity_pos.z));
     chunk_t *curr_chunk = get_chunk_from_pos(int_pos, false);
+    if (!curr_chunk)
+        return true;
     chunkvbo_t &vbo = curr_chunk->vbos[int_pos.y >> 4];
     if (vbo.dirty || curr_chunk->light_update_count || vbo.cached_solid != vbo.solid || vbo.cached_transparent != vbo.transparent)
         return false;
@@ -56,6 +62,8 @@ void aabb_entity_t::set_position(vec3f pos)
 
 void aabb_entity_t::tick()
 {
+    ticks_existed++;
+    prev_rotation = rotation;
     vec3f fluid_velocity = vec3f(0, 0, 0);
     bool water_movement = false;
     bool lava_movement = false;
@@ -154,12 +162,20 @@ void aabb_entity_t::tick()
 
         if (local)
         {
-            velocity.x += wiimote_x * 0.02;
-            velocity.z += wiimote_z * 0.02;
-
-            if ((wiimote_held & WPAD_CLASSIC_BUTTON_B))
-                velocity.y += 0.04;
+            movement.x = wiimote_x;
+            movement.z = wiimote_z;
+            jumping = (wiimote_held & WPAD_CLASSIC_BUTTON_B);
         }
+        else
+        {
+            jumping = should_jump();
+        }
+        velocity.x += movement.x * 0.02;
+        velocity.z += movement.z * 0.02;
+
+        if (jumping)
+            velocity.y += 0.04;
+
         velocity = velocity + (fluid_velocity.normalize() * 0.004);
 
         move_and_check_collisions();
@@ -190,15 +206,21 @@ void aabb_entity_t::tick()
             }
         }
 
+        jumping = false;
+        vfloat_t speed = on_ground ? 0.1 * (0.16277136 / (h_friction * h_friction * h_friction)) : 0.02;
         if (local)
         {
             // If the entity is on the ground, allow them to jump
             jumping = on_ground && (wiimote_held & WPAD_CLASSIC_BUTTON_B);
-
-            vfloat_t speed = on_ground ? 0.1 * (0.16277136 / (h_friction * h_friction * h_friction)) : 0.02;
-            velocity.x += wiimote_x * speed;
-            velocity.z += wiimote_z * speed;
+            movement.x = wiimote_x;
+            movement.z = wiimote_z;
         }
+        else
+        {
+            jumping = on_ground && should_jump();
+        }
+        velocity.x += movement.x * speed;
+        velocity.z += movement.z * speed;
         if (jumping)
         {
             velocity.y = 0.42;
@@ -336,6 +358,11 @@ void aabb_entity_t::move_and_check_collisions()
         velocity.z = 0;
 }
 
+vec3f aabb_entity_t::simple_pathfind(vec3f target)
+{
+    return -pathfinder.pathfind_direction(target, position, chunk);
+}
+
 falling_block_entity_t::falling_block_entity_t(block_t block_state, const vec3i &position) : aabb_entity_t(0.999f, 0.999f), block_state(block_state)
 {
     aabb_entity_t(0.999f, 0.999f);
@@ -386,6 +413,8 @@ void falling_block_entity_t::render(float partial_ticks)
     if (!chunk->light_update_count && fall_time && block_at_pos && !properties(block_at_pos->id).m_solid)
         block_state.light = block_at_pos->light;
     block_state.visibility_flags = 0x7F;
+
+    use_texture(blockmap_texture);
 
     // Draw the selected block
     if (on_ground || fall_time <= 1)
@@ -460,4 +489,138 @@ void exploding_block_entity_t::render(float partial_ticks)
     render_single_block(block_state, true);
 
     use_texture(blockmap_texture);
+}
+
+creeper_model_t creeper_entity_t::creeper_model;
+
+creeper_entity_t::creeper_entity_t(const vec3f &position) : aabb_entity_t(0.6f, 1.7f)
+{
+    aabb_entity_t(0.6f, 1.7f);
+    set_position(position);
+    this->walk_sound = false;
+    this->gravity = 0.08;
+    this->y_offset = 1.445;
+    memcpy(&creeper_model.texture, &creeper_texture, sizeof(GXTexObj));
+}
+
+void creeper_entity_t::tick()
+{
+    if (dead)
+        return;
+
+    if (!follow_entity)
+    {
+        for (int x = position.x - 16; x <= position.x + 16 && !follow_entity; x += 16)
+        {
+            for (int z = position.z - 16; z <= position.z + 16 && !follow_entity; z += 16)
+            {
+                chunk_t *chunk = get_chunk_from_pos(vec3i(x, 0, z), false, false);
+                if (!chunk)
+                    continue;
+                for (aabb_entity_t *entity : chunk->entities)
+                {
+                    if (entity && !entity->dead && entity == player)
+                    {
+                        vec3f entity_position = entity->get_position(0);
+                        vec3f direction = entity_position - position;
+                        vfloat_t sqrdistance = direction.sqr_magnitude();
+                        if (sqrdistance < 512 && sqrdistance > 0.5)
+                        {
+                            follow_entity = entity;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (follow_entity)
+    {
+        vec3f direction = follow_entity->position - position;
+        vfloat_t sqrdistance = direction.sqr_magnitude();
+        if (sqrdistance < 512 && sqrdistance > 0.5)
+        {
+            direction = direction.normalize();
+            rotation = vector_to_angles(direction);
+            if (ticks_existed % 8 == 0)
+            {
+                vec3f move = simple_pathfind(follow_entity->position);
+                movement = vec3f(move.x, 0, move.z).normalize() * 0.5 + vec3f(0, move.y > 0.25, 0);
+            }
+        }
+        if (sqrdistance < 6.25)
+        {
+            // TODO: Add explosion logic
+        }
+        if (sqrdistance > 256)
+        {
+            follow_entity = nullptr;
+        }
+    }
+    aabb_entity_t::tick();
+}
+
+bool creeper_entity_t::should_jump()
+{
+    if (!follow_entity)
+        return false;
+
+    if (in_water || movement.y > 0)
+        return true;
+
+    return false;
+}
+
+void creeper_entity_t::render(float partial_ticks)
+{
+    if (!chunk)
+        return;
+
+    vec3f entity_position = get_position(partial_ticks);
+    vec3f entity_rotation = get_rotation(partial_ticks);
+
+    vec3i block_pos = vec3i(std::floor(entity_position.x), std::floor(entity_position.y), std::floor(entity_position.z));
+    block_t *block = get_block_at(block_pos, chunk);
+    if (block && !properties(block->id).m_solid)
+    {
+        light_level = block->light;
+    }
+
+    while (entity_rotation.y < 0)
+        entity_rotation.y += 360;
+    entity_rotation.y = std::fmod(entity_rotation.y, 360);
+
+    while (body_rotation.y < 0)
+        body_rotation.y += 360;
+    body_rotation.y = std::fmod(body_rotation.y, 360);
+
+    vfloat_t diff = entity_rotation.y - body_rotation.y;
+    // Get the shortest angle
+    if (diff > 180)
+        diff -= 360;
+    if (diff < -180)
+        diff += 360;
+
+    // Rotate the body to stay in bounds of the head rotation
+    if (diff > 45)
+        body_rotation.y = entity_rotation.y - 45;
+    if (diff < -45)
+        body_rotation.y = entity_rotation.y + 45;
+
+    vec3f h_velocity = vec3f(velocity.x, 0, velocity.z);
+    h_velocity.y = 0;
+
+    body_rotation.y = lerpd(body_rotation.y, entity_rotation.y, h_velocity.magnitude());
+
+    creeper_model.speed = h_velocity.magnitude() * 30;
+
+    creeper_model.pos = entity_position - vec3f(0.5, 0.5, 0.5);
+    creeper_model.rot = body_rotation;
+    creeper_model.head_rot = vec3f(entity_rotation.x, entity_rotation.y, 0);
+
+    // Draw the creeper
+    set_color_multiply(get_lightmap_color(light_level));
+
+    creeper_model.render(partial_ticks);
 }

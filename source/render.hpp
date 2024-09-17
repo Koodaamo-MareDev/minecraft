@@ -29,6 +29,7 @@ extern float xrot, yrot;
 extern int tickCounter;
 extern float partialTicks;
 extern Mtx active_mtx;
+extern uint8_t light_map[1024];
 
 struct mtx34_t
 {
@@ -132,19 +133,23 @@ void render_single_item(uint32_t texture_index, bool transparency);
 
 vec3f angles_to_vector(float x, float y);
 
+vec3f vector_to_angles(const vec3f &vec);
+
 float distance_to_plane(const vec3f &point, const frustum_t &frustum, int planeIndex);
 
 float distance_to_frustum(const vec3f &point, const frustum_t &frustum);
 
 frustum_t calculate_frustum(camera_t &camera);
 
-void transform_view(Mtx view, guVector world_pos, guVector object_scale = guVector{1, 1, 1}, bool load = true);
+void transform_view(Mtx view, guVector world_pos, guVector object_scale = guVector{1, 1, 1}, guVector object_rot = guVector{0, 0, 0}, bool load = true);
 
 void transform_view_screen(Mtx view, guVector off);
 
 void draw_sky(GXColor background);
 
 GXColor get_sky_color(bool cave_darkness = true);
+
+GXColor get_lightmap_color(uint8_t light);
 
 void set_color_add(GXColor color);
 

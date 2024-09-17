@@ -6,6 +6,7 @@
 #include "vec3f.hpp"
 #include "aabb.hpp"
 #include "block.hpp"
+#include "model.hpp"
 
 constexpr vfloat_t ENTITY_GRAVITY = 9.8f;
 
@@ -31,8 +32,12 @@ public:
         before_friction = false,
         after_friction = true,
     };
+    uint16_t ticks_existed = 0;
     aabb_t aabb;
+    vec3f rotation = vec3f(0, 0, 0);
     vec3f prev_position = vec3f(0, 0, 0);
+    vec3f prev_rotation = vec3f(0, 0, 0);
+    vec3f movement = vec3f(0, 0, 0);
     vfloat_t width = 0;
     vfloat_t height = 0;
     vfloat_t y_offset = 0;
@@ -81,6 +86,18 @@ public:
     {
         return this->prev_position + (this->position - this->prev_position) * partial_ticks;
     }
+
+    vec3f get_rotation(vfloat_t partial_ticks)
+    {
+        return this->prev_rotation + (this->rotation - this->prev_rotation) * partial_ticks;
+    }
+
+    virtual bool should_jump()
+    {
+        return false;
+    }
+
+    vec3f simple_pathfind(vec3f target);
 };
 
 class falling_block_entity_t : public aabb_entity_t
@@ -111,6 +128,25 @@ public:
     virtual void tick();
 
     virtual void render(float partial_ticks);
+};
+
+class creeper_entity_t : public aabb_entity_t
+{
+private:
+    static creeper_model_t creeper_model;
+
+public:
+    vec3f body_rotation;
+
+    aabb_entity_t *follow_entity = nullptr;
+
+    creeper_entity_t(const vec3f &position);
+
+    virtual void tick();
+
+    virtual void render(float partial_ticks);
+
+    virtual bool should_jump();
 };
 
 #endif

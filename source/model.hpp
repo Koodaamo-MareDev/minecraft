@@ -6,6 +6,7 @@
 #include <ogcsys.h>
 #include <ogc/gx.h>
 #include "vec3f.hpp"
+#include "maths.hpp"
 
 extern int tickCounter;
 
@@ -20,7 +21,7 @@ public:
     modelbox_t(const modelbox_t &other) = delete;            // Prevent copying
     modelbox_t &operator=(const modelbox_t &other) = delete; // Prevent copying
 
-    void draw();
+    void render();
 
     void set_pos(const vec3f &pos)
     {
@@ -45,6 +46,7 @@ class model_t
 {
 public:
     vec3f pos = vec3f(0, 0, 0);
+    vec3f rot = vec3f(0, 0, 0);
     GXTexObj texture;
     std::vector<modelbox_t *> boxes;
     model_t() {}
@@ -52,7 +54,7 @@ public:
     model_t(const model_t &other) = delete;            // Prevent copying
     model_t &operator=(const model_t &other) = delete; // Prevent copying
 
-    virtual void draw(float partial_ticks);
+    virtual void render(float partial_ticks);
 
     modelbox_t *add_box(vec3f pos, vec3f size, uint16_t uv_off_x, uint16_t uv_off_y, vfloat_t inflate)
     {
@@ -79,6 +81,8 @@ public:
     modelbox_t *leg2 = nullptr;
     modelbox_t *leg3 = nullptr;
     modelbox_t *leg4 = nullptr;
+    float speed = 0.0f;
+    vec3f head_rot = vec3f(0, 0, 0);
     creeper_model_t()
     {
         head = add_box(vec3f(-4, -8, -4), vec3f(8, 8, 8), 0, 0, 0);
@@ -95,22 +99,19 @@ public:
         leg4->set_pos(vec3f(2, 16, -4));
     }
 
-    void set_rot(const vec3f &rot, float ticks)
+    void render(float partial_ticks) override
     {
-        head->set_rot(vec3f(rot.x, rot.y, 0));
-        float leg_rot = std::cos(ticks * M_DTOR * 0.6662f) * 1.4f / M_DTOR;
-        float leg_rot2 = std::cos(ticks * M_DTOR * 0.6662f + 3.1415927f) * 1.4f / M_DTOR;
+        float ticks = tickCounter + partial_ticks;
+
+        head->set_rot(head_rot - rot);
+
+        float leg_rot = std::cos(ticks * 0.3331f) * 28 * speed;
+        float leg_rot2 = std::cos(ticks * 0.3331f + 3.1415927f) * 28 * speed;
         leg1->set_rot(vec3f(leg_rot, 0, 0));
         leg2->set_rot(vec3f(leg_rot2, 0, 0));
         leg3->set_rot(vec3f(leg_rot2, 0, 0));
         leg4->set_rot(vec3f(leg_rot, 0, 0));
-    }
-
-    void draw(float partial_ticks) override
-    {
-        float ticks = tickCounter + partial_ticks;
-        set_rot(vec3f(0, ticks * 5, 0), ticks);
-        model_t::draw(ticks);
+        model_t::render(ticks);
     }
 };
 

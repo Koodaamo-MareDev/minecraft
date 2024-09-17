@@ -598,6 +598,18 @@ void GetInput()
         tickCounter += 6000;
     }
 
+    if (player && (raw_wiimote_down & WPAD_CLASSIC_BUTTON_DOWN) != 0)
+    {
+        // Spawn a creeper at the player's position
+        vec3f pos = player->get_position(std::fmod(partialTicks, 1));
+        chunk_t *creeper_chunk = get_chunk_from_pos(vec3i(pos.x, pos.y, pos.z), false, false);
+        if (creeper_chunk)
+        {
+            creeper_entity_t *creeper = new creeper_entity_t(pos);
+            creeper->chunk = creeper_chunk;
+            creeper_chunk->entities.push_back(creeper);
+        }
+    }
     expansion_t expansion;
     WPAD_Expansion(0, &expansion);
     vec3f left_stick(0, 0, 0);
