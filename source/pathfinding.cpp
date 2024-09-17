@@ -44,11 +44,11 @@ std::vector<vec3i> pathfinding_t::a_star_search(vec3i start, vec3i goal, chunk_t
         {
 
             float new_cost = cost_so_far[current.pos] + 1;
-            if (new_cost > 32)
+            if (new_cost > 64)
                 continue;
 
             vec3i next = current.pos + new_pos;
-            if (current.pos.y - current.parent.y > 1 && new_pos.y == 1)
+            if (next.y - current.parent.y > 1)
                 continue;
             if (next == current.parent)
                 continue;
@@ -124,19 +124,11 @@ vec3f pathfinding_t::straighten_path(vec3f start, vec3f goal, chunk_t *chunk)
 
     if (path.size() > 1)
     {
-        direction = vec3f(path[path.size() - 2].x, path[path.size() - 2].y, path[path.size() - 2].z) - start;
+        direction = vec3f(path[1].x + 0.5 - start.x, path[1].y - start.y, path[1].z + 0.5 - start.z);
     }
-
-    // Go as far as possible on a flat surface, with a maximum horizontal distance of 1
-    for (int i = path.size() - 1; i > 0; i++)
+    if (path.size() > 2)
     {
-        vec3i current = path[i];
-        vec3i next = path[i - 1];
-        direction = vec3f(next.x, next.y, next.z) - start;
-        if (current.y != next.y)
-            break;
-        if (std::abs(start_i.x - next.x) > 1 || std::abs(start_i.z - next.z) > 1)
-            break;
+        direction = direction + vec3f(path[2].x + 0.5 - start.x, path[2].y - start.y, path[2].z + 0.5 - start.z);
     }
     if (direction.sqr_magnitude() > 1)
         direction = direction.normalize();
