@@ -33,6 +33,7 @@ struct aiff
 class aiff_container
 {
 public:
+    unsigned char* bin_data = nullptr;
     aiff *data = nullptr;
     aiff_container(uint8_t *raw_data);
 };

@@ -551,26 +551,26 @@ sound_t get_step_sound(BlockID block_id)
     switch (properties.m_sound_type)
     {
     case SoundType::cloth:
-        sound = sound_t(get_random_sound(cloth_sounds));
+        sound = randomize_sound("cloth", 4);
         break;
     case SoundType::glass:
-        sound = sound_t(get_random_sound(stone_sounds));
+        sound = randomize_sound("stone", 4);
         break;
     case SoundType::grass:
-        sound = sound_t(get_random_sound(grass_sounds));
+        sound = randomize_sound("grass", 4);
         break;
     case SoundType::dirt:
-        sound = sound_t(get_random_sound(gravel_sounds));
+        sound = randomize_sound("gravel", 4);
         break;
     case SoundType::sand:
-        sound = sound_t(get_random_sound(sand_sounds));
+        sound = randomize_sound("sand", 4);
         break;
     case SoundType::wood:
-        sound = sound_t(get_random_sound(wood_sounds));
+        sound = randomize_sound("wood", 4);
         break;
     case SoundType::stone:
     case SoundType::metal: // The metal sound is the same as stone with a different pitch.
-        sound = sound_t(get_random_sound(stone_sounds));
+        sound = randomize_sound("stone", 4);
         break;
     default:
         break;
@@ -590,26 +590,26 @@ sound_t get_mine_sound(BlockID block_id)
     switch (properties.m_sound_type)
     {
     case SoundType::cloth:
-        sound = sound_t(get_random_sound(cloth_sounds));
+        sound = randomize_sound("cloth", 4);
         break;
     case SoundType::glass:
-        sound = sound_t(get_random_sound(stone_sounds));
+        sound = randomize_sound("stone", 4);
         break;
     case SoundType::grass:
-        sound = sound_t(get_random_sound(grass_sounds));
+        sound = randomize_sound("grass", 4);
         break;
     case SoundType::dirt:
-        sound = sound_t(get_random_sound(gravel_sounds));
+        sound = randomize_sound("gravel", 4);
         break;
     case SoundType::sand:
-        sound = sound_t(get_random_sound(sand_sounds));
+        sound = randomize_sound("sand", 4);
         break;
     case SoundType::wood:
-        sound = sound_t(get_random_sound(wood_sounds));
+        sound = randomize_sound("wood", 4);
         break;
     case SoundType::stone:
     case SoundType::metal: // The metal sound is the same as stone with a different pitch.
-        sound = sound_t(get_random_sound(stone_sounds));
+        sound = randomize_sound("stone", 4);
         break;
     default:
         break;
@@ -628,26 +628,26 @@ sound_t get_break_sound(BlockID block_id)
     switch (properties.m_sound_type)
     {
     case SoundType::cloth:
-        sound = sound_t(get_random_sound(cloth_sounds));
+        sound = randomize_sound("cloth", 4);
         break;
     case SoundType::glass:
-        sound = sound_t(get_random_sound(glass_sounds));
+        sound = randomize_sound("glass", 4);
         break;
     case SoundType::grass:
-        sound = sound_t(get_random_sound(grass_sounds));
+        sound = randomize_sound("grass", 4);
         break;
     case SoundType::dirt:
-        sound = sound_t(get_random_sound(gravel_sounds));
+        sound = randomize_sound("gravel", 4);
         break;
     case SoundType::sand:
-        sound = sound_t(get_random_sound(sand_sounds));
+        sound = randomize_sound("gravel", 4);
         break;
     case SoundType::wood:
-        sound = sound_t(get_random_sound(wood_sounds));
+        sound = randomize_sound("wood", 4);
         break;
     case SoundType::stone:
     case SoundType::metal: // The metal sound is the same as stone with a different pitch.
-        sound = sound_t(get_random_sound(stone_sounds));
+        sound = randomize_sound("stone", 4);
         break;
     default:
         break;

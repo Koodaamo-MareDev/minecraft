@@ -25,6 +25,7 @@ public:
     int voice = -1;
     sound_t() {}
     sound_t(aiff_container &aiff_data);
+    sound_t(aiff_container* aiff_data);
 
     void set_aiff_data(aiff_container &aiff_data);
     void play();

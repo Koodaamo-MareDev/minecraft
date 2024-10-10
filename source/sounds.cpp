@@ -1,46 +1,5 @@
 #include "sounds.hpp"
-
-std::vector<aiff_container> pling_sounds({aiff_container(pling_aiff)});
-
-std::vector<aiff_container> cloth_sounds({aiff_container(cloth1_aiff),
-                                          aiff_container(cloth2_aiff),
-                                          aiff_container(cloth3_aiff),
-                                          aiff_container(cloth4_aiff)});
-
-std::vector<aiff_container> glass_sounds({aiff_container(glass1_aiff),
-                                          aiff_container(glass2_aiff),
-                                          aiff_container(glass3_aiff)});
-
-std::vector<aiff_container> grass_sounds({aiff_container(grass1_aiff),
-                                          aiff_container(grass2_aiff),
-                                          aiff_container(grass3_aiff),
-                                          aiff_container(grass4_aiff)});
-
-std::vector<aiff_container> gravel_sounds({aiff_container(gravel1_aiff),
-                                           aiff_container(gravel2_aiff),
-                                           aiff_container(gravel3_aiff),
-                                           aiff_container(gravel4_aiff)});
-
-std::vector<aiff_container> sand_sounds({aiff_container(sand1_aiff),
-                                         aiff_container(sand2_aiff),
-                                         aiff_container(sand3_aiff),
-                                         aiff_container(sand4_aiff)});
-
-std::vector<aiff_container> wood_sounds({aiff_container(wood1_aiff),
-                                         aiff_container(wood2_aiff),
-                                         aiff_container(wood3_aiff),
-                                         aiff_container(wood4_aiff)});
-
-std::vector<aiff_container> stone_sounds({aiff_container(stone1_aiff),
-                                          aiff_container(stone2_aiff),
-                                          aiff_container(stone3_aiff),
-                                          aiff_container(stone4_aiff)});
-
-aiff_container splash_sound(splash_aiff);
-
-aiff_container explode_sound(explode_aiff);
-
-aiff_container fuse_sound(fuse_aiff);
+#include <cstring>
 
 aiff_container &get_random_sound(std::vector<aiff_container> &sounds)
 {
@@ -69,4 +28,55 @@ std::string get_random_music(std::vector<std::string> &music_files)
     }
 
     return music_files[rand() % music_files.size()];
+}
+
+std::map<std::string, aiff_container*> sound_map;
+
+aiff_container *get_sound(std::string name)
+{
+    auto it = sound_map.find(name);
+    if (it != sound_map.end())
+    {
+        return it->second;
+    }
+    std::string path = "sound/" + name + ".aiff";
+
+    FILE *file = fopen(path.c_str(), "rb");
+    if (!file)
+    {
+        printf("Failed to open sound file: %s\n", path.c_str());
+        return nullptr;
+    }
+    fseek(file, 0, SEEK_END);
+    size_t size = ftell(file);
+    fseek(file, 0, SEEK_SET);
+
+    uint8_t* data = new(std::align_val_t(32)) uint8_t[size];
+    if (!data)
+    {
+        fclose(file);
+        return nullptr;
+    }
+
+    fread(data, size, 1, file);
+
+    fclose(file);
+
+    aiff_container *sound = new aiff_container(data);
+    if(!sound->data)
+    {
+        // Aiff validation failed
+        delete sound;
+        delete[] data;
+        return nullptr;
+    }
+    
+    sound_map[name] = sound;
+    return sound;
+}
+
+aiff_container* randomize_sound(std::string name, int count)
+{
+    name += std::to_string((rand() % count) + 1);
+    return get_sound(name);
 }

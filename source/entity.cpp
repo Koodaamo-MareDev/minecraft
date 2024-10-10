@@ -7,6 +7,7 @@
 #include "particle.hpp"
 #include "maths.hpp"
 #include "pathfinding.hpp"
+#include "sounds.hpp"
 extern float wiimote_x;
 extern float wiimote_z;
 extern u32 wiimote_held;
@@ -103,7 +104,7 @@ void aabb_entity_t::tick()
             if (impact > 1.0)
                 impact = 1.0;
 
-            sound_t sound = splash_sound;
+            sound_t sound = get_sound("splash");
             sound.position = position;
             sound.pitch = 0.6 + JavaLCGFloat() * 0.8;
             sound.volume = impact;
@@ -442,7 +443,7 @@ exploding_block_entity_t::exploding_block_entity_t(block_t block_state, const ve
     // Play the fuse sound if there is a long enough fuse
     if (fuse > 45)
     {
-        sound_t sound(fuse_sound);
+        sound_t sound = get_sound("fuse");
         sound.position = get_position(0);
         sound.volume = 0.5;
         sound.pitch = 1.0;

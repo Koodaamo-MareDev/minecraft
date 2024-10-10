@@ -61,11 +61,7 @@ aiff_container::aiff_container(uint8_t *raw_data)
     uint32_t data_address = (uint32_t)data;
 
     // Check if the data is already aligned to 32 bytes
-    if ((data_address & 31) == 0)
-    {
-        this->data = data;
-    }
-    else
+    if ((data_address & 31) != 0)
     {
         // Align data to 32 bytes - this might cut off the last few bytes of the sound data
         uint32_t aligned_address = (data_address + 31) & ~31;

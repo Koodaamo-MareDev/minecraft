@@ -6,6 +6,12 @@ sound_t::sound_t(aiff_container &aiff_data)
     set_aiff_data(aiff_data);
 }
 
+sound_t::sound_t(aiff_container *aiff_data)
+{
+    if (aiff_data)
+        set_aiff_data(*aiff_data);
+}
+
 void sound_t::set_aiff_data(aiff_container &aiff_data)
 {
     this->valid = aiff_data.data != nullptr;

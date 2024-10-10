@@ -1063,7 +1063,7 @@ void CreateExplosion(vec3f pos, float power, chunk_t *near)
 {
     explode(pos, power, near);
 
-    sound_t sound(explode_sound);
+    sound_t sound = get_sound("old_explode");
     sound.position = pos;
     sound.volume = 0.5;
     sound.pitch = 0.8;
