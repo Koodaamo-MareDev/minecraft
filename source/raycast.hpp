@@ -43,7 +43,7 @@ inline int checkabove(vec3i pos, chunk_t *chunk = nullptr)
         return pos.y;
     // Starting from the y coordinate, cast a ray up that stops at the first (partially) opaque block.
     pos.y++;
-    while (pos.y < 255 && (block = chunk->get_block(pos)) && !get_block_opacity(block->get_blockid()))
+    while (pos.y < 255 && (block = chunk->get_block(pos)) && properties(block->get_blockid()).m_collision == CollisionType::none)
         pos.y++;
     // This should return 255 at most which means the ray hit the world height limit
     return pos.y;
@@ -56,7 +56,7 @@ inline int checkbelow(vec3i pos, chunk_t *chunk = nullptr)
         return pos.y;
     // Starting from the y coordinate, cast a ray down that stops at the first (partially) opaque block.
     pos.y--;
-    while (pos.y > 0 && (block = chunk->get_block(pos)) && !get_block_opacity(block->get_blockid()))
+    while (pos.y > 0 && (block = chunk->get_block(pos)) && properties(block->get_blockid()).m_collision == CollisionType::none)
         pos.y--;
     // This should return 0 at most which means the ray hit the bedrock
     return pos.y;
