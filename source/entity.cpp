@@ -498,7 +498,7 @@ creeper_entity_t::creeper_entity_t(const vec3f &position) : aabb_entity_t(0.6f, 
 {
     aabb_entity_t(0.6f, 1.7f);
     set_position(position);
-    this->walk_sound = false;
+    this->walk_sound = true;
     this->gravity = 0.08;
     this->y_offset = 1.445;
     memcpy(&creeper_model.texture, &creeper_texture, sizeof(GXTexObj));
