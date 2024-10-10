@@ -79,23 +79,19 @@ chunk_t *get_chunk_from_pos(const vec3i &pos, bool load, bool write_cache)
 std::map<lwp_t, chunk_t *> chunk_cache;
 chunk_t *get_chunk(const vec3i &pos, bool load, bool write_cache)
 {
-    chunk_t *retval = nullptr;
-    // Chunk lookup based on x and z position
-    for (chunk_t *&chunk : chunks)
+    std::deque<chunk_t *>::iterator it = std::find_if(chunks.begin(), chunks.end(), [pos](chunk_t *chunk)
+                                                      { return chunk && chunk->x == pos.x && chunk->z == pos.z; });
+    if (it == chunks.end())
     {
-        if (chunk)
-            if (chunk->x == pos.x && chunk->z == pos.z)
-            {
-                retval = chunk;
-                break;
-            }
+        if (load)
+            add_chunk(pos);
+        return nullptr;
     }
-    if (!retval && load)
-    {
-        add_chunk(pos);
-    }
+    chunk_t *chunk = *it;
+    if (LWP_GetSelf() != GX_GetCurrentGXThread())
+        std::swap(*it, chunks.front());
 
-    return retval;
+    return chunk;
 }
 
 void add_chunk(vec3i pos)
@@ -130,7 +126,7 @@ void add_chunk(vec3i pos)
             chunk->x = pos.x;
             chunk->z = pos.z;
             pending_chunks.push_back(chunk);
-            std::sort(pending_chunks.begin(), pending_chunks.end(), chunk_sorter);
+            // std::sort(pending_chunks.begin(), pending_chunks.end(), chunk_sorter);
         }
         in_progress = false;
     };
