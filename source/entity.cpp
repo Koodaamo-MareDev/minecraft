@@ -631,4 +631,31 @@ void creeper_entity_t::render(float partial_ticks)
     set_color_multiply(get_lightmap_color(light_level));
 
     creeper_model.render(partial_ticks);
+#ifdef DEBUG
+    if (follow_entity)
+    {
+        block_t block_state;
+        block_state.id = 50; // Fire
+        block_state.visibility_flags = 0x7F;
+        block_state.meta = 0;
+        block_state.light = 0xFF;
+        use_texture(blockmap_texture);
+        for (size_t i = 0; i < path.size(); i++)
+        {
+            vec3i path_pos = path[i];
+            vec3f chunk_pos = vec3f(path_pos.x & ~0xF, path_pos.y & ~0xF, path_pos.z & ~0xF);
+            transform_view(get_view_matrix(), chunk_pos);
+            render_single_block_at(block_state, path_pos, false);
+            render_single_block_at(block_state, path_pos, true);
+        }
+        vec3i path_pos = vec3i(std::floor(follow_entity->position.x), std::floor(follow_entity->aabb.min.y), std::floor(follow_entity->position.z));
+        int below = checkbelow(path_pos) + 1;
+        path_pos.y = below;
+        block_state.id = 56; // Diamond block
+        vec3f chunk_pos = vec3f(path_pos.x & ~0xF, path_pos.y & ~0xF, path_pos.z & ~0xF);
+        transform_view(get_view_matrix(), chunk_pos);
+        render_single_block_at(block_state, path_pos, false);
+        render_single_block_at(block_state, path_pos, true);
+    }
+#endif
 }
