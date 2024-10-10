@@ -1,6 +1,8 @@
 #include "pathfinding.hpp"
+#include "raycast.hpp"
+#include "timers.hpp"
 
-void pathfinding_t::reconstruct_path(vec3i start, vec3i goal, std::vector<vec3i> &path)
+void pathfinding_t::reconstruct_path(vec3i start, vec3i goal, std::deque<vec3i> &path)
 {
     vec3i current = goal;
     path.push_back(current);
@@ -11,10 +13,10 @@ void pathfinding_t::reconstruct_path(vec3i start, vec3i goal, std::vector<vec3i>
     }
 }
 
-std::vector<vec3i> pathfinding_t::a_star_search(vec3i start, vec3i goal, chunk_t *chunk)
+bool pathfinding_t::a_star_search(vec3i start, vec3i goal, std::deque<vec3i> &path)
 {
     init();
-    node_t start_node = {start, start, 0, heuristic(start, goal), heuristic(start, goal)};
+    node_t start_node = {start, start, 0, heuristic(start, goal)};
     frontier.push(start_node);
     came_from[start] = start;
     cost_so_far[start] = 0;
@@ -27,115 +29,119 @@ std::vector<vec3i> pathfinding_t::a_star_search(vec3i start, vec3i goal, chunk_t
         vec3i{0, -1, 0},
         vec3i{0, 1, 0},
     };
-
+    auto is_valid = [](vec3i position, chunk_t *chunk) -> bool
+    {
+        block_t *block = get_block_at(position, nullptr);
+        block_t *block_above = get_block_at(position + vec3i(0, 1, 0), nullptr);
+        int y_below = checkbelow(position, nullptr);
+        if (position.y - y_below >= 3)
+            return false;
+        return block && block_above &&
+               (properties(block->id).m_collision == CollisionType::none || properties(block->id).m_collision == CollisionType::fluid) &&
+               (properties(block_above->id).m_collision == CollisionType::none || properties(block_above->id).m_collision == CollisionType::fluid);
+    };
+    uint64_t start_time = time_get();
     while (!frontier.empty())
     {
+        if (time_diff_us(start_time, time_get()) > 2500)
+            break;
         node_t current = frontier.top();
         frontier.pop();
 
         if (current.pos == goal)
         {
-            std::vector<vec3i> path;
+            path.clear();
             reconstruct_path(start, goal, path);
-            return path;
+            return true;
         }
-
+        int new_cost = cost_so_far[current.pos] + 1;
+        if (new_cost > 40)
+            break;
         for (vec3i &new_pos : neighbors)
         {
-
-            float new_cost = cost_so_far[current.pos] + 1;
-            if (new_cost > 64)
-                continue;
-
             vec3i next = current.pos + new_pos;
-            if (next.y - current.parent.y > 1)
-                continue;
-            if (next == current.parent)
-                continue;
-            if ((current.pos.x & ~0xF) != (next.z & ~0xF) || (current.pos.z & ~0xF) != (next.z & ~0xF))
-                chunk = get_chunk_from_pos(next, false, false);
-            block_t *block = get_block_at(next, chunk);
-            if (!block || properties(block->id).m_collision == CollisionType::solid)
-                continue;
-            block = get_block_at(next + vec3i(0, 1, 0), chunk);
-            if (!block || properties(block->id).m_collision == CollisionType::solid)
-                continue;
-            if (new_pos.y == 1)
-            {
-                // Check if the block below is solid
-                block = get_block_at(current.pos - vec3i(0, 1, 0), chunk);
-                if (!block || properties(block->id).m_collision != CollisionType::solid)
-                    continue;
-            }
-            if (next.y == current.pos.y && next.y == current.parent.y && current.parent != current.pos)
-            {
-                // Check if the block below the next node is solid
-                int solid_count = 3;
-                block = get_block_at(next - vec3i(0, 1, 0), chunk);
-                if (!block || properties(block->id).m_collision != CollisionType::solid)
-                    solid_count--;
-
-                // Check if the block below the current node is solid
-                block = get_block_at(current.pos - vec3i(0, 1, 0), chunk);
-                if (!block || properties(block->id).m_collision != CollisionType::solid)
-                    solid_count--;
-
-                // Check if the block below the previous node is solid
-                block = get_block_at(current.parent - vec3i(0, 1, 0), chunk);
-                if (!block || properties(block->id).m_collision != CollisionType::solid)
-                    solid_count--;
-                if (solid_count < 1)
-                    continue;
-            }
             if (!cost_so_far.count(next) || new_cost < cost_so_far[next])
             {
+                if (!is_valid(next, nullptr))
+                    continue;
+                block_t *block = get_block_at(next - vec3i(0, 1, 0));
+                bool next_in_air = !block || properties(block->id).m_collision == CollisionType::none;
+                bool next_horizontal_in_air = false;
+
+                if (current.in_air)
+                {
+                    if (new_pos.y == 0 && current.horizontal_in_air)
+                        continue;
+                    if (new_pos.y <= 0)
+                        next_horizontal_in_air = next_in_air;
+                }
+                if (new_pos.y == 1 && current.in_air)
+                    continue;
+
                 cost_so_far[next] = new_cost;
-                float priority = new_cost + heuristic(next, goal);
-                node_t next_node = {next, current.pos, new_cost, heuristic(next, goal), priority};
+                int priority = new_cost + heuristic(next, goal);
+                node_t next_node = {next, current.pos, new_cost, priority, next_in_air, next_horizontal_in_air};
                 frontier.push(next_node);
                 came_from[next] = current.pos;
             }
         }
     }
-
-    return std::vector<vec3i>();
+    return false;
 }
 
-vec3f pathfinding_t::simple_pathfind(vec3f start, vec3f goal, chunk_t *chunk)
+vec3f pathfinding_t::simple_pathfind(vec3f start, vec3f goal, std::deque<vec3i> &path)
 {
     vec3i start_i = vec3i(std::floor(start.x), std::floor(start.y), std::floor(start.z));
     vec3i goal_i = vec3i(std::floor(goal.x), std::floor(goal.y), std::floor(goal.z));
-    std::vector<vec3i> path = a_star_search(start_i, goal_i, chunk);
+
+    bool path_valid = true;
+
+    auto is_valid = [](vec3i position) -> bool
+    {
+        block_t *block = get_block_at(position, nullptr);
+        block_t *block_above = get_block_at(position + vec3i(0, 1, 0), nullptr);
+        int y_below = checkbelow(position, nullptr);
+        if (position.y - y_below >= 3)
+            return false;
+        return block && block_above &&
+               (properties(block->id).m_collision == CollisionType::none || properties(block->id).m_collision == CollisionType::fluid) &&
+               (properties(block_above->id).m_collision == CollisionType::none || properties(block_above->id).m_collision == CollisionType::fluid);
+    };
+
+    std::deque<vec3i>::iterator it = std::find_if(path.begin(), path.end(), [start_i, this](vec3i pos)
+                                                  { return heuristic(pos, start_i) < 1; });
+
+    if (it != path.end())
+        path.erase(path.begin(), it);
+    else
+        path.clear();
+
+    if (path.size())
+    {
+        if (path[path.size() - 1] != goal_i)
+            path_valid = false;
+        else
+        {
+            for (size_t i = 0; i < path.size() - 1; i++)
+            {
+                if (!is_valid(path[i]))
+                {
+                    path_valid = false;
+                }
+            }
+        }
+    }
+    else
+        path_valid = false;
+    if (!path_valid)
+    {
+        path_valid = a_star_search(start_i, goal_i, path);
+        std::reverse(path.begin(), path.end());
+    }
+    vec3f dir = vec3f(0, 0, 0);
     if (path.size() > 1)
-    {
-        vec3i next = path[1];
-        return vec3f(next.x, next.y, next.z);
-    }
-    return vec3f(0, -1, 0);
-}
-
-vec3f pathfinding_t::straighten_path(vec3f start, vec3f goal, chunk_t *chunk)
-{
-    vec3i start_i = vec3i(std::floor(start.x), std::floor(start.y), std::floor(start.z));
-    vec3i goal_i = vec3i(std::floor(goal.x), std::floor(goal.y), std::floor(goal.z));
-    std::vector<vec3i> path = a_star_search(start_i, goal_i, chunk);
-
-    vec3f direction(0, 0, 0);
-
-    if (path.size() > 1)
-    {
-        direction = vec3f(path[1].x + 0.5 - start.x, path[1].y - start.y, path[1].z + 0.5 - start.z);
-    }
-    if (path.size() > 2)
-    {
-        direction = direction + vec3f(path[2].x + 0.5 - start.x, path[2].y - start.y, path[2].z + 0.5 - start.z);
-    }
-    if (direction.sqr_magnitude() > 1)
-        direction = direction.normalize();
-    return direction;
-}
-
-vec3f pathfinding_t::pathfind_direction(vec3f start, vec3f goal, chunk_t *chunk)
-{
-    return straighten_path(start, goal, chunk);
+        dir = (path[1] + vec3f(0.5, 0, 0.5) - start);
+    if(path.size() > 2 && path[1].y != start_i.y)
+        dir = dir + (path[2] + vec3f(0.5, 0, 0.5) - start);
+    return dir.normalize();
 }

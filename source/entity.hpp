@@ -7,6 +7,7 @@
 #include "aabb.hpp"
 #include "block.hpp"
 #include "model.hpp"
+#include <deque>
 
 constexpr vfloat_t ENTITY_GRAVITY = 9.8f;
 
@@ -54,6 +55,8 @@ public:
     bool dead = false;
     drag_phase_t drag_phase = drag_phase_t::before_friction;
     uint8_t light_level = 0;
+    std::deque<vec3i> path;
+    vec3i last_goal = vec3i(0, 0, 0);
 
     aabb_entity_t(float width, float height) : entity_t(), width(width), height(height) {}
 

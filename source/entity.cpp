@@ -360,7 +360,7 @@ void aabb_entity_t::move_and_check_collisions()
 
 vec3f aabb_entity_t::simple_pathfind(vec3f target)
 {
-    return -pathfinder.pathfind_direction(target, position, chunk);
+    return pathfinder.simple_pathfind(vec3f(position.x, aabb.min.y, position.z), target, path);
 }
 
 falling_block_entity_t::falling_block_entity_t(block_t block_state, const vec3i &position) : aabb_entity_t(0.999f, 0.999f), block_state(block_state)
@@ -543,9 +543,17 @@ void creeper_entity_t::tick()
         {
             direction = direction.normalize();
             rotation = vector_to_angles(direction);
-            if (ticks_existed % 8 == 0)
+            if (ticks_existed % 4 == 0)
             {
-                vec3f move = simple_pathfind(follow_entity->position);
+                vec3f target = vec3f(std::floor(follow_entity->position.x), std::floor(follow_entity->aabb.min.y), std::floor(follow_entity->position.z));
+
+                vec3i target_i = vec3i(target.x, target.y, target.z);
+                int below = checkbelow(target_i) + 1;
+                if (target.y - below < 3)
+                {
+                    target.y = below;
+                }
+                vec3f move = simple_pathfind(target);
                 movement = vec3f(move.x, 0, move.z).normalize() * 0.5 + vec3f(0, move.y > 0.25, 0);
             }
         }

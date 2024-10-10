@@ -8,6 +8,7 @@
 
 #include <map>
 #include <queue>
+#include <deque>
 
 class pathfinding_t
 {
@@ -16,9 +17,10 @@ public:
     {
         vec3i pos;
         vec3i parent;
-        float g;
-        float h;
-        float f;
+        int g;
+        int f;
+        bool in_air = false;
+        bool horizontal_in_air = false;
         bool operator<(const node_t &other) const
         {
             return f > other.f;
@@ -26,7 +28,7 @@ public:
     };
 
     std::map<vec3i, vec3i> came_from;
-    std::map<vec3i, float> cost_so_far;
+    std::map<vec3i, int> cost_so_far;
     std::priority_queue<node_t> frontier;
 
     pathfinding_t() {}
@@ -38,19 +40,15 @@ public:
         frontier = std::priority_queue<node_t>();
     }
 
-    void reconstruct_path(vec3i start, vec3i goal, std::vector<vec3i> &path);
+    void reconstruct_path(vec3i start, vec3i goal, std::deque<vec3i> &path);
 
-    float heuristic(vec3i a, vec3i b)
+    int heuristic(vec3i a, vec3i b)
     {
-        return (a - b).sqr_magnitude();
+        return (std::abs(a.x - b.x) + std::abs(a.y - b.y) + std::abs(a.z - b.z));
     }
 
-    std::vector<vec3i> a_star_search(vec3i start, vec3i goal, chunk_t *chunk);
+    bool a_star_search(vec3i start, vec3i goal, std::deque<vec3i> &path);
 
-    vec3f simple_pathfind(vec3f start, vec3f goal, chunk_t *chunk);
-
-    vec3f straighten_path(vec3f start, vec3f goal, chunk_t *chunk);
-
-    vec3f pathfind_direction(vec3f start, vec3f goal, chunk_t *chunk);
+    vec3f simple_pathfind(vec3f start, vec3f goal, std::deque<vec3i> &path);
 };
 #endif
