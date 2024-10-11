@@ -34,7 +34,7 @@ bool pathfinding_t::a_star_search(vec3i start, vec3i goal, std::deque<vec3i> &pa
         block_t *block = get_block_at(position, nullptr);
         block_t *block_above = get_block_at(position + vec3i(0, 1, 0), nullptr);
         int y_below = checkbelow(position, nullptr);
-        if (position.y - y_below >= 3)
+        if (position.y - y_below >= 10)
             return false;
         return block && block_above &&
                (properties(block->id).m_collision == CollisionType::none || properties(block->id).m_collision == CollisionType::fluid) &&
@@ -43,7 +43,7 @@ bool pathfinding_t::a_star_search(vec3i start, vec3i goal, std::deque<vec3i> &pa
     uint64_t start_time = time_get();
     while (!frontier.empty())
     {
-        if (time_diff_us(start_time, time_get()) > 2500)
+        if (time_diff_us(start_time, time_get()) > 3000)
             break;
         node_t current = frontier.top();
         frontier.pop();
@@ -55,7 +55,7 @@ bool pathfinding_t::a_star_search(vec3i start, vec3i goal, std::deque<vec3i> &pa
             return true;
         }
         int new_cost = cost_so_far[current.pos] + 1;
-        if (new_cost > 40)
+        if (new_cost > 64)
             break;
         for (vec3i &new_pos : neighbors)
         {
@@ -101,7 +101,7 @@ vec3f pathfinding_t::simple_pathfind(vec3f start, vec3f goal, std::deque<vec3i> 
         block_t *block = get_block_at(position, nullptr);
         block_t *block_above = get_block_at(position + vec3i(0, 1, 0), nullptr);
         int y_below = checkbelow(position, nullptr);
-        if (position.y - y_below >= 3)
+        if (position.y - y_below >= 10)
             return false;
         return block && block_above &&
                (properties(block->id).m_collision == CollisionType::none || properties(block->id).m_collision == CollisionType::fluid) &&
