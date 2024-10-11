@@ -498,7 +498,7 @@ creeper_entity_t::creeper_entity_t(const vec3f &position) : aabb_entity_t(0.6f, 
 {
     aabb_entity_t(0.6f, 1.7f);
     set_position(position);
-    this->walk_sound = true;
+    this->walk_sound = false;
     this->gravity = 0.08;
     this->y_offset = 1.445;
     memcpy(&creeper_model.texture, &creeper_texture, sizeof(GXTexObj));
@@ -542,8 +542,7 @@ void creeper_entity_t::tick()
         vfloat_t sqrdistance = direction.sqr_magnitude();
         if (sqrdistance < 512 && sqrdistance > 0.5)
         {
-            direction = direction.normalize();
-            rotation = vector_to_angles(direction);
+            rotation = vector_to_angles(direction.normalize());
             if (ticks_existed % 4 == 0)
             {
                 vec3f target = vec3f(std::floor(follow_entity->position.x), std::floor(follow_entity->aabb.min.y), std::floor(follow_entity->position.z));
@@ -557,10 +556,45 @@ void creeper_entity_t::tick()
                 vec3f move = simple_pathfind(target);
                 movement = vec3f(move.x, 0, move.z).normalize() * 0.5 + vec3f(0, move.y > 0.25, 0);
             }
+            if (ticks_existed % 1200 == 300)
+            {
+                sound_t sound = randomize_sound("cave", 13);
+                sound.position = position;
+                sound.volume = 1.0;
+                sound.pitch = 1.0;
+                PlaySound(sound);
+            }
         }
+        // Explode if the player is too close
         if (sqrdistance < 6.25)
         {
-            // TODO: Add explosion logic
+            // Stop movement
+            movement = vec3f(0, 0, 0);
+
+            // Play the fuse sound
+            if (fuse == creeper_fuse)
+            {
+                sound_t sound = get_sound("fuse");
+                sound.position = position;
+                sound.volume = 0.5;
+                sound.pitch = 1.0;
+                PlaySound(sound);
+            }
+
+            if (!fuse)
+            {
+                dead = true;
+                CreateExplosion(get_position(0), 3, nullptr);
+            }
+            else
+            {
+                fuse--;
+            }
+        }
+        else if (fuse < creeper_fuse)
+        {
+            // Reset the fuse slowly when out of range
+            fuse++;
         }
         if (sqrdistance > 256)
         {
@@ -630,6 +664,11 @@ void creeper_entity_t::render(float partial_ticks)
 
     // Draw the creeper
     set_color_multiply(get_lightmap_color(light_level));
+
+    if (fuse < creeper_fuse)
+    {
+        set_color_add(std::sin(fuse + partial_ticks * 0.1) > 0 ? GXColor{0, 0, 0, 0xFF} : GXColor{0xFF, 0xFF, 0xFF, 0xFF});
+    }
 
     creeper_model.render(partial_ticks);
 #ifdef DEBUG

@@ -11,6 +11,8 @@
 
 constexpr vfloat_t ENTITY_GRAVITY = 9.8f;
 
+constexpr uint8_t creeper_fuse = 20;
+
 class chunk_t;
 
 class entity_t
@@ -140,6 +142,7 @@ private:
 
 public:
     vec3f body_rotation;
+    uint8_t fuse = creeper_fuse;
 
     aabb_entity_t *follow_entity = nullptr;
 

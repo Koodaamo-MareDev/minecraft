@@ -1079,7 +1079,7 @@ void CreateExplosion(vec3f pos, float power, chunk_t *near)
     for (int i = 0; i < 64; i++)
     {
         // Randomize the particle position and velocity
-        particle.position = pos + vec3f(JavaLCGFloat() - .5f, JavaLCGFloat() - .5f, JavaLCGFloat() - .5f) * 10.2;
+        particle.position = pos + vec3f(JavaLCGFloat() - .5f, JavaLCGFloat() - .5f, JavaLCGFloat() - .5f) * power * 2;
 
         // Randomize the particle life time by up to 10 ticks
         particle.life_time = particle.max_life_time - (rand() % 20) - 20;

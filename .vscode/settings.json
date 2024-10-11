@@ -61,7 +61,13 @@
         "map": "cpp",
         "ogcsys.h": "c",
         "network.h": "c",
-        "gcsd.h": "c"
+        "gcsd.h": "c",
+        "forward_list": "cpp",
+        "executor": "cpp",
+        "io_context": "cpp",
+        "netfwd": "cpp",
+        "timer": "cpp",
+        "future": "cpp"
     },
     "[javascript]": {
         "editor.maxTokenizationLineLength": 25000
