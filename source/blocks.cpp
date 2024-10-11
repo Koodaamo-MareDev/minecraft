@@ -4,7 +4,10 @@
 #include "vec3i.hpp"
 #include "chunk_new.hpp"
 #include "light.hpp"
+#include "sounds.hpp"
 #include <cmath>
+
+void PlaySound(sound_t sound);                               // in minecraft.cpp
 int8_t get_block_opacity(BlockID blockid)
 {
     return block_properties[int(blockid)].m_opacity;
@@ -330,6 +333,16 @@ void update_fluid(block_t *block, vec3i pos, chunk_t *near)
                             surround->set_blockid(new_surround_id);
                             update_block_at(pos + surrounding_offset);
                             update_neighbors(pos + surrounding_offset);
+
+                            // Play fizz sound when fluids collide.
+                            if (is_fluid(block_id) && is_fluid(surround_id))
+                            {
+                                sound_t sound = get_sound("fizz");
+                                sound.position = vec3f() + pos + surrounding_offset;
+                                sound.volume = 0.25;
+                                sound.pitch = 1.0;
+                                PlaySound(sound);
+                            }
                         }
                     }
                 }
