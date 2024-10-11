@@ -1061,7 +1061,7 @@ void AddParticle(const particle_t &particle)
 
 void CreateExplosion(vec3f pos, float power, chunk_t *near)
 {
-    explode(pos, power, near);
+    explode(pos, power * 0.75f, near);
 
     sound_t sound = get_sound("old_explode");
     sound.position = pos;
