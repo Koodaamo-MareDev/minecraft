@@ -30,6 +30,10 @@ public:
     vec3f normalize() const;
     vfloat_t magnitude() const;
     vfloat_t sqr_magnitude() const;
+    static vec3f lerp(vec3f a, vec3f b, vfloat_t t)
+    {
+        return a + (b - a) * t;
+    }
     vec3f(vfloat_t x, vfloat_t y, vfloat_t z) : x(x), y(y), z(z) {}
     vec3f(vfloat_t xyz) : x(xyz), y(xyz), z(xyz) {}
     vec3f() : x(0), y(0), z(0) {}

@@ -83,6 +83,9 @@ bool destroy_block = false;
 bool place_block = false;
 block_t selected_block = {uint8_t(BlockID::stone), 0x7F, 0, 0xF, 0xF};
 
+vec3f view_bob_offset(0, 0, 0);
+vec3f view_bob_screen_offset(0, 0, 0);
+
 particle_system_t particle_system;
 sound_system_t *sound_system = nullptr;
 
@@ -403,6 +406,28 @@ int main(int argc, char **argv)
             // Update the sound system
             sound_system->update(angles_to_vector(0, yrot + 90), player->get_position(std::fmod(partialTicks, 1)));
             player_pos = player->get_position(std::fmod(partialTicks, 1)) - vec3f(0.5, 0.5, 0.5);
+
+            // View bobbing
+            static float view_bob_angle = 0;
+            vec3f target_view_bob_offset;
+            vec3f target_view_bob_screen_offset;
+            vfloat_t view_bob_amount = 0.15;
+
+            vec3f h_velocity = vec3f(player->velocity.x, 0, player->velocity.z);
+            view_bob_angle += h_velocity.magnitude();
+            if (h_velocity.sqr_magnitude() > 0.001 && player->on_ground)
+            {
+                target_view_bob_offset = (vec3f(0, std::abs(std::sin(view_bob_angle)) * view_bob_amount * 2, 0) + angles_to_vector(0, yrot + 90) * std::cos(view_bob_angle) * view_bob_amount);
+                target_view_bob_screen_offset = view_bob_amount * vec3f(std::sin(view_bob_angle), -std::abs(std::cos(view_bob_angle)), 0);
+            }
+            else
+            {
+                target_view_bob_offset = vec3f(0, 0, 0);
+                target_view_bob_screen_offset = vec3f(0, 0, 0);
+            }
+            view_bob_offset = vec3f::lerp(view_bob_offset, target_view_bob_offset, 0.035);
+            view_bob_screen_offset = vec3f::lerp(view_bob_screen_offset, target_view_bob_screen_offset, 0.035);
+            player_pos = view_bob_offset + player_pos;
             camera.position = player_pos;
             camera.rot.x = xrot;
             camera.rot.y = yrot;
@@ -1351,10 +1376,10 @@ void DrawSelectedBlock()
     GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
 
     // Specify the selected block offset
-    vec3f selectedBlockPos = vec3f(+.85f, -0.75f, -1.f);
+    vec3f selectedBlockPos = vec3f(+.625f, -.625f, -.625f) + vec3f(-view_bob_screen_offset.x, view_bob_screen_offset.y, 0);
 
     // Transform the selected block position
-    transform_view_screen(get_view_matrix(), selectedBlockPos);
+    transform_view_screen(get_view_matrix(), selectedBlockPos, guVector{.5f, .5f, .5f}, guVector{10, -45, 0});
 
     // Draw the opaque pass
     GX_SetZMode(GX_TRUE, GX_ALWAYS, GX_TRUE);
