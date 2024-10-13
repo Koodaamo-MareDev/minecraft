@@ -143,7 +143,7 @@ frustum_t calculate_frustum(camera_t &camera);
 
 void transform_view(Mtx view, guVector world_pos, guVector object_scale = guVector{1, 1, 1}, guVector object_rot = guVector{0, 0, 0}, bool load = true);
 
-void transform_view_screen(Mtx view, guVector off);
+void transform_view_screen(Mtx view, guVector screen_pos, guVector object_scale = guVector{1, 1, 1}, guVector object_rot = guVector{0, 0, 0}, bool load = true);
 
 void draw_sky(GXColor background);
 

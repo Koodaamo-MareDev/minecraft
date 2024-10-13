@@ -637,22 +637,53 @@ void transform_view(Mtx view, guVector world_pos, guVector object_scale, guVecto
         GX_LoadPosMtxImm(modelview, GX_PNMTX0);
 }
 
-void transform_view_screen(Mtx view, guVector off)
+void transform_view_screen(Mtx view, guVector screen_pos, guVector object_scale, guVector object_rot, bool load)
 {
     Mtx model, modelview;
     Mtx posmtx;
+    Mtx scalemtx;
+    Mtx objrotx;
+    Mtx objroty;
+    Mtx objrotz;
 
     // Reset matrices
     guMtxIdentity(model);
     guMtxIdentity(posmtx);
 
     // Position the object on the screen
-    guMtxTrans(posmtx, -off.x, -off.y, -off.z);
+    guMtxTrans(posmtx, -screen_pos.x, -screen_pos.y, -screen_pos.z);
+
+    // Scale the object
+    guMtxScale(scalemtx, object_scale.x, object_scale.y, object_scale.z);
+    guMtxInverse(scalemtx, scalemtx);
+
+    guVector axis; // Axis to rotate on
+
+    // Rotate object
+    axis.x = 0;
+    axis.y = 0;
+    axis.z = 1;
+    guMtxRotAxisDeg(objrotz, &axis, object_rot.z);
+    axis.x = 0;
+    axis.y = 1;
+    axis.z = 0;
+    guMtxRotAxisDeg(objroty, &axis, object_rot.y);
+    axis.x = 1;
+    axis.y = 0;
+    axis.z = 0;
+    guMtxRotAxisDeg(objrotx, &axis, object_rot.x);
+
     // Apply matrices
+    guMtxConcat(objrotz, objroty, objroty);
+    guMtxConcat(objroty, objrotx, objrotx);
+    guMtxConcat(objrotx, scalemtx, scalemtx);
+    guMtxConcat(scalemtx, posmtx, posmtx);
     guMtxConcat(posmtx, model, model);
     guMtxInverse(model, model);
     guMtxConcat(model, view, modelview);
-    GX_LoadPosMtxImm(modelview, GX_PNMTX0);
+    guMtxCopy(modelview, active_mtx);
+    if (load)
+        GX_LoadPosMtxImm(modelview, GX_PNMTX0);
 }
 
 void draw_particle(camera_t &camera, vec3f pos, uint32_t texture_index, float size, uint8_t brightness)
