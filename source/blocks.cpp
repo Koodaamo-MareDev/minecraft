@@ -493,6 +493,19 @@ void slab_aabb(const vec3i &pos, block_t *block, const aabb_t &other, std::vecto
         aabb_list.push_back(aabb);
 }
 
+void torch_aabb(const vec3i &pos, block_t *block, const aabb_t &other, std::vector<aabb_t> &aabb_list)
+{
+    aabb_t aabb;
+    constexpr vfloat_t offset = 0.40625;
+    constexpr vfloat_t width = 0.1875;
+    constexpr vfloat_t height = 0.65625;
+    aabb.min = vec3f(pos.x + offset, pos.y, pos.z + offset);
+    aabb.max = aabb.min + vec3f(width, height, width);
+
+    if (aabb.intersects(other))
+        aabb_list.push_back(aabb);
+}
+
 blockproperties_t block_properties[256] = {
     blockproperties_t().id(BlockID::air).opacity(0).solid(false).transparent(true).collision(CollisionType::none).valid_item(false),
     blockproperties_t().id(BlockID::stone).texture(0).sound(SoundType::stone),
@@ -543,7 +556,7 @@ blockproperties_t block_properties[256] = {
     blockproperties_t().id(BlockID::bookshelf).texture(35).sound(SoundType::wood).render_type(RenderType::full_special),
     blockproperties_t().id(BlockID::mossy_cobblestone).texture(36).sound(SoundType::stone),
     blockproperties_t().id(BlockID::obsidian).texture(37).sound(SoundType::stone).blast_resistance(-1),
-    blockproperties_t().id(BlockID::torch).texture(80).solid(false).opacity(0).transparent(true).luminance(14).sound(SoundType::wood).render_type(RenderType::special).collision(CollisionType::none),
+    blockproperties_t().id(BlockID::torch).texture(80).solid(false).opacity(0).transparent(true).luminance(14).sound(SoundType::wood).aabb(torch_aabb).render_type(RenderType::special).collision(CollisionType::none),
     blockproperties_t().id(BlockID::fire).texture(31).solid(false).opacity(0).transparent(true).luminance(15).sound(SoundType::cloth),
     blockproperties_t().id(BlockID::mob_spawner).texture(65).solid(false).opacity(0).transparent(true).sound(SoundType::metal),
     blockproperties_t().id(BlockID::oak_stairs).texture(4).solid(false).sound(SoundType::wood),
