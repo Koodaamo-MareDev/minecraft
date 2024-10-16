@@ -131,6 +131,8 @@ void render_single_block_at(block_t &selected_block, vec3i pos, bool transparenc
 
 void render_single_item(uint32_t texture_index, bool transparency);
 
+void render_item_pixel(uint32_t texture_index, uint8_t x, uint8_t y, bool x_next, bool y_next, uint8_t light);
+
 vec3f angles_to_vector(float x, float y);
 
 vec3f vector_to_angles(const vec3f &vec);

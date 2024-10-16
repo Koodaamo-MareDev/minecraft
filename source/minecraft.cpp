@@ -1389,18 +1389,72 @@ void DrawSelectedBlock()
     GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
 
     // Specify the selected block offset
-    vec3f selectedBlockPos = vec3f(+.625f, -.625f, -.625f) + vec3f(-view_bob_screen_offset.x, view_bob_screen_offset.y, 0);
+    vec3f selectedBlockPos = vec3f(+.625f, -.75f, -.75f) + vec3f(-view_bob_screen_offset.x, view_bob_screen_offset.y, 0);
 
-    // Transform the selected block position
-    transform_view_screen(get_view_matrix(), selectedBlockPos, guVector{.5f, .5f, .5f}, guVector{10, -45, 0});
+    RenderType render_type = properties(selected_block.id).m_render_type;
 
-    // Draw the opaque pass
-    GX_SetZMode(GX_TRUE, GX_ALWAYS, GX_TRUE);
-    render_single_block(selected_block, false);
+    if (!properties(selected_block.id).m_fluid && (render_type == RenderType::full || render_type == RenderType::full_special || render_type == RenderType::slab))
+    {
+        // Render as a block
 
-    // Draw the transparent pass
-    GX_SetZMode(GX_FALSE, GX_ALWAYS, GX_TRUE);
-    render_single_block(selected_block, true);
+        // Transform the selected block position
+        transform_view_screen(get_view_matrix(), selectedBlockPos, guVector{.5f, .5f, .5f}, guVector{10, -45, 0});
+
+        // Opaque pass
+        GX_SetZMode(GX_TRUE, GX_ALWAYS, GX_TRUE);
+        render_single_block(selected_block, false);
+
+        // Transparent pass
+        GX_SetZMode(GX_FALSE, GX_ALWAYS, GX_TRUE);
+        render_single_block(selected_block, true);
+    }
+    else
+    {
+        // Render as an item
+
+        // Transform the selected block position
+        transform_view_screen(get_view_matrix(), selectedBlockPos, guVector{.75f, .75f, .75f}, guVector{10, 45, 180});
+
+        // Get the texture index of the selected block
+        int texture_index = get_default_texture_index(BlockID(selected_block.id));
+
+        int tex_width = 256;
+
+        char *texbuf = (char *)MEM_PHYSICAL_TO_K1(GX_GetTexObjData(&blockmap_texture));
+
+        uint32_t tex_x = TEXTURE_X(texture_index);
+        uint32_t tex_y = TEXTURE_Y(texture_index);
+
+        // Opaque pass - items are always drawn in the opaque pass
+        GX_SetZMode(GX_TRUE, GX_ALWAYS, GX_TRUE);
+
+        for (int y = 0; y < 16; y++)
+            for (int x = 0; x < 16; x++)
+            {
+                int u = tex_x + x + 1;
+                int v = tex_y + 15 - y;
+
+                // Get the index to the 4x4 texel in the target texture
+                int index = (tex_width << 2) * (v & ~3) + ((u & ~3) << 4);
+                // Put the data within the 4x4 texel into the target texture
+                int index_within = ((u & 3) + ((v & 3) << 2)) << 1;
+
+                int next_x = index + index_within;
+
+                u = tex_x + x;
+                v = tex_y + 15 - y - 1;
+
+                // Get the index to the 4x4 texel in the target texture
+                index = (tex_width << 2) * (v & ~3) + ((u & ~3) << 4);
+                // Put the data within the 4x4 texel into the target texture
+                index_within = ((u & 3) + ((v & 3) << 2)) << 1;
+
+                int next_y = index + index_within;
+
+                // Check if the texel is transparent
+                render_item_pixel(texture_index, x, 15 - y, x == 15 || !texbuf[next_x], y == 15 || !texbuf[next_y], view_block->light);
+            }
+    }
 }
 
 void DrawScene(std::deque<chunk_t *> &chunks, bool transparency)

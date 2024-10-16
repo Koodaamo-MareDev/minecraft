@@ -452,6 +452,35 @@ void render_single_item(uint32_t texture_index, bool transparency)
     GX_EndGroup();
 }
 
+void render_item_pixel(uint32_t texture_index, uint8_t x, uint8_t y, bool x_next, bool y_next, uint8_t light)
+{
+    GX_BeginGroup(GX_QUADS, (1 + x_next + y_next) << 2);
+    // Render the selected pixel.
+    GX_VertexLit({vec3f(+.5 - x * 0.0625 - 0.0625, -.5 + y * 0.0625, -.5), TEXTURE_X(texture_index) + x + 1, TEXTURE_Y(texture_index) + y}, light, FACE_PX);
+    GX_VertexLit({vec3f(+.5 - x * 0.0625 - 0.0625, -.5 + y * 0.0625 + 0.0625, -.5), TEXTURE_X(texture_index) + x + 1, TEXTURE_Y(texture_index) + y + 1}, light, FACE_PX);
+    GX_VertexLit({vec3f(+.5 - x * 0.0625, -.5 + y * 0.0625 + 0.0625, -.5), TEXTURE_X(texture_index) + x, TEXTURE_Y(texture_index) + y + 1}, light, FACE_PX);
+    GX_VertexLit({vec3f(+.5 - x * 0.0625, -.5 + y * 0.0625, -.5), TEXTURE_X(texture_index) + x, TEXTURE_Y(texture_index) + y}, light, FACE_PX);
+
+    if (x_next)
+    {
+        // Render the selected pixel.
+        GX_VertexLit({vec3f(+.5 - x * 0.0625 - 0.0625, -.5 + y * 0.0625, -.625), TEXTURE_X(texture_index) + x + 1, TEXTURE_Y(texture_index) + y}, light, FACE_PZ);
+        GX_VertexLit({vec3f(+.5 - x * 0.0625 - 0.0625, -.5 + y * 0.0625 + 0.0625, -.625), TEXTURE_X(texture_index) + x + 1, TEXTURE_Y(texture_index) + y + 1}, light, FACE_PZ);
+        GX_VertexLit({vec3f(+.5 - x * 0.0625 - 0.0625, -.5 + y * 0.0625 + 0.0625, -.5), TEXTURE_X(texture_index) + x, TEXTURE_Y(texture_index) + y + 1}, light, FACE_PZ);
+        GX_VertexLit({vec3f(+.5 - x * 0.0625 - 0.0625, -.5 + y * 0.0625, -.5), TEXTURE_X(texture_index) + x, TEXTURE_Y(texture_index) + y}, light, FACE_PZ);
+    }
+    if (y_next)
+    {
+        // Render the selected pixel.
+        GX_VertexLit({vec3f(+.5 - x * 0.0625 - 0.0625, -.5 + y * 0.0625, -.625), TEXTURE_X(texture_index) + x + 1, TEXTURE_Y(texture_index) + y}, light, FACE_PY);
+        GX_VertexLit({vec3f(+.5 - x * 0.0625 - 0.0625, -.5 + y * 0.0625, -.5), TEXTURE_X(texture_index) + x + 1, TEXTURE_Y(texture_index) + y + 1}, light, FACE_PY);
+        GX_VertexLit({vec3f(+.5 - x * 0.0625, -.5 + y * 0.0625, -.5), TEXTURE_X(texture_index) + x, TEXTURE_Y(texture_index) + y + 1}, light, FACE_PY);
+        GX_VertexLit({vec3f(+.5 - x * 0.0625, -.5 + y * 0.0625, -.625), TEXTURE_X(texture_index) + x, TEXTURE_Y(texture_index) + y}, light, FACE_PY);
+    }
+    // End the group
+    GX_EndGroup();
+}
+
 // Assuming a right-handed coordinate system and that the angles are in degrees. X = pitch, Y = yaw
 vec3f angles_to_vector(float x, float y)
 {
