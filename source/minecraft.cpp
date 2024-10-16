@@ -49,7 +49,7 @@ f32 xrot = 0.0f;
 f32 yrot = 0.0f;
 aabb_entity_t *player = nullptr;
 guVector player_pos = {0.F, 80.0F, 0.F};
-void *frameBuffer[2] = {NULL, NULL};
+void *frameBuffer[3] = {NULL, NULL, NULL};
 static GXRModeObj *rmode = NULL;
 
 bool draw_block_outline = false;
@@ -220,8 +220,10 @@ int main(int argc, char **argv)
     frameBuffer[0] = MEM_K0_TO_K1(SYS_AllocateFramebuffer(rmode));
     frameBuffer[1] = MEM_K0_TO_K1(SYS_AllocateFramebuffer(rmode));
 
-    CON_Init(frameBuffer[0], 20, 20, rmode->fbWidth, rmode->xfbHeight, rmode->fbWidth * VI_DISPLAY_PIX_SZ);
-
+#ifdef DEBUG
+    frameBuffer[2] = MEM_K0_TO_K1(SYS_AllocateFramebuffer(rmode));
+    CON_Init(frameBuffer[2], 0, 0, rmode->fbWidth, rmode->xfbHeight, rmode->fbWidth * VI_DISPLAY_PIX_SZ);
+#endif
     // Configure video
     VIDEO_Configure(rmode);
     VIDEO_SetNextFramebuffer(frameBuffer[0]);
@@ -242,8 +244,13 @@ int main(int argc, char **argv)
     GX_SetViewport(0, 0, rmode->fbWidth, rmode->efbHeight, 0, 1);
     yscale = GX_GetYScaleFactor(rmode->efbHeight, rmode->xfbHeight);
     xfbHeight = GX_SetDispCopyYScale(yscale);
+#ifdef DEBUG
+    GX_SetScissor(0, 0, rmode->fbWidth - 224, rmode->efbHeight);
+    GX_SetDispCopySrc(0, 0, rmode->fbWidth - 224, rmode->efbHeight);
+#else
     GX_SetScissor(0, 0, rmode->fbWidth, rmode->efbHeight);
     GX_SetDispCopySrc(0, 0, rmode->fbWidth, rmode->efbHeight);
+#endif
     GX_SetDispCopyDst(rmode->fbWidth, xfbHeight);
     GX_SetCopyFilter(rmode->aa, rmode->sample_pattern, GX_TRUE, rmode->vfilter);
     GX_SetFieldMode(rmode->field_rendering, ((rmode->viHeight == 2 * rmode->xfbHeight) ? GX_ENABLE : GX_DISABLE));
@@ -536,6 +543,12 @@ int main(int argc, char **argv)
         GX_DrawDone();
 
         GX_CopyDisp(frameBuffer[fb], GX_TRUE);
+#ifdef DEBUG
+        for (int i = 0; i < rmode->efbHeight; i++)
+        {
+            memcpy((char *)frameBuffer[fb] + i * rmode->viWidth * VI_DISPLAY_PIX_SZ + (rmode->viWidth - 224) * VI_DISPLAY_PIX_SZ, (char *)frameBuffer[2] + i * rmode->viWidth * VI_DISPLAY_PIX_SZ, 224 * VI_DISPLAY_PIX_SZ);
+        }
+#endif
         VIDEO_SetNextFramebuffer(frameBuffer[fb]);
         VIDEO_Flush();
         VIDEO_WaitVSync();
