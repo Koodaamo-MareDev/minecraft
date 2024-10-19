@@ -575,6 +575,7 @@ int main(int argc, char **argv)
     VIDEO_WaitVSync();
     if (HWButton != -1)
     {
+        GX_Flush();
         SYS_ResetSystem(HWButton, 0, 0);
     }
     return 0;
