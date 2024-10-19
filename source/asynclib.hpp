@@ -126,6 +126,6 @@ public:
 };
 extern async_lib *asyncLib;
 
-#define WRAP_ASYNC_FUNC(mtx, func) do {static bool __##mtx_run = 1; if (__##mtx_run) { __##mtx_run = 0; new async_func(mtx, [&]() { func; __##mtx_run = 1; }); } } while(0)
+#define WRAP_ASYNC_FUNC(mtx, func) do {static bool __##mtx##_run = 1; if (__##mtx##_run) { __##mtx##_run = 0; new async_func(mtx, [&]() { func; __##mtx##_run = 1; }); } } while(0)
 
 #endif
