@@ -12,7 +12,9 @@ public:
     bool operator==(vec3i const &a) const;
     bool operator!=(vec3i const &a) const;
     vec3i operator+(vec3i const &a) const;
+    vec3i& operator+=(vec3i const &a);
     vec3i operator-(vec3i const &a) const;
+    vec3i& operator-=(vec3i const &a);
     vec3f operator+(vec3f const &a) const;
     vec3f operator-(vec3f const &a) const;
     vec3i operator*(int const &a) const;
@@ -40,4 +42,15 @@ inline vec3i operator*(int const &a, vec3i const &b)
 {
     return b * a;
 }
+
+inline vec3i block_to_chunk_pos(vec3i pos)
+{
+    pos.x &= ~0xF;
+    pos.z &= ~0xF;
+    pos.x /= 16;
+    pos.z /= 16;
+    pos.y = 0;
+    return pos;
+}
+
 #endif

@@ -937,7 +937,7 @@ void RemoveRedundantChunks(std::deque<chunk_t *> &chunks)
     WRAP_ASYNC_FUNC(chunk_mutex, chunks.erase(
                                      std::remove_if(chunks.begin(), chunks.end(),
                                                     [](chunk_t *&c)
-                                                    {if(!c) return true; if(!c->valid) {delete c; c = nullptr; return true;} return false; }),
+                                                    {if(!c) return true; if(c->generation_stage == ChunkGenStage::invalid) {delete c; c = nullptr; return true;} return false; }),
                                      chunks.end()));
 }
 
@@ -960,7 +960,7 @@ void PrepareChunkRemoval(chunk_t *chunk)
         vbo.cached_solid.clear();
         vbo.cached_transparent.clear();
     }
-    chunk->valid = false;
+    chunk->generation_stage = ChunkGenStage::invalid;
 }
 
 void EditBlocks()
@@ -1135,9 +1135,10 @@ void CreateExplosion(vec3f pos, float power, chunk_t *near)
 void UpdateChunkData(frustum_t &frustum, std::deque<chunk_t *> &chunks)
 {
     int light_up_calls = 0;
+    WRAP_ASYNC_FUNC(chunk_mutex, for (chunk_t *&chunk : chunks) if (chunk && chunk->generation_stage == ChunkGenStage::features) if (try_generate_features(chunk)) break;);
     for (chunk_t *&chunk : chunks)
     {
-        if (chunk && chunk->valid)
+        if (chunk && (chunk->generation_stage == ChunkGenStage::done || chunk->generation_stage == ChunkGenStage::features))
         {
             float hdistance = std::max(std::abs((chunk->x * 16 + 8) - player_pos.x), std::abs((chunk->z * 16 + 8) - player_pos.z));
             if (hdistance > RENDER_DISTANCE * 16)
@@ -1185,7 +1186,7 @@ void UpdateChunkVBOs(std::deque<chunk_t *> &chunks)
     {
         for (chunk_t *&chunk : chunks)
         {
-            if (chunk && chunk->valid && !chunk->light_update_count)
+            if (chunk && chunk->generation_stage == ChunkGenStage::done && !chunk->light_update_count)
             {
                 // Check if chunk has other chunks around it.
                 bool surrounding = true;
@@ -1470,7 +1471,7 @@ void DrawScene(std::deque<chunk_t *> &chunks, bool transparency)
     {
         for (chunk_t *&chunk : chunks)
         {
-            if (chunk && chunk->valid && chunk->lit_state)
+            if (chunk && chunk->generation_stage == ChunkGenStage::done && chunk->lit_state)
             {
                 for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
                 {
@@ -1493,7 +1494,7 @@ void DrawScene(std::deque<chunk_t *> &chunks, bool transparency)
     {
         for (chunk_t *&chunk : chunks)
         {
-            if (chunk && chunk->valid && chunk->lit_state)
+            if (chunk && chunk->generation_stage == ChunkGenStage::done && chunk->lit_state)
             {
                 for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
                 {

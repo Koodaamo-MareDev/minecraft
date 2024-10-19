@@ -61,16 +61,6 @@ std::deque<chunk_t *> &get_chunks()
     return chunks;
 }
 
-vec3i block_to_chunk_pos(vec3i pos)
-{
-    pos.x &= ~0xF;
-    pos.z &= ~0xF;
-    pos.x /= 16;
-    pos.z /= 16;
-    pos.y = 0;
-    return pos;
-}
-
 chunk_t *get_chunk_from_pos(const vec3i &pos, bool load, bool write_cache)
 {
     return get_chunk(block_to_chunk_pos(pos), load, write_cache);
@@ -88,7 +78,7 @@ chunk_t *get_chunk(const vec3i &pos, bool load, bool write_cache)
         return nullptr;
     }
     chunk_t *chunk = *it;
-    if (LWP_GetSelf() != GX_GetCurrentGXThread())
+    if (LWP_GetSelf() != GX_GetCurrentGXThread() && it != chunks.begin())
         std::swap(*it, chunks.front());
 
     return chunk;
@@ -125,8 +115,9 @@ void add_chunk(vec3i pos)
         {
             chunk->x = pos.x;
             chunk->z = pos.z;
+            chunk->generation_stage = ChunkGenStage::empty;
             pending_chunks.push_back(chunk);
-            // std::sort(pending_chunks.begin(), pending_chunks.end(), chunk_sorter);
+            std::sort(pending_chunks.begin(), pending_chunks.end(), chunk_sorter);
         }
         in_progress = false;
     };
@@ -166,10 +157,10 @@ inline void treerand(int x, int z, uint32_t *output, uint32_t count)
     }
 }
 
-inline void plant_tree(vec3i position, chunk_t *chunk, int height)
+inline void plant_tree(vec3i position, int height)
 {
-    block_t *base_block = chunk->get_block(position - vec3i(0, 1, 0));
-    if (base_block->get_blockid() != BlockID::grass)
+    block_t *base_block = get_block_at(position - vec3i(0, 1, 0));
+    if (!base_block || base_block->get_blockid() != BlockID::grass)
         return;
 
     // Place dirt below tree
@@ -182,7 +173,7 @@ inline void plant_tree(vec3i position, chunk_t *chunk, int height)
             for (int z = -2; z <= 2; z++)
             {
                 vec3i leaves_pos = position + vec3i(x, y, z);
-                chunk->replace_air(leaves_pos, BlockID::leaves);
+                replace_air_at(leaves_pos, BlockID::leaves);
             }
     }
     // Place narrow part of leaves
@@ -196,41 +187,134 @@ inline void plant_tree(vec3i position, chunk_t *chunk, int height)
                 // Place the leaves in a "+" pattern at the top.
                 if (y == height && (x | z) && std::abs(x) == std::abs(z))
                     continue;
-                chunk->replace_air(position + leaves_off, BlockID::leaves);
+                replace_air_at(position + leaves_off, BlockID::leaves);
             }
         }
     }
     // Place tree logs
     for (int y = 0; y < height; y++)
     {
-        chunk->set_block(position, BlockID::wood);
+        set_block_at(position, BlockID::wood);
         ++position.y;
     }
 }
 
-inline void generate_trees(chunk_t *chunk)
+inline void generate_trees(vec3i pos)
 {
     static uint32_t tree_positions[WORLDGEN_TREE_ATTEMPTS];
-    treerand(chunk->x, chunk->z, tree_positions, WORLDGEN_TREE_ATTEMPTS);
+    treerand(pos.x, pos.z, tree_positions, WORLDGEN_TREE_ATTEMPTS);
     for (uint32_t c = 0; c < WORLDGEN_TREE_ATTEMPTS; c++)
     {
         uint32_t tree_value = tree_positions[c];
         vec3i tree_pos((tree_value & 15), 0, ((tree_value >> 24) & 15));
 
-        // Dirty fix: Just don't place trees at chunk borders
-        if (tree_pos.x < 2 || tree_pos.x > 13 || tree_pos.z < 2 || tree_pos.z > 13)
-            continue;
-
         // Place the trees on above ground.
-        tree_pos.y = chunk->height_map[tree_pos.x | (tree_pos.z << 4)] + 1;
+        tree_pos.y = skycast(pos + tree_pos);
+        tree_pos += vec3i(pos.x, 1, pos.z);
 
         // Trees should only grow on top of the sea level
         if (tree_pos.y >= 64)
         {
             int tree_height = (tree_value >> 28) & 3;
-            plant_tree(tree_pos, chunk, 3 + tree_height);
+            plant_tree(tree_pos, 3 + tree_height);
         }
     }
+}
+
+void generate_vein(vec3i pos, BlockID id)
+{
+    for (int x = pos.x; x < pos.x + 2; x++)
+    {
+        for (int y = pos.y; y < pos.y + 2; y++)
+        {
+            for (int z = pos.z; z < pos.z + 2; z++)
+            {
+                if (JavaLCGIntN(2) == 0)
+                {
+                    vec3i pos(x, y, z);
+                    block_t *block = get_block_at(pos);
+                    if (block && block->get_blockid() == BlockID::stone)
+                    {
+                        block->set_blockid(id);
+                    }
+                }
+            }
+        }
+    }
+}
+
+void generate_ore_type(vec3i neighbor_pos, BlockID id, int count, int max_height)
+{
+    for (int i = 0; i < count; i++)
+    {
+        int x = JavaLCGIntN(16);
+        int y = JavaLCGIntN(80);
+        int z = JavaLCGIntN(16);
+        vec3i pos(x + neighbor_pos.x, y, z + neighbor_pos.z);
+        if (y > max_height)
+            continue;
+        generate_vein(pos, id);
+        block_t *block = get_block_at(pos);
+        x = JavaLCGIntN(3) - 1;
+        y = JavaLCGIntN(3) - 1;
+        z = JavaLCGIntN(3) - 1;
+        if (block && block->get_blockid() == id && (x | y | z) != 0)
+        {
+            pos = vec3i(x + pos.x, y + pos.y, z + pos.z);
+            generate_vein(pos, id);
+        }
+    }
+}
+
+void generate_ores(vec3i neighbor_pos)
+{
+    int coal_count = JavaLCGIntN(8) + 16;
+    int iron_count = JavaLCGIntN(4) + 8;
+    int gold_count = JavaLCGIntN(4) + 8;
+    int diamond_count = JavaLCGIntN(4) + 8;
+
+    generate_ore_type(neighbor_pos, BlockID::coal_ore, coal_count, 80);
+    generate_ore_type(neighbor_pos, BlockID::iron_ore, iron_count, 56);
+    generate_ore_type(neighbor_pos, BlockID::gold_ore, gold_count, 32);
+    generate_ore_type(neighbor_pos, BlockID::diamond_ore, diamond_count, 12);
+}
+
+void generate_features(chunk_t *chunk)
+{
+    JavaLCGInit(chunk->x * 0x4F9939F508L + chunk->z * 0x1F38D3E7L + cavegen_seed);
+    vec3i block_pos(chunk->x * 16, 0, chunk->z * 16);
+    generate_ores(block_pos);
+    generate_trees(block_pos);
+}
+
+bool try_generate_features(chunk_t *chunk)
+{
+    // Get the neighboring chunks for features generation
+    for (int32_t x = chunk->x - 1; x <= chunk->x + 1; x++)
+    {
+        for (int32_t z = chunk->z - 1; z <= chunk->z + 1; z++)
+        {
+            if (!get_chunk(vec3i(x, 0, z), false, false))
+                return false; // Not all neighbors are loaded
+        }
+    }
+
+    generate_features(chunk);
+
+    chunk_t *neighbor_chunks[4];
+    neighbor_chunks[0] = get_chunk(vec3i(chunk->x + 1, 0, chunk->z), false, false);
+    neighbor_chunks[1] = get_chunk(vec3i(chunk->x - 1, 0, chunk->z), false, false);
+    neighbor_chunks[2] = get_chunk(vec3i(chunk->x, 0, chunk->z + 1), false, false);
+    neighbor_chunks[3] = get_chunk(vec3i(chunk->x, 0, chunk->z - 1), false, false);
+    chunk_t **c = neighbor_chunks;
+    for (int i = 0; i < 4; i++, c++)
+        if (*c)
+            for (int vbo_y = 0; vbo_y < 16; vbo_y++)
+                (*c)->vbos[vbo_y].dirty = true;
+
+    chunk->generation_stage = ChunkGenStage::done;
+
+    return true;
 }
 
 void generate_chunk()
@@ -238,8 +322,11 @@ void generate_chunk()
     if (pending_chunks.size() == 0)
         return;
     chunk_t *chunk = pending_chunks.back();
-    if (!chunk || chunk->valid)
+    if (!chunk || chunk->generation_stage != ChunkGenStage::empty)
         return;
+
+    chunk->generation_stage = ChunkGenStage::heightmap;
+
     int x_offset = (chunk->x * 16);
     int z_offset = (chunk->z * 16);
     int index = 0;
@@ -248,14 +335,11 @@ void generate_chunk()
     // the amount of unnecessary calls to the noise generator.
     uint8_t max_height = 0;
 
-    static float chunk_noise_set[9];
     static float terrain_noise[4096];
     static float sand_noise[256];
 
     vec3i noise_block_pos(x_offset, 512, z_offset);
     vec3f noise_pos(x_offset - 1, 384, z_offset - 1);
-    improved_noise.GetNoiseSet(noise_pos, vec3i(2, 1, 2), 128, 1, chunk_noise_set);
-    float avg_chunk_noise = (chunk_noise_set[0] + chunk_noise_set[1] + chunk_noise_set[2] + chunk_noise_set[3]) * 0.25;
     noise_pos.x++;
     noise_pos.z++;
     noise_pos.y = 512;
@@ -278,8 +362,7 @@ void generate_chunk()
     {
         for (int x = 0; x < 16; x++, index++)
         {
-            vfloat_t dist = avg_chunk_noise < 0.005 ? 1.0 - (((z - 8) * (z - 8) + (x - 8) * (x - 8)) * 0.00025 - avg_chunk_noise) : 0.0;
-
+            vfloat_t dist = 0;
             uint8_t height = uint8_t((dist + terrain_noise[index]) * 32) + 48;
             chunk->height_map[index] = height;
             max_height = std::max(height, max_height);
@@ -323,6 +406,8 @@ void generate_chunk()
             }
         }
     }
+    chunk->generation_stage = ChunkGenStage::cavegen;
+
     // Carve caves
     JavaLCGInit(cavegen_seed);
     off_x = (JavaLCG() / 2L) * 2L + 1L;
@@ -351,8 +436,9 @@ void generate_chunk()
         block->set_blockid(carved[i]);
     }
 
+    chunk->generation_stage = ChunkGenStage::features;
+
     usleep(100);
-    generate_trees(chunk);
 
     // Reset chunk heightmap for further use.
     memset(chunk->height_map, 0, 256);
@@ -364,25 +450,10 @@ void generate_chunk()
         delete chunk;
         return;
     }
-    chunk->valid = true;
+
     lock_t chunk_lock(chunk_mutex);
     chunks.push_back(chunk);
-    pending_chunks.erase(
-        std::remove_if(pending_chunks.begin(), pending_chunks.end(),
-                       [](chunk_t *&c)
-                       { return !c || c->valid; }),
-        pending_chunks.end());
-    chunk_lock.unlock();
-    chunk_t *neighbor_chunks[4];
-    neighbor_chunks[0] = get_chunk(vec3i(chunk->x + 1, 0, chunk->z), false, false);
-    neighbor_chunks[1] = get_chunk(vec3i(chunk->x - 1, 0, chunk->z), false, false);
-    neighbor_chunks[2] = get_chunk(vec3i(chunk->x, 0, chunk->z + 1), false, false);
-    neighbor_chunks[3] = get_chunk(vec3i(chunk->x, 0, chunk->z - 1), false, false);
-    chunk_t **c = neighbor_chunks;
-    for (int i = 0; i < 4; i++, c++)
-        if (*c)
-            for (int vbo_y = 0; vbo_y < 16; vbo_y++)
-                (*c)->vbos[vbo_y].dirty = true;
+    pending_chunks.erase(std::find(pending_chunks.begin(), pending_chunks.end(), chunk));
 }
 
 void print_chunk_status()
@@ -449,6 +520,20 @@ block_t *get_block_at(const vec3i &position, chunk_t *near)
     if (!chunk)
         return nullptr;
     return chunk->get_block(position);
+}
+
+void set_block_at(const vec3i &pos, BlockID id, chunk_t *near)
+{
+    block_t *block = get_block_at(pos, near);
+    if (block)
+        block->set_blockid(id);
+}
+
+void replace_air_at(vec3i pos, BlockID id, chunk_t *near)
+{
+    block_t *block = get_block_at(pos, near);
+    if (block && block->get_blockid() == BlockID::air)
+        block->set_blockid(id);
 }
 
 void chunk_t::update_height_map(vec3i pos)
