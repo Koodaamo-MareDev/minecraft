@@ -68,6 +68,7 @@ void aabb_entity_t::tick()
     vec3f fluid_velocity = vec3f(0, 0, 0);
     bool water_movement = false;
     bool lava_movement = false;
+    bool cobweb_movement = false;
     aabb_t fluid_aabb = aabb;
     fluid_aabb.min.y += 0.4;
     fluid_aabb.max.y -= 0.4;
@@ -81,11 +82,13 @@ void aabb_entity_t::tick()
             {
                 vec3i block_pos = vec3i(x, y, z);
                 block_t *block = get_block_at(block_pos, chunk);
+                if (!block->intersects(fluid_aabb, block_pos))
+                    continue;
+                if (block->get_blockid() == BlockID::cobweb)
+                    cobweb_movement = true;
                 if (!block || !is_fluid(block->get_blockid()))
                     continue;
                 if (y + 1 - get_fluid_height(block_pos, block->get_blockid(), chunk) >= max.y)
-                    continue;
-                if (!block->intersects(fluid_aabb, block_pos))
                     continue;
                 fluid_velocity = fluid_velocity + get_fluid_direction(block, block_pos);
                 BlockID base_fluid = basefluid(block->get_blockid());
@@ -179,6 +182,9 @@ void aabb_entity_t::tick()
 
         velocity = velocity + (fluid_velocity.normalize() * 0.004);
 
+        if (cobweb_movement)
+            velocity = velocity * 0.25;
+
         move_and_check_collisions();
 
         if (water_movement)
@@ -226,6 +232,8 @@ void aabb_entity_t::tick()
         {
             velocity.y = 0.42;
         }
+        if (cobweb_movement)
+            velocity = velocity * 0.25;
         move_and_check_collisions();
 
         // Gravity can be applied in different phases - before or after applying friction
