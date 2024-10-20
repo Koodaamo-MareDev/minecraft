@@ -506,6 +506,47 @@ void torch_aabb(const vec3i &pos, block_t *block, const aabb_t &other, std::vect
         aabb_list.push_back(aabb);
 }
 
+void mushroom_aabb(const vec3i &pos, block_t *block, const aabb_t &other, std::vector<aabb_t> &aabb_list)
+{
+    aabb_t aabb;
+    constexpr vfloat_t offset = 0.25;
+    constexpr vfloat_t width = 0.5;
+    constexpr vfloat_t height = 0.375;
+    
+    aabb.min = vec3f(pos.x + offset, pos.y, pos.z + offset);
+    aabb.max = aabb.min + vec3f(width, height, width);
+
+    if (aabb.intersects(other))
+        aabb_list.push_back(aabb);
+}
+
+void flower_aabb(const vec3i &pos, block_t *block, const aabb_t &other, std::vector<aabb_t> &aabb_list)
+{
+    aabb_t aabb;
+    constexpr vfloat_t offset = 0.3125;
+    constexpr vfloat_t width = 0.375;
+    constexpr vfloat_t height = 0.625;
+    
+    aabb.min = vec3f(pos.x + offset, pos.y, pos.z + offset);
+    aabb.max = aabb.min + vec3f(width, height, width);
+
+    if (aabb.intersects(other))
+        aabb_list.push_back(aabb);
+}
+
+void flat_aabb(const vec3i &pos, block_t *block, const aabb_t &other, std::vector<aabb_t> &aabb_list)
+{
+    aabb_t aabb;
+    constexpr vfloat_t width = 1.0;
+    constexpr vfloat_t height = 0.0625;
+    
+    aabb.min = vec3f(pos.x, pos.y, pos.z);
+    aabb.max = aabb.min + vec3f(width, height, width);
+
+    if (aabb.intersects(other))
+        aabb_list.push_back(aabb);
+}
+
 blockproperties_t block_properties[256] = {
     blockproperties_t().id(BlockID::air).opacity(0).solid(false).transparent(true).collision(CollisionType::none).valid_item(false),
     blockproperties_t().id(BlockID::stone).texture(0).sound(SoundType::stone),
@@ -534,8 +575,8 @@ blockproperties_t block_properties[256] = {
     blockproperties_t().id(BlockID::sandstone).texture(176).sound(SoundType::stone).render_type(RenderType::full_special),
     blockproperties_t().id(BlockID::note_block).texture(74).sound(SoundType::wood),
     blockproperties_t().id(BlockID::bed).texture(134).transparent(true).solid(false).opacity(0).sound(SoundType::stone).render_type(RenderType::special).valid_item(false),
-    blockproperties_t().id(BlockID::golden_rail).texture(163).opacity(0).transparent(true).solid(false).sound(SoundType::metal).render_type(RenderType::flat_ground).collision(CollisionType::none),
-    blockproperties_t().id(BlockID::detector_rail).texture(179).opacity(0).transparent(true).solid(false).sound(SoundType::metal).render_type(RenderType::flat_ground).collision(CollisionType::none),
+    blockproperties_t().id(BlockID::golden_rail).texture(163).opacity(0).transparent(true).solid(false).sound(SoundType::metal).aabb(flat_aabb).render_type(RenderType::flat_ground).collision(CollisionType::none),
+    blockproperties_t().id(BlockID::detector_rail).texture(179).opacity(0).transparent(true).solid(false).sound(SoundType::metal).aabb(flat_aabb).render_type(RenderType::flat_ground).collision(CollisionType::none),
     blockproperties_t().id(BlockID::sticky_piston).state(0x0B).texture(106).solid(false).sound(SoundType::stone).render_type(RenderType::full_special),
     blockproperties_t().id(BlockID::cobweb).texture(11).solid(false).opacity(0).transparent(true).sound(SoundType::stone).render_type(RenderType::cross).collision(CollisionType::none),
     blockproperties_t().id(BlockID::deadbush).texture(55).solid(false).opacity(0).transparent(true).sound(SoundType::grass).render_type(RenderType::cross).collision(CollisionType::none),
@@ -543,10 +584,10 @@ blockproperties_t block_properties[256] = {
     blockproperties_t().id(BlockID::piston_head).texture(107).solid(false).sound(SoundType::stone).valid_item(false),
     blockproperties_t().id(BlockID::wool).texture(64).sound(SoundType::cloth),
     blockproperties_t().id(BlockID::piston_extension).texture(0).solid(false).sound(SoundType::stone).valid_item(false),
-    blockproperties_t().id(BlockID::dandelion).texture(13).solid(false).opacity(0).transparent(true).sound(SoundType::grass).render_type(RenderType::cross).collision(CollisionType::none),
-    blockproperties_t().id(BlockID::rose).texture(12).solid(false).opacity(0).transparent(true).sound(SoundType::grass).render_type(RenderType::cross).collision(CollisionType::none),
-    blockproperties_t().id(BlockID::brown_mushroom).texture(29).solid(false).opacity(0).transparent(true).sound(SoundType::grass).render_type(RenderType::cross).collision(CollisionType::none),
-    blockproperties_t().id(BlockID::red_mushroom).texture(28).solid(false).opacity(0).transparent(true).sound(SoundType::grass).render_type(RenderType::cross).collision(CollisionType::none),
+    blockproperties_t().id(BlockID::dandelion).texture(13).solid(false).opacity(0).transparent(true).sound(SoundType::grass).aabb(flower_aabb).render_type(RenderType::cross).collision(CollisionType::none),
+    blockproperties_t().id(BlockID::rose).texture(12).solid(false).opacity(0).transparent(true).sound(SoundType::grass).aabb(flower_aabb).render_type(RenderType::cross).collision(CollisionType::none),
+    blockproperties_t().id(BlockID::brown_mushroom).texture(29).solid(false).opacity(0).transparent(true).sound(SoundType::grass).aabb(mushroom_aabb).render_type(RenderType::cross).collision(CollisionType::none),
+    blockproperties_t().id(BlockID::red_mushroom).texture(28).solid(false).opacity(0).transparent(true).sound(SoundType::grass).aabb(mushroom_aabb).render_type(RenderType::cross).collision(CollisionType::none),
     blockproperties_t().id(BlockID::gold_block).texture(23).sound(SoundType::metal),
     blockproperties_t().id(BlockID::iron_block).texture(22).sound(SoundType::metal),
     blockproperties_t().id(BlockID::double_stone_slab).texture(6).sound(SoundType::stone).render_type(RenderType::full_special),
@@ -561,7 +602,7 @@ blockproperties_t block_properties[256] = {
     blockproperties_t().id(BlockID::mob_spawner).texture(65).solid(false).opacity(0).transparent(true).sound(SoundType::metal),
     blockproperties_t().id(BlockID::oak_stairs).texture(4).solid(false).sound(SoundType::wood),
     blockproperties_t().id(BlockID::chest).texture(27).sound(SoundType::wood).render_type(RenderType::full_special),
-    blockproperties_t().id(BlockID::redstone_wire).texture(164).solid(false).opacity(0).transparent(true).sound(SoundType::stone).render_type(RenderType::flat_ground).valid_item(false).collision(CollisionType::none),
+    blockproperties_t().id(BlockID::redstone_wire).texture(164).solid(false).opacity(0).transparent(true).sound(SoundType::stone).aabb(flat_aabb).render_type(RenderType::flat_ground).valid_item(false).collision(CollisionType::none),
     blockproperties_t().id(BlockID::diamond_ore).texture(50).sound(SoundType::stone),
     blockproperties_t().id(BlockID::diamond_block).texture(24).sound(SoundType::metal),
 
