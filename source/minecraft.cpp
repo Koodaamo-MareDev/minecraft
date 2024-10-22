@@ -76,6 +76,10 @@ float wiimote_x = 0;
 float wiimote_z = 0;
 float wiimote_rx = 0;
 float wiimote_ry = 0;
+u32 raw_wiimote_down = 0;
+u32 raw_wiimote_held = 0;
+vec3f left_stick(0, 0, 0);
+vec3f right_stick(0, 0, 0);
 int shoulder_btn_frame_counter = 0;
 float prev_left_shoulder = 0;
 float prev_right_shoulder = 0;
@@ -89,6 +93,8 @@ vec3f view_bob_screen_offset(0, 0, 0);
 particle_system_t particle_system;
 sound_system_t *sound_system = nullptr;
 
+int cursor_x = 0;
+int cursor_y = 0;
 bool inventory_visible = false;
 bool show_dirtscreen = true;
 bool has_loaded = false;
@@ -382,10 +388,10 @@ int main(int argc, char **argv)
             background = in_lava ? GXColor{0xFF, 0, 0, 0xFF} : GXColor{0, 0, 0xFF, 0xFF};
             GX_SetCopyClear(background, 0x00FFFFFF);
             float fog_multiplier = in_lava ? 0.05f : 0.6f;
-            use_fog(true, viewport, background, fog_depth_multiplier * fog_multiplier * (GENERATION_DISTANCE * 0.5f - 8), fog_depth_multiplier * fog_multiplier * (GENERATION_DISTANCE * 0.5f));
+            use_fog(true, viewport, background, fog_depth_multiplier * fog_multiplier * (RENDER_DISTANCE * 5.5f - 8), fog_depth_multiplier * fog_multiplier * (RENDER_DISTANCE * 5.5f));
         }
         else
-            use_fog(true, viewport, background, fog_depth_multiplier * (GENERATION_DISTANCE * 0.5f - 8), fog_depth_multiplier * (GENERATION_DISTANCE * 0.5f));
+            use_fog(true, viewport, background, fog_depth_multiplier * (RENDER_DISTANCE * 5.5f - 8), fog_depth_multiplier * (RENDER_DISTANCE * 5.5f));
 
         UpdateLightDir();
 
@@ -622,8 +628,8 @@ void GetInput()
 {
     WPAD_ScanPads();
     static u32 prev_nunchuk_held = 0;
-    u32 raw_wiimote_down = WPAD_ButtonsDown(0);
-    u32 raw_wiimote_held = WPAD_ButtonsHeld(0);
+    raw_wiimote_down = WPAD_ButtonsDown(0);
+    raw_wiimote_held = WPAD_ButtonsHeld(0);
     if ((raw_wiimote_down & (WPAD_BUTTON_HOME | WPAD_CLASSIC_BUTTON_HOME)))
         isExiting = true;
     if ((raw_wiimote_down & WPAD_BUTTON_1))
@@ -637,22 +643,10 @@ void GetInput()
         tickCounter += 6000;
     }
 
-    if (player && (raw_wiimote_down & WPAD_CLASSIC_BUTTON_DOWN) != 0)
-    {
-        // Spawn a creeper at the player's position
-        vec3f pos = player->get_position(std::fmod(partialTicks, 1));
-        chunk_t *creeper_chunk = get_chunk_from_pos(vec3i(pos.x, pos.y, pos.z), false, false);
-        if (creeper_chunk)
-        {
-            creeper_entity_t *creeper = new creeper_entity_t(pos);
-            creeper->chunk = creeper_chunk;
-            creeper_chunk->entities.push_back(creeper);
-        }
-    }
     expansion_t expansion;
     WPAD_Expansion(0, &expansion);
-    vec3f left_stick(0, 0, 0);
-    vec3f right_stick(0, 0, 0);
+    left_stick = vec3f(0, 0, 0);
+    right_stick = vec3f(0, 0, 0);
     float sensitivity = LOOKAROUND_SENSITIVITY;
     if (expansion.type == WPAD_EXP_NONE || expansion.type == WPAD_EXP_UNKNOWN)
     {
@@ -924,6 +918,9 @@ void GenerateChunks(int count)
     {
         for (int z = start_z; count && z <= end_z; z += 16)
         {
+            float hdistance = std::max(std::abs((x + 8) - player_pos.x), std::abs((z + 8) - player_pos.z));
+            if (hdistance > RENDER_DISTANCE * 16 + 16)
+                continue;
             if (!get_chunk_from_pos(vec3i(x, 0, z), true, false))
             {
                 count--;
@@ -1142,7 +1139,7 @@ void UpdateChunkData(frustum_t &frustum, std::deque<chunk_t *> &chunks)
         if (chunk && (chunk->generation_stage == ChunkGenStage::done || chunk->generation_stage == ChunkGenStage::features))
         {
             float hdistance = std::max(std::abs((chunk->x * 16 + 8) - player_pos.x), std::abs((chunk->z * 16 + 8) - player_pos.z));
-            if (hdistance > RENDER_DISTANCE * 16)
+            if (hdistance > RENDER_DISTANCE * 16 + 16)
             {
                 PrepareChunkRemoval(chunk);
                 continue;
@@ -1198,7 +1195,7 @@ void UpdateChunkVBOs(std::deque<chunk_t *> &chunks)
                         i = 4;
                     // Check if the surrounding chunk exists and has no lighting updates pending
                     chunk_t *surrounding_chunk = get_chunk(vec3i(chunk->x + face_offsets[i].x, 0, chunk->z + face_offsets[i].z), false);
-                    if (!surrounding_chunk || surrounding_chunk->light_update_count)
+                    if (!surrounding_chunk || surrounding_chunk->light_update_count || surrounding_chunk->generation_stage != ChunkGenStage::done)
                     {
                         surrounding = false;
                         break;
@@ -1263,6 +1260,20 @@ void UpdateChunkVBOs(std::deque<chunk_t *> &chunks)
 
 void UpdateScene(frustum_t &frustum, std::deque<chunk_t *> &chunks)
 {
+
+    if (!inventory_visible && player && (raw_wiimote_down & WPAD_CLASSIC_BUTTON_DOWN) != 0)
+    {
+        // Spawn a creeper at the player's position
+        vec3f pos = player->get_position(std::fmod(partialTicks, 1));
+        chunk_t *creeper_chunk = get_chunk_from_pos(vec3i(pos.x, pos.y, pos.z), false, false);
+        if (creeper_chunk)
+        {
+            creeper_entity_t *creeper = new creeper_entity_t(pos);
+            creeper->chunk = creeper_chunk;
+            creeper_chunk->entities.push_back(creeper);
+        }
+    }
+
     if (!light_engine_busy())
         GenerateChunks(1);
     RemoveRedundantChunks(chunks);
@@ -1368,6 +1379,72 @@ void DrawInventory(view_t &viewport)
             render_single_item(texture_index, true);
         }
     }
+
+    GX_LoadPosMtxImm(inventory_flat_matrix, GX_PNMTX0);
+
+    cursor_x += left_stick.x * 8;
+    cursor_y -= left_stick.y * 8;
+
+    int slot_x = (cursor_x + 162) / 36;
+    int slot_y = (cursor_y + 186) / 36;
+
+    if (raw_wiimote_down & WPAD_CLASSIC_BUTTON_LEFT)
+        slot_x--;
+    if (raw_wiimote_down & WPAD_CLASSIC_BUTTON_RIGHT)
+        slot_x++;
+    if (raw_wiimote_down & WPAD_CLASSIC_BUTTON_UP)
+        slot_y--;
+    if (raw_wiimote_down & WPAD_CLASSIC_BUTTON_DOWN)
+        slot_y++;
+    if (slot_x < 0)
+        slot_x = 0;
+    if (slot_x > 8)
+        slot_x = 8;
+    if (slot_y < 0)
+        slot_y = 0;
+    if (slot_y > 5)
+        slot_y = 5;
+
+    if ((raw_wiimote_down & (WPAD_CLASSIC_BUTTON_LEFT | WPAD_CLASSIC_BUTTON_RIGHT | WPAD_CLASSIC_BUTTON_UP | WPAD_CLASSIC_BUTTON_DOWN)))
+    {
+        cursor_x = slot_x * 36 - 162 + 18;
+        cursor_y = slot_y * 36 - 186 + 18;
+    }
+
+    if (cursor_x < -176)
+        cursor_x = -176;
+    if (cursor_x > 176)
+        cursor_x = 176;
+    if (cursor_y < -220)
+        cursor_y = -220;
+    if (cursor_y > 220)
+        cursor_y = 220;
+
+    if (raw_wiimote_down & WPAD_CLASSIC_BUTTON_B)
+    {
+        int index = slot_x + slot_y * 9;
+        if (index >= 0 && index < 54)
+        {
+            selected_block.id = 0;
+            for (int i = 0; i <= index; i++)
+            {
+                do
+                {
+                    selected_block.id++;
+                } while (!properties(selected_block.id).m_valid_item);
+            }
+            selected_block.meta = properties(selected_block.id).m_default_state;
+        }
+    }
+
+    // Disable backface culling for the cursor
+    GX_SetCullMode(GX_CULL_NONE);
+
+    // Enable direct colors
+    GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
+
+    // Draw the cursor
+    draw_textured_quad(icons_texture, cursor_x - 16, cursor_y - 16, 32, 32, 0, 32, 32, 64);
 }
 
 void DrawSelectedBlock()
