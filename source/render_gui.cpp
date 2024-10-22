@@ -5,12 +5,6 @@ int draw_textured_quad(GXTexObj &texture, int32_t x, int32_t y, int32_t w, int32
     use_texture(texture);
     float scale_u = float(BASE3D_UV_FRAC) / GX_GetTexObjWidth(&texture);
     float scale_v = float(BASE3D_UV_FRAC) / GX_GetTexObjHeight(&texture);
-    if (u1 < 0)
-        --u1;
-    if (u2 < 0)
-        --u2;
-    if (v1 < 0)
-        --v1;
     u1 *= scale_u;
     u2 *= scale_u;
     v1 *= scale_v;

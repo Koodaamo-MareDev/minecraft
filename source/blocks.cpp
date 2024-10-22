@@ -57,7 +57,7 @@ uint32_t get_face_texture_index(block_t *block, int face)
             return 202;
         case FACE_NY:
             return 2;
-        case FACE_PY:
+        default:
             return 203;
         }
     }
