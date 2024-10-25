@@ -383,15 +383,14 @@ int main(int argc, char **argv)
             }
         }
         // Enable fog
+        float fog_multiplier = 1.0f;
         if (in_fluid)
         {
             background = in_lava ? GXColor{0xFF, 0, 0, 0xFF} : GXColor{0, 0, 0xFF, 0xFF};
             GX_SetCopyClear(background, 0x00FFFFFF);
-            float fog_multiplier = in_lava ? 0.05f : 0.6f;
-            use_fog(true, viewport, background, fog_depth_multiplier * fog_multiplier * (RENDER_DISTANCE * 5.5f - 8), fog_depth_multiplier * fog_multiplier * (RENDER_DISTANCE * 5.5f));
+            fog_multiplier = in_lava ? 0.05f : 0.6f;
         }
-        else
-            use_fog(true, viewport, background, fog_depth_multiplier * (RENDER_DISTANCE * 5.5f - 8), fog_depth_multiplier * (RENDER_DISTANCE * 5.5f));
+        use_fog(true, viewport, background, fog_depth_multiplier * fog_multiplier * (RENDER_DISTANCE * 5.5f - 8), fog_depth_multiplier * fog_multiplier * (RENDER_DISTANCE * 5.5f));
 
         UpdateLightDir();
 
