@@ -102,7 +102,7 @@ public:
 
     float player_taxicab_distance()
     {
-        return std::abs(this->x - player_pos.x) + std::abs(this->y - player_pos.y) + std::abs(this->z - player_pos.z);
+        return std::abs((this->x & ~15) - (int(player_pos.x) & ~15)) + std::abs((this->y & ~15) - (int(player_pos.y) & ~15)) + std::abs((this->z & ~15) - (int(player_pos.z) & ~15));
     }
 
     bool operator<(chunkvbo_t &other)
@@ -122,6 +122,7 @@ public:
     uint8_t lit_state = 0;
     block_t blockstates[16 * 16 * 256] = {0};
     uint8_t height_map[16 * 16] = {0};
+    uint8_t terrain_map[16 * 16] = {0};
     chunkvbo_t vbos[VERTICAL_SECTION_COUNT];
     uint8_t has_fluid_updates[VERTICAL_SECTION_COUNT] = {1};
     uint32_t light_update_count = 0;
@@ -207,7 +208,7 @@ public:
 
     float player_taxicab_distance()
     {
-        return std::abs(this->x - player_pos.x) + std::abs(this->z - player_pos.z);
+        return std::abs((this->x << 4) - (int(player_pos.x) & ~15)) + std::abs((this->z << 4) - (int(player_pos.z) & ~15));
     }
 
     bool operator<(chunk_t &other)
@@ -267,7 +268,6 @@ chunk_t *get_chunk_from_pos(const vec3i &pos, bool load, bool write_cache = true
 chunk_t *get_chunk(const vec3i &pos, bool load, bool write_cache = true);
 void add_chunk(vec3i pos);
 void generate_chunk();
-bool try_generate_features(chunk_t *chunk);
 void *get_aligned_pointer_32(void *ptr);
 void get_neighbors(const vec3i &pos, block_t **neighbors, chunk_t *near = nullptr);
 void update_block_at(const vec3i &pos);

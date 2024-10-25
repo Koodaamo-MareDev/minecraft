@@ -53,7 +53,12 @@ bool has_pending_chunks()
 
 bool chunk_sorter(chunk_t *&a, chunk_t *&b)
 {
-    return !(*a < *b);
+    return (*a < *b);
+}
+
+bool chunk_sorter_reverse(chunk_t *&a, chunk_t *&b)
+{
+    return (*b < *a);
 }
 
 std::deque<chunk_t *> &get_chunks()
@@ -117,12 +122,13 @@ void add_chunk(vec3i pos)
             chunk->z = pos.z;
             chunk->generation_stage = ChunkGenStage::empty;
             pending_chunks.push_back(chunk);
-            std::sort(pending_chunks.begin(), pending_chunks.end(), chunk_sorter);
+            std::sort(pending_chunks.begin(), pending_chunks.end(), chunk_sorter_reverse);
         }
         in_progress = false;
     };
     in_progress = true;
-    new async_func(chunk_mutex, add_later);
+    add_later();
+    // new async_func(chunk_mutex, add_later);
 }
 
 inline bool in_range(int x, int min, int max)
@@ -157,10 +163,13 @@ inline void treerand(int x, int z, uint32_t *output, uint32_t count)
     }
 }
 
-inline void plant_tree(vec3i position, int height)
+inline void plant_tree(vec3i position, int height, chunk_t *chunk)
 {
-    block_t *base_block = get_block_at(position - vec3i(0, 1, 0));
-    if (!base_block || base_block->get_blockid() != BlockID::grass)
+    block_t *base_block = get_block_at(position - vec3i(0, 1, 0), chunk);
+    if (!base_block)
+        return;
+    BlockID base_id = base_block->get_blockid();
+    if (base_id != BlockID::grass && base_id != BlockID::dirt)
         return;
 
     // Place dirt below tree
@@ -173,7 +182,7 @@ inline void plant_tree(vec3i position, int height)
             for (int z = -2; z <= 2; z++)
             {
                 vec3i leaves_pos = position + vec3i(x, y, z);
-                replace_air_at(leaves_pos, BlockID::leaves);
+                replace_air_at(leaves_pos, BlockID::leaves, chunk);
             }
     }
     // Place narrow part of leaves
@@ -187,19 +196,19 @@ inline void plant_tree(vec3i position, int height)
                 // Place the leaves in a "+" pattern at the top.
                 if (y == height && (x | z) && std::abs(x) == std::abs(z))
                     continue;
-                replace_air_at(position + leaves_off, BlockID::leaves);
+                replace_air_at(position + leaves_off, BlockID::leaves, chunk);
             }
         }
     }
     // Place tree logs
     for (int y = 0; y < height; y++)
     {
-        set_block_at(position, BlockID::wood);
+        set_block_at(position, BlockID::wood, chunk);
         ++position.y;
     }
 }
 
-inline void generate_trees(vec3i pos)
+inline void generate_trees(vec3i pos, chunk_t *chunk)
 {
     static uint32_t tree_positions[WORLDGEN_TREE_ATTEMPTS];
     treerand(pos.x, pos.z, tree_positions, WORLDGEN_TREE_ATTEMPTS);
@@ -209,19 +218,19 @@ inline void generate_trees(vec3i pos)
         vec3i tree_pos((tree_value & 15), 0, ((tree_value >> 24) & 15));
 
         // Place the trees on above ground.
-        tree_pos.y = skycast(pos + tree_pos);
+        tree_pos.y = chunk->terrain_map[tree_pos.x | (tree_pos.z << 4)];
         tree_pos += vec3i(pos.x, 1, pos.z);
 
         // Trees should only grow on top of the sea level
         if (tree_pos.y >= 64)
         {
             int tree_height = (tree_value >> 28) & 3;
-            plant_tree(tree_pos, 3 + tree_height);
+            plant_tree(tree_pos, 3 + tree_height, chunk);
         }
     }
 }
 
-void generate_vein(vec3i pos, BlockID id)
+void generate_vein(vec3i pos, BlockID id, chunk_t *chunk)
 {
     for (int x = pos.x; x < pos.x + 2; x++)
     {
@@ -232,7 +241,7 @@ void generate_vein(vec3i pos, BlockID id)
                 if (JavaLCGIntN(2) == 0)
                 {
                     vec3i pos(x, y, z);
-                    block_t *block = get_block_at(pos);
+                    block_t *block = get_block_at(pos, chunk);
                     if (block && block->get_blockid() == BlockID::stone)
                     {
                         block->set_blockid(id);
@@ -243,7 +252,7 @@ void generate_vein(vec3i pos, BlockID id)
     }
 }
 
-void generate_ore_type(vec3i neighbor_pos, BlockID id, int count, int max_height)
+void generate_ore_type(vec3i neighbor_pos, BlockID id, int count, int max_height, chunk_t *chunk)
 {
     for (int i = 0; i < count; i++)
     {
@@ -253,68 +262,38 @@ void generate_ore_type(vec3i neighbor_pos, BlockID id, int count, int max_height
         vec3i pos(x + neighbor_pos.x, y, z + neighbor_pos.z);
         if (y > max_height)
             continue;
-        generate_vein(pos, id);
-        block_t *block = get_block_at(pos);
+        generate_vein(pos, id, chunk);
+        block_t *block = get_block_at(pos, chunk);
         x = JavaLCGIntN(3) - 1;
         y = JavaLCGIntN(3) - 1;
         z = JavaLCGIntN(3) - 1;
         if (block && block->get_blockid() == id && (x | y | z) != 0)
         {
             pos = vec3i(x + pos.x, y + pos.y, z + pos.z);
-            generate_vein(pos, id);
+            generate_vein(pos, id, chunk);
         }
     }
 }
 
-void generate_ores(vec3i neighbor_pos)
+void generate_ores(vec3i neighbor_pos, chunk_t *chunk)
 {
     int coal_count = JavaLCGIntN(8) + 16;
     int iron_count = JavaLCGIntN(4) + 8;
     int gold_count = JavaLCGIntN(4) + 8;
     int diamond_count = JavaLCGIntN(4) + 8;
 
-    generate_ore_type(neighbor_pos, BlockID::coal_ore, coal_count, 80);
-    generate_ore_type(neighbor_pos, BlockID::iron_ore, iron_count, 56);
-    generate_ore_type(neighbor_pos, BlockID::gold_ore, gold_count, 32);
-    generate_ore_type(neighbor_pos, BlockID::diamond_ore, diamond_count, 12);
+    generate_ore_type(neighbor_pos, BlockID::coal_ore, coal_count, 80, chunk);
+    generate_ore_type(neighbor_pos, BlockID::iron_ore, iron_count, 56, chunk);
+    generate_ore_type(neighbor_pos, BlockID::gold_ore, gold_count, 32, chunk);
+    generate_ore_type(neighbor_pos, BlockID::diamond_ore, diamond_count, 12, chunk);
 }
 
 void generate_features(chunk_t *chunk)
 {
     JavaLCGInit(chunk->x * 0x4F9939F508L + chunk->z * 0x1F38D3E7L + cavegen_seed);
     vec3i block_pos(chunk->x * 16, 0, chunk->z * 16);
-    generate_ores(block_pos);
-    generate_trees(block_pos);
-}
-
-bool try_generate_features(chunk_t *chunk)
-{
-    // Get the neighboring chunks for features generation
-    for (int32_t x = chunk->x - 1; x <= chunk->x + 1; x++)
-    {
-        for (int32_t z = chunk->z - 1; z <= chunk->z + 1; z++)
-        {
-            if (!get_chunk(vec3i(x, 0, z), false, false))
-                return false; // Not all neighbors are loaded
-        }
-    }
-
-    generate_features(chunk);
-
-    chunk_t *neighbor_chunks[4];
-    neighbor_chunks[0] = get_chunk(vec3i(chunk->x + 1, 0, chunk->z), false, false);
-    neighbor_chunks[1] = get_chunk(vec3i(chunk->x - 1, 0, chunk->z), false, false);
-    neighbor_chunks[2] = get_chunk(vec3i(chunk->x, 0, chunk->z + 1), false, false);
-    neighbor_chunks[3] = get_chunk(vec3i(chunk->x, 0, chunk->z - 1), false, false);
-    chunk_t **c = neighbor_chunks;
-    for (int i = 0; i < 4; i++, c++)
-        if (*c)
-            for (int vbo_y = 0; vbo_y < 16; vbo_y++)
-                (*c)->vbos[vbo_y].dirty = true;
-
-    chunk->generation_stage = ChunkGenStage::done;
-
-    return true;
+    generate_ores(block_pos, chunk);
+    generate_trees(block_pos, chunk);
 }
 
 void generate_chunk()
@@ -364,7 +343,7 @@ void generate_chunk()
         {
             vfloat_t dist = 0;
             uint8_t height = uint8_t((dist + terrain_noise[index]) * 32) + 48;
-            chunk->height_map[index] = height;
+            chunk->terrain_map[index] = height;
             max_height = std::max(height, max_height);
             bool generate_sand = sand_noise[index] > 0.5;
             for (int y = std::max(63, int(height)); y >= 0; y--)
@@ -440,8 +419,10 @@ void generate_chunk()
 
     usleep(100);
 
-    // Reset chunk heightmap for further use.
-    memset(chunk->height_map, 0, 256);
+    index = 0;
+    for (int z = 0; z < 16; z++)
+        for (int x = 0; x < 16; x++, index++)
+            chunk->terrain_map[index] = skycast(vec3i(x + x_offset, chunk->terrain_map[index], z + z_offset), chunk);
 
     // If the chunk generator has already been de-initialized
     // during generation, clean up the chunk and return
@@ -454,6 +435,28 @@ void generate_chunk()
     lock_t chunk_lock(chunk_mutex);
     chunks.push_back(chunk);
     pending_chunks.erase(std::find(pending_chunks.begin(), pending_chunks.end(), chunk));
+    chunk_lock.unlock();
+    for (int32_t x = chunk->x - 1; x <= chunk->x + 1; x++)
+    {
+        for (int32_t z = chunk->z - 1; z <= chunk->z + 1; z++)
+        {
+            // Skip corners
+            if ((x - chunk->x) && (z - chunk->z))
+                continue;
+            // Attempt to generate features for the neighboring chunks
+            chunk_t *neighbor = get_chunk(vec3i(x, 0, z), false, false);
+            if (neighbor)
+            {
+                generate_features(neighbor);
+
+                // Update the VBOs of the neighboring chunks
+                for (int i = 0; i < 16; i++)
+                    neighbor->vbos[i].dirty = true;
+            }
+        }
+    }
+
+    chunk->generation_stage = ChunkGenStage::done;
 }
 
 void print_chunk_status()
@@ -634,6 +637,11 @@ void chunk_t::recalculate_visibility(block_t *block, vec3i pos)
     block_t *neighbors[6];
     get_neighbors(pos, neighbors, this);
     uint8_t visibility = 0x40;
+    if (block->get_blockid() == BlockID::leaves)
+    {
+        block->visibility_flags = 0x7F;
+        return;
+    }
     for (int i = 0; i < 6; i++)
     {
         block_t *other_block = neighbors[i];

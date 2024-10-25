@@ -920,8 +920,8 @@ void GenerateChunks(int count)
     {
         for (int z = start_z; count && z <= end_z; z += 16)
         {
-            float hdistance = std::max(std::abs((x + 8) - player_pos.x), std::abs((z + 8) - player_pos.z));
-            if (hdistance > RENDER_DISTANCE * 16 + 16)
+            float hdistance = std::abs((start_x & ~15) - (int(player_pos.x) & ~15)) + std::abs((start_z & ~15) - (int(player_pos.z) & ~15));
+            if (hdistance > RENDER_DISTANCE * 24)
                 continue;
             if (!get_chunk_from_pos(vec3i(x, 0, z), true, false))
             {
@@ -1135,18 +1135,18 @@ void CreateExplosion(vec3f pos, float power, chunk_t *near)
 void UpdateChunkData(frustum_t &frustum, std::deque<chunk_t *> &chunks)
 {
     int light_up_calls = 0;
-    WRAP_ASYNC_FUNC(chunk_mutex, for (chunk_t *&chunk : chunks) if (chunk && chunk->generation_stage == ChunkGenStage::features) if (try_generate_features(chunk)) break;);
     for (chunk_t *&chunk : chunks)
     {
         if (chunk && (chunk->generation_stage == ChunkGenStage::done || chunk->generation_stage == ChunkGenStage::features))
         {
-            float hdistance = std::max(std::abs((chunk->x * 16 + 8) - player_pos.x), std::abs((chunk->z * 16 + 8) - player_pos.z));
-            if (hdistance > RENDER_DISTANCE * 16 + 16)
+            float hdistance = chunk->player_taxicab_distance();
+            if (hdistance > RENDER_DISTANCE * 24 + 16)
             {
                 PrepareChunkRemoval(chunk);
                 continue;
             }
-
+            if (chunk->generation_stage != ChunkGenStage::done)
+                continue;
             // Tick chunks
             for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
             {
@@ -1186,7 +1186,7 @@ void UpdateChunkVBOs(std::deque<chunk_t *> &chunks)
     {
         for (chunk_t *&chunk : chunks)
         {
-            if (chunk && chunk->generation_stage == ChunkGenStage::done && !chunk->light_update_count)
+            if (chunk && chunk->generation_stage == ChunkGenStage::done && !chunk->light_update_count && chunk->lit_state)
             {
                 // Check if chunk has other chunks around it.
                 bool surrounding = true;
