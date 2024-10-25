@@ -17,9 +17,11 @@ public:
     vec3f rot = vec3f(0, 0, 0);
     void *display_list = nullptr;
     uint32_t display_list_size = 0;
-    modelbox_t(vec3f pivot = vec3f(0, 0, 0), vec3f size = vec3f(1, 1, 1), uint16_t uv_off_x = 0, uint16_t uv_off_y = 0, vfloat_t inflate = 0);
+    modelbox_t(vec3f pivot = vec3f(0, 0, 0), vec3f size = vec3f(1, 1, 1), uint16_t uv_off_x = 0, uint16_t uv_off_y = 0, vfloat_t inflate = 0) : pivot(pivot), size(size), uv_off_x(uv_off_x), uv_off_y(uv_off_y), inflate(inflate) {}
     modelbox_t(const modelbox_t &other) = delete;            // Prevent copying
     modelbox_t &operator=(const modelbox_t &other) = delete; // Prevent copying
+
+    void prepare();
 
     void render();
 
@@ -40,6 +42,13 @@ public:
             free(display_list);
         }
     }
+
+private:
+    vec3f pivot;
+    vec3f size;
+    uint16_t uv_off_x;
+    uint16_t uv_off_y;
+    vfloat_t inflate;
 };
 
 class model_t
@@ -49,10 +58,13 @@ public:
     vec3f rot = vec3f(0, 0, 0);
     GXTexObj texture;
     std::vector<modelbox_t *> boxes;
+    bool ready = false;
     model_t() {}
 
     model_t(const model_t &other) = delete;            // Prevent copying
     model_t &operator=(const model_t &other) = delete; // Prevent copying
+
+    void prepare();
 
     virtual void render(float partial_ticks);
 

@@ -39,6 +39,8 @@ bool aabb_entity_t::can_remove()
     chunk_t *curr_chunk = get_chunk_from_pos(int_pos, false);
     if (!curr_chunk)
         return true;
+    if (int_pos.y < 0 || int_pos.y >= 256)
+        return false;
     chunkvbo_t &vbo = curr_chunk->vbos[int_pos.y >> 4];
     if (vbo.dirty || curr_chunk->light_update_count || vbo.cached_solid != vbo.solid || vbo.cached_transparent != vbo.transparent)
         return false;
@@ -82,11 +84,13 @@ void aabb_entity_t::tick()
             {
                 vec3i block_pos = vec3i(x, y, z);
                 block_t *block = get_block_at(block_pos, chunk);
+                if (!block)
+                    continue;
                 if (!block->intersects(fluid_aabb, block_pos))
                     continue;
                 if (block->get_blockid() == BlockID::cobweb)
                     cobweb_movement = true;
-                if (!block || !is_fluid(block->get_blockid()))
+                if (!is_fluid(block->get_blockid()))
                     continue;
                 if (y + 1 - get_fluid_height(block_pos, block->get_blockid(), chunk) >= max.y)
                     continue;
@@ -500,7 +504,7 @@ void exploding_block_entity_t::render(float partial_ticks)
     use_texture(blockmap_texture);
 }
 
-creeper_model_t creeper_entity_t::creeper_model;
+creeper_model_t creeper_model = creeper_model_t();
 
 creeper_entity_t::creeper_entity_t(const vec3f &position) : aabb_entity_t(0.6f, 1.7f)
 {

@@ -138,7 +138,6 @@ public:
 class creeper_entity_t : public aabb_entity_t
 {
 private:
-    static creeper_model_t creeper_model;
 
 public:
     vec3f body_rotation;

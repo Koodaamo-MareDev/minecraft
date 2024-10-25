@@ -3,7 +3,7 @@
 #include "base3d.hpp"
 #include "render.hpp"
 
-modelbox_t::modelbox_t(vec3f pivot, vec3f size, uint16_t uv_off_x, uint16_t uv_off_y, vfloat_t inflate)
+void modelbox_t::prepare()
 {
     vertex_property_t faces[24];
     vec3f start = pivot - (vec3f(inflate, inflate, inflate));
@@ -121,8 +121,20 @@ void modelbox_t::render()
     }
 }
 
+void model_t::prepare()
+{
+    if (ready)
+        return;
+    for (auto &box : boxes)
+    {
+        box->prepare();
+    }
+    ready = true;
+}
+
 void model_t::render(float ticks)
 {
+    prepare();
     use_texture(texture);
     transform_view(get_view_matrix(), vec3f(player_pos) * 2 - pos, vec3f(1), rot, false);
     for (auto &box : boxes)

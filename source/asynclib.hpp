@@ -92,6 +92,7 @@ public:
                 if (func->called)
                 {
                     delete func;
+                    func = nullptr;
                     return true;
                 }
                 return false; }),
@@ -99,6 +100,8 @@ public:
 
             for (async_func *&func : lib->funcs)
             {
+                if (!func)
+                    continue;
                 if (func->awaiting) // If someone is waiting for this function to finish, we don't want to call it asynchronously anymore
                     continue;
                 func->update();
@@ -126,6 +129,15 @@ public:
 };
 extern async_lib *asyncLib;
 
-#define WRAP_ASYNC_FUNC(mtx, func) do {static bool __##mtx##_run = 1; if (__##mtx##_run) { __##mtx##_run = 0; new async_func(mtx, [&]() { func; __##mtx##_run = 1; }); } } while(0)
+#define WRAP_ASYNC_FUNC(mtx, func)          \
+    do                                      \
+    {                                       \
+        static bool __##mtx##_run = 1;      \
+        if (__##mtx##_run)                  \
+        {                                   \
+            __##mtx##_run = 0;              \
+            new async_func(mtx, [&]() { func; __##mtx##_run = 1; }); \
+        }                                   \
+    } while (0)
 
 #endif
