@@ -962,6 +962,10 @@ float get_sky_multiplier()
 GXColor get_sky_color(bool cave_darkness)
 {
     float elevation_brightness = std::pow(std::clamp((player_pos.y) * 0.03125f, 0.0f, 1.0f), 2.0f);
+    if (player_pos.y < -500.0f)
+    {
+        elevation_brightness = std::clamp((player_pos.y + 500.0f) / -250.0f, 0.0f, 1.0f);
+    }
     float sky_multiplier = get_sky_multiplier();
     float brightness = elevation_brightness * sky_multiplier;
     return GXColor{uint8_t(sky_color.r * brightness), uint8_t(sky_color.g * brightness), uint8_t(sky_color.b * brightness), 0xFF};
