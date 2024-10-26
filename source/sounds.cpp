@@ -1,11 +1,6 @@
 #include "sounds.hpp"
 #include <cstring>
 
-aiff_container &get_random_sound(std::vector<aiff_container> &sounds)
-{
-    return sounds[rand() % sounds.size()];
-}
-
 std::vector<std::string> music_files(
     {"calm1.ogg",
      "calm2.ogg",
@@ -20,7 +15,7 @@ std::vector<std::string> music_files(
      "piano2.ogg",
      "piano3.ogg"});
 
-std::string get_random_music(std::vector<std::string> &music_files)
+std::string get_random_music()
 {
     if (music_files.empty())
     {

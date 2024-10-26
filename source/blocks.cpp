@@ -620,9 +620,6 @@ sound_t get_step_sound(BlockID block_id)
     case SoundType::cloth:
         sound = randomize_sound("cloth", 4);
         break;
-    case SoundType::glass:
-        sound = randomize_sound("stone", 4);
-        break;
     case SoundType::grass:
         sound = randomize_sound("grass", 4);
         break;
@@ -635,6 +632,7 @@ sound_t get_step_sound(BlockID block_id)
     case SoundType::wood:
         sound = randomize_sound("wood", 4);
         break;
+    case SoundType::glass:
     case SoundType::stone:
     case SoundType::metal: // The metal sound is the same as stone with a different pitch.
         sound = randomize_sound("stone", 4);
@@ -659,9 +657,6 @@ sound_t get_mine_sound(BlockID block_id)
     case SoundType::cloth:
         sound = randomize_sound("cloth", 4);
         break;
-    case SoundType::glass:
-        sound = randomize_sound("stone", 4);
-        break;
     case SoundType::grass:
         sound = randomize_sound("grass", 4);
         break;
@@ -674,6 +669,7 @@ sound_t get_mine_sound(BlockID block_id)
     case SoundType::wood:
         sound = randomize_sound("wood", 4);
         break;
+    case SoundType::glass:
     case SoundType::stone:
     case SoundType::metal: // The metal sound is the same as stone with a different pitch.
         sound = randomize_sound("stone", 4);
@@ -698,7 +694,7 @@ sound_t get_break_sound(BlockID block_id)
         sound = randomize_sound("cloth", 4);
         break;
     case SoundType::glass:
-        sound = randomize_sound("glass", 4);
+        sound = randomize_sound("glass", 3);
         break;
     case SoundType::grass:
         sound = randomize_sound("grass", 4);
