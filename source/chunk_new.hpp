@@ -102,7 +102,7 @@ public:
 
     float player_taxicab_distance()
     {
-        return std::abs((this->x & ~15) - (int(player_pos.x) & ~15)) + std::abs((this->y & ~15) - (int(player_pos.y) & ~15)) + std::abs((this->z & ~15) - (int(player_pos.z) & ~15));
+        return std::abs((this->x & ~15) - (int(std::floor(player_pos.x)) & ~15)) + std::abs((this->y & ~15) - (int(std::floor(player_pos.y)) & ~15)) + std::abs((this->z & ~15) - (int(std::floor(player_pos.z)) & ~15));
     }
 
     bool operator<(chunkvbo_t &other)
@@ -208,7 +208,7 @@ public:
 
     float player_taxicab_distance()
     {
-        return std::abs((this->x << 4) - (int(player_pos.x) & ~15)) + std::abs((this->z << 4) - (int(player_pos.z) & ~15));
+        return std::abs((this->x << 4) - (int(std::floor(player_pos.x)) & ~15)) + std::abs((this->z << 4) - (int(std::floor(player_pos.z)) & ~15));
     }
 
     bool operator<(chunk_t &other)

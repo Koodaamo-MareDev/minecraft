@@ -27,7 +27,7 @@
 extern guVector player_pos;
 extern float xrot, yrot;
 extern int tickCounter;
-extern float partialTicks;
+extern double partialTicks;
 extern Mtx active_mtx;
 extern uint8_t light_map[1024];
 

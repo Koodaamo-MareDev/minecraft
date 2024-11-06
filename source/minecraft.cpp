@@ -65,8 +65,8 @@ int lastEntityTick = 0;
 int lastWaterTick = 0;
 int fluidUpdateCount = 0;
 float lastStepDistance = 0;
-float deltaTime = 0.0f;
-float partialTicks = 0.0f;
+double deltaTime = 0.0;
+double partialTicks = 0.0;
 
 uint32_t total_chunks_size = 0;
 
@@ -564,10 +564,10 @@ int main(int argc, char **argv)
         deltaTime = time_diff_s(frame_start, time_get());
 
         // Ensure that the delta time is not too large to prevent issues
-        if (deltaTime > 0.05f)
-            deltaTime = 0.05f;
+        if (deltaTime > 0.05)
+            deltaTime = 0.05;
 
-        partialTicks += deltaTime * 20.0f;
+        partialTicks += deltaTime * 20.0;
         tickCounter += int(partialTicks);
         partialTicks -= int(partialTicks);
         fb ^= 1;
@@ -639,6 +639,7 @@ void GetInput()
         printf("PRIM_CHUNK_MEMORY: %d B\n", total_chunks_size);
         printf("TICK: %d, WATER: %d\n", tickCounter, lastWaterTick);
         printf("SPEED: %f, %f\n", wiimote_x, wiimote_z);
+        printf("POS: %f, %f, %f\n", player_pos.x, player_pos.y, player_pos.z);
     }
     if ((raw_wiimote_down & WPAD_BUTTON_2))
     {
@@ -1033,6 +1034,8 @@ void EditBlocks()
                 {
                     // Add block particles
 
+                    javaport::Random rng;
+
                     int texture_index = get_default_texture_index(old_blockid);
 
                     particle_t particle;
@@ -1046,12 +1049,12 @@ void EditBlocks()
                     for (int i = 0; i < 64; i++)
                     {
                         // Randomize the particle position and velocity
-                        particle.position = vec3f(editable_pos.x, editable_pos.y, editable_pos.z) + vec3f(JavaLCGFloat() - .5f, JavaLCGFloat() - .5f, JavaLCGFloat() - .5f);
-                        particle.velocity = vec3f(JavaLCGFloat() - .5f, JavaLCGFloat() - .25f, JavaLCGFloat() - .5f) * 7.5;
+                        particle.position = vec3f(editable_pos.x, editable_pos.y, editable_pos.z) + vec3f(rng.nextFloat() - .5f, rng.nextFloat() - .5f, rng.nextFloat() - .5f);
+                        particle.velocity = vec3f(rng.nextFloat() - .5f, rng.nextFloat() - .25f, rng.nextFloat() - .5f) * 7.5;
 
                         // Randomize the particle texture coordinates
-                        particle.u = u + ((rand() & 3) << 2);
-                        particle.v = v + ((rand() & 3) << 2);
+                        particle.u = u + (rng.next(2) << 2);
+                        particle.v = v + (rng.next(2) << 2);
 
                         // Randomize the particle life time by up to 10 ticks
                         particle.life_time = particle.max_life_time - (rand() % 10);
@@ -1101,6 +1104,8 @@ void CreateExplosion(vec3f pos, float power, chunk_t *near)
 {
     explode(pos, power * 0.75f, near);
 
+    javaport::Random rng;
+
     sound_t sound = get_sound("old_explode");
     sound.position = pos;
     sound.volume = 0.5;
@@ -1117,10 +1122,10 @@ void CreateExplosion(vec3f pos, float power, chunk_t *near)
     for (int i = 0; i < 64; i++)
     {
         // Randomize the particle position and velocity
-        particle.position = pos + vec3f(JavaLCGFloat() - .5f, JavaLCGFloat() - .5f, JavaLCGFloat() - .5f) * power * 2;
+        particle.position = pos + vec3f(rng.nextFloat() - .5f, rng.nextFloat() - .5f, rng.nextFloat() - .5f) * power * 2;
 
         // Randomize the particle life time by up to 10 ticks
-        particle.life_time = particle.max_life_time - (rand() % 20) - 20;
+        particle.life_time = particle.max_life_time - (rng.nextInt(20)) - 20;
 
         // Randomize the particle size
         particle.size = rand() % 64 + 64;
@@ -1186,7 +1191,7 @@ void UpdateChunkVBOs(std::deque<chunk_t *> &chunks)
     {
         for (chunk_t *&chunk : chunks)
         {
-            if (chunk && chunk->generation_stage == ChunkGenStage::done && !chunk->light_update_count && chunk->lit_state)
+            if (chunk && chunk->generation_stage == ChunkGenStage::done && !chunk->light_update_count)
             {
                 // Check if chunk has other chunks around it.
                 bool surrounding = true;
@@ -1533,7 +1538,7 @@ void DrawSelectedBlock()
                 int next_y = index + index_within;
 
                 // Check if the texel is transparent
-                render_item_pixel(texture_index, x, 15 - y, x == 15 || !texbuf[next_x], y == 15 || !texbuf[next_y], view_block->light);
+                render_item_pixel(texture_index, x, 15 - y, x == 15 || !texbuf[next_x], y == 15 || !texbuf[next_y], selected_block.light);
             }
     }
 }

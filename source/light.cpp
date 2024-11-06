@@ -70,7 +70,10 @@ void light_engine_loop()
             if ((++updates & 1023) == 0)
             {
                 if (time_diff_us(start, time_get()) > 100)
-                    usleep(1000);
+                {
+                    usleep(10);
+                    start = time_get();
+                }
             }
         }
     }
@@ -115,7 +118,7 @@ static inline int8_t MAX_I8(int8_t a, int8_t b)
 
 void __update_light(std::pair<vec3i, chunk_t *> update)
 {
-    static std::deque<std::pair<vec3i, chunk_t *>> light_updates;
+    std::deque<std::pair<vec3i, chunk_t *>> light_updates;
 
     vec3i coords = update.first;
 
@@ -127,10 +130,10 @@ void __update_light(std::pair<vec3i, chunk_t *> update)
             light_updates.clear();
             return;
         }
-        std::pair item = light_updates.back();
+        std::pair item = light_updates.front();
         vec3i pos = item.first;
         chunk_t *chunk = item.second;
-        light_updates.pop_back();
+        light_updates.pop_front();
 
         if (pos.y > 255 || pos.y < 0)
             continue;

@@ -89,6 +89,8 @@ public:
             // Erase all the async functions that have been called - delete them manually as they are allocated using new
             lib->funcs.erase(std::remove_if(lib->funcs.begin(), lib->funcs.end(), [](async_func *&func)
                                             {
+                if(!func)
+                    return true;
                 if (func->called)
                 {
                     delete func;

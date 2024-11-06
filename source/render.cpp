@@ -854,14 +854,14 @@ void draw_stars()
     static vec3f vertices[780 << 2];
     if (!generated)
     {
-        JavaLCGInit(10842);
+        javaport::Random rng(10842);
         int index = 0;
         for (int var3 = 0; var3 < 1500; ++var3)
         {
-            double var4 = (double)(JavaLCGFloat() * 2.0F - 1.0F);
-            double var6 = (double)(JavaLCGFloat() * 2.0F - 1.0F);
-            double var8 = (double)(JavaLCGFloat() * 2.0F - 1.0F);
-            double var10 = (double)(0.25F + JavaLCGFloat() * 0.25F);
+            double var4 = (double)(rng.nextFloat() * 2.0F - 1.0F);
+            double var6 = (double)(rng.nextFloat() * 2.0F - 1.0F);
+            double var8 = (double)(rng.nextFloat() * 2.0F - 1.0F);
+            double var10 = (double)(0.25F + rng.nextFloat() * 0.25F);
             double var12 = var4 * var4 + var6 * var6 + var8 * var8;
             if (var12 < 1.0 && var12 > 0.01)
             {
@@ -878,7 +878,7 @@ void draw_stars()
                 double var26 = std::atan2(std::sqrt(var4 * var4 + var8 * var8), var6);
                 double var28 = std::sin(var26);
                 double var30 = std::cos(var26);
-                double var32 = JavaLCGDouble() * M_TWOPI;
+                double var32 = rng.nextDouble() * M_TWOPI;
                 double var34 = std::sin(var32);
                 double var36 = std::cos(var32);
 
@@ -1056,7 +1056,7 @@ void draw_sky(GXColor background)
     dist = 108.0f * scale;
 
     // Reset transform and move the clouds
-    transform_view(get_view_matrix(), guVector{0, 0, ((tickCounter % 40960) + partialTicks) * 0.05f});
+    transform_view(get_view_matrix(), guVector{0, 0, float(((tickCounter % 40960) + partialTicks) * 0.05)});
 
     // Clouds are a bit yellowish white. They are also affected by the time
     float sky_multiplier = get_sky_multiplier();

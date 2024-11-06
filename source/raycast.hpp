@@ -619,7 +619,7 @@ inline void explode(vec3f position, float power, chunk_t *near)
         return;
 
     // I suppose the float bits of the position vector are enough to generate a seed random enough
-    JavaLCGInit(rand());
+    javaport::Random rng;
 
     for (int x = -8; x <= 8; x++)
     {
@@ -628,11 +628,11 @@ inline void explode(vec3f position, float power, chunk_t *near)
             for (int y = -8; y <= 8; y += 16)
             {
                 dir = vec3f(x, y, z);
-                explode_raycast(position, dir, power * (JavaLCGFloat() * 0.6 + 0.7), near);
+                explode_raycast(position, dir, power * (rng.nextFloat() * 0.6 + 0.7), near);
                 dir = vec3f(x, z, y);
-                explode_raycast(position, dir, power * (JavaLCGFloat() * 0.6 + 0.7), near);
+                explode_raycast(position, dir, power * (rng.nextFloat() * 0.6 + 0.7), near);
                 dir = vec3f(y, z, x);
-                explode_raycast(position, dir, power * (JavaLCGFloat() * 0.6 + 0.7), near);
+                explode_raycast(position, dir, power * (rng.nextFloat() * 0.6 + 0.7), near);
             }
         }
     }

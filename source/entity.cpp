@@ -110,10 +110,10 @@ void aabb_entity_t::tick()
             float impact = 0.2 / Q_rsqrt_d(velocity.x * velocity.x * 0.2 + velocity.y * velocity.y + velocity.z * velocity.z * 0.2);
             if (impact > 1.0)
                 impact = 1.0;
-
+            javaport::Random rng;
             sound_t sound = get_sound("splash");
             sound.position = position;
-            sound.pitch = 0.6 + JavaLCGFloat() * 0.8;
+            sound.pitch = 0.6 + rng.nextFloat() * 0.8;
             sound.volume = impact;
             PlaySound(sound);
 
@@ -131,10 +131,10 @@ void aabb_entity_t::tick()
             for (int i = 0; i < 1 + width * 20; i++)
             {
                 // Randomize the particle position and velocity
-                particle.position = position + vec3f(JavaLCGFloat() * 2 - 1, 0, JavaLCGFloat() * 2 - 1) * width - vec3f(0.5, 0.5, 0.5);
+                particle.position = position + vec3f(rng.nextFloat() * 2 - 1, 0, rng.nextFloat() * 2 - 1) * width - vec3f(0.5, 0.5, 0.5);
                 particle.position.y = std::floor(aabb.min.y + 1);
                 particle.velocity = velocity;
-                particle.velocity.y -= 0.2 * JavaLCGFloat();
+                particle.velocity.y -= 0.2 * rng.nextFloat();
 
                 // Randomize life time
                 particle.life_time = particle.max_life_time - (rand() % 20);
@@ -146,9 +146,9 @@ void aabb_entity_t::tick()
 
             for (int i = 0; i < 1 + width * 20; i++)
             {
-                particle.u = JavaLCGIntN(4) + 3;
+                particle.u = rng.nextInt(4) + 3;
                 // Randomize the particle position and velocity
-                particle.position = position + vec3f(JavaLCGFloat() * 2 - 1, 0, JavaLCGFloat() * 2 - 1) * width - vec3f(0.5, 0.5, 0.5);
+                particle.position = position + vec3f(rng.nextFloat() * 2 - 1, 0, rng.nextFloat() * 2 - 1) * width - vec3f(0.5, 0.5, 0.5);
                 particle.position.y = std::floor(aabb.min.y + 1);
                 particle.velocity = velocity;
 
@@ -450,7 +450,8 @@ void falling_block_entity_t::render(float partial_ticks)
 exploding_block_entity_t::exploding_block_entity_t(block_t block_state, const vec3i &position, uint16_t fuse) : falling_block_entity_t(block_state, position), fuse(fuse)
 {
     falling_block_entity_t(block_state, position);
-    this->velocity = vec3f(JavaLCGDouble() * 0.04 - 0.02, 0.2, JavaLCGDouble() * 0.04 - 0.02);
+    javaport::Random rng;
+    this->velocity = vec3f(rng.nextDouble() * 0.04 - 0.02, 0.2, rng.nextDouble() * 0.04 - 0.02);
 
     // Play the fuse sound if there is a long enough fuse
     if (fuse > 45)

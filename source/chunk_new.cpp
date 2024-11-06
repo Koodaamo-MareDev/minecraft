@@ -13,6 +13,8 @@
 #include "lock.hpp"
 #include "asynclib.hpp"
 #include "ported/MapGenCaves.hpp"
+#include "ported/WorldGenLiquids.hpp"
+#include "ported/WorldGenLakes.hpp"
 #include "model.hpp"
 #include <tuple>
 #include <map>
@@ -127,8 +129,7 @@ void add_chunk(vec3i pos)
         in_progress = false;
     };
     in_progress = true;
-    add_later();
-    // new async_func(chunk_mutex, add_later);
+    new async_func(chunk_mutex, add_later);
 }
 
 inline bool in_range(int x, int min, int max)
@@ -208,7 +209,7 @@ inline void plant_tree(vec3i position, int height, chunk_t *chunk)
     }
 }
 
-inline void generate_trees(vec3i pos, chunk_t *chunk)
+inline void generate_trees(vec3i pos, chunk_t *chunk, javaport::Random &rng)
 {
     static uint32_t tree_positions[WORLDGEN_TREE_ATTEMPTS];
     treerand(pos.x, pos.z, tree_positions, WORLDGEN_TREE_ATTEMPTS);
@@ -230,7 +231,7 @@ inline void generate_trees(vec3i pos, chunk_t *chunk)
     }
 }
 
-void generate_vein(vec3i pos, BlockID id, chunk_t *chunk)
+void generate_vein(vec3i pos, BlockID id, chunk_t *chunk, javaport::Random &rng)
 {
     for (int x = pos.x; x < pos.x + 2; x++)
     {
@@ -238,7 +239,7 @@ void generate_vein(vec3i pos, BlockID id, chunk_t *chunk)
         {
             for (int z = pos.z; z < pos.z + 2; z++)
             {
-                if (JavaLCGIntN(2) == 0)
+                if (rng.nextInt(2) == 0)
                 {
                     vec3i pos(x, y, z);
                     block_t *block = get_block_at(pos, chunk);
@@ -252,48 +253,77 @@ void generate_vein(vec3i pos, BlockID id, chunk_t *chunk)
     }
 }
 
-void generate_ore_type(vec3i neighbor_pos, BlockID id, int count, int max_height, chunk_t *chunk)
+void generate_ore_type(vec3i neighbor_pos, BlockID id, int count, int max_height, chunk_t *chunk, javaport::Random &rng)
 {
     for (int i = 0; i < count; i++)
     {
-        int x = JavaLCGIntN(16);
-        int y = JavaLCGIntN(80);
-        int z = JavaLCGIntN(16);
+        int x = rng.nextInt(16);
+        int y = rng.nextInt(80);
+        int z = rng.nextInt(16);
         vec3i pos(x + neighbor_pos.x, y, z + neighbor_pos.z);
         if (y > max_height)
             continue;
-        generate_vein(pos, id, chunk);
+        generate_vein(pos, id, chunk, rng);
         block_t *block = get_block_at(pos, chunk);
-        x = JavaLCGIntN(3) - 1;
-        y = JavaLCGIntN(3) - 1;
-        z = JavaLCGIntN(3) - 1;
+        x = rng.nextInt(3) - 1;
+        y = rng.nextInt(3) - 1;
+        z = rng.nextInt(3) - 1;
         if (block && block->get_blockid() == id && (x | y | z) != 0)
         {
             pos = vec3i(x + pos.x, y + pos.y, z + pos.z);
-            generate_vein(pos, id, chunk);
+            generate_vein(pos, id, chunk, rng);
         }
     }
 }
 
-void generate_ores(vec3i neighbor_pos, chunk_t *chunk)
+void generate_ores(vec3i neighbor_pos, chunk_t *chunk, javaport::Random &rng)
 {
-    int coal_count = JavaLCGIntN(8) + 16;
-    int iron_count = JavaLCGIntN(4) + 8;
-    int gold_count = JavaLCGIntN(4) + 8;
-    int diamond_count = JavaLCGIntN(4) + 8;
+    int coal_count = rng.nextInt(8) + 16;
+    int iron_count = rng.nextInt(4) + 8;
+    int gold_count = rng.nextInt(4) + 8;
+    int diamond_count = rng.nextInt(4) + 8;
 
-    generate_ore_type(neighbor_pos, BlockID::coal_ore, coal_count, 80, chunk);
-    generate_ore_type(neighbor_pos, BlockID::iron_ore, iron_count, 56, chunk);
-    generate_ore_type(neighbor_pos, BlockID::gold_ore, gold_count, 32, chunk);
-    generate_ore_type(neighbor_pos, BlockID::diamond_ore, diamond_count, 12, chunk);
+    generate_ore_type(neighbor_pos, BlockID::coal_ore, coal_count, 80, chunk, rng);
+    generate_ore_type(neighbor_pos, BlockID::iron_ore, iron_count, 56, chunk, rng);
+    generate_ore_type(neighbor_pos, BlockID::gold_ore, gold_count, 32, chunk, rng);
+    generate_ore_type(neighbor_pos, BlockID::diamond_ore, diamond_count, 12, chunk, rng);
 }
-
+extern aabb_entity_t *player;
 void generate_features(chunk_t *chunk)
 {
-    JavaLCGInit(chunk->x * 0x4F9939F508L + chunk->z * 0x1F38D3E7L + cavegen_seed);
+    javaport::Random rng(chunk->x * 0x4F9939F508L + chunk->z * 0x1F38D3E7L + cavegen_seed);
     vec3i block_pos(chunk->x * 16, 0, chunk->z * 16);
-    generate_ores(block_pos, chunk);
-    generate_trees(block_pos, chunk);
+    generate_ores(block_pos, chunk, rng);
+    generate_trees(block_pos, chunk, rng);
+
+    if (rng.nextInt(4) == 0)
+    {
+        javaport::WorldGenLakes lake_gen(BlockID::water);
+        vec3i pos(rng.nextInt(16) + block_pos.x, rng.nextInt(128), rng.nextInt(16) + block_pos.z);
+        lake_gen.generate(rng, pos);
+    }
+
+    if (rng.nextInt(8) == 0)
+    {
+        javaport::WorldGenLakes lava_lake_gen(BlockID::lava);
+        vec3i pos(rng.nextInt(16) + block_pos.x, rng.nextInt(128), rng.nextInt(16) + block_pos.z);
+        if (pos.y < 64 || rng.nextInt(10) == 0)
+            lava_lake_gen.generate(rng, pos);
+    }
+
+    javaport::WorldGenLiquids water_liquid_gen(BlockID::water);
+    for (int i = 0; i < 50; i++)
+    {
+        vec3i pos(rng.nextInt(16) + 8, rng.nextInt(120) + 8, rng.nextInt(16) + 8);
+        water_liquid_gen.generate(rng, pos + block_pos);
+    }
+
+    javaport::WorldGenLiquids lava_gen(BlockID::lava);
+    for (int i = 0; i < 20; i++)
+    {
+        vec3i pos(rng.nextInt(16) + 8, rng.nextInt(rng.nextInt(rng.nextInt(112) + 8) + 8), rng.nextInt(16) + 8);
+        lava_gen.generate(rng, pos + block_pos);
+    }
 }
 
 void generate_chunk()
@@ -326,10 +356,9 @@ void generate_chunk()
     // it's used for storing the noise value for later parts of the
     // terrain generation, like the altitude of trees and caves.
     vec3i noise_size(16, 1, 16);
-
-    JavaLCGInit(cavegen_seed);
-    int32_t off_x = JavaLCGIntN(0xFFFFF);
-    int32_t off_z = JavaLCGIntN(0xFFFFF);
+    javaport::Random rng(cavegen_seed);
+    int32_t off_x = rng.nextInt(0xFFFFF);
+    int32_t off_z = rng.nextInt(0xFFFFF);
     vec3i sand_off(off_x, 0, off_z);
 
     improved_noise.GetNoiseSet(noise_pos, noise_size, 32, 2, terrain_noise);
@@ -388,9 +417,7 @@ void generate_chunk()
     chunk->generation_stage = ChunkGenStage::cavegen;
 
     // Carve caves
-    JavaLCGInit(cavegen_seed);
-    off_x = (JavaLCG() / 2L) * 2L + 1L;
-    off_z = (JavaLCG() / 2L) * 2L + 1L;
+    javaport::MapGenCaves cavegen;
 
     static BlockID carved[16 * 16 * 256];
 
@@ -399,15 +426,7 @@ void generate_chunk()
     {
         carved[i] = block->get_blockid();
     }
-
-    for (int32_t curr_x = chunk->x - MapGenCaves::max_off; curr_x <= chunk->x + MapGenCaves::max_off; ++curr_x)
-    {
-        for (int32_t curr_z = chunk->z - MapGenCaves::max_off; curr_z <= chunk->z + MapGenCaves::max_off; ++curr_z)
-        {
-            JavaLCGInit(((int64_t)curr_x * off_x + (int64_t)curr_z * off_z) ^ cavegen_seed);
-            MapGenCaves::gen_node(curr_x, curr_z, chunk->x, chunk->z, carved);
-        }
-    }
+    cavegen.generate(chunk, cavegen_seed, carved);
 
     block = chunk->blockstates;
     for (int32_t i = 0; i < 16 * 16 * 256; i++, block++)
@@ -448,6 +467,7 @@ void generate_chunk()
             if (neighbor)
             {
                 generate_features(neighbor);
+                usleep(100);
 
                 // Update the VBOs of the neighboring chunks
                 for (int i = 0; i < 16; i++)
@@ -580,11 +600,15 @@ void update_block_at(const vec3i &pos)
     if (prop.m_fall)
     {
         BlockID block_below = get_block_id_at(pos + vec3i(0, -1, 0), BlockID::stone, chunk);
-        if (block_below == BlockID::air || properties(block_below).m_fluid)
+        // Hopefully this prevents crashes caused by fluids colliding with falling blocks far away
+        if (chunk->player_taxicab_distance() < SIMULATION_DISTANCE * 16)
         {
-            chunk->entities.push_back(new falling_block_entity_t(*block, pos));
-            block->set_blockid(BlockID::air);
-            block->meta = 0;
+            if (block_below == BlockID::air || properties(block_below).m_fluid)
+            {
+                chunk->entities.push_back(new falling_block_entity_t(*block, pos));
+                block->set_blockid(BlockID::air);
+                block->meta = 0;
+            }
         }
     }
     chunk->update_height_map(pos);
