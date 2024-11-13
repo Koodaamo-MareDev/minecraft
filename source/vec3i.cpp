@@ -47,12 +47,12 @@ vec3f vec3i::operator-(vec3f const &a) const
     return vec3f{x - a.x, y - a.y, z - a.z};
 }
 
-vec3i vec3i::operator*(int const &a) const
+vec3i vec3i::operator*(int32_t const &a) const
 {
     return vec3i{x * a, y * a, z * a};
 }
 
-vec3i vec3i::operator/(int const &a) const
+vec3i vec3i::operator/(int32_t const &a) const
 {
     return vec3i{x / a, y / a, z / a};
 }
@@ -67,7 +67,7 @@ vfloat_t vec3i::magnitude() const
     return Q_sqrt_d(x * x + y * y + z * z);
 }
 
-vfloat_t vec3i::sqr_magnitude() const
+uint32_t vec3i::sqr_magnitude() const
 {
-    return x * x + y * y + z * z;
+    return uint32_t(x * x) + uint32_t(y * y) + uint32_t(z * z);
 }

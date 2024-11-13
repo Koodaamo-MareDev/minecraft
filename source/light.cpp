@@ -130,10 +130,10 @@ void __update_light(std::pair<vec3i, chunk_t *> update)
             light_updates.clear();
             return;
         }
-        std::pair item = light_updates.front();
+        std::pair item = light_updates.back();
         vec3i pos = item.first;
         chunk_t *chunk = item.second;
-        light_updates.pop_front();
+        light_updates.pop_back();
 
         if (pos.y > 255 || pos.y < 0)
             continue;
@@ -141,7 +141,7 @@ void __update_light(std::pair<vec3i, chunk_t *> update)
         {
             continue;
         }
-        vec3i chunk_pos = block_to_chunk_pos(pos);
+        vec2i chunk_pos = block_to_chunk_pos(pos);
         int map_index = ((pos.x & 15) << 4) | (pos.z & 15);
 
         block_t *block = chunk->get_block(pos);
@@ -179,7 +179,7 @@ void __update_light(std::pair<vec3i, chunk_t *> update)
                     std::pair<vec3i, chunk_t *> update = std::make_pair(pos + face_offsets[i], chunk);
                     if (block_to_chunk_pos(update.first) != chunk_pos)
                     {
-                        update.second = get_chunk_from_pos(update.first, false, false);
+                        update.second = get_chunk_from_pos(update.first);
                     }
                     light_updates.push_back(update);
                 }

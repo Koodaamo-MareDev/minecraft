@@ -1,6 +1,7 @@
 #ifndef _CHUNK_NEW_HPP_
 #define _CHUNK_NEW_HPP_
 
+#include "vec2i.hpp"
 #include "vec3i.hpp"
 #include "vec3f.hpp"
 #include "block.hpp"
@@ -13,7 +14,7 @@
 #define SIMULATION_DISTANCE 2
 #define RENDER_DISTANCE 4
 #define CHUNK_COUNT ((RENDER_DISTANCE) * (RENDER_DISTANCE + 1) * 4)
-#define GENERATION_DISTANCE ((RENDER_DISTANCE - 1) * 16)
+#define GENERATION_DISTANCE (RENDER_DISTANCE - 1)
 #define VERTICAL_SECTION_COUNT 16
 
 #define WORLDGEN_TREE_ATTEMPTS 8
@@ -35,12 +36,19 @@ enum class ChunkGenStage : uint8_t
 };
 
 extern guVector player_pos;
+extern uint32_t world_tick;
+extern int world_seed;
+
+inline vec2i block_to_chunk_pos(const vec3i &pos)
+{
+    return vec2i((pos.x & ~0xF) >> 4, (pos.z & ~0xF) >> 4);
+}
 
 class vbo_buffer_t
 {
 public:
-    void *buffer;
-    uint32_t length;
+    void *buffer = nullptr;
+    uint32_t length = 0;
 
     vbo_buffer_t() : buffer(nullptr), length(0)
     {
@@ -92,15 +100,15 @@ public:
     int32_t x = 0;
     uint8_t y = 0;
     int32_t z = 0;
-    vbo_buffer_t solid;
-    vbo_buffer_t cached_solid;
-    vbo_buffer_t transparent;
-    vbo_buffer_t cached_transparent;
+    vbo_buffer_t solid = vbo_buffer_t();
+    vbo_buffer_t cached_solid = vbo_buffer_t();
+    vbo_buffer_t transparent = vbo_buffer_t();
+    vbo_buffer_t cached_transparent = vbo_buffer_t();
 
     bool has_solid_fluid = false;
     bool has_transparent_fluid = false;
 
-    float player_taxicab_distance()
+    int player_taxicab_distance()
     {
         return std::abs((this->x & ~15) - (int(std::floor(player_pos.x)) & ~15)) + std::abs((this->y & ~15) - (int(std::floor(player_pos.y)) & ~15)) + std::abs((this->z & ~15) - (int(std::floor(player_pos.z)) & ~15));
     }
@@ -123,7 +131,7 @@ public:
     block_t blockstates[16 * 16 * 256] = {0};
     uint8_t height_map[16 * 16] = {0};
     uint8_t terrain_map[16 * 16] = {0};
-    chunkvbo_t vbos[VERTICAL_SECTION_COUNT];
+    chunkvbo_t vbos[VERTICAL_SECTION_COUNT] = {0};
     uint8_t has_fluid_updates[VERTICAL_SECTION_COUNT] = {1};
     uint32_t light_update_count = 0;
     std::vector<aabb_entity_t *> entities;
@@ -148,7 +156,7 @@ public:
      */
     block_t *try_get_block(const vec3i &pos)
     {
-        if (block_to_chunk_pos(pos) != vec3i(this->x, 0, this->z))
+        if (block_to_chunk_pos(pos) != vec2i(this->x, this->z))
             return nullptr;
         return &this->blockstates[(pos.x & 0xF) | ((pos.y & 0xFF) << 8) | ((pos.z & 0xF) << 4)];
     }
@@ -173,7 +181,7 @@ public:
      */
     void try_set_block(const vec3i &pos, BlockID block_id)
     {
-        if (block_to_chunk_pos(pos) != vec3i(this->x, 0, this->z))
+        if (block_to_chunk_pos(pos) != vec2i(this->x, this->z))
             return;
         this->blockstates[(pos.x & 0xF) | ((pos.y & 0xFF) << 8) | ((pos.z & 0xF) << 4)].set_blockid(block_id);
     }
@@ -206,9 +214,9 @@ public:
         block->set_blockid(id);
     }
 
-    float player_taxicab_distance()
+    int32_t player_taxicab_distance()
     {
-        return std::abs((this->x << 4) - (int(std::floor(player_pos.x)) & ~15)) + std::abs((this->z << 4) - (int(std::floor(player_pos.z)) & ~15));
+        return std::abs((this->x << 4) - (int32_t(std::floor(player_pos.x)) & ~15)) + std::abs((this->z << 4) - (int32_t(std::floor(player_pos.z)) & ~15));
     }
 
     bool operator<(chunk_t &other)
@@ -220,9 +228,6 @@ public:
     void light_up();
     void recalculate_visibility(block_t *block, vec3i pos);
     void recalculate_section_visibility(int section);
-    void build_all_vbos();
-    void destroy_vbo(int section, unsigned char which);
-    void rebuild_vbo(int section, bool transparent);
     int build_vbo(int section, bool transparent);
     int render_fluid(block_t *block, const vec3i &pos);
     int pre_render_fluid_mesh(int section, bool transparent);
@@ -263,10 +268,10 @@ BlockID get_block_id_at(const vec3i &position, BlockID default_id = BlockID::air
 block_t *get_block_at(const vec3i &vec, chunk_t *near = nullptr);
 void set_block_at(const vec3i &pos, BlockID id, chunk_t *near = nullptr);
 void replace_air_at(vec3i pos, BlockID id, chunk_t *near = nullptr);
-vec3i block_to_chunk_pos(vec3i pos);
-chunk_t *get_chunk_from_pos(const vec3i &pos, bool load, bool write_cache = true);
-chunk_t *get_chunk(const vec3i &pos, bool load, bool write_cache = true);
-void add_chunk(vec3i pos);
+chunk_t *get_chunk_from_pos(const vec3i &pos);
+chunk_t *get_chunk(int32_t x, int32_t z);
+chunk_t *get_chunk(const vec2i &pos);
+bool add_chunk(int32_t x, int32_t z);
 void generate_chunk();
 void *get_aligned_pointer_32(void *ptr);
 void get_neighbors(const vec3i &pos, block_t **neighbors, chunk_t *near = nullptr);

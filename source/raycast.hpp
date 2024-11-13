@@ -38,7 +38,7 @@ inline double intbound(double s, double ds)
 inline int checkabove(vec3i pos, chunk_t *chunk = nullptr)
 {
     block_t *block = nullptr;
-    chunk = chunk ? chunk : get_chunk_from_pos(pos, false, false);
+    chunk = chunk ? chunk : get_chunk_from_pos(pos);
     if (!chunk)
         return pos.y;
     // Starting from the y coordinate, cast a ray up that stops at the first (partially) opaque block.
@@ -51,7 +51,7 @@ inline int checkabove(vec3i pos, chunk_t *chunk = nullptr)
 inline int checkbelow(vec3i pos, chunk_t *chunk = nullptr)
 {
     block_t *block = nullptr;
-    chunk = chunk ? chunk : get_chunk_from_pos(pos, false, false);
+    chunk = chunk ? chunk : get_chunk_from_pos(pos);
     if (!chunk)
         return pos.y;
     // Starting from the y coordinate, cast a ray down that stops at the first (partially) opaque block.
@@ -64,7 +64,7 @@ inline int checkbelow(vec3i pos, chunk_t *chunk = nullptr)
 inline int skycast(vec3i pos, chunk_t *chunk = nullptr)
 {
     block_t *block = nullptr;
-    chunk = chunk ? chunk : get_chunk_from_pos(pos, false, false);
+    chunk = chunk ? chunk : get_chunk_from_pos(pos);
     if (!chunk)
         return -9999;
     // Starting from world height limit, cast a ray down that stops at the first (partially) opaque block.
@@ -592,7 +592,7 @@ inline void explode_raycast(vec3f origin, vec3f direction, float intensity, chun
                     break;
                 if (block->get_blockid() == BlockID::tnt)
                 {
-                    get_chunk_from_pos(block_pos, false)->entities.push_back(new exploding_block_entity_t(*block, block_pos, rand() % 20 + 10));
+                    get_chunk_from_pos(block_pos)->entities.push_back(new exploding_block_entity_t(*block, block_pos, rand() % 20 + 10));
                 }
                 block->set_blockid(BlockID::air);
                 block->meta = 0;

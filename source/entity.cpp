@@ -36,7 +36,7 @@ bool aabb_entity_t::can_remove()
     if (entity_pos.y > 255)
         return false;
     vec3i int_pos = vec3i(std::floor(entity_pos.x), std::floor(entity_pos.y), std::floor(entity_pos.z));
-    chunk_t *curr_chunk = get_chunk_from_pos(int_pos, false);
+    chunk_t *curr_chunk = get_chunk_from_pos(int_pos);
     if (!curr_chunk)
         return true;
     if (int_pos.y < 0 || int_pos.y >= 256)
@@ -379,7 +379,7 @@ vec3f aabb_entity_t::simple_pathfind(vec3f target)
 falling_block_entity_t::falling_block_entity_t(block_t block_state, const vec3i &position) : aabb_entity_t(0.999f, 0.999f), block_state(block_state)
 {
     aabb_entity_t(0.999f, 0.999f);
-    chunk = get_chunk_from_pos(position, false);
+    chunk = get_chunk_from_pos(position);
     set_position(vec3f(position.x, position.y, position.z) + vec3f(0.5, 0, 0.5));
     this->walk_sound = false;
     this->drag_phase = drag_phase_t::after_friction;
@@ -528,7 +528,7 @@ void creeper_entity_t::tick()
         {
             for (int z = position.z - 16; z <= position.z + 16 && !follow_entity; z += 16)
             {
-                chunk_t *chunk = get_chunk_from_pos(vec3i(x, 0, z), false, false);
+                chunk_t *chunk = get_chunk_from_pos(vec3i(x, 0, z));
                 if (!chunk)
                     continue;
                 for (aabb_entity_t *entity : chunk->entities)

@@ -4,7 +4,7 @@ namespace javaport
 {
     bool WorldGenLakes::generate(Random &rng, vec3i pos)
     {
-        chunk_t *chunk = get_chunk_from_pos(pos, false, false);
+        chunk_t *chunk = get_chunk_from_pos(pos);
         if (!chunk)
             return false;
 

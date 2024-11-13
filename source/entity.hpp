@@ -35,6 +35,7 @@ public:
         before_friction = false,
         after_friction = true,
     };
+    uint32_t last_world_tick = 0;
     uint16_t ticks_existed = 0;
     aabb_t aabb;
     vec3f rotation = vec3f(0, 0, 0);

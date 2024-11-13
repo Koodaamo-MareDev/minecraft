@@ -369,7 +369,7 @@ int main(int argc, char **argv)
                 else
                 {
                     // Add the player to the chunks
-                    chunk_t *player_chunk = get_chunk_from_pos(vec3i(0, 0, 0), false, false);
+                    chunk_t *player_chunk = get_chunk_from_pos(vec3i(0, 0, 0));
                     if (player_chunk)
                     {
                         player = new aabb_entity_t(0.6, 1.8);
@@ -403,6 +403,7 @@ int main(int argc, char **argv)
 
         for (int i = lastEntityTick, count = 0; i < tickCounter && count < 10; i++, count++)
         {
+            world_tick++;
             for (chunk_t *&chunk : chunks)
             {
                 // Update the entities in the chunk
@@ -601,7 +602,7 @@ void UpdateLoadingStatus()
             for (int z = -1; z <= 1 && !is_loading; z++)
             {
                 vec3i chunk_pos = player_chunk_pos + vec3i(x * 16, 0, z * 16);
-                chunk_t *chunk = get_chunk_from_pos(chunk_pos, false, false);
+                chunk_t *chunk = get_chunk_from_pos(chunk_pos);
                 if (!chunk)
                 {
                     is_loading = true;
@@ -830,7 +831,7 @@ void GetInput()
             {
                 block_pos = block_pos + face;
                 vec3f pos = vec3f(block_pos.x, block_pos.y, block_pos.z) + vec3f(0.5, 0.5, 0.5);
-                CreateExplosion(pos, 3, get_chunk_from_pos(block_pos, false, false));
+                CreateExplosion(pos, 3, get_chunk_from_pos(block_pos));
             }
         }
     }
@@ -911,35 +912,30 @@ inline void RecalcSectionWater(chunk_t *chunk, int section)
 
 void GenerateChunks(int count)
 {
-    const int start_x = (int(player_pos.x - GENERATION_DISTANCE) & ~15);
-    const int start_z = (int(player_pos.z - GENERATION_DISTANCE) & ~15);
-    const int end_x = start_x + GENERATION_DISTANCE * 2;
-    const int end_z = start_z + GENERATION_DISTANCE * 2;
+    const int center_x = (int(std::floor(player_pos.x)) >> 4);
+    const int center_z = (int(std::floor(player_pos.z)) >> 4);
+    const int start_x = center_x - GENERATION_DISTANCE;
+    const int start_z = center_z - GENERATION_DISTANCE;
 
-    int generated = 0;
-    for (int x = start_x; count && x <= end_x; x += 16)
+    for (int x = start_x, rx = -GENERATION_DISTANCE; count && rx <= GENERATION_DISTANCE; x++, rx++)
     {
-        for (int z = start_z; count && z <= end_z; z += 16)
+        for (int z = start_z, rz = -GENERATION_DISTANCE; count && rz <= GENERATION_DISTANCE; z++, rz++)
         {
-            float hdistance = std::abs((start_x & ~15) - (int(player_pos.x) & ~15)) + std::abs((start_z & ~15) - (int(player_pos.z) & ~15));
-            if (hdistance > RENDER_DISTANCE * 24)
+            if (std::abs(rx) + std::abs(rz) > ((RENDER_DISTANCE * 3) >> 1))
                 continue;
-            if (!get_chunk_from_pos(vec3i(x, 0, z), true, false))
-            {
+            if (add_chunk(x, z))
                 count--;
-                generated++;
-            }
         }
     }
 }
 
 void RemoveRedundantChunks(std::deque<chunk_t *> &chunks)
 {
-    WRAP_ASYNC_FUNC(chunk_mutex, chunks.erase(
-                                     std::remove_if(chunks.begin(), chunks.end(),
-                                                    [](chunk_t *&c)
-                                                    {if(!c) return true; if(c->generation_stage == ChunkGenStage::invalid) {delete c; c = nullptr; return true;} return false; }),
-                                     chunks.end()));
+    chunks.erase(
+        std::remove_if(chunks.begin(), chunks.end(),
+                       [](chunk_t *&c)
+                       {if(!c) return true; if(c->generation_stage == ChunkGenStage::invalid) {delete c; c = nullptr; return true;} return false; }),
+        chunks.end());
 }
 
 void PrepareChunkRemoval(chunk_t *chunk)
@@ -1070,7 +1066,7 @@ void EditBlocks()
 
                     if (old_blockid == BlockID::tnt)
                     {
-                        get_chunk_from_pos(editable_pos, false)->entities.push_back(new exploding_block_entity_t(old_block, editable_pos, 80));
+                        get_chunk_from_pos(editable_pos)->entities.push_back(new exploding_block_entity_t(old_block, editable_pos, 80));
                     }
                 }
                 else if (place_block)
@@ -1142,16 +1138,20 @@ void UpdateChunkData(frustum_t &frustum, std::deque<chunk_t *> &chunks)
     int light_up_calls = 0;
     for (chunk_t *&chunk : chunks)
     {
-        if (chunk && (chunk->generation_stage == ChunkGenStage::done || chunk->generation_stage == ChunkGenStage::features))
+        if (chunk)
         {
             float hdistance = chunk->player_taxicab_distance();
-            if (hdistance > RENDER_DISTANCE * 24 + 16)
+            if (hdistance > RENDER_DISTANCE * 24 + 24)
             {
                 PrepareChunkRemoval(chunk);
                 continue;
             }
+
             if (chunk->generation_stage != ChunkGenStage::done)
                 continue;
+
+            bool visible = (hdistance <= std::max(RENDER_DISTANCE * 16 * fog_depth_multiplier, 16.0f));
+
             // Tick chunks
             for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
             {
@@ -1160,7 +1160,7 @@ void UpdateChunkData(frustum_t &frustum, std::deque<chunk_t *> &chunks)
                 vbo.y = j * 16;
                 vbo.z = chunk->z * 16;
                 float vdistance = std::abs(vbo.y - player_pos.y);
-                vbo.visible = (vdistance <= std::max(RENDER_DISTANCE * 12 * fog_depth_multiplier, 16.0f)) && (hdistance <= std::max(RENDER_DISTANCE * 16 * fog_depth_multiplier, 16.0f));
+                vbo.visible = visible && (vdistance <= std::max(RENDER_DISTANCE * 12 * fog_depth_multiplier, 16.0f));
                 if (chunk->has_fluid_updates[j] && vdistance <= SIMULATION_DISTANCE * 16 && tickCounter - lastWaterTick >= 5)
                     RecalcSectionWater(chunk, j);
             }
@@ -1201,7 +1201,7 @@ void UpdateChunkVBOs(std::deque<chunk_t *> &chunks)
                     if (i == 2)
                         i = 4;
                     // Check if the surrounding chunk exists and has no lighting updates pending
-                    chunk_t *surrounding_chunk = get_chunk(vec3i(chunk->x + face_offsets[i].x, 0, chunk->z + face_offsets[i].z), false);
+                    chunk_t *surrounding_chunk = get_chunk(chunk->x + face_offsets[i].x, chunk->z + face_offsets[i].z);
                     if (!surrounding_chunk || surrounding_chunk->light_update_count || surrounding_chunk->generation_stage != ChunkGenStage::done)
                     {
                         surrounding = false;
@@ -1227,9 +1227,8 @@ void UpdateChunkVBOs(std::deque<chunk_t *> &chunks)
         {
             chunkvbo_t &vbo = *vbo_ptr;
             int vbo_i = vbo.y >> 4;
-            chunk_t *chunk = get_chunk_from_pos(vec3i(vbo.x, 0, vbo.z), false);
+            chunk_t *chunk = get_chunk_from_pos(vec3i(vbo.x, 0, vbo.z));
             vbo.dirty = false;
-            chunk->recalculate_section_visibility(vbo_i);
             chunk->build_vbo(vbo_i, false);
             chunk->build_vbo(vbo_i, true);
             vbos_to_update.push_back(vbo_ptr);
@@ -1272,7 +1271,7 @@ void UpdateScene(frustum_t &frustum, std::deque<chunk_t *> &chunks)
     {
         // Spawn a creeper at the player's position
         vec3f pos = player->get_position(std::fmod(partialTicks, 1));
-        chunk_t *creeper_chunk = get_chunk_from_pos(vec3i(pos.x, pos.y, pos.z), false, false);
+        chunk_t *creeper_chunk = get_chunk_from_pos(vec3i(pos.x, pos.y, pos.z));
         if (creeper_chunk)
         {
             creeper_entity_t *creeper = new creeper_entity_t(pos);

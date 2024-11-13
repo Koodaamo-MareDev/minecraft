@@ -1,6 +1,7 @@
 #include "chunk_new.hpp"
 #include "blocks.hpp"
 #include "texturedefs.h"
+#include "vec2i.hpp"
 #include "vec3i.hpp"
 #include "blocks.hpp"
 #include "timers.hpp"
@@ -38,7 +39,8 @@ void *get_aligned_pointer_32(void *ptr)
 {
     return (void *)((u64(ptr) + 0x1F) & (~0x1F));
 }
-int cavegen_seed = 0;
+int world_seed = 0;
+uint32_t world_tick = 0;
 ImprovedNoise improved_noise;
 mutex_t chunk_mutex;
 lwp_t __chunk_generator_thread_handle = (lwp_t)NULL;
@@ -68,22 +70,22 @@ std::deque<chunk_t *> &get_chunks()
     return chunks;
 }
 
-chunk_t *get_chunk_from_pos(const vec3i &pos, bool load, bool write_cache)
+chunk_t *get_chunk_from_pos(const vec3i &pos)
 {
-    return get_chunk(block_to_chunk_pos(pos), load, write_cache);
+    return get_chunk(block_to_chunk_pos(pos));
 }
 
-std::map<lwp_t, chunk_t *> chunk_cache;
-chunk_t *get_chunk(const vec3i &pos, bool load, bool write_cache)
+chunk_t *get_chunk(const vec2i &pos)
 {
-    std::deque<chunk_t *>::iterator it = std::find_if(chunks.begin(), chunks.end(), [pos](chunk_t *chunk)
-                                                      { return chunk && chunk->x == pos.x && chunk->z == pos.z; });
+    return get_chunk(pos.x, pos.y);
+}
+
+chunk_t *get_chunk(int32_t x, int32_t z)
+{
+    std::deque<chunk_t *>::iterator it = std::find_if(chunks.begin(), chunks.end(), [x, z](chunk_t *chunk)
+                                                      { return chunk && chunk->x == x && chunk->z == z; });
     if (it == chunks.end())
-    {
-        if (load)
-            add_chunk(pos);
         return nullptr;
-    }
     chunk_t *chunk = *it;
     if (LWP_GetSelf() != GX_GetCurrentGXThread() && it != chunks.begin())
         std::swap(*it, chunks.front());
@@ -91,45 +93,40 @@ chunk_t *get_chunk(const vec3i &pos, bool load, bool write_cache)
     return chunk;
 }
 
-void add_chunk(vec3i pos)
+bool add_chunk(int32_t x, int32_t z)
 {
-    static bool in_progress = false;
-    if (in_progress)
-        return;
     if (pending_chunks.size() + chunks.size() >= CHUNK_COUNT)
-        return;
-    auto add_later = [pos]()
+        return false;
+    lock_t chunk_lock(chunk_mutex);
+    for (chunk_t *&m_chunk : pending_chunks)
     {
-        for (chunk_t *&m_chunk : pending_chunks)
+        if (m_chunk && m_chunk->x == x && m_chunk->z == z)
         {
-            if (m_chunk && m_chunk->x == pos.x && m_chunk->z == pos.z)
-            {
-                in_progress = false;
-                return;
-            }
+            return false;
         }
+    }
+    for (chunk_t *&m_chunk : chunks)
+    {
+        if (m_chunk && m_chunk->x == x && m_chunk->z == z)
+        {
+            return false;
+        }
+    }
 
-        for (chunk_t *&m_chunk : chunks)
-        {
-            if (m_chunk && m_chunk->x == pos.x && m_chunk->z == pos.z)
-            {
-                in_progress = false;
-                return;
-            }
-        }
-        chunk_t *chunk = new chunk_t;
-        if (chunk)
-        {
-            chunk->x = pos.x;
-            chunk->z = pos.z;
-            chunk->generation_stage = ChunkGenStage::empty;
-            pending_chunks.push_back(chunk);
-            std::sort(pending_chunks.begin(), pending_chunks.end(), chunk_sorter_reverse);
-        }
-        in_progress = false;
-    };
-    in_progress = true;
-    new async_func(chunk_mutex, add_later);
+    chunk_t *chunk = new chunk_t;
+    if (chunk)
+    {
+        chunk->x = x;
+        chunk->z = z;
+        chunk->generation_stage = ChunkGenStage::empty;
+        pending_chunks.push_back(chunk);
+        std::sort(pending_chunks.begin(), pending_chunks.end(), chunk_sorter);
+        return true;
+    }
+
+    printf("Failed to allocate memory for chunk\n");
+
+    return false;
 }
 
 inline bool in_range(int x, int min, int max)
@@ -291,7 +288,7 @@ void generate_ores(vec3i neighbor_pos, chunk_t *chunk, javaport::Random &rng)
 extern aabb_entity_t *player;
 void generate_features(chunk_t *chunk)
 {
-    javaport::Random rng(chunk->x * 0x4F9939F508L + chunk->z * 0x1F38D3E7L + cavegen_seed);
+    javaport::Random rng(chunk->x * 0x4F9939F508L + chunk->z * 0x1F38D3E7L + world_seed);
     vec3i block_pos(chunk->x * 16, 0, chunk->z * 16);
     generate_ores(block_pos, chunk, rng);
     generate_trees(block_pos, chunk, rng);
@@ -333,7 +330,7 @@ void generate_chunk()
     chunk_t *chunk = pending_chunks.back();
     if (!chunk || chunk->generation_stage != ChunkGenStage::empty)
         return;
-
+    printf("Start generation of chunk %d, %d\n", chunk->x, chunk->z);
     chunk->generation_stage = ChunkGenStage::heightmap;
 
     int x_offset = (chunk->x * 16);
@@ -344,7 +341,7 @@ void generate_chunk()
     // the amount of unnecessary calls to the noise generator.
     uint8_t max_height = 0;
 
-    static float terrain_noise[4096];
+    static float terrain_noise[256];
     static float sand_noise[256];
 
     vec3i noise_block_pos(x_offset, 512, z_offset);
@@ -356,13 +353,12 @@ void generate_chunk()
     // it's used for storing the noise value for later parts of the
     // terrain generation, like the altitude of trees and caves.
     vec3i noise_size(16, 1, 16);
-    javaport::Random rng(cavegen_seed);
+    javaport::Random rng(world_seed);
     int32_t off_x = rng.nextInt(0xFFFFF);
     int32_t off_z = rng.nextInt(0xFFFFF);
     vec3i sand_off(off_x, 0, off_z);
 
     improved_noise.GetNoiseSet(noise_pos, noise_size, 32, 2, terrain_noise);
-    usleep(1000);
     improved_noise.GetNoiseSet(noise_pos + sand_off, noise_size, 24, 1, sand_noise);
 
     index = 0;
@@ -426,7 +422,7 @@ void generate_chunk()
     {
         carved[i] = block->get_blockid();
     }
-    cavegen.generate(chunk, cavegen_seed, carved);
+    cavegen.generate(chunk, world_seed, carved);
 
     block = chunk->blockstates;
     for (int32_t i = 0; i < 16 * 16 * 256; i++, block++)
@@ -441,7 +437,7 @@ void generate_chunk()
     index = 0;
     for (int z = 0; z < 16; z++)
         for (int x = 0; x < 16; x++, index++)
-            chunk->terrain_map[index] = skycast(vec3i(x + x_offset, chunk->terrain_map[index], z + z_offset), chunk);
+            chunk->terrain_map[index] = skycast(vec3i(x, chunk->terrain_map[index], z), chunk);
 
     // If the chunk generator has already been de-initialized
     // during generation, clean up the chunk and return
@@ -463,7 +459,7 @@ void generate_chunk()
             if ((x - chunk->x) && (z - chunk->z))
                 continue;
             // Attempt to generate features for the neighboring chunks
-            chunk_t *neighbor = get_chunk(vec3i(x, 0, z), false, false);
+            chunk_t *neighbor = get_chunk(x, z);
             if (neighbor)
             {
                 generate_features(neighbor);
@@ -471,12 +467,16 @@ void generate_chunk()
 
                 // Update the VBOs of the neighboring chunks
                 for (int i = 0; i < 16; i++)
+                {
                     neighbor->vbos[i].dirty = true;
+                    neighbor->recalculate_section_visibility(i);
+                }
             }
         }
     }
 
     chunk->generation_stage = ChunkGenStage::done;
+    printf("End generation of chunk %d, %d\n", chunk->x, chunk->z);
 }
 
 void print_chunk_status()
@@ -510,7 +510,7 @@ void init_chunks()
 
 void *__chunk_generator_init_internal(void *)
 {
-    improved_noise.Init(cavegen_seed = fastrand());
+    improved_noise.Init(world_seed = fastrand());
 
     while (__chunk_generator_init_done)
     {
@@ -539,7 +539,7 @@ block_t *get_block_at(const vec3i &position, chunk_t *near)
         return nullptr;
     if (near && near->x == (position.x >> 4) && near->z == (position.z >> 4))
         return near->get_block(position);
-    chunk_t *chunk = get_chunk_from_pos(position, false, false);
+    chunk_t *chunk = get_chunk_from_pos(position);
     if (!chunk)
         return nullptr;
     return chunk->get_block(position);
@@ -587,7 +587,7 @@ void update_block_at(const vec3i &pos)
 {
     if (pos.y > 255 || pos.y < 0)
         return;
-    chunk_t *chunk = get_chunk_from_pos(pos, false, false);
+    chunk_t *chunk = get_chunk_from_pos(pos);
     if (!chunk)
         return;
     block_t *block = chunk->get_block(pos);
@@ -612,6 +612,8 @@ void update_block_at(const vec3i &pos)
         }
     }
     chunk->update_height_map(pos);
+    if (block->get_visibility())
+        chunk->recalculate_visibility(block, pos);
     update_light(pos, chunk);
 }
 
@@ -705,36 +707,6 @@ void chunk_t::recalculate_section_visibility(int section)
     }
 }
 
-void chunk_t::destroy_vbo(int section, unsigned char which)
-{
-    if (!which)
-        return;
-    chunkvbo_t &vbo = this->vbos[section];
-    if ((which & VBO_SOLID))
-    {
-        vbo.solid.clear();
-    }
-    if ((which & VBO_TRANSPARENT))
-    {
-        vbo.transparent.clear();
-    }
-}
-
-void chunk_t::build_all_vbos()
-{
-    for (int i = 0; i < VERTICAL_SECTION_COUNT; i++)
-    {
-        this->destroy_vbo(i, VBO_ALL);
-        if (this->build_vbo(i, false) || this->build_vbo(i, true))
-            printf("BuildVBO failed.\n");
-    }
-}
-void chunk_t::rebuild_vbo(int section, bool transparent)
-{
-    destroy_vbo(section, transparent ? VBO_TRANSPARENT : VBO_SOLID);
-    if (this->build_vbo(section, transparent))
-        printf("BuildVBO failed.\n");
-}
 int chunk_t::build_vbo(int section, bool transparent)
 {
     chunkvbo_t &vbo = this->vbos[section];
@@ -847,17 +819,17 @@ int chunk_t::build_vbo(int section, bool transparent)
         printf("Failed to create display list for section %d at (%d, %d)\n", section, this->x, this->z);
         return (2);
     }
+    if (transparent)
+    {
+        vbo.transparent.detach();
+    }
+    else
+    {
+        vbo.solid.detach();
+    }
 
     if (!quadVtxCount && !triVtxCount)
     {
-        if (transparent)
-        {
-            vbo.transparent.detach();
-        }
-        else
-        {
-            vbo.solid.detach();
-        }
         return (0);
     }
 
@@ -1550,11 +1522,17 @@ void chunk_t::update_entities()
     // Update entities
     for (aabb_entity_t *&entity : entities)
     {
+        // Workaround to prevent duplicate updates for entities that moved to a different chunk
+        if (entity->last_world_tick == world_tick)
+            continue;
+
         // Update the entities' positions
         entity->prev_position = entity->position;
 
         // Tick the entity
         entity->tick();
+
+        entity->last_world_tick = world_tick;
     }
 
     // Resolve collisions with current chunk and neighboring chunks' entities
@@ -1562,7 +1540,7 @@ void chunk_t::update_entities()
     {
         if (i == FACE_NY || i == FACE_PY)
             continue;
-        chunk_t *neighbor = (i == 6 ? this : get_chunk(vec3i(this->x + face_offsets[i].x, 0, this->z + face_offsets[i].z), false, false));
+        chunk_t *neighbor = (i == 6 ? this : get_chunk(this->x + face_offsets[i].x, this->z + face_offsets[i].z));
         if (neighbor)
         {
             for (aabb_entity_t *&entity : neighbor->entities)
@@ -1583,7 +1561,7 @@ void chunk_t::update_entities()
     std::vector<aabb_entity_t *> out_of_bounds;
     for (aabb_entity_t *&entity : entities)
     {
-        vec3i entity_pos = vec3i(int(entity->position.x), int(entity->position.y), int(entity->position.z));
+        vec3i entity_pos = vec3i(int(std::floor(entity->position.x)), int(std::floor(entity->position.y)), int(std::floor(entity->position.z)));
         if (entity->can_remove() || entity_pos.x < this->x * 16 || entity_pos.x >= (this->x + 1) * 16 || entity_pos.z < this->z * 16 || entity_pos.z >= (this->z + 1) * 16)
         {
             out_of_bounds.push_back(entity);
@@ -1600,7 +1578,7 @@ void chunk_t::update_entities()
     for (aabb_entity_t *&entity : out_of_bounds)
     {
         vec3i entity_pos = vec3i(int(entity->position.x), int(entity->position.y), int(entity->position.z));
-        chunk_t *new_chunk = get_chunk_from_pos(entity_pos, false, false);
+        chunk_t *new_chunk = get_chunk_from_pos(entity_pos);
 
         // Check if the chunk is loaded
         if (!entity->can_remove() && new_chunk)
@@ -1639,13 +1617,4 @@ uint32_t chunk_t::size()
     for (aabb_entity_t *&entity : entities)
         base_size += entity->size();
     return base_size;
-}
-
-// destroy chunk
-void destroy_chunk(chunk_t *chunk)
-{
-    for (int i = 0; i < VERTICAL_SECTION_COUNT; i++)
-    {
-        chunk->destroy_vbo(i, VBO_ALL);
-    }
 }

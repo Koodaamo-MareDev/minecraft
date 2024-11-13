@@ -27,7 +27,7 @@ SOUND		:=	sound
 # options for code generation
 #---------------------------------------------------------------------------------
 
-CFLAGS	= -g -O1 -Wall $(MACHDEP) $(INCLUDE)
+CFLAGS	= -g -O2 -Wall $(MACHDEP) $(INCLUDE)
 CXXFLAGS	=	$(CFLAGS)
 
 LDFLAGS	=	-g $(MACHDEP) -Wl,-Map,$(notdir $@).map
@@ -115,7 +115,7 @@ $(BUILD):
 #---------------------------------------------------------------------------------
 clean:
 	@echo clean ...
-	rm -fr $(BUILD) $(abspath share/minecraft.elf) $(OUTPUT).elf $(OUTPUT).dol
+	rm -fr $(BUILD) $(OUTPUT).elf $(OUTPUT).dol
 #---------------------------------------------------------------------------------
 run:
 	wiiload $(OUTPUT).dol
@@ -126,8 +126,6 @@ else
 # main targets
 #---------------------------------------------------------------------------------
 $(OUTPUT).dol: $(OUTPUT).elf
-$(abspath ../share/minecraft.elf): $(OUTPUT).elf
-	@cp $< $@
 $(OUTPUT).elf: $(OFILES)
 
 $(OFILES_SOURCES) : $(HFILES)
