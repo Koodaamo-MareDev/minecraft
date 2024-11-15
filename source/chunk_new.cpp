@@ -465,7 +465,6 @@ void generate_chunk()
                 for (int i = 0; i < 16; i++)
                 {
                     neighbor->vbos[i].dirty = true;
-                    neighbor->recalculate_section_visibility(i);
                 }
             }
         }
@@ -608,8 +607,6 @@ void update_block_at(const vec3i &pos)
         }
     }
     chunk->update_height_map(pos);
-    if (block->get_visibility())
-        chunk->recalculate_visibility(block, pos);
     update_light(pos, chunk);
 }
 

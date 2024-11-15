@@ -1272,6 +1272,7 @@ void UpdateChunkVBOs(std::deque<chunk_t *> &chunks)
             int vbo_i = vbo.y >> 4;
             chunk_t *chunk = get_chunk_from_pos(vec3i(vbo.x, 0, vbo.z));
             vbo.dirty = false;
+            chunk->recalculate_section_visibility(vbo_i);
             chunk->build_vbo(vbo_i, false);
             chunk->build_vbo(vbo_i, true);
             vbos_to_update.push_back(vbo_ptr);
