@@ -86,11 +86,7 @@ chunk_t *get_chunk(int32_t x, int32_t z)
                                                       { return chunk && chunk->x == x && chunk->z == z; });
     if (it == chunks.end())
         return nullptr;
-    chunk_t *chunk = *it;
-    if (LWP_GetSelf() != GX_GetCurrentGXThread() && it != chunks.begin())
-        std::swap(*it, chunks.front());
-
-    return chunk;
+    return *it;
 }
 
 bool add_chunk(int32_t x, int32_t z)
