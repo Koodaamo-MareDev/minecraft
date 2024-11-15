@@ -76,6 +76,9 @@ float wiimote_x = 0;
 float wiimote_z = 0;
 float wiimote_rx = 0;
 float wiimote_ry = 0;
+float wiimote_ir_x = 0;
+float wiimote_ir_y = 0;
+bool wiimote_ir_visible = false;
 u32 raw_wiimote_down = 0;
 u32 raw_wiimote_held = 0;
 vec3f left_stick(0, 0, 0);
@@ -534,6 +537,18 @@ int main(int argc, char **argv)
             int crosshair_y = int(viewport.height - 32) >> 1;
 
             draw_textured_quad(icons_texture, crosshair_x, crosshair_y, 32, 32, 0, 0, 16, 16);
+
+            // Draw IR cursor if visible
+            if (wiimote_ir_visible)
+            {
+                // Reset the position matrix
+                Mtx flat_matrix;
+                guMtxIdentity(flat_matrix);
+                guMtxTransApply(flat_matrix, flat_matrix, 0.0F, 0.0F, -0.5F);
+                GX_LoadPosMtxImm(flat_matrix, GX_PNMTX0);
+
+                draw_textured_quad(icons_texture, wiimote_ir_x * viewport.width - 7, wiimote_ir_y * viewport.height - 3, 48, 48, 32, 32, 56, 56);
+            }
         }
         else
             DrawInventory(viewport);
@@ -658,8 +673,14 @@ void GetInput()
     }
     else if (expansion.type == WPAD_EXP_NUNCHUK)
     {
-        // Get the left stick position from the D-pad
-        left_stick = vec3f(0, 0, 0);
+        static int ir_tracking_keep_alive = 0;
+        ir_tracking_keep_alive++;
+        if (ir_tracking_keep_alive > 300)
+        {
+            // Enable IR tracking every 5 seconds to prevent tracking loss due to connection issues
+            ir_tracking_keep_alive = 0;
+            WPAD_SetDataFormat(0, WPAD_FMT_BTNS_ACC_IR);
+        }
 
         u32 nunchuk_held = expansion.nunchuk.btns_held;
         u32 nunchuk_down = expansion.nunchuk.btns_held & ~prev_nunchuk_held;
@@ -668,17 +689,39 @@ void GetInput()
         u32 new_raw_wiimote_down = 0;
         u32 new_raw_wiimote_held = 0;
 
-        if ((raw_wiimote_held & WPAD_BUTTON_LEFT))
-            left_stick.x--;
-        if ((raw_wiimote_held & WPAD_BUTTON_RIGHT))
-            left_stick.x++;
-        if ((raw_wiimote_held & WPAD_BUTTON_UP))
-            left_stick.y++;
-        if ((raw_wiimote_held & WPAD_BUTTON_DOWN))
-            left_stick.y--;
+        // Emulate the right stick with the IR sensor
+        ir_t ir;
+        WPAD_IR(0, &ir);
+        if (ir.valid)
+        {
+            wiimote_ir_visible = true;
+            right_stick.x = (ir.x / ir.vres[0]) - 0.5;
+            right_stick.y = 0.5 - (ir.y / ir.vres[1]);
 
-        if (left_stick.magnitude() > 0.001)
-            left_stick = left_stick.normalize();
+            wiimote_ir_x = ir.x / ir.vres[0];
+            wiimote_ir_y = ir.y / ir.vres[1];
+
+            // Ensure that the coordinates are at least 0.125 away from the center to prevent accidental movement.
+            if (right_stick.magnitude() < 0.125)
+            {
+                right_stick = vec3f(0, 0, 0);
+            }
+            else
+            {
+                // Magnitude of 0.25 or less means that the stick is near the center. 1 means it's at the edge and means it will move at full speed.
+                right_stick = right_stick.normalize() * ((right_stick.magnitude() - 0.125) / 0.875);
+
+                // Multiply the result by 2 since the edges of the screen are difficult to reach as tracking is lost.
+                right_stick = right_stick * 2;
+            }
+        }
+        else
+        {
+            wiimote_ir_visible = false;
+        }
+
+        if (right_stick.magnitude() > 1.0)
+            right_stick = right_stick.normalize();
 
         // Map the Wiimote and Nunchuck buttons to the Classic Controller buttons
         if ((nunchuk_held & NUNCHUK_BUTTON_C))
@@ -709,8 +752,8 @@ void GetInput()
 
         raw_wiimote_down = new_raw_wiimote_down;
         raw_wiimote_held = new_raw_wiimote_held;
-        right_stick.x = float(int(expansion.nunchuk.js.pos.x) - int(expansion.nunchuk.js.center.x)) * 2 / (int(expansion.nunchuk.js.max.x) - 2 - int(expansion.nunchuk.js.min.x));
-        right_stick.y = float(int(expansion.nunchuk.js.pos.y) - int(expansion.nunchuk.js.center.y)) * 2 / (int(expansion.nunchuk.js.max.y) - 2 - int(expansion.nunchuk.js.min.y));
+        left_stick.x = float(int(expansion.nunchuk.js.pos.x) - int(expansion.nunchuk.js.center.x)) * 2 / (int(expansion.nunchuk.js.max.x) - 2 - int(expansion.nunchuk.js.min.x));
+        left_stick.y = float(int(expansion.nunchuk.js.pos.y) - int(expansion.nunchuk.js.center.y)) * 2 / (int(expansion.nunchuk.js.max.y) - 2 - int(expansion.nunchuk.js.min.y));
     }
     else if (expansion.type == WPAD_EXP_CLASSIC)
     {
@@ -1390,6 +1433,12 @@ void DrawInventory(view_t &viewport)
 
     cursor_x += left_stick.x * 8;
     cursor_y -= left_stick.y * 8;
+    if (wiimote_ir_visible)
+    {
+        cursor_x = int(wiimote_ir_x * viewport.width - viewport.width / 2);
+        cursor_y = int(wiimote_ir_y * viewport.height - viewport.height / 2);
+    }
+    bool cursor_in_inventory = cursor_x >= -176 && cursor_x <= 176 && cursor_y >= -220 && cursor_y <= 220;
 
     int slot_x = (cursor_x + 162) / 36;
     int slot_y = (cursor_y + 186) / 36;
@@ -1450,7 +1499,10 @@ void DrawInventory(view_t &viewport)
     GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
 
     // Draw the cursor
-    draw_textured_quad(icons_texture, cursor_x - 16, cursor_y - 16, 32, 32, 0, 32, 32, 64);
+    if (wiimote_ir_visible && !cursor_in_inventory)
+        draw_textured_quad(icons_texture, (wiimote_ir_x - 0.5) * viewport.width - 7, (wiimote_ir_y - 0.5) * viewport.height - 3, 48, 48, 32, 32, 56, 56);
+    else
+        draw_textured_quad(icons_texture, cursor_x - 16, cursor_y - 16, 32, 32, 0, 32, 32, 64);
 }
 
 void DrawSelectedBlock()
