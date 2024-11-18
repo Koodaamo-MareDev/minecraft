@@ -6,7 +6,9 @@
 #include <array>
 
 #include "vec3i.hpp"
-#include "entity.hpp"
+#include <stdexcept>
+
+class aabb_entity_t;
 
 namespace inventory
 {
@@ -41,6 +43,7 @@ namespace inventory
     public:
         uint16_t id = 0;
         uint8_t max_stack = 64;
+        uint8_t texture_index = 0;
         tool_type tool = none;
         tool_tier tier = wood;
         std::function<void(item &, vec3i, vec3i, aabb_entity_t *)> on_use = default_on_use;
@@ -62,11 +65,23 @@ namespace inventory
         uint8_t count;
         uint8_t meta;
 
-        item_stack(uint16_t id = 0, uint8_t count = 1, uint8_t meta = 0) : id(id), count(count), meta(meta) {}
+        item_stack(uint16_t id = 0, uint8_t count = 0, uint8_t meta = 0) : id(id), count(count), meta(meta) {}
 
         item &as_item() const
         {
             return item_list[id];
+        }
+
+        bool empty()
+        {
+            if (count == 0)
+            {
+                // Nullify the item_stack just in case
+                id = 0;
+                meta = 0;
+                return true;
+            }
+            return id == 0;
         }
     };
 
@@ -74,15 +89,25 @@ namespace inventory
     {
     private:
         std::vector<item_stack> stacks;
+        uint32_t usable_slots;
 
     public:
-        container(size_t size)
+        container(size_t size, uint32_t usable_slots) : usable_slots(usable_slots)
         {
+            if (size < usable_slots)
+            {
+                throw std::invalid_argument("Container usable_slots cannot be greater than size");
+            }
             stacks.resize(size);
         }
+        container(size_t size) : container(size, size) {}
 
         item_stack &operator[](size_t index)
         {
+            if (index >= stacks.size())
+            {
+                throw std::out_of_range("Index out of range");
+            }
             return stacks[index];
         }
 
@@ -94,12 +119,12 @@ namespace inventory
         /**
          * @return The maximum number of item_stacks that can be stored
          */
-        size_t size() const;
+        size_t size();
 
         /**
          * @return The number of item_stacks stored
          */
-        size_t count() const;
+        size_t count();
 
         /**
          * Adds the item_stack to the container

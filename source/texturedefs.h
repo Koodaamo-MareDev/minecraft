@@ -15,6 +15,9 @@ extern GXTexObj container_texture;
 extern GXTexObj underwater_texture;
 extern GXTexObj vignette_texture;
 extern GXTexObj creeper_texture;
+extern GXTexObj font_texture;
+extern GXTexObj items_texture;
+extern GXTexObj inventory_texture;
 
 // Animated textures
 extern water_texanim_t water_still_anim;

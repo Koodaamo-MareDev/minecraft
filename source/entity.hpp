@@ -7,6 +7,7 @@
 #include "aabb.hpp"
 #include "block.hpp"
 #include "model.hpp"
+#include "inventory.hpp"
 #include <deque>
 
 constexpr vfloat_t ENTITY_GRAVITY = 9.8f;
@@ -65,7 +66,7 @@ public:
 
     ~aabb_entity_t() {}
 
-    bool collides(aabb_entity_t *other);
+    virtual bool collides(aabb_entity_t *other);
 
     bool can_remove();
 
@@ -75,7 +76,7 @@ public:
 
     virtual void tick();
 
-    virtual void render(float partial_ticks) {}
+    virtual void render(float partial_ticks, bool transparency) {}
 
     virtual size_t size()
     {
@@ -122,7 +123,7 @@ public:
 
     virtual void tick();
 
-    virtual void render(float partial_ticks);
+    virtual void render(float partial_ticks, bool transparency);
 };
 
 class exploding_block_entity_t : public falling_block_entity_t
@@ -133,13 +134,12 @@ public:
 
     virtual void tick();
 
-    virtual void render(float partial_ticks);
+    virtual void render(float partial_ticks, bool transparency);
 };
 
 class creeper_entity_t : public aabb_entity_t
 {
 private:
-
 public:
     vec3f body_rotation;
     uint8_t fuse = creeper_fuse;
@@ -150,9 +150,24 @@ public:
 
     virtual void tick();
 
-    virtual void render(float partial_ticks);
+    virtual void render(float partial_ticks, bool transparency);
 
     virtual bool should_jump();
+};
+
+class item_entity_t : public aabb_entity_t
+{
+public:
+    inventory::item_stack item_stack;
+    item_entity_t(const vec3f &position, const inventory::item_stack &item_stack);
+
+    virtual void tick();
+
+    virtual void render(float partial_ticks, bool transparency);
+
+    virtual void resolve_collision(aabb_entity_t *b);
+
+    virtual bool collides(aabb_entity_t *other);
 };
 
 #endif

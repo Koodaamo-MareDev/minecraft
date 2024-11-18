@@ -28,6 +28,9 @@
 #include "asynclib.hpp"
 #include "particle.hpp"
 #include "sound.hpp"
+#include "inventory.hpp"
+#include "gui.hpp"
+#include "gui_survival.hpp"
 
 #ifdef MONO_LIGHTING
 #include "light_day_mono_rgba.h"
@@ -102,12 +105,16 @@ bool inventory_visible = false;
 bool show_dirtscreen = true;
 bool has_loaded = false;
 
+gui *current_gui = nullptr;
+inventory::container player_inventory(40, 36); // 4 rows of 9 slots, the rest 4 are the armor slots
+
 float fog_depth_multiplier = 1.0f;
 
 void CreateExplosion(vec3f pos, float power, chunk_t *near);
 void UpdateLoadingStatus();
 void UpdateLightDir();
-void DrawInventory(view_t &view);
+void UpdateInventory(view_t &viewport);
+void DrawInventory(view_t &viewport);
 void DrawSelectedBlock();
 void DrawScene(std::deque<chunk_t *> &chunks, bool transparency);
 void GenerateChunks(int count);
@@ -334,9 +341,17 @@ int main(int argc, char **argv)
     std::deque<chunk_t *> &chunks = get_chunks();
 
     sound_system = new sound_system_t();
+    inventory::init_items();
 
     bool in_fluid = false;
     bool in_lava = false;
+
+    player_inventory.add(inventory::item_stack(256, 1));
+    player_inventory.add(inventory::item_stack(257, 1));
+    player_inventory.add(inventory::item_stack(uint8_t(BlockID::cobblestone), 64));
+    player_inventory.add(inventory::item_stack(uint8_t(BlockID::dirt), 16));
+    player_inventory.add(inventory::item_stack(uint8_t(BlockID::wood), 12));
+    player_inventory.add(inventory::item_stack(uint8_t(BlockID::bricks), 64));
 
     while (!isExiting)
     {
@@ -450,6 +465,8 @@ int main(int argc, char **argv)
             camera.position = player_pos;
             camera.rot.x = xrot;
             camera.rot.y = yrot;
+            player->rotation.x = xrot;
+            player->rotation.y = yrot;
         }
 
         // Construct the view frustum matrix from the camera
@@ -532,6 +549,12 @@ int main(int argc, char **argv)
         }
         else if (!inventory_visible)
         {
+            if (current_gui)
+            {
+                current_gui->close();
+                delete current_gui;
+                current_gui = nullptr;
+            }
             // Draw crosshair
             int crosshair_x = int(viewport.width - 32) >> 1;
             int crosshair_y = int(viewport.height - 32) >> 1;
@@ -551,7 +574,14 @@ int main(int argc, char **argv)
             }
         }
         else
+        {
+            if (!current_gui)
+            {
+                current_gui = new gui_survival(viewport, player_inventory);
+            }
+            UpdateInventory(viewport);
             DrawInventory(viewport);
+        }
 
         if (player)
         {
@@ -674,13 +704,13 @@ void GetInput()
     else if (expansion.type == WPAD_EXP_NUNCHUK)
     {
         static int ir_tracking_keep_alive = 0;
-        ir_tracking_keep_alive++;
-        if (ir_tracking_keep_alive > 300)
+        if (ir_tracking_keep_alive % 300 == 0)
         {
             // Enable IR tracking every 5 seconds to prevent tracking loss due to connection issues
             ir_tracking_keep_alive = 0;
             WPAD_SetDataFormat(0, WPAD_FMT_BTNS_ACC_IR);
         }
+        ir_tracking_keep_alive++;
 
         u32 nunchuk_held = expansion.nunchuk.btns_held;
         u32 nunchuk_down = expansion.nunchuk.btns_held & ~prev_nunchuk_held;
@@ -1111,6 +1141,14 @@ void EditBlocks()
                     {
                         get_chunk_from_pos(editable_pos)->entities.push_back(new exploding_block_entity_t(old_block, editable_pos, 80));
                     }
+                    else
+                    {
+                        // Drop items
+                        vec3f item_pos = vec3f(editable_pos.x, editable_pos.y, editable_pos.z) + vec3f(0.5);
+                        item_entity_t *entity = new item_entity_t(item_pos, inventory::item_stack(uint8_t(old_blockid), 1, old_block.meta));
+                        entity->velocity = vec3f(rng.nextFloat() - .5f, rng.nextFloat(), rng.nextFloat() - .5f) * 0.25f;
+                        get_chunk_from_pos(editable_pos)->entities.push_back(entity);
+                    }
                 }
                 else if (place_block)
                 {
@@ -1342,166 +1380,52 @@ void UpdateScene(frustum_t &frustum, std::deque<chunk_t *> &chunks)
     }
 }
 
+void UpdateInventory(view_t &viewport)
+{
+    if (!current_gui)
+        return;
+
+    cursor_x += left_stick.x * 8;
+    cursor_y -= left_stick.y * 8;
+
+    if (!wiimote_ir_visible)
+    {
+        // Since you can technically go out of bounds using a joystick, we need to clamp the cursor position; it'd be really annoying losing the cursor
+        cursor_x = std::clamp(cursor_x, 0, int(viewport.width));
+        cursor_y = std::clamp(cursor_y, 0, int(viewport.height));
+    }
+    current_gui->update();
+}
+
 void DrawInventory(view_t &viewport)
 {
-    std::deque<chunk_t *> &chunks = get_chunks();
-    if (chunks.size() == 0)
+    if (!current_gui)
+        return;
+
+    // This is required as blocks require a dummy chunk to be rendered
+    if (!get_chunks().size())
         return;
 
     // Disable depth testing for GUI elements
     GX_SetZMode(GX_TRUE, GX_ALWAYS, GX_TRUE);
 
-    // Prepare position matrix for rendering GUI elements
-    Mtx tmp_matrix;
-    guMtxIdentity(tmp_matrix);
-    Mtx inventory_matrix;
-    guMtxIdentity(inventory_matrix);
-    Mtx inventory_flat_matrix;
-    guMtxIdentity(inventory_flat_matrix);
+    // Reset the orthogonal position matrix and push it onto the stack
+    use_ortho(viewport);
+    push_matrix();
 
-    guMtxRotDeg(tmp_matrix, 'x', 202.5F);
-    guMtxConcat(inventory_matrix, tmp_matrix, inventory_matrix);
+    // Draw the GUI elements
+    current_gui->draw();
 
-    guMtxRotDeg(tmp_matrix, 'y', 45.0F);
-    guMtxConcat(inventory_matrix, tmp_matrix, inventory_matrix);
-
-    guMtxScaleApply(inventory_matrix, inventory_matrix, 0.65, 0.65, 0.65f);
-    guMtxTransApply(inventory_matrix, inventory_matrix, viewport.width * 0.5f, viewport.height * 0.5f, -10.0f);
-
-    guMtxScaleApply(inventory_flat_matrix, inventory_flat_matrix, 1.0f, 1.0f, 1.0f);
-    guMtxTransApply(inventory_flat_matrix, inventory_flat_matrix, viewport.width * 0.5f, viewport.height * 0.5f, -10.0f);
-
-    GX_LoadPosMtxImm(inventory_flat_matrix, GX_PNMTX0);
-
-    // Disable backface culling for the inventory background
-    GX_SetCullMode(GX_CULL_NONE);
-
-    // Enable direct colors
-    GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
-
-    // Draw the inventory background
-    draw_simple_textured_quad(container_texture, -176, -220, 512, 512);
-
-    // Enable backface culling for blocks
-    GX_SetCullMode(GX_CULL_BACK);
-
-    // Enable indexed colors
-    GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
-
-    // Draw the blocks in the inventory
-    use_texture(blockmap_texture);
-    block_t template_block = {0x00, 0x7F, 0, 0xF, 0xF};
-    for (int i = 0; i < 54; i++)
-    {
-        // Calculate the position of the block in the inventory
-        int x = i % 9;
-        int y = i / 9;
-        int x_offset = 36 * (x - 4);
-        int y_offset = 36 * (y - 4) - 24;
-
-        // Set the block id of the template block
-        do
-        {
-            template_block.id++;
-        } while (!properties(template_block.id).m_valid_item);
-
-        template_block.meta = block_properties[template_block.id].m_default_state;
-        RenderType render_type = properties(template_block.id).m_render_type;
-        if (!properties(template_block.id).m_fluid && (render_type == RenderType::full || render_type == RenderType::full_special || render_type == RenderType::slab))
-        {
-            // Translate the block to the correct position
-            guMtxCopy(inventory_matrix, tmp_matrix);
-            guMtxTransApply(tmp_matrix, tmp_matrix, x_offset, y_offset, 0.0f);
-            GX_LoadPosMtxImm(tmp_matrix, GX_PNMTX0);
-
-            // Draw the block
-            render_single_block(template_block, false);
-            render_single_block(template_block, true);
-        }
-        else
-        {
-            guMtxCopy(inventory_flat_matrix, tmp_matrix);
-            guMtxTransApply(tmp_matrix, tmp_matrix, x_offset, y_offset, 0.0f);
-            GX_LoadPosMtxImm(tmp_matrix, GX_PNMTX0);
-
-            int texture_index = get_default_texture_index(BlockID(template_block.id));
-            render_single_item(texture_index, false);
-            render_single_item(texture_index, true);
-        }
-    }
-
-    GX_LoadPosMtxImm(inventory_flat_matrix, GX_PNMTX0);
-
-    cursor_x += left_stick.x * 8;
-    cursor_y -= left_stick.y * 8;
-    if (wiimote_ir_visible)
-    {
-        cursor_x = int(wiimote_ir_x * viewport.width - viewport.width / 2);
-        cursor_y = int(wiimote_ir_y * viewport.height - viewport.height / 2);
-    }
-    bool cursor_in_inventory = cursor_x >= -176 && cursor_x <= 176 && cursor_y >= -220 && cursor_y <= 220;
-
-    int slot_x = (cursor_x + 162) / 36;
-    int slot_y = (cursor_y + 186) / 36;
-
-    if (raw_wiimote_down & WPAD_CLASSIC_BUTTON_LEFT)
-        slot_x--;
-    if (raw_wiimote_down & WPAD_CLASSIC_BUTTON_RIGHT)
-        slot_x++;
-    if (raw_wiimote_down & WPAD_CLASSIC_BUTTON_UP)
-        slot_y--;
-    if (raw_wiimote_down & WPAD_CLASSIC_BUTTON_DOWN)
-        slot_y++;
-    if (slot_x < 0)
-        slot_x = 0;
-    if (slot_x > 8)
-        slot_x = 8;
-    if (slot_y < 0)
-        slot_y = 0;
-    if (slot_y > 5)
-        slot_y = 5;
-
-    if ((raw_wiimote_down & (WPAD_CLASSIC_BUTTON_LEFT | WPAD_CLASSIC_BUTTON_RIGHT | WPAD_CLASSIC_BUTTON_UP | WPAD_CLASSIC_BUTTON_DOWN)))
-    {
-        cursor_x = slot_x * 36 - 162 + 18;
-        cursor_y = slot_y * 36 - 186 + 18;
-    }
-
-    if (cursor_x < -176)
-        cursor_x = -176;
-    if (cursor_x > 176)
-        cursor_x = 176;
-    if (cursor_y < -220)
-        cursor_y = -220;
-    if (cursor_y > 220)
-        cursor_y = 220;
-
-    if (raw_wiimote_down & WPAD_CLASSIC_BUTTON_B)
-    {
-        int index = slot_x + slot_y * 9;
-        if (index >= 0 && index < 54)
-        {
-            selected_block.id = 0;
-            for (int i = 0; i <= index; i++)
-            {
-                do
-                {
-                    selected_block.id++;
-                } while (!properties(selected_block.id).m_valid_item);
-            }
-            selected_block.meta = properties(selected_block.id).m_default_state;
-        }
-    }
-
-    // Disable backface culling for the cursor
-    GX_SetCullMode(GX_CULL_NONE);
+    // Restore the orthogonal position matrix
+    pop_matrix();
+    GX_LoadPosMtxImm(active_mtx, GX_PNMTX0);
 
     // Enable direct colors
     GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
 
     // Draw the cursor
-    if (wiimote_ir_visible && !cursor_in_inventory)
-        draw_textured_quad(icons_texture, (wiimote_ir_x - 0.5) * viewport.width - 7, (wiimote_ir_y - 0.5) * viewport.height - 3, 48, 48, 32, 32, 56, 56);
+    if (wiimote_ir_visible && !current_gui->contains(cursor_x, cursor_y))
+        draw_textured_quad(icons_texture, cursor_x - 7, cursor_y - 3, 32, 48, 32, 32, 48, 56);
     else
         draw_textured_quad(icons_texture, cursor_x - 16, cursor_y - 16, 32, 32, 0, 32, 32, 64);
 }
@@ -1622,7 +1546,7 @@ void DrawScene(std::deque<chunk_t *> &chunks, bool transparency)
                         Render(chunkPos, vbo.cached_solid.buffer, vbo.cached_solid.length);
                     }
                 }
-                chunk->render_entities(partialTicks);
+                chunk->render_entities(partialTicks, false);
             }
         }
     }
@@ -1645,7 +1569,7 @@ void DrawScene(std::deque<chunk_t *> &chunks, bool transparency)
                         Render(chunkPos, vbo.cached_transparent.buffer, vbo.cached_transparent.length);
                     }
                 }
-                chunk->render_entities(partialTicks);
+                chunk->render_entities(partialTicks, true);
             }
         }
     }

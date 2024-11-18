@@ -8,10 +8,14 @@
 #include "maths.hpp"
 #include "pathfinding.hpp"
 #include "sounds.hpp"
+#include "inventory.hpp"
+#include "gui.hpp"
 extern float wiimote_x;
 extern float wiimote_z;
 extern u32 wiimote_held;
 extern aabb_entity_t *player;
+extern inventory::container player_inventory;
+extern gui *current_gui;
 
 pathfinding_t pathfinder;
 
@@ -415,7 +419,7 @@ void falling_block_entity_t::tick()
     }
 }
 
-void falling_block_entity_t::render(float partial_ticks)
+void falling_block_entity_t::render(float partial_ticks, bool transparency)
 {
     if (!chunk)
         return;
@@ -481,7 +485,7 @@ void exploding_block_entity_t::tick()
     }
 }
 
-void exploding_block_entity_t::render(float partial_ticks)
+void exploding_block_entity_t::render(float partial_ticks, bool transparency)
 {
     if (!chunk)
         return;
@@ -628,9 +632,13 @@ bool creeper_entity_t::should_jump()
     return false;
 }
 
-void creeper_entity_t::render(float partial_ticks)
+void creeper_entity_t::render(float partial_ticks, bool transparency)
 {
     if (!chunk)
+        return;
+
+    // The creeper should not render in the transparent pass
+    if (transparency)
         return;
 
     vec3f entity_position = get_position(partial_ticks);
@@ -711,4 +719,152 @@ void creeper_entity_t::render(float partial_ticks)
         render_single_block_at(block_state, path_pos, true);
     }
 #endif
+}
+
+item_entity_t::item_entity_t(const vec3f &position, const inventory::item_stack &item_stack) : aabb_entity_t(.2f, .2f)
+{
+    set_position(position);
+    chunk = get_chunk_from_pos(vec3i(std::floor(position.x), std::floor(position.y), std::floor(position.z)));
+    this->walk_sound = false;
+    this->gravity = 0.04;
+    this->y_offset = 0.125;
+    this->item_stack = item_stack;
+}
+
+void item_entity_t::tick()
+{
+    if (dead)
+        return;
+    aabb_entity_t::tick();
+
+    if (ticks_existed >= 6000)
+        dead = true;
+}
+
+void item_entity_t::render(float partial_ticks, bool transparency)
+{
+    if (!chunk)
+        return;
+
+    if (dead)
+        return;
+
+    vec3f entity_position = get_position(partial_ticks);
+
+    vec3i block_pos = vec3i(std::floor(entity_position.x), std::floor(entity_position.y), std::floor(entity_position.z));
+    block_t *light_block = get_block_at(block_pos, chunk);
+    if (light_block && !properties(light_block->id).m_solid)
+    {
+        light_level = light_block->light;
+    }
+
+    // Default item rotation
+    vec3f item_rot = vec3f(0, 0, 0);
+
+    // Get the direction towards the player
+    if (player)
+    {
+        item_rot.y = player->rotation.y + 180;
+    }
+
+    // Lock the item rotation to the y-axis
+    item_rot.x = 0;
+    item_rot.z = 0;
+
+    int multi = item_stack.count > 1 ? 1 : 0;
+
+    inventory::item item = item_stack.as_item();
+
+    RenderType render_type = properties(item.id).m_render_type;
+    block_t block = {uint8_t(item.id & 0xFF), 0x7F, item_stack.meta, 0xF, 0xF};
+    block.light = light_level;
+
+    vec3f anim_offset = vec3f(-0.5, std::sin((ticks_existed + partial_ticks) * M_1_PI * 0.25) * 0.125 - 0.375, -0.5);
+    vec3f dupe_offset = vec3f(0.0625);
+    // Draw the item (twice if there are multiple items)
+    for (int i = 0; i <= multi; i++)
+    {
+        if (item.is_block())
+        {
+            use_texture(blockmap_texture);
+
+            if (!properties(item.id).m_fluid && (render_type == RenderType::full || render_type == RenderType::full_special || render_type == RenderType::slab))
+            {
+                // Draw the block
+                item_rot.y = (ticks_existed + partial_ticks) * 4;
+                transform_view(get_view_matrix(), entity_position + anim_offset + dupe_offset * i, vec3f(4), item_rot, true);
+                blockproperties_t props = properties(block.id);
+                if (bool(props.m_transparent) == transparency)
+                    render_single_block(block, props.m_transparent);
+            }
+            else
+            {
+                // Draw the item
+                item_rot.z = 180;
+                transform_view(get_view_matrix(), entity_position + anim_offset + dupe_offset * i + vec3f(0, 0.125, 0), vec3f(2), item_rot, true);
+
+                if (transparency)
+                    render_single_item(get_default_texture_index(BlockID(block.id)), true, light_level);
+            }
+        }
+        else
+        {
+            use_texture(items_texture);
+
+            // Draw the item
+            item_rot.z = 180;
+            transform_view(get_view_matrix(), entity_position + anim_offset + dupe_offset * i + vec3f(0, 0.125, 0), vec3f(2), item_rot, true);
+
+            if (transparency)
+                render_single_item(item.texture_index, true, light_level);
+        }
+    }
+}
+
+void item_entity_t::resolve_collision(aabb_entity_t *b)
+{
+    if (dead)
+        return;
+
+    if (ticks_existed < 10)
+        return;
+
+    if (b == player)
+    {
+        inventory::item_stack left_over = player_inventory.add(item_stack);
+        if (left_over.count)
+        {
+            if (left_over.count != item_stack.count)
+            {
+                // Play the pop sound if the player picks up at least one item
+                javaport::Random rng;
+                sound_t sound = get_sound("pop");
+                sound.position = position;
+                sound.volume = 0.5;
+                sound.pitch = rng.nextFloat() * 0.8 + 0.6;
+                PlaySound(sound);
+                if (current_gui)
+                    current_gui->refresh();
+            }
+            item_stack = left_over;
+        }
+        else
+        {
+            // Play the pop sound if the player picks up the stack
+            javaport::Random rng;
+            sound_t sound = get_sound("pop");
+            sound.position = position;
+            sound.volume = 0.5;
+            sound.pitch = rng.nextFloat() * 0.8 + 0.6;
+            PlaySound(sound);
+            dead = true;
+            if (current_gui)
+                current_gui->refresh();
+        }
+    }
+}
+
+bool item_entity_t::collides(aabb_entity_t *other)
+{
+    return aabb.inflate(0.7).intersects(other->aabb);
 }

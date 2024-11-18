@@ -12,6 +12,9 @@
 #include "underwater_tpl.h"
 #include "vignette_tpl.h"
 #include "creeper_tpl.h"
+#include "font_tpl.h"
+#include "items_tpl.h"
+#include "inventory_tpl.h"
 
 const GXColor sky_color = {0x88, 0xBB, 0xFF, 0xFF};
 
@@ -31,6 +34,9 @@ GXTexObj container_texture;
 GXTexObj underwater_texture;
 GXTexObj vignette_texture;
 GXTexObj creeper_texture;
+GXTexObj font_texture;
+GXTexObj items_texture;
+GXTexObj inventory_texture;
 
 // Animated textures
 water_texanim_t water_still_anim;
@@ -61,6 +67,9 @@ void init_textures()
     init_texture(underwater_texture, underwater_tpl, underwater_tpl_size);
     init_texture(vignette_texture, vignette_tpl, vignette_tpl_size);
     init_texture(creeper_texture, creeper_tpl, creeper_tpl_size);
+    init_texture(font_texture, font_tpl, font_tpl_size);
+    init_texture(items_texture, items_tpl, items_tpl_size);
+    init_texture(inventory_texture, inventory_tpl, inventory_tpl_size);
 
     GX_InitTexObjWrapMode(&clouds_texture, GX_REPEAT, GX_REPEAT);
     GX_InitTexObjWrapMode(&underwater_texture, GX_REPEAT, GX_REPEAT);
@@ -135,6 +144,7 @@ void use_ortho(view_t view)
     guMtxIdentity(flat_matrix);
     guMtxTransApply(flat_matrix, flat_matrix, 0.0F, 0.0F, -0.5F);
     GX_LoadPosMtxImm(flat_matrix, GX_PNMTX0);
+    guMtxCopy(flat_matrix, active_mtx);
 }
 
 void use_perspective(view_t view)
@@ -439,15 +449,15 @@ void render_single_block_at(block_t &selected_block, vec3i pos, bool transparenc
     GX_EndGroup();
 }
 
-void render_single_item(uint32_t texture_index, bool transparency)
+void render_single_item(uint32_t texture_index, bool transparency, uint8_t light)
 {
     vec3f vertex_pos = vec3f(0, 0, 0);
     GX_BeginGroup(GX_QUADS, 4);
     // Render the selected block.
-    GX_VertexLit({vertex_pos + vec3f(0.5, -.5, -.5), TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, 0xFF, FACE_PY);
-    GX_VertexLit({vertex_pos + vec3f(0.5, 0.5, -.5), TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, 0xFF, FACE_PY);
-    GX_VertexLit({vertex_pos + vec3f(-.5, 0.5, -.5), TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, 0xFF, FACE_PY);
-    GX_VertexLit({vertex_pos + vec3f(-.5, -.5, -.5), TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, 0xFF, FACE_PY);
+    GX_VertexLit({vertex_pos + vec3f(0.5, -.5, 0), TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, light, FACE_PY);
+    GX_VertexLit({vertex_pos + vec3f(0.5, 0.5, 0), TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, light, FACE_PY);
+    GX_VertexLit({vertex_pos + vec3f(-.5, 0.5, 0), TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, light, FACE_PY);
+    GX_VertexLit({vertex_pos + vec3f(-.5, -.5, 0), TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, light, FACE_PY);
     // End the group
     GX_EndGroup();
 }

@@ -244,7 +244,7 @@ public:
 
     void update_entities();
 
-    void render_entities(float partial_ticks);
+    void render_entities(float partial_ticks, bool transparency);
 
     uint32_t size();
     chunk_t()

@@ -129,7 +129,7 @@ void render_single_block(block_t &selected_block, bool transparency);
 
 void render_single_block_at(block_t &selected_block, vec3i pos, bool transparency);
 
-void render_single_item(uint32_t texture_index, bool transparency);
+void render_single_item(uint32_t texture_index, bool transparency, uint8_t light = 0xFF);
 
 void render_item_pixel(uint32_t texture_index, uint8_t x, uint8_t y, bool x_next, bool y_next, uint8_t light);
 

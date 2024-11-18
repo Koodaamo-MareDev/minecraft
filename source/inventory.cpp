@@ -7,6 +7,8 @@ namespace inventory
         {
             item_list[i].id = i;
         }
+        item_list[256].texture_index = 82;
+        item_list[257].texture_index = 98;
     }
 
     item item_list[512];
@@ -24,17 +26,17 @@ namespace inventory
         }
     }
 
-    size_t container::size() const
+    size_t container::size()
     {
         return stacks.size();
     }
 
-    size_t container::count() const
+    size_t container::count()
     {
         size_t count = 0;
         for (size_t i = 0; i < size(); i++)
         {
-            if (stacks[i].id != 0 && stacks[i].count != 0)
+            if (!stacks[i].empty())
             {
                 count++;
             }
@@ -45,7 +47,7 @@ namespace inventory
     item_stack container::add(item_stack stack)
     {
         // Search for stacks with the same id and meta
-        for (size_t i = 0; i < size(); i++)
+        for (size_t i = 0; i < size() && i < usable_slots; i++)
         {
             item_stack &current = stacks[i];
             size_t max_stack = current.as_item().max_stack;
@@ -71,9 +73,9 @@ namespace inventory
         }
 
         // Place the stack in the first empty slot
-        for (size_t i = 0; i < size(); i++)
+        for (size_t i = 0; i < size() && i < usable_slots; i++)
         {
-            if (stacks[i].id == 0)
+            if (stacks[i].empty())
             {
                 stacks[i] = stack;
                 return item_stack();

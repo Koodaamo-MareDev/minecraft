@@ -131,6 +131,11 @@ public:
         this->max = this->max + offset;
     }
 
+    aabb_t inflate(vfloat_t amount)
+    {
+        return aabb_t(this->min - vec3f(amount, amount, amount), this->max + vec3f(amount, amount, amount));
+    }
+
     vec3f push_out(aabb_t other);
 };
 

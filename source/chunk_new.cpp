@@ -1543,7 +1543,11 @@ void chunk_t::update_entities()
                     // Prevent entities from colliding with themselves
                     if (entity != this_entity && entity->collides(this_entity))
                     {
-                        entity->resolve_collision(this_entity);
+                        // Resolve the collision - always resolve from the perspective of the non-player entity
+                        if (this_entity == player)
+                            entity->resolve_collision(this_entity);
+                        else
+                            this_entity->resolve_collision(entity);
                     }
                 }
             }
@@ -1587,11 +1591,11 @@ void chunk_t::update_entities()
     }
 }
 
-void chunk_t::render_entities(float partial_ticks)
+void chunk_t::render_entities(float partial_ticks, bool transparency)
 {
     for (aabb_entity_t *&entity : entities)
     {
-        entity->render(partial_ticks);
+        entity->render(partial_ticks, transparency);
     }
 
     // Restore default texture

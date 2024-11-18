@@ -88,7 +88,7 @@ export OFILES_BIN	:=	$(addsuffix .o,$(BINFILES)) $(addsuffix .o,$(TPLFILES)) $(a
 export OFILES_SOURCES := $(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(sFILES:.s=.o) $(SFILES:.S=.o)
 export OFILES := $(OFILES_BIN) $(OFILES_SOURCES) $(addsuffix _alpha.c,$(basename $(ALPHAMAPSRC))) $(addsuffix _rgba.c,$(basename $(LIGHTMAPSRC))) brightness_values.c
 
-export HFILES := $(addsuffix .h,$(subst .,_,$(BINFILES))) $(addsuffix .h,$(subst .,_,$(TPLFILES))) $(addsuffix .h,$(subst .,_,$(AIFFFILES))) $(ALPHAMAPFILES) $(LIGHTMAPFILES) brightness_values.h
+export HFILES := $(addsuffix .h,$(subst .,_,$(BINFILES))) $(addsuffix .h,$(subst .,_,$(TPLFILES))) $(addsuffix .h,$(subst .,_,$(AIFFFILES))) $(ALPHAMAPFILES) $(LIGHTMAPFILES) brightness_values.h font_tile_widths.hpp
 
 #---------------------------------------------------------------------------------
 # build a list of include paths
@@ -140,6 +140,9 @@ $(OFILES_SOURCES) : $(HFILES)
 brightness_values.h brightness_values.c :
 	@echo brightness_values.h
 	@python ../gen_brightness.py
+font_tile_widths.hpp : font.png
+	@echo $(notdir $<)
+	@python ../gen_font_tile_widths.py $<
 #---------------------------------------------------------------------------------
 # This rule links in binary data with the .bin extension
 #---------------------------------------------------------------------------------
