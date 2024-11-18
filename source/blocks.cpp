@@ -550,7 +550,7 @@ void flat_aabb(const vec3i &pos, block_t *block, const aabb_t &other, std::vecto
 blockproperties_t block_properties[256] = {
     blockproperties_t().id(BlockID::air).opacity(0).solid(false).transparent(true).collision(CollisionType::none).valid_item(false),
     blockproperties_t().id(BlockID::stone).texture(0).sound(SoundType::stone),
-    blockproperties_t().id(BlockID::grass).texture(1).sound(SoundType::grass).render_type(RenderType::full_special),
+    blockproperties_t().id(BlockID::grass).texture(202).sound(SoundType::grass).render_type(RenderType::full_special),
     blockproperties_t().id(BlockID::dirt).texture(2).sound(SoundType::dirt),
     blockproperties_t().id(BlockID::cobblestone).texture(16).sound(SoundType::stone),
     blockproperties_t().id(BlockID::planks).texture(4).sound(SoundType::wood),
