@@ -438,7 +438,7 @@ int main(int argc, char **argv)
             // Update the sound system
             sound_system->update(angles_to_vector(0, yrot + 90), player->get_position(std::fmod(partialTicks, 1)));
             player_pos = player->get_position(std::fmod(partialTicks, 1)) - vec3f(0.5, 0.5, 0.5);
-            if (player->aabb.min.y < -750)
+            if (player_pos.y < -750)
             {
                 player->set_position(vec3f(0.5, 500, 0.5));
             }
