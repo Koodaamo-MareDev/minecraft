@@ -242,6 +242,7 @@ int main(int argc, char **argv)
 #endif
     // Configure video
     VIDEO_Configure(rmode);
+    VIDEO_ClearFrameBuffer(rmode, frameBuffer[0], COLOR_BLACK);
     VIDEO_SetNextFramebuffer(frameBuffer[0]);
     VIDEO_SetBlack(FALSE);
     VIDEO_Flush();
