@@ -326,7 +326,6 @@ void generate_chunk()
     chunk_t *chunk = pending_chunks.back();
     if (!chunk || chunk->generation_stage != ChunkGenStage::empty)
         return;
-    printf("Start generation of chunk %d, %d\n", chunk->x, chunk->z);
     chunk->generation_stage = ChunkGenStage::heightmap;
 
     int x_offset = (chunk->x * 16);
@@ -471,7 +470,6 @@ void generate_chunk()
     }
 
     chunk->generation_stage = ChunkGenStage::done;
-    printf("End generation of chunk %d, %d\n", chunk->x, chunk->z);
 }
 
 void print_chunk_status()
