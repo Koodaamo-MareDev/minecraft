@@ -7,7 +7,7 @@
 #include "sounds.hpp"
 #include <cmath>
 
-void PlaySound(sound_t sound);                               // in minecraft.cpp
+void PlaySound(sound_t sound); // in minecraft.cpp
 int8_t get_block_opacity(BlockID blockid)
 {
     return block_properties[int(blockid)].m_opacity;
@@ -150,6 +150,14 @@ uint32_t get_face_texture_index(block_t *block, int face)
             return 172 + (block_direction & 1);
         else
             return 188 + ((face & 1) ^ ((face & ~1) == FACE_NY));
+    }
+    case BlockID::wool:
+    {
+        int color = block->meta & 0x0F;
+        if (!color)
+            return 64;
+        return 226 - (((color & 0x07) << 4) | (color >> 3));
+        break;
     }
     default:
         return get_default_texture_index(blockid);
@@ -512,7 +520,7 @@ void mushroom_aabb(const vec3i &pos, block_t *block, const aabb_t &other, std::v
     constexpr vfloat_t offset = 0.25;
     constexpr vfloat_t width = 0.5;
     constexpr vfloat_t height = 0.375;
-    
+
     aabb.min = vec3f(pos.x + offset, pos.y, pos.z + offset);
     aabb.max = aabb.min + vec3f(width, height, width);
 
@@ -526,7 +534,7 @@ void flower_aabb(const vec3i &pos, block_t *block, const aabb_t &other, std::vec
     constexpr vfloat_t offset = 0.3125;
     constexpr vfloat_t width = 0.375;
     constexpr vfloat_t height = 0.625;
-    
+
     aabb.min = vec3f(pos.x + offset, pos.y, pos.z + offset);
     aabb.max = aabb.min + vec3f(width, height, width);
 
@@ -539,7 +547,7 @@ void flat_aabb(const vec3i &pos, block_t *block, const aabb_t &other, std::vecto
     aabb_t aabb;
     constexpr vfloat_t width = 1.0;
     constexpr vfloat_t height = 0.0625;
-    
+
     aabb.min = vec3f(pos.x, pos.y, pos.z);
     aabb.max = aabb.min + vec3f(width, height, width);
 
@@ -582,7 +590,7 @@ blockproperties_t block_properties[256] = {
     blockproperties_t().id(BlockID::deadbush).texture(55).solid(false).opacity(0).transparent(true).sound(SoundType::grass).render_type(RenderType::cross).collision(CollisionType::none),
     blockproperties_t().id(BlockID::piston).state(3).texture(108).solid(false).sound(SoundType::stone).render_type(RenderType::full_special),
     blockproperties_t().id(BlockID::piston_head).texture(107).solid(false).sound(SoundType::stone).valid_item(false),
-    blockproperties_t().id(BlockID::wool).texture(64).sound(SoundType::cloth),
+    blockproperties_t().id(BlockID::wool).texture(64).sound(SoundType::cloth).render_type(RenderType::full_special),
     blockproperties_t().id(BlockID::piston_extension).texture(0).solid(false).sound(SoundType::stone).valid_item(false),
     blockproperties_t().id(BlockID::dandelion).texture(13).solid(false).opacity(0).transparent(true).sound(SoundType::grass).aabb(flower_aabb).render_type(RenderType::cross).collision(CollisionType::none),
     blockproperties_t().id(BlockID::rose).texture(12).solid(false).opacity(0).transparent(true).sound(SoundType::grass).aabb(flower_aabb).render_type(RenderType::cross).collision(CollisionType::none),
