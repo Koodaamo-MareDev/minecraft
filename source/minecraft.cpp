@@ -91,7 +91,9 @@ float prev_left_shoulder = 0;
 float prev_right_shoulder = 0;
 bool destroy_block = false;
 bool place_block = false;
-block_t selected_block = {uint8_t(BlockID::stone), 0x7F, 0, 0xF, 0xF};
+// block_t selected_block = {uint8_t(BlockID::stone), 0x7F, 0, 0xF, 0xF};
+int selected_hotbar_slot = 0;
+inventory::item_stack *selected_item = nullptr;
 
 vec3f view_bob_offset(0, 0, 0);
 vec3f view_bob_screen_offset(0, 0, 0);
@@ -115,6 +117,7 @@ void UpdateLoadingStatus();
 void UpdateLightDir();
 void UpdateInventory(view_t &viewport);
 void DrawInventory(view_t &viewport);
+void DrawHUD(view_t &viewport);
 void DrawSelectedBlock();
 void DrawScene(std::deque<chunk_t *> &chunks, bool transparency);
 void GenerateChunks(int count);
@@ -343,6 +346,7 @@ int main(int argc, char **argv)
 
     sound_system = new sound_system_t();
     inventory::init_items();
+    gui::init_matrices();
 
     bool in_fluid = false;
     bool in_lava = false;
@@ -353,7 +357,9 @@ int main(int argc, char **argv)
     player_inventory.add(inventory::item_stack(uint8_t(BlockID::dirt), 16));
     player_inventory.add(inventory::item_stack(uint8_t(BlockID::wood), 12));
     player_inventory.add(inventory::item_stack(uint8_t(BlockID::bricks), 64));
-
+    for (uint8_t i = 0; i < 16; i++)
+        player_inventory.add(inventory::item_stack(uint8_t(BlockID::wool), 64, i));
+    selected_item = &player_inventory[0];
     while (!isExiting)
     {
         u64 frame_start = time_get();
@@ -556,23 +562,7 @@ int main(int argc, char **argv)
                 delete current_gui;
                 current_gui = nullptr;
             }
-            // Draw crosshair
-            int crosshair_x = int(viewport.width - 32) >> 1;
-            int crosshair_y = int(viewport.height - 32) >> 1;
-
-            draw_textured_quad(icons_texture, crosshair_x, crosshair_y, 32, 32, 0, 0, 16, 16);
-
-            // Draw IR cursor if visible
-            if (wiimote_ir_visible)
-            {
-                // Reset the position matrix
-                Mtx flat_matrix;
-                guMtxIdentity(flat_matrix);
-                guMtxTransApply(flat_matrix, flat_matrix, 0.0F, 0.0F, -0.5F);
-                GX_LoadPosMtxImm(flat_matrix, GX_PNMTX0);
-
-                draw_textured_quad(icons_texture, wiimote_ir_x * viewport.width - 7, wiimote_ir_y * viewport.height - 3, 48, 48, 32, 32, 56, 56);
-            }
+            DrawHUD(viewport);
         }
         else
         {
@@ -860,40 +850,13 @@ void GetInput()
     }
     if (raw_wiimote_down & WPAD_CLASSIC_BUTTON_ZL)
     {
-        do
-        {
-            // Decrease the selected block id by 1 unless we're at the lowest block id already
-            if (selected_block.id > 0)
-            {
-                selected_block.id--;
-            }
-            else
-            {
-                break; // Break out of the loop if we're at the lowest block id
-            }
-            // If the selected block is air, don't allow the player to select it
-        } while (!properties(selected_block.id).m_valid_item);
-        selected_block.meta = properties(selected_block.id).m_default_state;
+        selected_hotbar_slot = (selected_hotbar_slot + 8) % 9;
     }
     if (raw_wiimote_down & WPAD_CLASSIC_BUTTON_ZR)
     {
-        do
-        {
-            // Increase the selected block id by 1 unless we're at the highest block id already
-            if (selected_block.id < 255)
-            {
-                selected_block.id++;
-            }
-            else
-            {
-                break; // Break out of the loop if we're at the highest block id
-            }
-            // If the selected block is air, don't allow the player to select it
-        } while (!properties(selected_block.id).m_valid_item);
-        selected_block.meta = properties(selected_block.id).m_default_state;
+        selected_hotbar_slot = (selected_hotbar_slot + 1) % 9;
     }
-    if (selected_block.get_blockid() == BlockID::air)
-        selected_block.set_blockid(BlockID::stone);
+    selected_item = &player_inventory[selected_hotbar_slot];
 
     if ((raw_wiimote_down & WPAD_CLASSIC_BUTTON_LEFT))
     {
@@ -1038,6 +1001,17 @@ void EditBlocks()
 {
     guVector forward = angles_to_vector(xrot, yrot);
 
+    if (!selected_item)
+        return;
+
+    if (place_block && (selected_item->empty() || !selected_item->as_item().is_block()))
+    {
+        place_block = false;
+        destroy_block = false;
+        return;
+    }
+    block_t selected_block = block_t{uint8_t(selected_item->id & 0xFF), 0x7F, selected_item->meta};
+
     draw_block_outline = raycast_precise(vec3f(player_pos.x + .5, player_pos.y + .5, player_pos.z + .5), vec3f(forward.x, forward.y, forward.z), 4, &raycast_pos, &raycast_face, block_bounds);
     if (draw_block_outline)
     {
@@ -1106,7 +1080,7 @@ void EditBlocks()
 
                     javaport::Random rng;
 
-                    int texture_index = get_default_texture_index(old_blockid);
+                    int texture_index = get_face_texture_index(&old_block, FACE_NX);
 
                     particle_t particle;
                     particle.max_life_time = 60;
@@ -1158,6 +1132,9 @@ void EditBlocks()
                     sound.pitch *= 0.8f;
                     sound.position = vec3f(editable_pos.x, editable_pos.y, editable_pos.z);
                     sound_system->play_sound(sound);
+                    player_inventory[selected_hotbar_slot].count--;
+                    if (player_inventory[selected_hotbar_slot].count == 0)
+                        player_inventory[selected_hotbar_slot] = inventory::item_stack();
                 }
             }
         }
@@ -1398,6 +1375,53 @@ void UpdateInventory(view_t &viewport)
     current_gui->update();
 }
 
+void DrawHUD(view_t &viewport)
+{
+    // Disable depth testing for GUI elements
+    GX_SetZMode(GX_TRUE, GX_ALWAYS, GX_TRUE);
+
+    // Reset the orthogonal position matrix and push it onto the stack
+    use_ortho(viewport);
+    push_matrix();
+
+    // Draw crosshair
+    int crosshair_x = int(viewport.width - 32) >> 1;
+    int crosshair_y = int(viewport.height - 32) >> 1;
+
+    draw_textured_quad(icons_texture, crosshair_x, crosshair_y, 32, 32, 0, 0, 16, 16);
+
+    // Draw IR cursor if visible
+    if (wiimote_ir_visible)
+    {
+        // Reset the position matrix
+        Mtx flat_matrix;
+        guMtxIdentity(flat_matrix);
+        guMtxTransApply(flat_matrix, flat_matrix, 0.0F, 0.0F, -0.5F);
+        GX_LoadPosMtxImm(flat_matrix, GX_PNMTX0);
+
+        draw_textured_quad(icons_texture, wiimote_ir_x * viewport.width - 7, wiimote_ir_y * viewport.height - 3, 48, 48, 32, 32, 56, 56);
+    }
+
+    // Restore the orthogonal position matrix
+    pop_matrix();
+    GX_LoadPosMtxImm(active_mtx, GX_PNMTX0);
+
+    // Enable direct colors
+    GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
+
+    // Draw the hotbar background
+    draw_textured_quad(icons_texture, (viewport.width - 364) / 2, viewport.height - 44, 364, 44, 56, 9, 238, 31);
+
+    // Draw the hotbar selection
+    draw_textured_quad(icons_texture, (viewport.width - 364) / 2 + selected_hotbar_slot * 40 - 2, viewport.height - 46, 48, 48, 56, 31, 80, 55);
+
+    // Draw the hotbar items
+    for (size_t i = 0; i < 9; i++)
+    {
+        gui::draw_item((viewport.width - 364) / 2 + i * 40 + 6, viewport.height - 38, player_inventory[i]);
+    }
+}
+
 void DrawInventory(view_t &viewport)
 {
     if (!current_gui)
@@ -1434,18 +1458,20 @@ void DrawInventory(view_t &viewport)
 void DrawSelectedBlock()
 {
     std::deque<chunk_t *> &chunks = get_chunks();
-    if (chunks.size() == 0)
+    if (chunks.size() == 0 || !selected_item || selected_item->empty())
         return;
+
+    uint8_t light_value = 0;
     // Get the block at the player's position
     block_t *view_block = get_block_at(vec3i(std::round(player_pos.x), std::round(player_pos.y), std::round(player_pos.z)));
     if (view_block)
     {
         // Set the light level of the selected block
-        selected_block.light = view_block->light;
+        light_value = view_block->light;
     }
     else
     {
-        selected_block.light = 0xFF;
+        light_value = 0xFF;
     }
 
     // Enable indexed colors
@@ -1454,70 +1480,93 @@ void DrawSelectedBlock()
     // Specify the selected block offset
     vec3f selectedBlockPos = vec3f(+.625f, -.75f, -.75f) + vec3f(-view_bob_screen_offset.x, view_bob_screen_offset.y, 0);
 
-    RenderType render_type = properties(selected_block.id).m_render_type;
+    int texture_index;
+    char *texbuf;
 
-    if (!properties(selected_block.id).m_fluid && (render_type == RenderType::full || render_type == RenderType::full_special || render_type == RenderType::slab))
+    // Check if the selected item is a block
+    if (selected_item->as_item().is_block())
     {
-        // Render as a block
+        block_t selected_block = block_t{uint8_t(selected_item->id & 0xFF), 0x7F, selected_item->meta};
+        selected_block.light = light_value;
+        RenderType render_type = properties(selected_block.id).m_render_type;
 
-        // Transform the selected block position
-        transform_view_screen(get_view_matrix(), selectedBlockPos, guVector{.5f, .5f, .5f}, guVector{10, -45, 0});
+        if (!properties(selected_block.id).m_fluid && (render_type == RenderType::full || render_type == RenderType::full_special || render_type == RenderType::slab))
+        {
+            // Render as a block
 
-        // Opaque pass
-        GX_SetZMode(GX_TRUE, GX_ALWAYS, GX_TRUE);
-        render_single_block(selected_block, false);
+            // Transform the selected block position
+            transform_view_screen(get_view_matrix(), selectedBlockPos, guVector{.5f, .5f, .5f}, guVector{10, -45, 0});
 
-        // Transparent pass
-        GX_SetZMode(GX_FALSE, GX_ALWAYS, GX_TRUE);
-        render_single_block(selected_block, true);
+            // Opaque pass
+            GX_SetZMode(GX_TRUE, GX_ALWAYS, GX_TRUE);
+            render_single_block(selected_block, false);
+
+            // Transparent pass
+            GX_SetZMode(GX_FALSE, GX_ALWAYS, GX_TRUE);
+            render_single_block(selected_block, true);
+            return;
+        }
+
+        // Setup flat item properties
+
+        // Get the texture index of the selected block
+        texture_index = get_default_texture_index(BlockID(selected_item->id));
+
+        // Use the blockmap texture
+        use_texture(blockmap_texture);
+        texbuf = (char *)MEM_PHYSICAL_TO_K1(GX_GetTexObjData(&blockmap_texture));
     }
     else
     {
-        // Render as an item
+        // Setup item properties
 
-        // Transform the selected block position
-        transform_view_screen(get_view_matrix(), selectedBlockPos, guVector{.75f, .75f, .75f}, guVector{10, 45, 180});
+        // Get the texture index of the selected item
+        texture_index = selected_item->as_item().texture_index;
 
-        // Get the texture index of the selected block
-        int texture_index = get_default_texture_index(BlockID(selected_block.id));
-
-        int tex_width = 256;
-
-        char *texbuf = (char *)MEM_PHYSICAL_TO_K1(GX_GetTexObjData(&blockmap_texture));
-
-        uint32_t tex_x = TEXTURE_X(texture_index);
-        uint32_t tex_y = TEXTURE_Y(texture_index);
-
-        // Opaque pass - items are always drawn in the opaque pass
-        GX_SetZMode(GX_TRUE, GX_ALWAYS, GX_TRUE);
-
-        for (int y = 0; y < 16; y++)
-            for (int x = 0; x < 16; x++)
-            {
-                int u = tex_x + x + 1;
-                int v = tex_y + 15 - y;
-
-                // Get the index to the 4x4 texel in the target texture
-                int index = (tex_width << 2) * (v & ~3) + ((u & ~3) << 4);
-                // Put the data within the 4x4 texel into the target texture
-                int index_within = ((u & 3) + ((v & 3) << 2)) << 1;
-
-                int next_x = index + index_within;
-
-                u = tex_x + x;
-                v = tex_y + 15 - y - 1;
-
-                // Get the index to the 4x4 texel in the target texture
-                index = (tex_width << 2) * (v & ~3) + ((u & ~3) << 4);
-                // Put the data within the 4x4 texel into the target texture
-                index_within = ((u & 3) + ((v & 3) << 2)) << 1;
-
-                int next_y = index + index_within;
-
-                // Check if the texel is transparent
-                render_item_pixel(texture_index, x, 15 - y, x == 15 || !texbuf[next_x], y == 15 || !texbuf[next_y], selected_block.light);
-            }
+        // Use the item texture
+        use_texture(items_texture);
+        texbuf = (char *)MEM_PHYSICAL_TO_K1(GX_GetTexObjData(&items_texture));
     }
+
+    // Render as an item
+
+    // Transform the selected block position
+    transform_view_screen(get_view_matrix(), selectedBlockPos, guVector{.75f, .75f, .75f}, guVector{10, 45, 180});
+
+    uint32_t tex_x = TEXTURE_X(texture_index);
+    uint32_t tex_y = TEXTURE_Y(texture_index);
+
+    // Opaque pass - items are always drawn in the opaque pass
+    GX_SetZMode(GX_TRUE, GX_ALWAYS, GX_TRUE);
+
+    constexpr int tex_width = 256;
+
+    for (int y = 0; y < 16; y++)
+        for (int x = 0; x < 16; x++)
+        {
+            int u = tex_x + x + 1;
+            int v = tex_y + 15 - y;
+
+            // Get the index to the 4x4 texel in the target texture
+            int index = (tex_width << 2) * (v & ~3) + ((u & ~3) << 4);
+            // Put the data within the 4x4 texel into the target texture
+            int index_within = ((u & 3) + ((v & 3) << 2)) << 1;
+
+            int next_x = index + index_within;
+
+            u = tex_x + x;
+            v = tex_y + 15 - y - 1;
+
+            // Get the index to the 4x4 texel in the target texture
+            index = (tex_width << 2) * (v & ~3) + ((u & ~3) << 4);
+            // Put the data within the 4x4 texel into the target texture
+            index_within = ((u & 3) + ((v & 3) << 2)) << 1;
+
+            int next_y = index + index_within;
+
+            // Check if the texel is transparent
+            render_item_pixel(texture_index, x, 15 - y, x == 15 || !texbuf[next_x], y == 15 || !texbuf[next_y], light_value);
+        }
 }
 
 void DrawScene(std::deque<chunk_t *> &chunks, bool transparency)
