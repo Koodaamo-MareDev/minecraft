@@ -23,6 +23,9 @@ void PlaySound(sound_t sound);                               // in minecraft.cpp
 void AddParticle(const particle_t &particle);                // in minecraft.cpp
 void CreateExplosion(vec3f pos, float power, chunk_t *near); // in minecraft.cpp
 
+constexpr int item_pickup_ticks = 2;
+constexpr int item_lifetime = 6000;
+
 bool aabb_entity_t::collides(aabb_entity_t *other)
 {
     return aabb.intersects(other->aabb);
@@ -729,6 +732,7 @@ item_entity_t::item_entity_t(const vec3f &position, const inventory::item_stack 
     this->gravity = 0.04;
     this->y_offset = 0.125;
     this->item_stack = item_stack;
+    this->pickup_pos = position;
 }
 
 void item_entity_t::tick()
@@ -750,6 +754,15 @@ void item_entity_t::render(float partial_ticks, bool transparency)
         return;
 
     vec3f entity_position = get_position(partial_ticks);
+
+    // Adjust position for pickup animation
+    if (picked_up)
+    {
+        // Lerp the position towards the target in <item_pickup_ticks> ticks
+        vec3f target = pickup_pos;
+        vfloat_t factor = (ticks_existed + partial_ticks - (item_lifetime - item_pickup_ticks)) / vfloat_t(item_pickup_ticks); // The lifetime is adjusted to line up with the pickup animation
+        entity_position = vec3f::lerp(entity_position, target, factor);
+    }
 
     vec3i block_pos = vec3i(std::floor(entity_position.x), std::floor(entity_position.y), std::floor(entity_position.z));
     block_t *light_block = get_block_at(block_pos, chunk);
@@ -823,10 +836,7 @@ void item_entity_t::render(float partial_ticks, bool transparency)
 
 void item_entity_t::resolve_collision(aabb_entity_t *b)
 {
-    if (dead)
-        return;
-
-    if (ticks_existed < 10)
+    if (dead || picked_up || ticks_existed < 20)
         return;
 
     if (b == player)
@@ -857,7 +867,9 @@ void item_entity_t::resolve_collision(aabb_entity_t *b)
             sound.volume = 0.5;
             sound.pitch = rng.nextFloat() * 0.8 + 0.6;
             PlaySound(sound);
-            dead = true;
+            picked_up = true;
+            pickup_pos = player->get_position(0) - vec3f(0, 0.5, 0);
+            ticks_existed = item_lifetime - item_pickup_ticks;
             if (current_gui)
                 current_gui->refresh();
         }

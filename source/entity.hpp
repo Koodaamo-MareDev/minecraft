@@ -139,7 +139,6 @@ public:
 
 class creeper_entity_t : public aabb_entity_t
 {
-private:
 public:
     vec3f body_rotation;
     uint8_t fuse = creeper_fuse;
@@ -168,6 +167,10 @@ public:
     virtual void resolve_collision(aabb_entity_t *b);
 
     virtual bool collides(aabb_entity_t *other);
+
+private:
+    bool picked_up = false;
+    vec3f pickup_pos;
 };
 
 #endif
