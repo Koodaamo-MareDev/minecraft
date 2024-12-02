@@ -112,6 +112,7 @@ inventory::container player_inventory(40, 36); // 4 rows of 9 slots, the rest 4 
 
 float fog_depth_multiplier = 1.0f;
 
+void SpawnDrop(const vec3i &pos, const block_t &old_block, inventory::item_stack item);
 void CreateExplosion(vec3f pos, float power, chunk_t *near);
 void UpdateLoadingStatus();
 void UpdateLightDir();
@@ -357,8 +358,7 @@ int main(int argc, char **argv)
     player_inventory.add(inventory::item_stack(uint8_t(BlockID::dirt), 16));
     player_inventory.add(inventory::item_stack(uint8_t(BlockID::wood), 12));
     player_inventory.add(inventory::item_stack(uint8_t(BlockID::bricks), 64));
-    for (uint8_t i = 0; i < 16; i++)
-        player_inventory.add(inventory::item_stack(uint8_t(BlockID::wool), 64, i));
+    player_inventory.add(inventory::item_stack(uint8_t(BlockID::tnt), 64));
     selected_item = &player_inventory[0];
     while (!isExiting)
     {
@@ -1112,18 +1112,8 @@ void EditBlocks()
                     sound.position = vec3f(editable_pos.x, editable_pos.y, editable_pos.z);
                     sound_system->play_sound(sound);
 
-                    if (old_blockid == BlockID::tnt)
-                    {
-                        get_chunk_from_pos(editable_pos)->entities.push_back(new exploding_block_entity_t(old_block, editable_pos, 80));
-                    }
-                    else
-                    {
-                        // Drop items
-                        vec3f item_pos = vec3f(editable_pos.x, editable_pos.y, editable_pos.z) + vec3f(0.5);
-                        item_entity_t *entity = new item_entity_t(item_pos, inventory::item_stack(uint8_t(old_blockid), 1, old_block.meta));
-                        entity->velocity = vec3f(rng.nextFloat() - .5f, rng.nextFloat(), rng.nextFloat() - .5f) * 0.25f;
-                        get_chunk_from_pos(editable_pos)->entities.push_back(entity);
-                    }
+                    properties(old_blockid).m_destroy(editable_pos, old_block);
+                    SpawnDrop(editable_pos, old_block, properties(old_blockid).m_drops(old_block));
                 }
                 else if (place_block)
                 {
@@ -1153,6 +1143,22 @@ void PlaySound(sound_t sound)
 void AddParticle(const particle_t &particle)
 {
     particle_system.add_particle(particle);
+}
+
+void SpawnDrop(const vec3i &pos, const block_t &old_block, inventory::item_stack item)
+{
+    if (item.empty())
+        return;
+    chunk_t *chunk = get_chunk_from_pos(pos);
+    if (!chunk)
+        return;
+    // Drop items
+    javaport::Random rng;
+    vec3f item_pos = vec3f(pos.x, pos.y, pos.z) + vec3f(0.5);
+    item_entity_t *entity = new item_entity_t(item_pos, item);
+    entity->ticks_existed = 10; // Halves the pickup delay (20 ticks / 2 = 10)
+    entity->velocity = vec3f(rng.nextFloat() - .5f, rng.nextFloat(), rng.nextFloat() - .5f) * 0.25f;
+    chunk->entities.push_back(entity);
 }
 
 void CreateExplosion(vec3f pos, float power, chunk_t *near)

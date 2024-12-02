@@ -472,6 +472,29 @@ bool is_fluid_overridable(BlockID id)
     }
 }
 
+inventory::item_stack default_drop(const block_t &old_block)
+{
+    return inventory::item_stack(old_block.id, 1, old_block.meta);
+}
+
+// Randomly drops items with a count between 1 and the original count.
+inventory::item_stack random_drop(const block_t &old_block, inventory::item_stack item)
+{
+    javaport::Random rng;
+    if (item.count > 1)
+        item.count = rng.nextInt(item.count) + 1;
+    return item;
+}
+
+void default_destroy(const vec3i &pos, const block_t &old_block)
+{
+}
+
+void spawn_tnt_destroy(const vec3i &pos, const block_t &old_block)
+{
+    get_chunk_from_pos(pos)->entities.push_back(new exploding_block_entity_t(old_block, pos, 80));
+}
+
 void default_aabb(const vec3i &pos, block_t *block, const aabb_t &other, std::vector<aabb_t> &aabb_list)
 {
     aabb_t aabb;
@@ -558,7 +581,7 @@ void flat_aabb(const vec3i &pos, block_t *block, const aabb_t &other, std::vecto
 blockproperties_t block_properties[256] = {
     blockproperties_t().id(BlockID::air).opacity(0).solid(false).transparent(true).collision(CollisionType::none).valid_item(false),
     blockproperties_t().id(BlockID::stone).texture(0).sound(SoundType::stone),
-    blockproperties_t().id(BlockID::grass).texture(202).sound(SoundType::grass).render_type(RenderType::full_special),
+    blockproperties_t().id(BlockID::grass).texture(202).sound(SoundType::grass).render_type(RenderType::full_special).drops(std::bind(random_drop, std::placeholders::_1, inventory::item_stack(BlockID::dirt, 1))),
     blockproperties_t().id(BlockID::dirt).texture(2).sound(SoundType::dirt),
     blockproperties_t().id(BlockID::cobblestone).texture(16).sound(SoundType::stone),
     blockproperties_t().id(BlockID::planks).texture(4).sound(SoundType::wood),
@@ -601,7 +624,7 @@ blockproperties_t block_properties[256] = {
     blockproperties_t().id(BlockID::double_stone_slab).texture(6).sound(SoundType::stone).render_type(RenderType::full_special),
     blockproperties_t().id(BlockID::stone_slab).texture(6).opacity(0).solid(false).transparent(true).sound(SoundType::stone).aabb(slab_aabb).render_type(RenderType::slab),
     blockproperties_t().id(BlockID::bricks).texture(7).sound(SoundType::stone),
-    blockproperties_t().id(BlockID::tnt).texture(8).sound(SoundType::grass).render_type(RenderType::full_special),
+    blockproperties_t().id(BlockID::tnt).texture(8).sound(SoundType::grass).render_type(RenderType::full_special).destroy(spawn_tnt_destroy).drops(std::bind(random_drop, std::placeholders::_1, inventory::item_stack())),
     blockproperties_t().id(BlockID::bookshelf).texture(35).sound(SoundType::wood).render_type(RenderType::full_special),
     blockproperties_t().id(BlockID::mossy_cobblestone).texture(36).sound(SoundType::stone),
     blockproperties_t().id(BlockID::obsidian).texture(37).sound(SoundType::stone).blast_resistance(-1),

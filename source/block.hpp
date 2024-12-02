@@ -9,6 +9,7 @@
 #include "aabb.hpp"
 #include "vec3f.hpp"
 #include "vec3i.hpp"
+#include "inventory.hpp"
 
 #define FACE_NX 0
 #define FACE_PX 1
@@ -53,6 +54,8 @@ class block_t;
 
 void default_aabb(const vec3i &pos, block_t *block, const aabb_t &other, std::vector<aabb_t> &aabb_list);
 void slab_aabb(const vec3i &pos, block_t *block, const aabb_t &other, std::vector<aabb_t> &aabb_list);
+void default_destroy(const vec3i &pos, const block_t &old_block);
+inventory::item_stack default_drop(const block_t &old_block);
 
 struct blockproperties_t
 {
@@ -85,6 +88,10 @@ struct blockproperties_t
 
     std::function<void(const vec3i &, block_t *, const aabb_t &, std::vector<aabb_t> &)> m_aabb;
 
+    std::function<void(const vec3i &, const block_t &)> m_destroy;
+
+    std::function<inventory::item_stack(const block_t &)> m_drops;
+
     bool intersects(const vec3i &pos, block_t *block, const aabb_t &other)
     {
         std::vector<aabb_t> aabb_list;
@@ -101,6 +108,8 @@ struct blockproperties_t
         m_fluid = 0;
         m_valid_item = 1;
         m_aabb = default_aabb;
+        m_destroy = default_destroy;
+        m_drops = default_drop;
     }
 
     // FIXME: This is a temporary constructor replacement as the inlay hints are otherwise not visible.
@@ -232,6 +241,18 @@ struct blockproperties_t
     blockproperties_t &aabb(std::function<void(const vec3i &, block_t *, const aabb_t &, std::vector<aabb_t> &)> aabb_func)
     {
         this->m_aabb = aabb_func;
+        return *this;
+    }
+
+    blockproperties_t &destroy(std::function<void(const vec3i &, const block_t &)> destroy_func)
+    {
+        this->m_destroy = destroy_func;
+        return *this;
+    }
+
+    blockproperties_t &drops(std::function<inventory::item_stack(const block_t &)> drops_func)
+    {
+        this->m_drops = drops_func;
         return *this;
     }
 };

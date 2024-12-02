@@ -6,6 +6,7 @@
 #include <array>
 
 #include "vec3i.hpp"
+#include "block_id.hpp"
 #include <stdexcept>
 
 class aabb_entity_t;
@@ -66,6 +67,7 @@ namespace inventory
         uint8_t meta;
 
         item_stack(uint16_t id = 0, uint8_t count = 0, uint8_t meta = 0) : id(id), count(count), meta(meta) {}
+        item_stack(BlockID id, uint8_t count = 0, uint8_t meta = 0) : id(uint8_t(id)), count(count), meta(meta) {}
 
         item &as_item() const
         {
