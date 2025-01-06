@@ -15,10 +15,10 @@ void modelbox_t::prepare()
     // Define quads and uvs for each face of the cube
 
     // Negative X
-    faces[0] = vertex_property_t(vec3f(start.x, start.y, start.z), 0, size.z);
-    faces[1] = vertex_property_t(vec3f(start.x, start.y, end.z), size.z, size.z);
-    faces[2] = vertex_property_t(vec3f(start.x, end.y, end.z), size.z, size.y + size.z);
-    faces[3] = vertex_property_t(vec3f(start.x, end.y, start.z), 0, size.y + size.z);
+    faces[0] = vertex_property_t(vec3f(start.x, start.y, start.z), size.z, size.z);
+    faces[1] = vertex_property_t(vec3f(start.x, start.y, end.z), 0, size.z);
+    faces[2] = vertex_property_t(vec3f(start.x, end.y, end.z), 0, size.y + size.z);
+    faces[3] = vertex_property_t(vec3f(start.x, end.y, start.z), size.z, size.y + size.z);
 
     // Positive X
     faces[4] = vertex_property_t(vec3f(end.x, start.y, start.z), size.z + size.x, size.z);
@@ -39,10 +39,10 @@ void modelbox_t::prepare()
     faces[15] = vertex_property_t(vec3f(start.x, start.y, start.z), size.z, 0);
 
     // Negative Z
-    faces[16] = vertex_property_t(vec3f(start.x, start.y, start.z), size.z, size.z);
-    faces[17] = vertex_property_t(vec3f(start.x, end.y, start.z), size.z, size.z + size.y);
-    faces[18] = vertex_property_t(vec3f(end.x, end.y, start.z), size.z + size.x, size.z + size.y);
-    faces[19] = vertex_property_t(vec3f(end.x, start.y, start.z), size.z + size.x, size.z);
+    faces[16] = vertex_property_t(vec3f(start.x, start.y, start.z), size.z + size.x, size.z);
+    faces[17] = vertex_property_t(vec3f(start.x, end.y, start.z), size.z + size.x, size.z + size.y);
+    faces[18] = vertex_property_t(vec3f(end.x, end.y, start.z), size.z, size.z + size.y);
+    faces[19] = vertex_property_t(vec3f(end.x, start.y, start.z), size.z, size.z);
 
     // Positive Z
     faces[20] = vertex_property_t(vec3f(start.x, start.y, end.z), size.z + size.x + size.z, size.z);
