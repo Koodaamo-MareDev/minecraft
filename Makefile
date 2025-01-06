@@ -18,7 +18,7 @@ include $(DEVKITPPC)/wii_rules
 #---------------------------------------------------------------------------------
 TARGET		:=	$(notdir $(CURDIR))
 BUILD		:=	build
-SOURCES		:=	source source/opensimplexnoise source/ported source/improvednoise source/fastnoise source/jvm source/jvm/extensions source/oggplayer
+SOURCES		:=	source source/opensimplexnoise source/ported source/improvednoise source/fastnoise source/jvm source/jvm/extensions source/oggplayer source/crapper source/crapper/miniz
 DATA		:=
 TEXTURES	:=	textures
 INCLUDES	:=	source/ported
@@ -27,7 +27,7 @@ SOUND		:=	sound
 # options for code generation
 #---------------------------------------------------------------------------------
 
-CFLAGS	= -g -O2 -Wall $(MACHDEP) $(INCLUDE)
+CFLAGS	= -g -O2 -Wall $(MACHDEP) $(INCLUDE) -DMINIZ_NO_ARCHIVE_APIS
 CXXFLAGS	=	$(CFLAGS)
 
 LDFLAGS	=	-g $(MACHDEP) -Wl,-Map,$(notdir $@).map
@@ -64,7 +64,7 @@ export DEPSDIR	:=	$(CURDIR)/$(BUILD)
 #---------------------------------------------------------------------------------
 ALPHAMAPSRC	:=	blockmap.png
 ALPHAMAPFILES	:=	$(ALPHAMAPSRC:.png=_alpha.h)
-LIGHTMAPSRC	:=	light_day.png light_night.png light_day_mono.png light_night_mono.png
+LIGHTMAPSRC	:=	light_day.png light_night.png light_day_mono.png light_night_mono.png light_nether.png
 LIGHTMAPFILES	:=	$(LIGHTMAPSRC:.png=_rgba.h)
 CFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
 CPPFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
