@@ -34,6 +34,7 @@ enum class BlockID
     detector_rail,
     sticky_piston,
     cobweb,
+    tallgrass, // tall grass, shrubs, ferns
     deadbush,
     piston,
     piston_head,

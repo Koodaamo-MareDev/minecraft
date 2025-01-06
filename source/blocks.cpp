@@ -610,6 +610,7 @@ blockproperties_t block_properties[256] = {
     blockproperties_t().id(BlockID::detector_rail).texture(179).opacity(0).transparent(true).solid(false).sound(SoundType::metal).aabb(flat_aabb).render_type(RenderType::flat_ground).collision(CollisionType::none),
     blockproperties_t().id(BlockID::sticky_piston).state(0x0B).texture(106).solid(false).sound(SoundType::stone).render_type(RenderType::full_special),
     blockproperties_t().id(BlockID::cobweb).texture(11).solid(false).opacity(0).transparent(true).sound(SoundType::stone).render_type(RenderType::cross).collision(CollisionType::none),
+    blockproperties_t().id(BlockID::tallgrass).texture(55).solid(false).opacity(0).transparent(true).sound(SoundType::grass).render_type(RenderType::cross).collision(CollisionType::none),
     blockproperties_t().id(BlockID::deadbush).texture(55).solid(false).opacity(0).transparent(true).sound(SoundType::grass).render_type(RenderType::cross).collision(CollisionType::none),
     blockproperties_t().id(BlockID::piston).state(3).texture(108).solid(false).sound(SoundType::stone).render_type(RenderType::full_special),
     blockproperties_t().id(BlockID::piston_head).texture(107).solid(false).sound(SoundType::stone).valid_item(false),
