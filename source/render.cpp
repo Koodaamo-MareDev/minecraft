@@ -15,6 +15,7 @@
 #include "font_tpl.h"
 #include "items_tpl.h"
 #include "inventory_tpl.h"
+#include "char_tpl.h"
 
 const GXColor sky_color = {0x88, 0xBB, 0xFF, 0xFF};
 
@@ -34,6 +35,7 @@ GXTexObj container_texture;
 GXTexObj underwater_texture;
 GXTexObj vignette_texture;
 GXTexObj creeper_texture;
+GXTexObj player_texture;
 GXTexObj font_texture;
 GXTexObj items_texture;
 GXTexObj inventory_texture;
@@ -67,6 +69,7 @@ void init_textures()
     init_texture(underwater_texture, underwater_tpl, underwater_tpl_size);
     init_texture(vignette_texture, vignette_tpl, vignette_tpl_size);
     init_texture(creeper_texture, creeper_tpl, creeper_tpl_size);
+    init_texture(player_texture, char_tpl, char_tpl_size);
     init_texture(font_texture, font_tpl, font_tpl_size);
     init_texture(items_texture, items_tpl, items_tpl_size);
     init_texture(inventory_texture, inventory_tpl, inventory_tpl_size);
