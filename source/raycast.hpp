@@ -504,6 +504,11 @@ inline bool raycast_precise(
                     aabbs.clear();
                 }
             }
+            else
+            {
+                aabbs.clear();
+                return false;
+            }
         }
 
         // tMaxX stores the t-value at which we cross a cube boundary along the
