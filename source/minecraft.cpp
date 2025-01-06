@@ -111,6 +111,7 @@ inventory::container player_inventory(40, 36); // 4 rows of 9 slots, the rest 4 
 
 float fog_depth_multiplier = 1.0f;
 
+std::string dirtscreen_text = "Loading...";
 void SpawnDrop(const vec3i &pos, const block_t &old_block, inventory::item_stack item);
 void CreateExplosion(vec3f pos, float power, chunk_t *near);
 void UpdateLoadingStatus();
@@ -545,6 +546,8 @@ int main(int argc, char **argv)
         {
             int texture_index = get_default_texture_index(BlockID::dirt);
             fill_screen_texture(blockmap_texture, viewport, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index), TEXTURE_PX(texture_index), TEXTURE_PY(texture_index));
+
+            gui::draw_text((viewport.width - gui::text_width(dirtscreen_text)) / 2, viewport.height / 2, dirtscreen_text, GXColor{255, 255, 255, 255});
         }
         else if (!inventory_visible)
         {
