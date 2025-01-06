@@ -1306,10 +1306,11 @@ int chunk_t::render_torch(block_t *block, const vec3i &pos)
 vec3f get_fluid_direction(block_t *block, vec3i pos, chunk_t *chunk)
 {
 
-    BlockID block_id = block->get_blockid();
-
-    if (is_still_fluid(block_id))
+    uint8_t fluid_level = get_fluid_meta_level(block);
+    if ((fluid_level & 7) == 0)
         return vec3f(0.0, -1.0, 0.0);
+
+    BlockID block_id = block->get_blockid();
 
     // Used to check block types around the fluid
     block_t *neighbors[6];
@@ -1318,7 +1319,6 @@ vec3f get_fluid_direction(block_t *block, vec3i pos, chunk_t *chunk)
     vec3f direction = vec3f(0.0, 0.0, 0.0);
 
     bool direction_set = false;
-
     for (int i = 0; i < 6; i++)
     {
         if (i == FACE_NY || i == FACE_PY)
@@ -1326,9 +1326,9 @@ vec3f get_fluid_direction(block_t *block, vec3i pos, chunk_t *chunk)
         if (neighbors[i] && is_same_fluid(neighbors[i]->get_blockid(), block_id))
         {
             direction_set = true;
-            if (get_fluid_meta_level(neighbors[i]) < get_fluid_meta_level(block))
+            if (get_fluid_meta_level(neighbors[i]) < fluid_level)
                 direction = direction - vec3f(face_offsets[i].x, 0, face_offsets[i].z);
-            else if (get_fluid_meta_level(neighbors[i]) > get_fluid_meta_level(block))
+            else if (get_fluid_meta_level(neighbors[i]) > fluid_level)
                 direction = direction + vec3f(face_offsets[i].x, 0, face_offsets[i].z);
             else
                 direction_set = false;

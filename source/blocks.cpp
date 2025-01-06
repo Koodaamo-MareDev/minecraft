@@ -452,9 +452,7 @@ uint8_t get_fluid_meta_level(block_t *block)
     if (block)
     {
         BlockID block_id = block->get_blockid();
-        if (is_still_fluid(block_id))
-            return 0;
-        if (is_flowing_fluid(block_id))
+        if (is_fluid(block_id))
             return block->meta & 0xF;
     }
     return 8;
