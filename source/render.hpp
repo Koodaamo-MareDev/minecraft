@@ -27,6 +27,7 @@
 extern guVector player_pos;
 extern float xrot, yrot;
 extern int tickCounter;
+extern int timeOfDay;
 extern double partialTicks;
 extern Mtx active_mtx;
 extern uint8_t light_map[1024];
@@ -86,6 +87,19 @@ struct view_t
         this->far = far;
         this->widescreen = widescreen;
     }
+
+    view_t()
+    {
+    }
+};
+
+struct fog_t
+{
+    bool enabled;
+    view_t view;
+    GXColor color;
+    float start;
+    float end;
 };
 
 inline uint8_t get_face_light_index(vec3i pos, uint8_t face, chunk_t *near, block_t *default_block = nullptr)
@@ -111,7 +125,9 @@ void use_texture(GXTexObj &texture);
 
 void init_fog(Mtx44 &projection_mtx, uint16_t viewport_width);
 
-void use_fog(bool use, view_t view, GXColor color, float start, float end);
+void set_fog(bool use, view_t view, GXColor color, float start, float end);
+
+void use_fog(bool use);
 
 void use_ortho(view_t view);
 

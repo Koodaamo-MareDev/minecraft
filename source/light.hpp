@@ -12,6 +12,8 @@ void light_engine_init();
 void light_engine_deinit();
 void light_engine_loop();
 void light_engine_update();
+void light_engine_reset();
 void update_light(vec3i pos, chunk_t* chunk);
+void set_skylight_enabled(bool enabled);
 
 #endif

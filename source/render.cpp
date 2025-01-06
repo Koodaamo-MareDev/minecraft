@@ -24,6 +24,8 @@ GXColor color_add = {0, 0, 0, 0};
 
 std::stack<mtx34_t> matrix_stack;
 
+static fog_t fog = {false, view_t{}, {0, 0, 0, 0}, 0.0f, 0.0f};
+
 GXTexObj white_texture;
 GXTexObj clouds_texture;
 GXTexObj sun_texture;
@@ -130,9 +132,20 @@ void init_fog(Mtx44 &projection_mtx, uint16_t viewport_width)
     fog_init_done = true;
 }
 
-void use_fog(bool use, view_t view, GXColor color, float start, float end)
+void set_fog(bool use, view_t view, GXColor color, float start, float end)
 {
+    fog.enabled = use;
+    fog.view = view;
+    fog.color = color;
+    fog.start = start;
+    fog.end = end;
     GX_SetFog(use ? GX_FOG_PERSP_LIN : GX_FOG_NONE, start, end, view.near, view.far, color);
+}
+
+void use_fog(bool use)
+{
+    fog.enabled = use;
+    GX_SetFog(fog.enabled ? GX_FOG_PERSP_LIN : GX_FOG_NONE, fog.start, fog.end, fog.view.near, fog.view.far, fog.color);
 }
 
 void use_ortho(view_t view)
@@ -925,7 +938,7 @@ void draw_stars()
 
 float get_celestial_angle()
 {
-    int daytime_ticks = (int)(tickCounter % 24000L);
+    int daytime_ticks = (timeOfDay % 24000);
     float normalized_daytime = ((float)daytime_ticks + partialTicks) / 24000.0F - 0.25F;
     if (normalized_daytime < 0.0F)
     {
@@ -975,6 +988,9 @@ float get_sky_multiplier()
 }
 GXColor get_sky_color(bool cave_darkness)
 {
+    if (is_hell_world())
+        return GXColor{0x20, 0, 0, 0xFF};
+
     float elevation_brightness = std::pow(std::clamp((player_pos.y) * 0.03125f, 0.0f, 1.0f), 2.0f);
     if (player_pos.y < -500.0f)
     {

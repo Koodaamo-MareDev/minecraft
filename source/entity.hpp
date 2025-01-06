@@ -14,6 +14,8 @@ constexpr vfloat_t ENTITY_GRAVITY = 9.8f;
 
 constexpr uint8_t creeper_fuse = 20;
 
+bool is_remote();
+
 class chunk_t;
 
 class entity_t
@@ -36,8 +38,10 @@ public:
         before_friction = false,
         after_friction = true,
     };
+    int32_t entity_id = 0;
+    uint8_t type = 0;
     uint32_t last_world_tick = 0;
-    uint16_t ticks_existed = 0;
+    uint32_t ticks_existed = 0;
     aabb_t aabb;
     vec3f rotation = vec3f(0, 0, 0);
     vec3f prev_position = vec3f(0, 0, 0);
@@ -57,6 +61,14 @@ public:
     bool horizontal_collision = false;
     bool walk_sound = true;
     bool dead = false;
+    bool simulate_offline = false;
+    vec3i server_pos = vec3i(0, 0, 0);
+    vec3f animation_pos = vec3f(0, 0, 0);
+    vec3f animation_rot = vec3f(0, 0, 0);
+    vfloat_t accumulated_walk_distance = 0;
+    uint8_t animation_tick = 0;
+    uint8_t health = 20;
+    uint16_t holding_item = 0;
     drag_phase_t drag_phase = drag_phase_t::before_friction;
     uint8_t light_level = 0;
     std::deque<vec3i> path;
@@ -72,11 +84,21 @@ public:
 
     virtual void resolve_collision(aabb_entity_t *b);
 
-    void set_position(vec3f pos);
+    void teleport(vec3f pos);
+
+    // NOTE: The position should be provided in 1/32ths of a block
+    void set_server_position(vec3i pos, uint8_t ticks = 0);
+
+    // NOTE: The position should be provided in 1/32ths of a block
+    void set_server_pos_rot(vec3i pos, vec3f rot, uint8_t ticks);
+
+    virtual void hurt();
 
     virtual void tick();
 
-    virtual void render(float partial_ticks, bool transparency) {}
+    virtual void animate();
+
+    virtual void render(float partial_ticks, bool transparency);
 
     virtual size_t size()
     {
@@ -168,9 +190,28 @@ public:
 
     virtual bool collides(aabb_entity_t *other);
 
+    virtual void pickup(vec3f pos);
+
 private:
     bool picked_up = false;
     vec3f pickup_pos;
+};
+
+class mp_player_entity_t : public aabb_entity_t
+{
+public:
+    std::string player_name = "";
+    vfloat_t body_rotation_y = 0.0;
+    vfloat_t last_speed = 0.0;
+    mp_player_entity_t(const vec3f &position, std::string player_name);
+
+    virtual void hurt();
+
+    virtual void tick();
+
+    virtual void render(float partial_ticks, bool transparency);
+
+    virtual void animate();
 };
 
 #endif

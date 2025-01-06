@@ -11,11 +11,14 @@
 #include <cstddef>
 #include <vector>
 #include <deque>
+#include <map>
 #define SIMULATION_DISTANCE 2
 #define RENDER_DISTANCE 4
 #define CHUNK_COUNT ((RENDER_DISTANCE) * (RENDER_DISTANCE + 1) * 4)
 #define GENERATION_DISTANCE (RENDER_DISTANCE - 1)
-#define VERTICAL_SECTION_COUNT 16
+#define VERTICAL_SECTION_COUNT 8
+#define WORLD_HEIGHT (VERTICAL_SECTION_COUNT << 4)
+#define MAX_WORLD_Y (WORLD_HEIGHT - 1)
 
 #define WORLDGEN_TREE_ATTEMPTS 8
 
@@ -128,7 +131,7 @@ public:
     uint32_t chunk_seed_x;
     uint32_t chunk_seed_z;
     uint8_t lit_state = 0;
-    block_t blockstates[16 * 16 * 256] = {0};
+    block_t blockstates[16 * 16 * WORLD_HEIGHT] = {0};
     uint8_t height_map[16 * 16] = {0};
     uint8_t terrain_map[16 * 16] = {0};
     chunkvbo_t vbos[VERTICAL_SECTION_COUNT] = {0};
@@ -146,7 +149,7 @@ public:
      */
     block_t *get_block(const vec3i &pos)
     {
-        return &this->blockstates[(pos.x & 0xF) | ((pos.y & 0xFF) << 8) | ((pos.z & 0xF) << 4)];
+        return &this->blockstates[(pos.x & 0xF) | ((pos.y & MAX_WORLD_Y) << 8) | ((pos.z & 0xF) << 4)];
     }
 
     /**
@@ -158,7 +161,7 @@ public:
     {
         if (block_to_chunk_pos(pos) != vec2i(this->x, this->z))
             return nullptr;
-        return &this->blockstates[(pos.x & 0xF) | ((pos.y & 0xFF) << 8) | ((pos.z & 0xF) << 4)];
+        return &this->blockstates[(pos.x & 0xF) | ((pos.y & MAX_WORLD_Y) << 8) | ((pos.z & 0xF) << 4)];
     }
 
     /**
@@ -171,7 +174,7 @@ public:
      */
     void set_block(const vec3i &pos, BlockID block_id)
     {
-        this->blockstates[(pos.x & 0xF) | ((pos.y & 0xFF) << 8) | ((pos.z & 0xF) << 4)].set_blockid(block_id);
+        this->blockstates[(pos.x & 0xF) | ((pos.y & MAX_WORLD_Y) << 8) | ((pos.z & 0xF) << 4)].set_blockid(block_id);
     }
 
     /**
@@ -183,7 +186,7 @@ public:
     {
         if (block_to_chunk_pos(pos) != vec2i(this->x, this->z))
             return;
-        this->blockstates[(pos.x & 0xF) | ((pos.y & 0xFF) << 8) | ((pos.z & 0xF) << 4)].set_blockid(block_id);
+        this->blockstates[(pos.x & 0xF) | ((pos.y & MAX_WORLD_Y) << 8) | ((pos.z & 0xF) << 4)].set_blockid(block_id);
     }
 
     /**
@@ -226,6 +229,7 @@ public:
 
     void update_height_map(vec3i pos);
     void light_up();
+    void recalculate_height_map();
     void recalculate_visibility(block_t *block, vec3i pos);
     void recalculate_section_visibility(int section);
     int build_vbo(int section, bool transparent);
@@ -250,6 +254,7 @@ public:
     chunk_t()
     {
     }
+    ~chunk_t();
 
 private:
 };
@@ -264,6 +269,10 @@ void init_chunks();
 void deinit_chunks();
 void print_chunk_status();
 bool has_pending_chunks();
+bool is_remote();
+void set_world_remote(bool remote);
+bool is_hell_world();
+void set_world_hell(bool hell);
 BlockID get_block_id_at(const vec3i &position, BlockID default_id = BlockID::air, chunk_t *near = nullptr);
 block_t *get_block_at(const vec3i &vec, chunk_t *near = nullptr);
 void set_block_at(const vec3i &pos, BlockID id, chunk_t *near = nullptr);
@@ -278,4 +287,8 @@ void get_neighbors(const vec3i &pos, block_t **neighbors, chunk_t *near = nullpt
 void update_block_at(const vec3i &pos);
 void update_neighbors(const vec3i &pos);
 vec3f get_fluid_direction(block_t *block, vec3i pos, chunk_t *chunk = nullptr);
+std::map<int32_t, aabb_entity_t *> &get_entities();
+void add_entity(aabb_entity_t *entity);
+void remove_entity(int32_t entity_id);
+aabb_entity_t *get_entity_by_id(int32_t entity_id);
 #endif

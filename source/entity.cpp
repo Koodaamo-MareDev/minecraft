@@ -2,6 +2,7 @@
 #include "raycast.hpp"
 #include "chunk_new.hpp"
 #include "render.hpp"
+#include "render_gui.hpp"
 #include "blocks.hpp"
 #include "light.hpp"
 #include "particle.hpp"
@@ -26,13 +27,20 @@ void CreateExplosion(vec3f pos, float power, chunk_t *near); // in minecraft.cpp
 constexpr int item_pickup_ticks = 2;
 constexpr int item_lifetime = 6000;
 
+creeper_model_t creeper_model = creeper_model_t();
+player_model_t player_model = player_model_t();
+
 bool aabb_entity_t::collides(aabb_entity_t *other)
 {
-    return aabb.intersects(other->aabb);
+    return other && aabb.intersects(other->aabb);
 }
 
 bool aabb_entity_t::can_remove()
 {
+    if (is_remote())
+    {
+        return dead && !local;
+    }
     if (local)
         return false;
     if (!chunk)
@@ -56,24 +64,49 @@ bool aabb_entity_t::can_remove()
 
 void aabb_entity_t::resolve_collision(aabb_entity_t *b)
 {
-    vec3f push = aabb.push_out(b->aabb);
+    vec3f push = aabb.push_out_horizontal(b->aabb);
 
     // Add velocity to separate the entities
-    this->velocity = this->velocity + push * 0.5;
+    this->velocity = this->velocity + push.normalize() * 0.025;
 }
 
-void aabb_entity_t::set_position(vec3f pos)
+void aabb_entity_t::teleport(vec3f pos)
 {
     position = pos;
     prev_position = pos;
-    aabb.min = vec3f(pos.x - width * 0.5, pos.y - y_offset + y_size, pos.z - width * 0.5);
-    aabb.max = vec3f(pos.x + width * 0.5, pos.y - y_offset + y_size + height, pos.z + width * 0.5);
+    vfloat_t half_width = width * 0.5;
+    aabb.min = vec3f(pos.x - half_width, pos.y - y_offset + y_size, pos.z - half_width);
+    aabb.max = vec3f(pos.x + half_width, pos.y - y_offset + y_size + height, pos.z + half_width);
+}
+
+void aabb_entity_t::set_server_position(vec3i pos, uint8_t ticks)
+{
+    server_pos = pos;
+    animation_pos = vec3f(pos.x, pos.y, pos.z) / 32.0;
+    animation_tick = ticks;
+}
+
+void aabb_entity_t::set_server_pos_rot(vec3i pos, vec3f rot, uint8_t ticks)
+{
+    server_pos = pos;
+    animation_pos = vec3f(pos.x, pos.y, pos.z) / 32.0;
+    animation_rot = rot;
+    animation_tick = ticks;
+}
+
+void aabb_entity_t::hurt()
+{
 }
 
 void aabb_entity_t::tick()
 {
     ticks_existed++;
     prev_rotation = rotation;
+    prev_position = position;
+    if (is_remote() && !(local || simulate_offline))
+    {
+        return;
+    }
     vec3f fluid_velocity = vec3f(0, 0, 0);
     bool water_movement = false;
     bool lava_movement = false;
@@ -114,7 +147,7 @@ void aabb_entity_t::tick()
     {
         if (!in_water)
         {
-            float impact = 0.2 / Q_rsqrt_d(velocity.x * velocity.x * 0.2 + velocity.y * velocity.y + velocity.z * velocity.z * 0.2);
+            vfloat_t impact = 0.2 / Q_rsqrt_d(velocity.x * velocity.x * 0.2 + velocity.y * velocity.y + velocity.z * velocity.z * 0.2);
             if (impact > 1.0)
                 impact = 1.0;
             javaport::Random rng;
@@ -233,7 +266,7 @@ void aabb_entity_t::tick()
             movement.x = wiimote_x;
             movement.z = wiimote_z;
         }
-        else
+        else if (!is_remote())
         {
             jumping = on_ground && should_jump();
         }
@@ -283,6 +316,53 @@ void aabb_entity_t::tick()
             }
         }
     }
+}
+void aabb_entity_t::animate()
+{
+    // Animate the entity's position and rotation
+    if (animation_tick > 0)
+    {
+        vec3f diff = animation_pos - position;
+        vec3f new_position = position + diff / animation_tick;
+        vfloat_t diff_rot = animation_rot.y - rotation.y;
+        while (diff_rot < -180.0)
+            diff_rot += 360.0;
+        while (diff_rot >= 180.0)
+            diff_rot -= 360.0;
+        vec3f new_rotation = vec3f(rotation.x + (animation_rot.x - rotation.x) / animation_tick, rotation.y + diff_rot / animation_tick, 0);
+        animation_tick--;
+        position = new_position;
+        rotation = new_rotation;
+    }
+    else if (!local && !simulate_offline)
+    {
+        position = animation_pos;
+        rotation = animation_rot;
+    }
+}
+void aabb_entity_t::render(float partial_ticks, bool transparency)
+{
+#define DEBUG_ENTITIES
+#ifdef DEBUG_ENTITIES
+    if (!local && chunk)
+    {
+        vec3f entity_position = get_position(partial_ticks);
+        vec3i block_pos = vec3i(std::floor(entity_position.x), std::floor(entity_position.y + 0.5), std::floor(entity_position.z));
+        block_t *block = get_block_at(block_pos, chunk);
+        if (block && !properties(block->id).m_solid)
+        {
+            light_level = block->light;
+        }
+        // Render a mob spawner at the entity's position
+        block_t block_state = {uint8_t(BlockID::bricks), 0x7F, 0, light_level};
+        entity_position.y = aabb.min.y + (aabb.max.y - aabb.min.y) * 0.5;
+        transform_view(get_view_matrix(), entity_position - vec3f(0.5, 0.5, 0.5), (aabb.max - aabb.min));
+
+        // Restore default texture
+        use_texture(blockmap_texture);
+        render_single_block(block_state, transparency);
+    }
+#endif
 }
 
 std::vector<aabb_t> aabb_entity_t::get_colliding_aabbs(const aabb_t &aabb)
@@ -387,10 +467,11 @@ falling_block_entity_t::falling_block_entity_t(block_t block_state, const vec3i 
 {
     aabb_entity_t(0.999f, 0.999f);
     chunk = get_chunk_from_pos(position);
-    set_position(vec3f(position.x, position.y, position.z) + vec3f(0.5, 0, 0.5));
+    teleport(vec3f(position.x, position.y, position.z) + vec3f(0.5, 0, 0.5));
     this->walk_sound = false;
     this->drag_phase = drag_phase_t::after_friction;
     this->gravity = 0.04;
+    this->simulate_offline = true;
     if (!chunk)
         dead = true;
 }
@@ -398,7 +479,7 @@ void falling_block_entity_t::tick()
 {
     if (dead)
         return;
-    if (!fall_time)
+    if (!fall_time && !is_remote())
     {
         update_neighbors(vec3i(std::floor(position.x), std::floor(position.y), std::floor(position.z)));
     }
@@ -410,7 +491,7 @@ void falling_block_entity_t::tick()
         vec3f current_pos = get_position(0);
         vec3i int_pos = vec3i(std::floor(current_pos.x), std::floor(current_pos.y), std::floor(current_pos.z));
         block_t *block = get_block_at(int_pos, chunk);
-        if (block)
+        if (block && !is_remote())
         {
             // Update the block
             *block = this->block_state;
@@ -418,7 +499,7 @@ void falling_block_entity_t::tick()
             update_block_at(int_pos);
             update_neighbors(int_pos);
         }
-        set_position(vec3f(int_pos.x, int_pos.y, int_pos.z) + vec3f(0.5, 0, 0.5));
+        teleport(vec3f(int_pos.x, int_pos.y, int_pos.z) + vec3f(0.5, 0, 0.5));
     }
 }
 
@@ -512,12 +593,10 @@ void exploding_block_entity_t::render(float partial_ticks, bool transparency)
     use_texture(blockmap_texture);
 }
 
-creeper_model_t creeper_model = creeper_model_t();
-
 creeper_entity_t::creeper_entity_t(const vec3f &position) : aabb_entity_t(0.6f, 1.7f)
 {
     aabb_entity_t(0.6f, 1.7f);
-    set_position(position);
+    teleport(position);
     this->walk_sound = false;
     this->gravity = 0.08;
     this->y_offset = 1.445;
@@ -675,7 +754,7 @@ void creeper_entity_t::render(float partial_ticks, bool transparency)
     if (diff < -45)
         body_rotation.y = entity_rotation.y + 45;
 
-    vec3f h_velocity = vec3f(velocity.x, 0, velocity.z);
+    vec3f h_velocity = animation_tick ? (animation_pos - position) : (position - prev_position);
     h_velocity.y = 0;
 
     body_rotation.y = lerpd(body_rotation.y, entity_rotation.y, h_velocity.magnitude());
@@ -694,7 +773,7 @@ void creeper_entity_t::render(float partial_ticks, bool transparency)
         set_color_add(std::sin(fuse + partial_ticks * 0.1) > 0 ? GXColor{0, 0, 0, 0xFF} : GXColor{0xFF, 0xFF, 0xFF, 0xFF});
     }
 
-    creeper_model.render(partial_ticks);
+    creeper_model.render(accumulated_walk_distance, partial_ticks);
 #ifdef DEBUG
     if (follow_entity)
     {
@@ -724,15 +803,17 @@ void creeper_entity_t::render(float partial_ticks, bool transparency)
 #endif
 }
 
-item_entity_t::item_entity_t(const vec3f &position, const inventory::item_stack &item_stack) : aabb_entity_t(.2f, .2f)
+item_entity_t::item_entity_t(const vec3f &position, const inventory::item_stack &item_stack) : aabb_entity_t(.25f, .25f)
 {
-    set_position(position);
     chunk = get_chunk_from_pos(vec3i(std::floor(position.x), std::floor(position.y), std::floor(position.z)));
     this->walk_sound = false;
     this->gravity = 0.04;
     this->y_offset = 0.125;
     this->item_stack = item_stack;
     this->pickup_pos = position;
+    this->type = 1;
+    this->simulate_offline = true;
+    teleport(position);
 }
 
 void item_entity_t::tick()
@@ -740,6 +821,9 @@ void item_entity_t::tick()
     if (dead)
         return;
     aabb_entity_t::tick();
+
+    if (is_remote())
+        return;
 
     if (ticks_existed >= 6000)
         dead = true;
@@ -761,6 +845,8 @@ void item_entity_t::render(float partial_ticks, bool transparency)
         // Lerp the position towards the target in <item_pickup_ticks> ticks
         vec3f target = pickup_pos;
         vfloat_t factor = (ticks_existed + partial_ticks - (item_lifetime - item_pickup_ticks)) / vfloat_t(item_pickup_ticks); // The lifetime is adjusted to line up with the pickup animation
+        if (factor > 1)
+            factor = 1;
         entity_position = vec3f::lerp(entity_position, target, factor);
     }
 
@@ -789,7 +875,7 @@ void item_entity_t::render(float partial_ticks, bool transparency)
     inventory::item item = item_stack.as_item();
 
     RenderType render_type = properties(item.id).m_render_type;
-    block_t block = {uint8_t(item.id & 0xFF), 0x7F, item_stack.meta, 0xF, 0xF};
+    block_t block = {uint8_t(item.id & 0xFF), 0x7F, uint8_t(item_stack.meta & 0xFF), 0xF, 0xF};
     block.light = light_level;
 
     vec3f anim_offset = vec3f(-0.5, std::sin((ticks_existed + partial_ticks) * M_1_PI * 0.25) * 0.125 - 0.375, -0.5);
@@ -805,7 +891,7 @@ void item_entity_t::render(float partial_ticks, bool transparency)
             {
                 // Draw the block
                 item_rot.y = (ticks_existed + partial_ticks) * 4;
-                transform_view(get_view_matrix(), entity_position + anim_offset + dupe_offset * i, vec3f(4), item_rot, true);
+                transform_view(get_view_matrix(), entity_position + anim_offset + dupe_offset * i, vec3f(0.25), item_rot, true);
                 blockproperties_t props = properties(block.id);
                 if (bool(props.m_transparent) == transparency)
                     render_single_block(block, props.m_transparent);
@@ -814,7 +900,7 @@ void item_entity_t::render(float partial_ticks, bool transparency)
             {
                 // Draw the item
                 item_rot.z = 180;
-                transform_view(get_view_matrix(), entity_position + anim_offset + dupe_offset * i + vec3f(0, 0.125, 0), vec3f(2), item_rot, true);
+                transform_view(get_view_matrix(), entity_position + anim_offset + dupe_offset * i + vec3f(0, 0.125, 0), vec3f(0.5), item_rot, true);
 
                 if (transparency)
                     render_single_item(get_default_texture_index(BlockID(block.id)), true, light_level);
@@ -826,7 +912,7 @@ void item_entity_t::render(float partial_ticks, bool transparency)
 
             // Draw the item
             item_rot.z = 180;
-            transform_view(get_view_matrix(), entity_position + anim_offset + dupe_offset * i + vec3f(0, 0.125, 0), vec3f(2), item_rot, true);
+            transform_view(get_view_matrix(), entity_position + anim_offset + dupe_offset * i + vec3f(0, 0.125, 0), vec3f(0.5), item_rot, true);
 
             if (transparency)
                 render_single_item(item.texture_index, true, light_level);
@@ -836,6 +922,8 @@ void item_entity_t::render(float partial_ticks, bool transparency)
 
 void item_entity_t::resolve_collision(aabb_entity_t *b)
 {
+    if (is_remote())
+        return;
     if (dead || picked_up || ticks_existed < 20)
         return;
 
@@ -879,4 +967,187 @@ void item_entity_t::resolve_collision(aabb_entity_t *b)
 bool item_entity_t::collides(aabb_entity_t *other)
 {
     return aabb.inflate(0.7).intersects(other->aabb);
+}
+
+void item_entity_t::pickup(vec3f pos)
+{
+    // Play the pop sound if the player picks up the stack
+    javaport::Random rng;
+    sound_t sound = get_sound("pop");
+    sound.position = position;
+    sound.volume = 0.5;
+    sound.pitch = rng.nextFloat() * 0.8 + 0.6;
+    PlaySound(sound);
+
+    // Mark the item as picked up
+    picked_up = true;
+
+    // Start the pickup animation
+    pickup_pos = pos;
+    ticks_existed = item_lifetime - item_pickup_ticks;
+}
+
+mp_player_entity_t::mp_player_entity_t(const vec3f &position, std::string player_name) : aabb_entity_t(0.6f, 1.8f)
+{
+    teleport(position);
+    this->walk_sound = false;
+    this->gravity = 0.08;
+    this->y_offset = 1.62;
+    this->y_size = 0;
+    this->player_name = player_name;
+    this->drag_phase = drag_phase_t::before_friction;
+    this->type = 48; // Mob - Not sure if this is correct as there is no player entity "type". Java uses instanceof to check if an entity is a player which is not possible in C++
+    memcpy(&player_model.texture, &player_texture, sizeof(GXTexObj));
+}
+
+void mp_player_entity_t::hurt()
+{
+    javaport::Random rng;
+    sound_t sound = get_sound("hurt");
+    sound.position = player->position;
+    sound.volume = 0.5;
+    sound.pitch = rng.nextFloat() * 0.8 + 0.6;
+    PlaySound(sound);
+}
+
+void mp_player_entity_t::tick()
+{
+    aabb_entity_t::tick();
+}
+
+void mp_player_entity_t::render(float partial_ticks, bool transparency)
+{
+    if (!chunk)
+        return;
+
+    // Get the player's position and rotation
+    vec3f entity_position = get_position(partial_ticks);
+    vec3f entity_rotation = get_rotation(partial_ticks);
+
+    // The name tag should render in the transparent pass
+    if (transparency)
+    {
+        transform_view(get_view_matrix(), entity_position, vec3f(1), vec3f(0, 0, 0), true);
+
+        use_fog(false);
+
+        // Enable direct colors
+        GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
+
+        // Render through walls
+        GX_SetZMode(GX_FALSE, GX_ALWAYS, GX_FALSE);
+
+        // Use floats for vertex positions (this will later be restored to fixed point by draw_text_3d)
+        GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_F32, 0);
+
+        // Use solid white as the texture
+        use_texture(white_texture);
+
+        // Render the background for the name tag
+        vec3f bg_size = vec3f(0.25);
+        bg_size.x *= (text_width_3d(player_name) + 2) * 0.125;
+        bg_size.y += 0.03125;
+        vec3f right_vec = -angles_to_vector(0, yrot + 90);
+        vec3f up_vec = -angles_to_vector(xrot + 90, yrot);
+        draw_colored_sprite_3d(white_texture, vec3f(-0.5, 1.875, -0.5), bg_size, vec3f(0, -0.03125 * 0.5, 0), right_vec, up_vec, 0, 0, 1, 1, GXColor{0, 0, 0, 0x3F});
+
+        // Render partially transparent name tag (as seen behind walls)
+        draw_text_3d(vec3f(-0.5, 1.875, -0.5), player_name, GXColor{0xFF, 0xFF, 0xFF, 0x3F});
+
+        // Render the name tag normally
+        use_fog(true);
+        GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
+        draw_text_3d(vec3f(-0.5, 1.875, -0.5), player_name, GXColor{0xFF, 0xFF, 0xFF, 0xFF});
+
+        // The player should not render in the transparent pass
+        return;
+    }
+
+    vec3i block_pos = vec3i(std::floor(entity_position.x), std::floor(entity_position.y), std::floor(entity_position.z));
+    block_t *block = get_block_at(block_pos, nullptr);
+    if (block && !properties(block->id).m_solid)
+    {
+        light_level = block->light;
+    }
+    entity_position.y += y_offset;
+
+    while (body_rotation_y >= 180)
+        body_rotation_y -= 360;
+    while (body_rotation_y < -180)
+        body_rotation_y += 360;
+    vec3f h_velocity = vec3f(velocity.x, 0, velocity.z);
+    vfloat_t h_speed = h_velocity.magnitude();
+
+    vfloat_t diff;
+    // Rotate body to face the direction of movement
+    if (h_speed > 0.1)
+    {
+        vfloat_t y_angle = vector_to_angles(h_velocity).y;
+        diff = y_angle - body_rotation_y;
+        while (diff >= 180)
+            diff -= 360;
+        while (diff < -180)
+            diff += 360;
+        body_rotation_y = lerpd(body_rotation_y, body_rotation_y + diff, h_speed);
+    }
+
+    diff = entity_rotation.y - body_rotation_y;
+
+    // Get the shortest angle
+    while (diff >= 180)
+        diff -= 360;
+    while (diff < -180)
+        diff += 360;
+
+    // Rotate the body to stay in bounds of the head rotation
+    if (diff > 45)
+        body_rotation_y = entity_rotation.y - 45;
+    if (diff < -45)
+        body_rotation_y = entity_rotation.y + 45;
+    if (h_speed > 0.05)
+    {
+        accumulated_walk_distance += h_speed * 0.6;
+        player_model.speed = lerpd(player_model.speed, 32, 0.15);
+    }
+    else
+    {
+        player_model.speed = lerpd(player_model.speed, 0, 0.15);
+    }
+
+    player_model.pos = entity_position - vec3f(0.5);
+    player_model.rot = vec3f(0, body_rotation_y, 0);
+    player_model.head_rot = vec3f(entity_rotation.x, entity_rotation.y, 0);
+
+    set_color_multiply(get_lightmap_color(light_level));
+    player_model.render(accumulated_walk_distance, partial_ticks);
+}
+
+void mp_player_entity_t::animate()
+{
+    vec3f old_position = position;
+
+    // Animate the entity's position and rotation
+    if (animation_tick > 0)
+    {
+        vec3f diff = animation_pos - position;
+        vec3f new_position = position + diff / animation_tick;
+        vfloat_t diff_rot = animation_rot.y - rotation.y;
+        while (diff_rot < -180.0)
+            diff_rot += 360.0;
+        while (diff_rot >= 180.0)
+            diff_rot -= 360.0;
+        vec3f new_rotation = rotation + vec3f((animation_rot.x - rotation.x) / animation_tick, diff_rot / animation_tick, 0);
+        if (std::abs(new_rotation.y - body_rotation_y) > 45)
+            body_rotation_y += diff_rot / animation_tick;
+        animation_tick--;
+        teleport(new_position);
+        rotation = new_rotation;
+    }
+    else if (!local && !simulate_offline)
+    {
+        teleport(animation_pos);
+        rotation = animation_rot;
+    }
+
+    velocity = vec3f::lerp(velocity, position - old_position, 0.25);
 }

@@ -132,7 +132,7 @@ void model_t::prepare()
     ready = true;
 }
 
-void model_t::render(float ticks)
+void model_t::render(vfloat_t distance, float partialTicks)
 {
     prepare();
     use_texture(texture);

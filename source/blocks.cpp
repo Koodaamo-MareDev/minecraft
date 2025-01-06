@@ -68,7 +68,7 @@ uint32_t get_face_texture_index(block_t *block, int face)
             return 219;
         if (meta == 2)
             return 52;
-            return 186;
+        return 186;
     }
     case BlockID::wood:
     { // log
@@ -495,7 +495,8 @@ void default_destroy(const vec3i &pos, const block_t &old_block)
 
 void spawn_tnt_destroy(const vec3i &pos, const block_t &old_block)
 {
-    get_chunk_from_pos(pos)->entities.push_back(new exploding_block_entity_t(old_block, pos, 80));
+    if (!is_remote())
+        add_entity(new exploding_block_entity_t(old_block, pos, 80));
 }
 
 void default_aabb(const vec3i &pos, block_t *block, const aabb_t &other, std::vector<aabb_t> &aabb_list)

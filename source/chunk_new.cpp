@@ -17,6 +17,7 @@
 #include "ported/WorldGenLiquids.hpp"
 #include "ported/WorldGenLakes.hpp"
 #include "model.hpp"
+#include "light_nether_rgba.h"
 #include <tuple>
 #include <map>
 #include <vector>
@@ -46,9 +47,49 @@ mutex_t chunk_mutex;
 lwp_t __chunk_generator_thread_handle = (lwp_t)NULL;
 bool __chunk_generator_init_done = false;
 void *__chunk_generator_init_internal(void *);
+bool __remote_world = false;
+bool __hell_world = false;
 
 std::deque<chunk_t *> chunks;
 std::deque<chunk_t *> pending_chunks;
+
+bool is_remote()
+{
+    return __remote_world;
+}
+
+bool is_hell_world()
+{
+    return __hell_world;
+}
+
+// NOTE: This function should only be used by the networking code.
+void set_world_remote(bool remote)
+{
+    __remote_world = remote;
+}
+
+// Used to set the world to hell
+void set_world_hell(bool hell)
+{
+    if (__hell_world == hell)
+        return;
+
+    // Stop processing any light updates
+    light_engine_reset();
+    if (hell)
+    {
+        // Set the light map to the nether light map
+        memcpy(light_map, light_nether_rgba, 1024); // 256 * 4
+        GX_SetArray(GX_VA_CLR0, light_map, 4 * sizeof(u8));
+        GX_InvVtxCache();
+    }
+
+    // Disable sky light in hell
+    set_skylight_enabled(!hell);
+
+    __hell_world = hell;
+}
 
 bool has_pending_chunks()
 {
@@ -68,6 +109,12 @@ bool chunk_sorter_reverse(chunk_t *&a, chunk_t *&b)
 std::deque<chunk_t *> &get_chunks()
 {
     return chunks;
+}
+
+std::map<int32_t, aabb_entity_t *> &get_entities()
+{
+    static std::map<int32_t, aabb_entity_t *> world_entities;
+    return world_entities;
 }
 
 chunk_t *get_chunk_from_pos(const vec3i &pos)
@@ -109,9 +156,9 @@ bool add_chunk(int32_t x, int32_t z)
         }
     }
 
-    chunk_t *chunk = new chunk_t;
-    if (chunk)
+    try
     {
+        chunk_t *chunk = new chunk_t;
         chunk->x = x;
         chunk->z = z;
         chunk->generation_stage = ChunkGenStage::empty;
@@ -119,9 +166,10 @@ bool add_chunk(int32_t x, int32_t z)
         std::sort(pending_chunks.begin(), pending_chunks.end(), chunk_sorter);
         return true;
     }
-
-    printf("Failed to allocate memory for chunk\n");
-
+    catch (std::bad_alloc &e)
+    {
+        printf("Failed to allocate memory for chunk\n");
+    }
     return false;
 }
 
@@ -410,17 +458,17 @@ void generate_chunk()
     // Carve caves
     javaport::MapGenCaves cavegen;
 
-    static BlockID carved[16 * 16 * 256];
+    static BlockID carved[16 * 16 * WORLD_HEIGHT];
 
     block_t *block = chunk->blockstates;
-    for (int32_t i = 0; i < 16 * 16 * 256; i++, block++)
+    for (int32_t i = 0; i < 16 * 16 * WORLD_HEIGHT; i++, block++)
     {
         carved[i] = block->get_blockid();
     }
     cavegen.generate(chunk, world_seed, carved);
 
     block = chunk->blockstates;
-    for (int32_t i = 0; i < 16 * 16 * 256; i++, block++)
+    for (int32_t i = 0; i < 16 * 16 * WORLD_HEIGHT; i++, block++)
     {
         block->set_blockid(carved[i]);
     }
@@ -461,7 +509,7 @@ void generate_chunk()
                 usleep(100);
 
                 // Update the VBOs of the neighboring chunks
-                for (int i = 0; i < 16; i++)
+                for (int i = 0; i < VERTICAL_SECTION_COUNT; i++)
                 {
                     neighbor->vbos[i].dirty = true;
                 }
@@ -528,7 +576,7 @@ BlockID get_block_id_at(const vec3i &position, BlockID default_id, chunk_t *near
 }
 block_t *get_block_at(const vec3i &position, chunk_t *near)
 {
-    if (position.y < 0 || position.y > 255)
+    if (position.y < 0 || position.y > MAX_WORLD_Y)
         return nullptr;
     if (near && near->x == (position.x >> 4) && near->z == (position.z >> 4))
         return near->get_block(position);
@@ -583,24 +631,27 @@ void update_block_at(const vec3i &pos)
     chunk_t *chunk = get_chunk_from_pos(pos);
     if (!chunk)
         return;
-    block_t *block = chunk->get_block(pos);
-    blockproperties_t prop = properties(block->id);
-    if (prop.m_fluid)
+    if (!is_remote())
     {
-        block->meta |= FLUID_UPDATE_REQUIRED_FLAG;
-        chunk->has_fluid_updates[pos.y >> 4] = 1;
-    }
-    if (prop.m_fall)
-    {
-        BlockID block_below = get_block_id_at(pos + vec3i(0, -1, 0), BlockID::stone, chunk);
-        // Hopefully this prevents crashes caused by fluids colliding with falling blocks far away
-        if (chunk->player_taxicab_distance() < SIMULATION_DISTANCE * 16)
+        block_t *block = chunk->get_block(pos);
+        blockproperties_t prop = properties(block->id);
+        if (prop.m_fluid)
         {
-            if (block_below == BlockID::air || properties(block_below).m_fluid)
+            block->meta |= FLUID_UPDATE_REQUIRED_FLAG;
+            chunk->has_fluid_updates[pos.y >> 4] = 1;
+        }
+        if (prop.m_fall)
+        {
+            BlockID block_below = get_block_id_at(pos + vec3i(0, -1, 0), BlockID::stone, chunk);
+            // Hopefully this prevents crashes caused by fluids colliding with falling blocks far away
+            if (chunk->player_taxicab_distance() < SIMULATION_DISTANCE * 16)
             {
-                chunk->entities.push_back(new falling_block_entity_t(*block, pos));
-                block->set_blockid(BlockID::air);
-                block->meta = 0;
+                if (block_below == BlockID::air || properties(block_below).m_fluid)
+                {
+                    chunk->entities.push_back(new falling_block_entity_t(*block, pos));
+                    block->set_blockid(BlockID::air);
+                    block->meta = 0;
+                }
             }
         }
     }
@@ -628,10 +679,10 @@ void chunk_t::light_up()
             for (int z = 0; z < 16; z++)
             {
                 int end_y = skycast(vec3i(x, 0, z), this);
-                if (end_y >= 255 || end_y <= 0)
+                if (end_y >= MAX_WORLD_Y || end_y <= 0)
                     return;
                 this->height_map[(x << 4) | z] = end_y + 1;
-                for (int y = 255; y > end_y; y--)
+                for (int y = MAX_WORLD_Y; y > end_y; y--)
                     this->get_block(vec3i(x, y, z))->sky_light = 15;
                 update_light(vec3i(chunkX + x, end_y + 1, chunkZ + z), this);
 
@@ -646,6 +697,20 @@ void chunk_t::light_up()
             }
         }
         lit_state = 1;
+    }
+}
+
+void chunk_t::recalculate_height_map()
+{
+    for (int x = 0; x < 16; x++)
+    {
+        for (int z = 0; z < 16; z++)
+        {
+            int end_y = skycast(vec3i(x, 0, z), this);
+            if (end_y >= MAX_WORLD_Y || end_y <= 0)
+                return;
+            this->height_map[(x << 4) | z] = end_y + 1;
+        }
     }
 }
 
@@ -848,6 +913,7 @@ int chunk_t::build_vbo(int section, bool transparent)
     if (displist_vbo == nullptr)
     {
         printf("Failed to allocate %d bytes for section %d VBO at (%d, %d)\n", displist_size, section, this->x, this->z);
+        printf("Chunk count: %d\n", chunks.size());
         return (1);
     }
 
@@ -1115,6 +1181,9 @@ int chunk_t::render_special(block_t *block, const vec3i &pos)
     switch (block->get_blockid())
     {
     case BlockID::torch:
+    case BlockID::unlit_redstone_torch:
+    case BlockID::redstone_torch:
+    case BlockID::lever:
         return render_torch(block, pos);
     default:
         break;
@@ -1339,6 +1408,46 @@ vec3f get_fluid_direction(block_t *block, vec3i pos, chunk_t *chunk)
     return direction.normalize();
 }
 
+void add_entity(aabb_entity_t *entity)
+{
+    std::map<int32_t, aabb_entity_t *> &world_entities = get_entities();
+    world_entities[entity->entity_id] = entity;
+    vec3i entity_pos = vec3i(int(std::floor(entity->position.x)), int(std::floor(entity->position.y)), int(std::floor(entity->position.z)));
+    entity->chunk = get_chunk_from_pos(entity_pos);
+    if (entity->chunk)
+        entity->chunk->entities.push_back(entity);
+}
+
+void remove_entity(int32_t entity_id)
+{
+    aabb_entity_t *entity = get_entity_by_id(entity_id);
+    if (!entity)
+    {
+        printf("Removing unknown entity %d\n", entity_id);
+        return;
+    }
+    if (entity->local)
+    {
+        printf("Attempt to remove the player entity\n");
+        return;
+    }
+    entity->dead = true;
+    if (!entity->chunk)
+        delete entity;
+}
+
+aabb_entity_t *get_entity_by_id(int32_t entity_id)
+{
+    try
+    {
+        return get_entities().at(entity_id);
+    }
+    catch (std::out_of_range &)
+    {
+        return nullptr;
+    }
+}
+
 int chunk_t::render_fluid(block_t *block, const vec3i &pos)
 {
     BlockID block_id = block->get_blockid();
@@ -1513,12 +1622,11 @@ void chunk_t::update_entities()
     // Update entities
     for (aabb_entity_t *&entity : entities)
     {
+        if (!entity)
+            continue;
         // Workaround to prevent duplicate updates for entities that moved to a different chunk
         if (entity->last_world_tick == world_tick)
             continue;
-
-        // Update the entities' positions
-        entity->prev_position = entity->position;
 
         // Tick the entity
         entity->tick();
@@ -1526,73 +1634,88 @@ void chunk_t::update_entities()
         entity->last_world_tick = world_tick;
     }
 
-    // Resolve collisions with current chunk and neighboring chunks' entities
-    for (int i = 0; i <= 6; i++)
+    if (!is_remote())
     {
-        if (i == FACE_NY || i == FACE_PY)
-            continue;
-        chunk_t *neighbor = (i == 6 ? this : get_chunk(this->x + face_offsets[i].x, this->z + face_offsets[i].z));
-        if (neighbor)
+        // Resolve collisions with current chunk and neighboring chunks' entities
+        for (int i = 0; i <= 6; i++)
         {
-            for (aabb_entity_t *&entity : neighbor->entities)
+            if (i == FACE_NY || i == FACE_PY)
+                continue;
+            chunk_t *neighbor = (i == 6 ? this : get_chunk(this->x + face_offsets[i].x, this->z + face_offsets[i].z));
+            if (neighbor)
             {
-                for (aabb_entity_t *&this_entity : this->entities)
+                for (aabb_entity_t *&entity : neighbor->entities)
                 {
-                    // Prevent entities from colliding with themselves
-                    if (entity != this_entity && entity->collides(this_entity))
+                    for (aabb_entity_t *&this_entity : this->entities)
                     {
-                        // Resolve the collision - always resolve from the perspective of the non-player entity
-                        if (this_entity == player)
-                            entity->resolve_collision(this_entity);
-                        else
-                            this_entity->resolve_collision(entity);
+                        // Prevent entities from colliding with themselves
+                        if (entity != this_entity && entity->collides(this_entity))
+                        {
+                            // Resolve the collision - always resolve from the perspective of the non-player entity
+                            if (this_entity == player)
+                                entity->resolve_collision(this_entity);
+                            else
+                                this_entity->resolve_collision(entity);
+                        }
                     }
                 }
             }
         }
     }
 
-    // Get a list of entities that are out of bounds while iterating
-    std::vector<aabb_entity_t *> out_of_bounds;
-    for (aabb_entity_t *&entity : entities)
-    {
-        vec3i entity_pos = vec3i(int(std::floor(entity->position.x)), int(std::floor(entity->position.y)), int(std::floor(entity->position.z)));
-        if (entity->can_remove() || entity_pos.x < this->x * 16 || entity_pos.x >= (this->x + 1) * 16 || entity_pos.z < this->z * 16 || entity_pos.z >= (this->z + 1) * 16)
+    // Get a list of entities that are out of bounds
+    entities.erase(std::remove_if(entities.begin(), entities.end(), [&](aabb_entity_t *&entity)
+                                  {
+        vec3i entity_pos = vec3i(int(std::floor(entity->position.x)), 0, int(std::floor(entity->position.z)));
+        chunk_t* new_chunk = get_chunk_from_pos(entity_pos);
+        if (new_chunk != entity->chunk)
         {
-            out_of_bounds.push_back(entity);
+            if (new_chunk)
+            {
+                entity->chunk = new_chunk;
+                new_chunk->entities.push_back(entity);
+            }
+            else
+            {
+                entity->chunk = nullptr;
+            }
+            return true;
         }
-    }
-
-    // Remove out of bounds entities from this chunk, we'll handle them later
-    for (aabb_entity_t *&entity : out_of_bounds)
-    {
-        entities.erase(std::remove(entities.begin(), entities.end(), entity), entities.end());
-    }
-
-    // Place out of bounds entities in the correct chunk
-    for (aabb_entity_t *&entity : out_of_bounds)
-    {
-        vec3i entity_pos = vec3i(int(entity->position.x), int(entity->position.y), int(entity->position.z));
-        chunk_t *new_chunk = get_chunk_from_pos(entity_pos);
-
-        // Check if the chunk is loaded
-        if (!entity->can_remove() && new_chunk)
+        return false; }),
+                   entities.end());
+    std::map<int32_t, aabb_entity_t *> &world_entities = get_entities();
+    // Remove entities that can be removed
+    entities.erase(std::remove_if(entities.begin(), entities.end(), [&](aabb_entity_t *&entity)
+                                  {
+        if (entity->can_remove())
         {
-            entity->chunk = new_chunk;
-            new_chunk->entities.push_back(entity);
-        }
-        else
-        {
-            // If the chunk is not loaded or entity is dead, delete the entity
+            // Remove the entity from the global entity list
+            try
+            {
+                if (world_entities.at(entity->entity_id) == entity)
+                    world_entities.erase(entity->entity_id);
+            }
+            catch (std::out_of_range &)
+            {
+                printf("Attempted to remove entity that doesn't exist. The entity list may have desynced.\n");
+            }
             delete entity;
+            return true;
         }
-    }
+        return false; }),
+                   entities.end());
 }
 
 void chunk_t::render_entities(float partial_ticks, bool transparency)
 {
     for (aabb_entity_t *&entity : entities)
     {
+        // Make sure the entity is valid
+        if (!entity)
+            continue;
+        // Skip rendering dead entities
+        if (entity->dead)
+            continue;
         entity->render(partial_ticks, transparency);
     }
 
@@ -1612,4 +1735,20 @@ uint32_t chunk_t::size()
     for (aabb_entity_t *&entity : entities)
         base_size += entity->size();
     return base_size;
+}
+
+chunk_t::~chunk_t()
+{
+    for (aabb_entity_t *&entity : entities)
+    {
+        if (!entity)
+            continue;
+        entity->chunk = nullptr;
+        if (!is_remote())
+        {
+            // Remove the entity from the global entity list
+            // NOTE: This will also delete the entity as its chunk is nullptr
+            remove_entity(entity->entity_id);
+        }
+    }
 }

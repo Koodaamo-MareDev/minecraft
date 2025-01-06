@@ -17,8 +17,17 @@ lwp_t __light_engine_thread_handle = (lwp_t)NULL;
 mutex_t light_mutex = (mutex_t)NULL;
 bool __light_engine_init_done = false;
 bool __light_engine_busy = false;
+bool __light_engine_use_skylight = true;
 std::deque<std::pair<vec3i, chunk_t *>> pending_light_updates;
-void __update_light(std::pair<vec3i, chunk_t*>);
+void set_skylight_enabled(bool enabled)
+{
+    __light_engine_use_skylight = enabled;
+}
+void light_engine_reset()
+{
+    pending_light_updates.clear();
+}
+void __update_light(std::pair<vec3i, chunk_t *>);
 void *__light_engine_init_internal(void *);
 
 void light_engine_init()
@@ -93,7 +102,7 @@ void light_engine_deinit()
 
 void update_light(vec3i pos, chunk_t *chunk)
 {
-    if (!chunk || pos.y > 255 || pos.y < 0)
+    if (!chunk || pos.y > MAX_WORLD_Y || pos.y < 0)
         return;
     ++chunk->light_update_count;
     pending_light_updates.push_back(std::make_pair(pos, chunk));
@@ -119,9 +128,8 @@ static inline int8_t MAX_I8(int8_t a, int8_t b)
 void __update_light(std::pair<vec3i, chunk_t *> update)
 {
     std::deque<std::pair<vec3i, chunk_t *>> light_updates;
-
+    std::deque<chunk_t *> chunks = get_chunks();
     vec3i coords = update.first;
-
     light_updates.push_back(update);
     while (light_updates.size() > 0)
     {
@@ -133,9 +141,11 @@ void __update_light(std::pair<vec3i, chunk_t *> update)
         std::pair item = light_updates.back();
         vec3i pos = item.first;
         chunk_t *chunk = item.second;
+        if (std::find(chunks.begin(), chunks.end(), chunk) == chunks.end()) // FIXME: This is a hacky way
+            return;                                                         // to check if the chunk is valid
         light_updates.pop_back();
 
-        if (pos.y > 255 || pos.y < 0)
+        if (pos.y > MAX_WORLD_Y || pos.y < 0)
             continue;
         if (!chunk)
         {
@@ -149,7 +159,7 @@ void __update_light(std::pair<vec3i, chunk_t *> update)
         uint8_t new_skylight = 0;
         uint8_t new_blocklight = properties(block->id).m_luminance;
 
-        if (pos.y >= chunk->height_map[map_index])
+        if (__light_engine_use_skylight && pos.y >= chunk->height_map[map_index])
             new_skylight = 0xF;
 
         block_t *neighbors[6];
