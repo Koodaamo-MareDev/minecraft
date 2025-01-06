@@ -15,7 +15,6 @@
 #include "blocks.hpp"
 #include "brightness_values.h"
 #include "vec3i.hpp"
-#include "vec3d.hpp"
 #include "timers.hpp"
 #include "texturedefs.h"
 #include "raycast.hpp"
