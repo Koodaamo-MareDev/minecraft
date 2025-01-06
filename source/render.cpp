@@ -638,6 +638,7 @@ void transform_view(Mtx view, guVector world_pos, guVector object_scale, guVecto
 
     // Scale the object
     guMtxScale(scalemtx, object_scale.x, object_scale.y, object_scale.z);
+    guMtxInverse(scalemtx, scalemtx);
 
     // Rotate object
     axis.x = 0;
