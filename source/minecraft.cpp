@@ -351,13 +351,6 @@ int main(int argc, char **argv)
     bool in_fluid = false;
     bool in_lava = false;
 
-    player_inventory.add(inventory::item_stack(256, 1));
-    player_inventory.add(inventory::item_stack(257, 1));
-    player_inventory.add(inventory::item_stack(uint8_t(BlockID::cobblestone), 64));
-    player_inventory.add(inventory::item_stack(uint8_t(BlockID::dirt), 16));
-    player_inventory.add(inventory::item_stack(uint8_t(BlockID::wood), 12));
-    player_inventory.add(inventory::item_stack(uint8_t(BlockID::bricks), 64));
-    player_inventory.add(inventory::item_stack(uint8_t(BlockID::tnt), 64));
     selected_item = &player_inventory[0];
     while (!isExiting)
     {
