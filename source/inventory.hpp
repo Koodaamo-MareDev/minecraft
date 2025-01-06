@@ -64,14 +64,14 @@ namespace inventory
     public:
         uint16_t id;
         uint8_t count;
-        uint8_t meta;
+        uint16_t meta;
 
-        item_stack(uint16_t id = 0, uint8_t count = 0, uint8_t meta = 0) : id(id), count(count), meta(meta) {}
-        item_stack(BlockID id, uint8_t count = 0, uint8_t meta = 0) : id(uint8_t(id)), count(count), meta(meta) {}
+        item_stack(uint16_t id = 0, uint8_t count = 0, uint16_t meta = 0) : id(id), count(count), meta(meta) {}
+        item_stack(BlockID id, uint8_t count = 0, uint16_t meta = 0) : id(uint8_t(id)), count(count), meta(meta) {}
 
         item &as_item() const
         {
-            return item_list[id];
+            return item_list[id & 0x1FF];
         }
 
         bool empty()
