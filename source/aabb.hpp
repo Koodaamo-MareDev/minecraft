@@ -137,6 +137,8 @@ public:
     }
 
     vec3f push_out(aabb_t other);
+
+    vec3f push_out_horizontal(aabb_t other);
 };
 
 #endif
