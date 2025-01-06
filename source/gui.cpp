@@ -87,7 +87,7 @@ void gui::draw_text(int x, int y, std::string str, GXColor color)
 
 void gui::draw_item(int x, int y, inventory::item_stack stack)
 {
-    if (stack.id == 0 || stack.count == 0)
+    if (stack.empty())
         return;
 
     // Enable backface culling for blocks
@@ -104,7 +104,7 @@ void gui::draw_item(int x, int y, inventory::item_stack stack)
     {
         use_texture(blockmap_texture);
 
-        block_t block = {uint8_t(item.id & 0xFF), 0x7F, stack.meta, 0xF, 0xF};
+        block_t block = {uint8_t(item.id & 0xFF), 0x7F, uint8_t(stack.meta & 0xFF), 0xF, 0xF};
 
         RenderType render_type = properties(item.id).m_render_type;
         if (!properties(item.id).m_fluid && (render_type == RenderType::full || render_type == RenderType::full_special || render_type == RenderType::slab))
