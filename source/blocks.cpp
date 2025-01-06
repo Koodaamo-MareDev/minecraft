@@ -63,11 +63,12 @@ uint32_t get_face_texture_index(block_t *block, int face)
     }
     case BlockID::leaves:
     {
-        if (!block->meta)
+        uint8_t meta = block->meta;
+        if (meta == 1)
+            return 219;
+        if (meta == 2)
+            return 52;
             return 186;
-        else if (block->meta == 1)
-            return 235;
-        return 219;
     }
     case BlockID::wood:
     { // log
@@ -77,6 +78,10 @@ uint32_t get_face_texture_index(block_t *block, int face)
         case FACE_PY:
             return 21;
         default:
+            if (block->meta == 1)
+                return 116;
+            else if (block->meta == 2)
+                return 117;
             return 20;
         }
     }
@@ -597,7 +602,7 @@ blockproperties_t block_properties[256] = {
     blockproperties_t().id(BlockID::iron_ore).texture(33).sound(SoundType::stone),
     blockproperties_t().id(BlockID::coal_ore).texture(34).sound(SoundType::stone),
     blockproperties_t().id(BlockID::wood).texture(20).sound(SoundType::wood).render_type(RenderType::full_special),
-    blockproperties_t().id(BlockID::leaves).texture(186).sound(SoundType::grass).opacity(1).transparent(true),
+    blockproperties_t().id(BlockID::leaves).texture(186).sound(SoundType::grass).opacity(1).transparent(true).render_type(RenderType::full_special),
     blockproperties_t().id(BlockID::sponge).texture(48).sound(SoundType::grass),
     blockproperties_t().id(BlockID::glass).texture(49).sound(SoundType::glass).opacity(0).transparent(true),
     blockproperties_t().id(BlockID::lapis_ore).texture(144).sound(SoundType::stone),
