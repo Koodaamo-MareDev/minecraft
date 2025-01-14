@@ -62,8 +62,6 @@ vec3i raycast_pos;
 vec3i raycast_face;
 std::vector<aabb_t> block_bounds;
 
-int dropFrames = 0;
-
 int frameCounter = 0;
 int tickCounter = 0;
 int timeOfDay = 0;
@@ -94,7 +92,6 @@ float prev_left_shoulder = 0;
 float prev_right_shoulder = 0;
 bool destroy_block = false;
 bool place_block = false;
-// block_t selected_block = {uint8_t(BlockID::stone), 0x7F, 0, 0xF, 0xF};
 int selected_hotbar_slot = 0;
 inventory::item_stack *selected_item = nullptr;
 
@@ -106,7 +103,6 @@ sound_system_t *sound_system = nullptr;
 
 int cursor_x = 0;
 int cursor_y = 0;
-bool inventory_visible = false;
 bool show_dirtscreen = true;
 bool has_loaded = false;
 
@@ -114,6 +110,8 @@ gui *current_gui = nullptr;
 inventory::container player_inventory(40, 36); // 4 rows of 9 slots, the rest 4 are the armor slots
 
 float fog_depth_multiplier = 1.0f;
+float fog_light_multiplier = 1.0f;
+BlockID in_fluid = BlockID::air;
 
 Crapper::MinecraftClient client;
 Crapper::ByteBuffer receive_buffer;
@@ -144,6 +142,7 @@ void SpawnDrop(const vec3i &pos, const block_t &old_block, inventory::item_stack
 void CreateExplosion(vec3f pos, float power, chunk_t *near);
 void UpdateLoadingStatus();
 void UpdateLightDir();
+void HandleGUI(view_t &viewport);
 void UpdateInventory(view_t &viewport);
 void DrawInventory(view_t &viewport);
 void DrawHUD(view_t &viewport);
@@ -152,6 +151,7 @@ void DrawScene(bool transparency);
 void GenerateChunks(int count);
 void RemoveRedundantChunks();
 void PrepareChunkRemoval(chunk_t *chunk);
+void UpdateCamera(camera_t &camera);
 void UpdateChunkData(frustum_t &frustum, std::deque<chunk_t *> &chunks);
 void UpdatePlayer();
 void UpdateScene(frustum_t &frustum);
@@ -343,6 +343,10 @@ int main(int argc, char **argv)
     // Init viewport params
     view_t viewport = view_t(rmode->fbWidth, rmode->efbHeight, CONF_GetAspectRatio(), 90, CAMERA_NEAR, CAMERA_FAR, yscale);
 
+    // Set the inventory cursor to the center of the screen
+    cursor_x = viewport.width / 2;
+    cursor_y = viewport.height / 2;
+
     f32 FOV = 90;
 
     camera_t camera = {
@@ -377,9 +381,6 @@ int main(int argc, char **argv)
     sound_system = new sound_system_t();
     inventory::init_items();
     gui::init_matrices();
-
-    bool in_fluid = false;
-    bool in_lava = false;
 
     selected_item = &player_inventory[0];
 
@@ -431,34 +432,47 @@ int main(int argc, char **argv)
             GX_InvVtxCache();
         }
         background = get_sky_color();
-        GX_SetCopyClear(background, 0x00FFFFFF);
+
+        block_t *block = get_block_at(vec3i(std::floor(player->position.x), std::floor(player->aabb.min.y + player->y_offset), std::floor(player->position.z)));
+        if (block)
+            fog_light_multiplier = flerp(fog_light_multiplier, std::pow(0.9f, (15.0f - block->sky_light)), 0.05f);
 
         fog_depth_multiplier = flerp(fog_depth_multiplier, std::min(std::max(player_pos.y, 24.f) / 36.f, 1.0f), 0.05f);
 
-        // Enable fog
         float fog_multiplier = is_hell_world() ? 0.5f : 1.0f;
-        if (in_fluid)
+        if (in_fluid == BlockID::lava)
         {
-            background = in_lava ? GXColor{0xFF, 0, 0, 0xFF} : GXColor{0, 0, 0xFF, 0xFF};
-            GX_SetCopyClear(background, 0x00FFFFFF);
-            fog_multiplier = in_lava ? 0.05f : 0.6f;
+            background = GXColor{0xFF, 0, 0, 0xFF};
+            fog_multiplier = 0.05f;
         }
+        else if (in_fluid == BlockID::water)
+        {
+            background = GXColor{0, 0, 0xFF, 0xFF};
+            fog_multiplier = 0.6f;
+        }
+
+        // Apply the fog light multiplier
+        background.r = background.r * fog_light_multiplier;
+        background.g = background.g * fog_light_multiplier;
+        background.b = background.b * fog_light_multiplier;
+
+        // Set the background color
+        GX_SetCopyClear(background, 0x00FFFFFF);
+
+        // Enable fog
         set_fog(true, viewport, background, fog_depth_multiplier * fog_multiplier * (RENDER_DISTANCE * 5.5f - 8), fog_depth_multiplier * fog_multiplier * (RENDER_DISTANCE * 5.5f));
 
         UpdateLightDir();
 
-        if (frameCounter % 3 == 0)
-        {
-            update_textures();
-        }
         UpdateNetwork();
 
         GetInput();
 
-        lock_t chunk_lock(chunk_mutex);
         for (int i = lastEntityTick, count = 0; i < tickCounter && count < 10; i++, count++)
         {
             world_tick++;
+
+            update_textures();
 
             // Find a chunk for any lingering entities
             std::map<int32_t, aabb_entity_t *> &world_entities = get_entities();
@@ -482,6 +496,11 @@ int main(int argc, char **argv)
                     // Update the entities in the chunk
                     chunk->update_entities();
                 }
+
+                // FIXME: This is a hacky fix for player movement not working in unloaded chunks
+                if (!player->chunk)
+                    player->tick();
+
                 // Update the player entity
                 UpdatePlayer();
                 for (auto &&e : world_entities)
@@ -498,46 +517,15 @@ int main(int argc, char **argv)
             wiimote_held = 0;
         }
         lastEntityTick = tickCounter;
-        chunk_lock.unlock();
 
-        if (player)
-        {
+        // Update the sound system
+        sound_system->update(angles_to_vector(0, yrot + 90), player->get_position(std::fmod(partialTicks, 1)));
 
-            // Update the sound system
-            sound_system->update(angles_to_vector(0, yrot + 90), player->get_position(std::fmod(partialTicks, 1)));
+        UpdateCamera(camera);
 
-            // Wrap the player around the world
-            player_pos = player->get_position(std::fmod(partialTicks, 1)) - vec3f(0.5, 0.5, 0.5);
-            if (!is_remote() && player_pos.y < -750)
-                player->teleport(vec3f(player->position.x, 256, player->position.z));
-
-            // View bobbing
-            static float view_bob_angle = 0;
-            vec3f target_view_bob_offset;
-            vec3f target_view_bob_screen_offset;
-            vfloat_t view_bob_amount = 0.15;
-
-            vec3f h_velocity = vec3f(player->velocity.x, 0, player->velocity.z);
-            view_bob_angle += h_velocity.magnitude();
-            if (h_velocity.sqr_magnitude() > 0.001 && player->on_ground)
-            {
-                target_view_bob_offset = (vec3f(0, std::abs(std::sin(view_bob_angle)) * view_bob_amount * 2, 0) + angles_to_vector(0, yrot + 90) * std::cos(view_bob_angle) * view_bob_amount);
-                target_view_bob_screen_offset = view_bob_amount * vec3f(std::sin(view_bob_angle), -std::abs(std::cos(view_bob_angle)), 0);
-            }
-            else
-            {
-                target_view_bob_offset = vec3f(0, 0, 0);
-                target_view_bob_screen_offset = vec3f(0, 0, 0);
-            }
-            view_bob_offset = vec3f::lerp(view_bob_offset, target_view_bob_offset, 0.035);
-            view_bob_screen_offset = vec3f::lerp(view_bob_screen_offset, target_view_bob_screen_offset, 0.035);
-            player_pos = view_bob_offset + player_pos;
-            camera.position = player_pos;
-            camera.rot.x = xrot;
-            camera.rot.y = yrot;
-            player->rotation.x = xrot;
-            player->rotation.y = yrot;
-        }
+        // Wrap the player around the world
+        if (!is_remote() && player->aabb.min.y < -750)
+            player->teleport(vec3f(player->position.x, 256, player->position.z));
 
         // Construct the view frustum matrix from the camera
         frustum_t frustum = calculate_frustum(camera);
@@ -550,7 +538,6 @@ int main(int argc, char **argv)
 
         if (!show_dirtscreen)
         {
-
             // Enable backface culling for terrain
             GX_SetCullMode(GX_CULL_BACK);
 
@@ -583,7 +570,7 @@ int main(int argc, char **argv)
             DrawSelectedBlock();
 
             // Draw sky
-            if (!in_fluid && !is_hell_world())
+            if (in_fluid == BlockID::air && !is_hell_world())
                 draw_sky(background);
         }
 
@@ -602,54 +589,7 @@ int main(int argc, char **argv)
         GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_NOOP);
         GX_SetAlphaUpdate(GX_TRUE);
 
-        static vec3f pan_underwater_texture(0, 0, 0);
-        pan_underwater_texture = pan_underwater_texture + vec3f(wiimote_rx * 0.25, wiimote_ry * 0.25, 0.0);
-        pan_underwater_texture.x = std::fmod(pan_underwater_texture.x, viewport.width);
-        pan_underwater_texture.y = std::fmod(pan_underwater_texture.y, viewport.height);
-        if (in_fluid && !in_lava)
-        {
-            draw_textured_quad(underwater_texture, pan_underwater_texture.x - viewport.width, pan_underwater_texture.y - viewport.height, viewport.width * 3, viewport.height * 3, 0, 0, 48, 48);
-            draw_textured_quad(vignette_texture, 0, 0, viewport.width, viewport.height, 0, 0, 256, 256);
-        }
-        draw_textured_quad(vignette_texture, 0, 0, viewport.width, viewport.height, 0, 0, 256, 256);
-        if (show_dirtscreen)
-        {
-            int texture_index = get_default_texture_index(BlockID::dirt);
-            fill_screen_texture(blockmap_texture, viewport, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index), TEXTURE_PX(texture_index), TEXTURE_PY(texture_index));
-
-            gui::draw_text((viewport.width - gui::text_width(dirtscreen_text)) / 2, viewport.height / 2, dirtscreen_text, GXColor{255, 255, 255, 255});
-        }
-        else if (!inventory_visible)
-        {
-            if (current_gui)
-            {
-                current_gui->close();
-                delete current_gui;
-                current_gui = nullptr;
-            }
-            DrawHUD(viewport);
-        }
-        else
-        {
-            if (!current_gui)
-            {
-                current_gui = new gui_survival(viewport, player_inventory);
-            }
-            UpdateInventory(viewport);
-            DrawInventory(viewport);
-        }
-
-        if (player)
-        {
-            vec3i block_pos = vec3i(std::floor(player->position.x), std::floor(player->aabb.min.y + player->y_offset), std::floor(player->position.z));
-            block_t *block = get_block_at(block_pos);
-            in_fluid = false;
-            if (block && properties(block->id).m_fluid && block_pos.y + 2 - get_fluid_height(block_pos, block->get_blockid(), player->chunk) >= player->aabb.min.y + player->y_offset)
-            {
-                in_fluid = true;
-                in_lava = properties(block->id).m_base_fluid == BlockID::lava;
-            }
-        }
+        HandleGUI(viewport);
         GX_DrawDone();
 
         GX_CopyDisp(frameBuffer[fb], GX_TRUE);
@@ -872,9 +812,7 @@ void GetInput()
         right_stick.y = 0;
     }
 
-    inventory_visible ^= (raw_wiimote_down & WPAD_CLASSIC_BUTTON_X) != 0;
-
-    if (!inventory_visible)
+    if (!current_gui)
     {
         float target_x = left_stick.x * sin(DegToRad(yrot + 90));
         float target_z = left_stick.x * cos(DegToRad(yrot + 90));
@@ -939,7 +877,7 @@ void GetInput()
 
     if ((raw_wiimote_down & WPAD_CLASSIC_BUTTON_LEFT))
     {
-        if (player && !is_remote())
+        if (!is_remote())
         {
             vec3i block_pos;
             vec3i face;
@@ -966,6 +904,50 @@ void UpdateLightDir()
     GX_InitLightDistAttn(&light, 1.0, 1.0, GX_DA_OFF);
     GX_InitLightDir(&light, look_dir.x, look_dir.y, look_dir.z);
     GX_LoadLightObj(&light, GX_LIGHT0);
+}
+
+void HandleGUI(view_t &viewport)
+{
+    if ((raw_wiimote_down & WPAD_CLASSIC_BUTTON_X) != 0)
+    {
+        if (current_gui)
+        {
+            current_gui->close();
+            delete current_gui;
+            current_gui = nullptr;
+        }
+        else
+        {
+            current_gui = new gui_survival(viewport, player_inventory);
+        }
+    }
+    if (show_dirtscreen)
+    {
+        // Fill the screen with the dirt texture
+        int texture_index = get_default_texture_index(BlockID::dirt);
+        fill_screen_texture(blockmap_texture, viewport, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index), TEXTURE_PX(texture_index), TEXTURE_PY(texture_index));
+
+        // Draw the status text
+        gui::draw_text((viewport.width - gui::text_width(dirtscreen_text)) / 2, viewport.height / 2, dirtscreen_text, GXColor{255, 255, 255, 255});
+    }
+    else
+    {
+        // Draw the underwater overlay
+        static vec3f pan_underwater_texture(0, 0, 0);
+        pan_underwater_texture = pan_underwater_texture + vec3f(wiimote_rx * 0.25, wiimote_ry * 0.25, 0.0);
+        pan_underwater_texture.x = std::fmod(pan_underwater_texture.x, viewport.width);
+        pan_underwater_texture.y = std::fmod(pan_underwater_texture.y, viewport.height);
+        if (in_fluid == BlockID::water)
+        {
+            draw_textured_quad(underwater_texture, pan_underwater_texture.x - viewport.width, pan_underwater_texture.y - viewport.height, viewport.width * 3, viewport.height * 3, 0, 0, 48, 48);
+            draw_textured_quad(vignette_texture, 0, 0, viewport.width, viewport.height, 0, 0, 256, 256);
+        }
+        draw_textured_quad(vignette_texture, 0, 0, viewport.width, viewport.height, 0, 0, 256, 256);
+
+        DrawHUD(viewport);
+        UpdateInventory(viewport);
+        DrawInventory(viewport);
+    }
 }
 
 void Render(guVector chunkPos, void *buffer, u32 length)
@@ -1028,11 +1010,6 @@ inline void RecalcSectionWater(chunk_t *chunk, int section)
 
 void GenerateChunks(int count)
 {
-    if (get_chunks().size() == 0)
-    {
-        // Assume the world just started generating
-        dirtscreen_text = "Building terrain...";
-    }
     const int center_x = (int(std::floor(player_pos.x)) >> 4);
     const int center_z = (int(std::floor(player_pos.z)) >> 4);
     const int start_x = center_x - GENERATION_DISTANCE;
@@ -1080,6 +1057,38 @@ void PrepareChunkRemoval(chunk_t *chunk)
         vbo.cached_transparent.clear();
     }
     chunk->generation_stage = ChunkGenStage::invalid;
+}
+
+void UpdateCamera(camera_t &camera)
+{
+    player_pos = player->get_position(std::fmod(partialTicks, 1)) - vec3f(0.5, 0.5, 0.5);
+
+    // View bobbing
+    static float view_bob_angle = 0;
+    vec3f target_view_bob_offset;
+    vec3f target_view_bob_screen_offset;
+    vfloat_t view_bob_amount = 0.15;
+
+    vec3f h_velocity = vec3f(player->velocity.x, 0, player->velocity.z);
+    view_bob_angle += h_velocity.magnitude();
+    if (h_velocity.sqr_magnitude() > 0.001 && player->on_ground)
+    {
+        target_view_bob_offset = (vec3f(0, std::abs(std::sin(view_bob_angle)) * view_bob_amount * 2, 0) + angles_to_vector(0, yrot + 90) * std::cos(view_bob_angle) * view_bob_amount);
+        target_view_bob_screen_offset = view_bob_amount * vec3f(std::sin(view_bob_angle), -std::abs(std::cos(view_bob_angle)), 0);
+    }
+    else
+    {
+        target_view_bob_offset = vec3f(0, 0, 0);
+        target_view_bob_screen_offset = vec3f(0, 0, 0);
+    }
+    view_bob_offset = vec3f::lerp(view_bob_offset, target_view_bob_offset, 0.035);
+    view_bob_screen_offset = vec3f::lerp(view_bob_screen_offset, target_view_bob_screen_offset, 0.035);
+    player_pos = view_bob_offset + player_pos;
+    camera.position = player_pos;
+    camera.rot.x = xrot;
+    camera.rot.y = yrot;
+    player->rotation.x = xrot;
+    player->rotation.y = yrot;
 }
 
 void EditBlocks()
@@ -1213,6 +1222,8 @@ void ResetWorld()
         if (chunk)
             PrepareChunkRemoval(chunk);
     }
+    // Assume the world just started generating
+    dirtscreen_text = "Building terrain...";
 }
 
 void UpdateNetwork()
@@ -1547,28 +1558,24 @@ void UpdatePlayer()
         }
     }
 #endif
+    vec3i block_pos = vec3i(std::floor(player->position.x), std::floor(player->aabb.min.y + player->y_offset), std::floor(player->position.z));
+    block_t *block = get_block_at(block_pos);
+    if (block && properties(block->id).m_fluid && block_pos.y + 2 - get_fluid_height(block_pos, block->get_blockid(), player->chunk) >= player->aabb.min.y + player->y_offset)
+    {
+        in_fluid = properties(block->id).m_base_fluid;
+    }
+    else
+    {
+        in_fluid = BlockID::air;
+    }
 }
 
 void UpdateScene(frustum_t &frustum)
 {
     std::deque<chunk_t *> &chunks = get_chunks();
-    if (!is_remote())
+    if (!is_remote() && !light_engine_busy())
     {
-        if (!inventory_visible && player && (raw_wiimote_down & WPAD_CLASSIC_BUTTON_DOWN) != 0)
-        {
-            // Spawn a creeper at the player's position
-            vec3f pos = player->get_position(std::fmod(partialTicks, 1));
-            chunk_t *creeper_chunk = get_chunk_from_pos(vec3i(pos.x, pos.y, pos.z));
-            if (creeper_chunk)
-            {
-                creeper_entity_t *creeper = new creeper_entity_t(pos);
-                creeper->chunk = creeper_chunk;
-                creeper_chunk->entities.push_back(creeper);
-            }
-        }
-
-        if (!light_engine_busy())
-            GenerateChunks(1);
+        GenerateChunks(1);
     }
     RemoveRedundantChunks();
     EditBlocks();

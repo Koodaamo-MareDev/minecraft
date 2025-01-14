@@ -103,7 +103,7 @@ void aabb_entity_t::tick()
     ticks_existed++;
     prev_rotation = rotation;
     prev_position = position;
-    if (is_remote() && !(local || simulate_offline))
+    if (is_remote() && !local && !simulate_offline)
     {
         return;
     }
