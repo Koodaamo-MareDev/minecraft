@@ -1295,8 +1295,7 @@ int chunk_t::render_slab(block_t *block, const vec3i &pos)
 
     if (render_bottom)
     {
-        vec3i offset(0, (!top_half), 0);
-        lighting = get_face_light_index(pos + offset, FACE_NY, this, block);
+        lighting = get_face_light_index(pos, FACE_NY, this, block);
         GX_VertexLit({vertex_pos + vec3f(-.5, -.5, -.5), TEXTURE_NX(top_index), TEXTURE_PY(top_index)}, lighting, FACE_NY);
         GX_VertexLit({vertex_pos + vec3f(-.5, -.5, 0.5), TEXTURE_NX(top_index), TEXTURE_NY(top_index)}, lighting, FACE_NY);
         GX_VertexLit({vertex_pos + vec3f(0.5, -.5, 0.5), TEXTURE_PX(top_index), TEXTURE_NY(top_index)}, lighting, FACE_NY);
@@ -1306,8 +1305,7 @@ int chunk_t::render_slab(block_t *block, const vec3i &pos)
 
     if (render_top)
     {
-        vec3i offset(0, -(!top_half), 0);
-        lighting = get_face_light_index(pos + offset, FACE_PY, this, block);
+        lighting = get_face_light_index(pos, FACE_PY, this, block);
         GX_VertexLit({vertex_pos + vec3f(0.5, 0.0, -.5), TEXTURE_NX(top_index), TEXTURE_PY(top_index)}, lighting, FACE_PY);
         GX_VertexLit({vertex_pos + vec3f(0.5, 0.0, 0.5), TEXTURE_NX(top_index), TEXTURE_NY(top_index)}, lighting, FACE_PY);
         GX_VertexLit({vertex_pos + vec3f(-.5, 0.0, 0.5), TEXTURE_PX(top_index), TEXTURE_NY(top_index)}, lighting, FACE_PY);
