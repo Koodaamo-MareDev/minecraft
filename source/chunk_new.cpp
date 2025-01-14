@@ -1433,7 +1433,12 @@ void remove_entity(int32_t entity_id)
     }
     entity->dead = true;
     if (!entity->chunk)
+    {
+        std::map<int32_t, aabb_entity_t *> &world_entities = get_entities();
+        if (world_entities.find(entity_id) != world_entities.end())
+            world_entities.erase(entity_id);
         delete entity;
+    }
 }
 
 aabb_entity_t *get_entity_by_id(int32_t entity_id)
