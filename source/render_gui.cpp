@@ -153,7 +153,7 @@ int draw_colored_quad(int32_t x, int32_t y, int32_t w, int32_t h, uint8_t r, uin
     return 4;
 }
 
-int fill_screen_texture(GXTexObj &texture, view_t &view, int32_t u1, int32_t v1, int32_t u2, int32_t v2, float scale)
+int fill_screen_texture(GXTexObj &texture, gertex::GXView &view, int32_t u1, int32_t v1, int32_t u2, int32_t v2, float scale)
 {
     use_texture(texture);
     float scale_u = float(BASE3D_UV_FRAC) / GX_GetTexObjWidth(&texture);

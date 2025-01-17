@@ -92,29 +92,30 @@ void modelbox_t::render()
 {
     if (display_list && display_list_size)
     {
-        push_matrix();
+        gertex::GXMatrix pos_mtx;
+        gertex::push_matrix();
         if (pos.sqr_magnitude() > 0)
         {
-            guMtxApplyTrans(active_mtx, active_mtx, pos.x / 16, pos.y / 16, pos.z / 16);
+            guMtxApplyTrans(pos_mtx.mtx, pos_mtx.mtx, pos.x / 16, pos.y / 16, pos.z / 16);
         }
         if (rot.sqr_magnitude() > 0)
         {
             Mtx rot_mtx;
             guMtxRotDeg(rot_mtx, 'z', rot.z);
-            guMtxConcat(active_mtx, rot_mtx, active_mtx);
+            guMtxConcat(pos_mtx.mtx, rot_mtx, pos_mtx.mtx);
             guMtxRotDeg(rot_mtx, 'y', rot.y);
-            guMtxConcat(active_mtx, rot_mtx, active_mtx);
+            guMtxConcat(pos_mtx.mtx, rot_mtx, pos_mtx.mtx);
             guMtxRotDeg(rot_mtx, 'x', rot.x);
-            guMtxConcat(active_mtx, rot_mtx, active_mtx);
+            guMtxConcat(pos_mtx.mtx, rot_mtx, pos_mtx.mtx);
         }
-        guMtxScaleApply(active_mtx, active_mtx, -1, -1, -1);
-        GX_LoadPosMtxImm(active_mtx, GX_PNMTX0);
+        guMtxScaleApply(pos_mtx.mtx, pos_mtx.mtx, -1, -1, -1);
+        gertex::use_matrix(pos_mtx.mtx, true);
 
         // Use floats for vertex positions
         GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_F32, 0);
 
         GX_CallDispList(display_list, display_list_size);
-        pop_matrix();
+        gertex::pop_matrix();
 
         // Restore fixed point format
         GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, BASE3D_POS_FRAC_BITS);
@@ -136,7 +137,7 @@ void model_t::render(vfloat_t distance, float partialTicks)
 {
     prepare();
     use_texture(texture);
-    transform_view(get_view_matrix(), vec3f(player_pos) * 2 - pos, vec3f(1), rot, false);
+    transform_view(gertex::get_view_matrix(), vec3f(player_pos) * 2 - pos, vec3f(1), rot, false);
     for (auto &box : boxes)
     {
         box->render();

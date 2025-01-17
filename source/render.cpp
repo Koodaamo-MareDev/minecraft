@@ -19,13 +19,6 @@
 
 const GXColor sky_color = {0x88, 0xBB, 0xFF, 0xFF};
 
-GXColor color_multiply = {0xFF, 0xFF, 0xFF, 0xFF};
-GXColor color_add = {0, 0, 0, 0};
-
-std::stack<mtx34_t> matrix_stack;
-
-static fog_t fog = {false, view_t{}, {0, 0, 0, 0}, 0.0f, 0.0f};
-
 GXTexObj white_texture;
 GXTexObj clouds_texture;
 GXTexObj sun_texture;
@@ -117,95 +110,6 @@ void update_textures()
 void use_texture(GXTexObj &texture)
 {
     GX_LoadTexObj(&texture, GX_TEXMAP0);
-}
-
-void init_fog(Mtx44 &projection_mtx, uint16_t viewport_width)
-{
-    static bool fog_init_done = false;
-
-    static GXFogAdjTbl fog_adjust_table;
-
-    if (fog_init_done)
-        return;
-    GX_InitFogAdjTable(&fog_adjust_table, viewport_width, projection_mtx);
-    GX_SetFogRangeAdj(GX_ENABLE, viewport_width >> 1, &fog_adjust_table);
-    fog_init_done = true;
-}
-
-void set_fog(bool use, view_t view, GXColor color, float start, float end)
-{
-    fog.enabled = use;
-    fog.view = view;
-    fog.color = color;
-    fog.start = start;
-    fog.end = end;
-    GX_SetFog(use ? GX_FOG_PERSP_LIN : GX_FOG_NONE, start, end, view.near, view.far, color);
-}
-
-void use_fog(bool use)
-{
-    fog.enabled = use;
-    GX_SetFog(fog.enabled ? GX_FOG_PERSP_LIN : GX_FOG_NONE, fog.start, fog.end, fog.view.near, fog.view.far, fog.color);
-}
-
-void use_ortho(view_t view)
-{
-    // Prepare projection matrix for rendering GUI elements
-    Mtx44 ortho_mtx;
-    guOrtho(ortho_mtx, 0, view.height, 0, view.width, 0, view.far);
-    GX_LoadProjectionMtx(ortho_mtx, GX_ORTHOGRAPHIC);
-
-    // Prepare position matrix for rendering GUI elements
-    Mtx flat_matrix;
-    guMtxIdentity(flat_matrix);
-    guMtxTransApply(flat_matrix, flat_matrix, 0.0F, 0.0F, -0.5F);
-    GX_LoadPosMtxImm(flat_matrix, GX_PNMTX0);
-    guMtxCopy(flat_matrix, active_mtx);
-}
-
-void use_perspective(view_t view)
-{
-    // Prepare projection matrix for rendering the world
-    Mtx44 prespective_mtx;
-    guPerspective(prespective_mtx, view.fov, view.aspect, view.near, view.far);
-    GX_LoadProjectionMtx(prespective_mtx, GX_PERSPECTIVE);
-
-    // Init fog params
-    init_fog(prespective_mtx, uint16_t(view.width));
-}
-
-static Mtx view_mtx;
-Mtx active_mtx;
-Mtx &get_view_matrix()
-{
-    static bool view_mtx_init = false;
-    if (!view_mtx_init)
-    {
-        // Setup our view matrix at the origin looking down the -Z axis with +Y up
-        guVector cam = {0.0F, 0.0F, 0.0F},
-                 up = {0.0F, 1.0F, 0.0F},
-                 look = {0.0F, 0.0F, -1.0F};
-        guLookAt(view_mtx, &cam, &up, &look);
-        view_mtx_init = true;
-    }
-    return view_mtx;
-}
-
-void pop_matrix()
-{
-    if (matrix_stack.size() > 0)
-    {
-        mtx34_t mtx = matrix_stack.top();
-        matrix_stack.pop();
-        memcpy(active_mtx, mtx.mtx, sizeof(Mtx));
-    }
-}
-
-void push_matrix()
-{
-    mtx34_t mtx;
-    memcpy(mtx.mtx, active_mtx, sizeof(Mtx));
-    matrix_stack.push(mtx);
 }
 
 void smooth_light(const vec3i &pos, uint8_t face_index, const vec3i &vertex_off, chunk_t *near, block_t *block, uint8_t &lighting, uint8_t &amb_occ)
@@ -622,7 +526,7 @@ frustum_t calculate_frustum(camera_t &camera)
     return frustum;
 }
 
-void transform_view(Mtx view, guVector world_pos, guVector object_scale, guVector object_rot, bool load)
+void transform_view(gertex::GXMatrix view, guVector world_pos, guVector object_scale, guVector object_rot, bool load)
 {
     Mtx model, modelview;
     Mtx offset;
@@ -687,13 +591,11 @@ void transform_view(Mtx view, guVector world_pos, guVector object_scale, guVecto
     guMtxConcat(rotz, roty, roty);
     guMtxConcat(roty, rotx, model);
     guMtxInverse(model, model);
-    guMtxConcat(model, view, modelview);
-    guMtxCopy(modelview, active_mtx);
-    if (load)
-        GX_LoadPosMtxImm(modelview, GX_PNMTX0);
+    guMtxConcat(model, view.mtx, modelview);
+    gertex::use_matrix(modelview, load);
 }
 
-void transform_view_screen(Mtx view, guVector screen_pos, guVector object_scale, guVector object_rot, bool load)
+void transform_view_screen(gertex::GXMatrix view, guVector screen_pos, guVector object_scale, guVector object_rot, bool load)
 {
     Mtx model, modelview;
     Mtx posmtx;
@@ -736,10 +638,8 @@ void transform_view_screen(Mtx view, guVector screen_pos, guVector object_scale,
     guMtxConcat(scalemtx, posmtx, posmtx);
     guMtxConcat(posmtx, model, model);
     guMtxInverse(model, model);
-    guMtxConcat(model, view, modelview);
-    guMtxCopy(modelview, active_mtx);
-    if (load)
-        GX_LoadPosMtxImm(modelview, GX_PNMTX0);
+    guMtxConcat(model, view.mtx, modelview);
+    gertex::use_matrix(modelview, load);
 }
 
 void draw_particle(camera_t &camera, vec3f pos, uint32_t texture_index, float size, uint8_t brightness)
@@ -1004,45 +904,27 @@ GXColor get_lightmap_color(uint8_t light)
 {
     return *(GXColor *)&light_map[uint32_t(light) << 2];
 }
-void set_color_add(GXColor color)
-{
-    color_add = color;
-    GX_SetTevKColor(GX_KCOLOR0, color);
-}
-GXColor get_color_add()
-{
-    return color_add;
-}
-void set_color_multiply(GXColor color)
-{
-    color_multiply = color;
-    GX_SetTevKColor(GX_KCOLOR1, color);
-}
-GXColor get_color_multiply()
-{
-    return color_multiply;
-}
 void draw_sky(GXColor background)
 {
     // Enable z-buffering
     GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
 
     // Disable fog
-    GX_SetFog(GX_FOG_NONE, RENDER_DISTANCE * 0.67f * 16 - 16, RENDER_DISTANCE * 0.67f * 16 - 8, CAMERA_NEAR, CAMERA_FAR, background);
+    gertex::use_fog(false);
 
     // Use additive blending
-    GX_SetBlendMode(GX_BM_BLEND, GX_BL_ONE, GX_BL_ONE, GX_LO_NOOP);
+    gertex::set_blending(gertex::GXBlendMode::additive);
     GX_SetAlphaUpdate(GX_FALSE);
     GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_FALSE);
 
     use_texture(white_texture);
 
-    Mtx celestial_rotated_view;
+    gertex::GXMatrix celestial_rotated_view;
     GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
 
     guVector axis{1, 0, 0};
-    guMtxRotAxisDeg(celestial_rotated_view, &axis, get_celestial_angle() * 360.0f);
-    guMtxConcat(get_view_matrix(), celestial_rotated_view, celestial_rotated_view);
+    guMtxRotAxisDeg(celestial_rotated_view.mtx, &axis, get_celestial_angle() * 360.0f);
+    guMtxConcat(gertex::get_view_matrix().mtx, celestial_rotated_view.mtx, celestial_rotated_view.mtx);
 
     transform_view(celestial_rotated_view, player_pos);
     draw_stars();
@@ -1068,10 +950,10 @@ void draw_sky(GXColor background)
     GX_EndGroup();
 
     // Enable fog but place it further away.
-    GX_SetFog(GX_FOG_PERSP_LIN, RENDER_DISTANCE * 2 * 16 - 16, RENDER_DISTANCE * 3 * 16 - 16, CAMERA_NEAR, CAMERA_FAR, background);
+    gertex::set_fog(gertex::GXFog{true, gertex::GXFogType::linear, RENDER_DISTANCE * 2 * 16 - 16, RENDER_DISTANCE * 3 * 16 - 16, gertex::CAMERA_NEAR, gertex::CAMERA_FAR, background});
 
     // Use default blend mode
-    GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_NOOP);
+    gertex::set_blending(gertex::GXBlendMode::normal);
     GX_SetAlphaUpdate(GX_TRUE);
     GX_SetAlphaCompare(GX_ALWAYS, 0, GX_AOP_OR, GX_ALWAYS, 0);
     GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_FALSE);
@@ -1086,7 +968,7 @@ void draw_sky(GXColor background)
     dist = 108.0f * scale;
 
     // Reset transform and move the clouds
-    transform_view(get_view_matrix(), guVector{0, 0, float(((tickCounter % 40960) + partialTicks) * 0.05)});
+    transform_view(gertex::get_view_matrix(), guVector{0, 0, float(((tickCounter % 40960) + partialTicks) * 0.05)});
 
     // Clouds are a bit yellowish white. They are also affected by the time
     float sky_multiplier = get_sky_multiplier();

@@ -1,7 +1,7 @@
 #include "gui_survival.hpp"
 #include "entity.hpp"
 extern aabb_entity_t *player;
-gui_survival::gui_survival(const view_t &viewport, inventory::container &container) : gui(viewport), linked_container(container)
+gui_survival::gui_survival(const gertex::GXView &viewport, inventory::container &container) : gui(viewport), linked_container(container)
 {
     init_matrices();
 
@@ -108,7 +108,7 @@ void gui_survival::draw()
         GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
 
         // Reset the position matrix
-        GX_LoadPosMtxImm(gui_item_matrix, GX_PNMTX0);
+        gertex::use_matrix(gui_item_matrix);
 
         draw_colored_quad(highlighted_slot->x, highlighted_slot->y, 32, 32, 255, 255, 255, 128);
     }

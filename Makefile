@@ -18,7 +18,7 @@ include $(DEVKITPPC)/wii_rules
 #---------------------------------------------------------------------------------
 TARGET		:=	$(notdir $(CURDIR))
 BUILD		:=	build
-SOURCES		:=	source source/opensimplexnoise source/ported source/improvednoise source/fastnoise source/jvm source/jvm/extensions source/oggplayer source/crapper source/crapper/miniz
+SOURCES		:=	source source/opensimplexnoise source/ported source/improvednoise source/fastnoise source/jvm source/jvm/extensions source/oggplayer source/crapper source/crapper/miniz source/gertex
 DATA		:=
 TEXTURES	:=	textures
 INCLUDES	:=	source/ported

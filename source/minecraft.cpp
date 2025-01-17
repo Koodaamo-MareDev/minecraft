@@ -142,10 +142,10 @@ void SpawnDrop(const vec3i &pos, const block_t &old_block, inventory::item_stack
 void CreateExplosion(vec3f pos, float power, chunk_t *near);
 void UpdateLoadingStatus();
 void UpdateLightDir();
-void HandleGUI(view_t &viewport);
-void UpdateInventory(view_t &viewport);
-void DrawInventory(view_t &viewport);
-void DrawHUD(view_t &viewport);
+void HandleGUI(gertex::GXView &viewport);
+void UpdateInventory(gertex::GXView &viewport);
+void DrawInventory(gertex::GXView &viewport);
+void DrawHUD(gertex::GXView &viewport);
 void DrawSelectedBlock();
 void DrawScene(bool transparency);
 void GenerateChunks(int count);
@@ -341,7 +341,7 @@ int main(int argc, char **argv)
     init_textures();
     update_textures();
     // Init viewport params
-    view_t viewport = view_t(rmode->fbWidth, rmode->efbHeight, CONF_GetAspectRatio(), 90, CAMERA_NEAR, CAMERA_FAR, yscale);
+    gertex::GXView viewport = gertex::GXView(rmode->fbWidth, rmode->efbHeight, CONF_GetAspectRatio(), 90, gertex::CAMERA_NEAR, gertex::CAMERA_FAR, yscale);
 
     // Set the inventory cursor to the center of the screen
     cursor_x = viewport.width / 2;
@@ -391,6 +391,8 @@ int main(int argc, char **argv)
     player->y_size = 0;
     player->teleport(vec3f(0.5, -999, 0.5));
     add_entity(player);
+
+    gertex::GXFog fog = gertex::GXFog{true, gertex::GXFogType::linear, viewport.near, viewport.far, viewport.near, viewport.far, background};
 
     if (Crapper::initNetwork())
     {
@@ -452,15 +454,11 @@ int main(int argc, char **argv)
         }
 
         // Apply the fog light multiplier
-        background.r = background.r * fog_light_multiplier;
-        background.g = background.g * fog_light_multiplier;
-        background.b = background.b * fog_light_multiplier;
+        background = background * fog_light_multiplier;
 
         // Set the background color
         GX_SetCopyClear(background, 0x00FFFFFF);
-
-        // Enable fog
-        set_fog(true, viewport, background, fog_depth_multiplier * fog_multiplier * (RENDER_DISTANCE * 5.5f - 8), fog_depth_multiplier * fog_multiplier * (RENDER_DISTANCE * 5.5f));
+        fog.color = background;
 
         UpdateLightDir();
 
@@ -532,9 +530,16 @@ int main(int argc, char **argv)
 
         UpdateScene(frustum);
 
-        use_perspective(viewport);
-
         UpdateLoadingStatus();
+
+        gertex::perspective(viewport);
+
+        // Set fog near and far distances
+        fog.start = fog_multiplier * fog_depth_multiplier * (GENERATION_DISTANCE - is_remote()) * 8.0f;
+        fog.end = fog_multiplier * fog_depth_multiplier * (GENERATION_DISTANCE - is_remote()) * 16.0f;
+
+        // Enable fog
+        gertex::set_fog(fog);
 
         if (!show_dirtscreen)
         {
@@ -542,11 +547,11 @@ int main(int argc, char **argv)
             GX_SetCullMode(GX_CULL_BACK);
 
             // Prepare the transformation matrix
-            transform_view(get_view_matrix(), guVector{0, 0, 0});
+            transform_view(gertex::get_view_matrix(), guVector{0, 0, 0});
 
             // Prepare opaque rendering parameters
             GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
-            GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_NOOP);
+            gertex::set_blending(gertex::GXBlendMode::normal);
             GX_SetAlphaUpdate(GX_TRUE);
 
             // Draw particles
@@ -559,7 +564,7 @@ int main(int argc, char **argv)
 
             // Prepare transparent rendering parameters
             GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
-            GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_NOOP);
+            gertex::set_blending(gertex::GXBlendMode::normal);
             GX_SetAlphaUpdate(GX_FALSE);
 
             // Draw chunks
@@ -574,19 +579,19 @@ int main(int argc, char **argv)
                 draw_sky(background);
         }
 
-        use_ortho(viewport);
+        gertex::ortho(viewport);
         // Use 0 fractional bits for the position data, because we're drawing in pixel space.
         GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, 0);
 
         // Disable fog
-        use_fog(false);
+        gertex::use_fog(false);
 
         // Enable direct colors
         GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
 
         // Draw GUI elements
         GX_SetZMode(GX_TRUE, GX_ALWAYS, GX_TRUE);
-        GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_NOOP);
+        gertex::set_blending(gertex::GXBlendMode::normal);
         GX_SetAlphaUpdate(GX_TRUE);
 
         HandleGUI(viewport);
@@ -906,7 +911,7 @@ void UpdateLightDir()
     GX_LoadLightObj(&light, GX_LIGHT0);
 }
 
-void HandleGUI(view_t &viewport)
+void HandleGUI(gertex::GXView &viewport)
 {
     if ((raw_wiimote_down & WPAD_CLASSIC_BUTTON_X) != 0)
     {
@@ -954,7 +959,7 @@ void Render(guVector chunkPos, void *buffer, u32 length)
 {
     if (!buffer || !length)
         return;
-    transform_view(get_view_matrix(), chunkPos);
+    transform_view(gertex::get_view_matrix(), chunkPos);
     // Render
     GX_CallDispList(buffer, length); // Draw the box
 }
@@ -1593,7 +1598,7 @@ void UpdateScene(frustum_t &frustum)
     }
 }
 
-void UpdateInventory(view_t &viewport)
+void UpdateInventory(gertex::GXView &viewport)
 {
     if (!current_gui)
         return;
@@ -1610,14 +1615,13 @@ void UpdateInventory(view_t &viewport)
     current_gui->update();
 }
 
-void DrawHUD(view_t &viewport)
+void DrawHUD(gertex::GXView &viewport)
 {
     // Disable depth testing for GUI elements
     GX_SetZMode(GX_TRUE, GX_ALWAYS, GX_TRUE);
 
     // Reset the orthogonal position matrix and push it onto the stack
-    use_ortho(viewport);
-    push_matrix();
+    gertex::ortho(viewport);
 
     // Draw crosshair
     int crosshair_x = int(viewport.width - 32) >> 1;
@@ -1628,18 +1632,8 @@ void DrawHUD(view_t &viewport)
     // Draw IR cursor if visible
     if (wiimote_ir_visible)
     {
-        // Reset the position matrix
-        Mtx flat_matrix;
-        guMtxIdentity(flat_matrix);
-        guMtxTransApply(flat_matrix, flat_matrix, 0.0F, 0.0F, -0.5F);
-        GX_LoadPosMtxImm(flat_matrix, GX_PNMTX0);
-
         draw_textured_quad(icons_texture, wiimote_ir_x * viewport.width - 7, wiimote_ir_y * viewport.height - 3, 48, 48, 32, 32, 56, 56);
     }
-
-    // Restore the orthogonal position matrix
-    pop_matrix();
-    GX_LoadPosMtxImm(active_mtx, GX_PNMTX0);
 
     // Enable direct colors
     GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
@@ -1651,7 +1645,7 @@ void DrawHUD(view_t &viewport)
     draw_textured_quad(icons_texture, (viewport.width - 364) / 2 + selected_hotbar_slot * 40 - 2, viewport.height - 46, 48, 48, 56, 31, 80, 55);
 
     // Push the orthogonal position matrix onto the stack
-    push_matrix();
+    gertex::push_matrix();
 
     // Draw the hotbar items
     for (size_t i = 0; i < 9; i++)
@@ -1660,8 +1654,8 @@ void DrawHUD(view_t &viewport)
     }
 
     // Restore the orthogonal position matrix
-    pop_matrix();
-    GX_LoadPosMtxImm(active_mtx, GX_PNMTX0);
+    gertex::pop_matrix();
+    gertex::load_matrix();
 
     // Enable direct colors as the previous call to draw_item may have changed the color mode
     GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
@@ -1688,7 +1682,7 @@ void DrawHUD(view_t &viewport)
     }
 }
 
-void DrawInventory(view_t &viewport)
+void DrawInventory(gertex::GXView &viewport)
 {
     if (!current_gui)
         return;
@@ -1701,15 +1695,15 @@ void DrawInventory(view_t &viewport)
     GX_SetZMode(GX_TRUE, GX_ALWAYS, GX_TRUE);
 
     // Reset the orthogonal position matrix and push it onto the stack
-    use_ortho(viewport);
-    push_matrix();
+    gertex::ortho(viewport);
+    gertex::push_matrix();
 
     // Draw the GUI elements
     current_gui->draw();
 
     // Restore the orthogonal position matrix
-    pop_matrix();
-    GX_LoadPosMtxImm(active_mtx, GX_PNMTX0);
+    gertex::pop_matrix();
+    gertex::load_matrix();
 
     // Enable direct colors
     GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
@@ -1761,7 +1755,7 @@ void DrawSelectedBlock()
             // Render as a block
 
             // Transform the selected block position
-            transform_view_screen(get_view_matrix(), selectedBlockPos, guVector{.5f, .5f, .5f}, guVector{10, -45, 0});
+            transform_view_screen(gertex::get_view_matrix(), selectedBlockPos, guVector{.5f, .5f, .5f}, guVector{10, -45, 0});
 
             // Opaque pass
             GX_SetZMode(GX_TRUE, GX_ALWAYS, GX_TRUE);
@@ -1797,7 +1791,7 @@ void DrawSelectedBlock()
     // Render as an item
 
     // Transform the selected block position
-    transform_view_screen(get_view_matrix(), selectedBlockPos, guVector{.75f, .75f, .75f}, guVector{10, 45, 180});
+    transform_view_screen(gertex::get_view_matrix(), selectedBlockPos, guVector{.75f, .75f, .75f}, guVector{10, 45, 180});
 
     uint32_t tex_x = TEXTURE_X(texture_index);
     uint32_t tex_y = TEXTURE_Y(texture_index);
@@ -1922,7 +1916,7 @@ void DrawScene(bool transparency)
         block_outer_bounds.min = b_min - floor_b_min;
         block_outer_bounds.max = b_max - floor_b_min;
 
-        transform_view(get_view_matrix(), floor_b_min + towards_camera - vec3f(0.5, 0.5, 0.5));
+        transform_view(gertex::get_view_matrix(), floor_b_min + towards_camera - vec3f(0.5, 0.5, 0.5));
 
         // Draw the block outline
         DrawOutline(block_outer_bounds);

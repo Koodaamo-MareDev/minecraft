@@ -356,7 +356,7 @@ void aabb_entity_t::render(float partial_ticks, bool transparency)
         // Render a mob spawner at the entity's position
         block_t block_state = {uint8_t(BlockID::bricks), 0x7F, 0, light_level};
         entity_position.y = aabb.min.y + (aabb.max.y - aabb.min.y) * 0.5;
-        transform_view(get_view_matrix(), entity_position - vec3f(0.5, 0.5, 0.5), (aabb.max - aabb.min));
+        transform_view(gertex::get_view_matrix(), entity_position - vec3f(0.5, 0.5, 0.5), (aabb.max - aabb.min));
 
         // Restore default texture
         use_texture(blockmap_texture);
@@ -522,14 +522,14 @@ void falling_block_entity_t::render(float partial_ticks, bool transparency)
     {
         // Prepare the transformation matrix
         vec3f chunk_pos = vec3f(int_pos.x & ~0xF, int_pos.y & ~0xF, int_pos.z & ~0xF);
-        transform_view(get_view_matrix(), chunk_pos);
+        transform_view(gertex::get_view_matrix(), chunk_pos);
         render_single_block_at(block_state, int_pos, false);
         render_single_block_at(block_state, int_pos, true);
     }
     else
     {
         // Prepare the transformation matrix
-        transform_view(get_view_matrix(), get_position(partial_ticks) - vec3f(0.5, 0, 0.5));
+        transform_view(gertex::get_view_matrix(), get_position(partial_ticks) - vec3f(0.5, 0, 0.5));
         render_single_block(block_state, false);
         render_single_block(block_state, true);
     }
@@ -582,7 +582,7 @@ void exploding_block_entity_t::render(float partial_ticks, bool transparency)
     block_state.visibility_flags = 0x7F;
 
     // Draw the selected block
-    transform_view(get_view_matrix(), get_position(partial_ticks) - vec3f(0.5, 0, 0.5));
+    transform_view(gertex::get_view_matrix(), get_position(partial_ticks) - vec3f(0.5, 0, 0.5));
 
     if ((fuse / 5) % 2 == 1)
         use_texture(white_texture);
@@ -766,11 +766,11 @@ void creeper_entity_t::render(float partial_ticks, bool transparency)
     creeper_model.head_rot = vec3f(entity_rotation.x, entity_rotation.y, 0);
 
     // Draw the creeper
-    set_color_multiply(get_lightmap_color(light_level));
+    gertex::set_color_mul(get_lightmap_color(light_level));
 
     if (fuse < creeper_fuse)
     {
-        set_color_add(std::sin(fuse + partial_ticks * 0.1) > 0 ? GXColor{0, 0, 0, 0xFF} : GXColor{0xFF, 0xFF, 0xFF, 0xFF});
+        gertex::set_color_add(std::sin(fuse + partial_ticks * 0.1) > 0 ? GXColor{0, 0, 0, 0xFF} : GXColor{0xFF, 0xFF, 0xFF, 0xFF});
     }
 
     creeper_model.render(accumulated_walk_distance, partial_ticks);
@@ -787,7 +787,7 @@ void creeper_entity_t::render(float partial_ticks, bool transparency)
         {
             vec3i path_pos = path[i];
             vec3f chunk_pos = vec3f(path_pos.x & ~0xF, path_pos.y & ~0xF, path_pos.z & ~0xF);
-            transform_view(get_view_matrix(), chunk_pos);
+            transform_view(gertex::get_view_matrix(), chunk_pos);
             render_single_block_at(block_state, path_pos, false);
             render_single_block_at(block_state, path_pos, true);
         }
@@ -796,7 +796,7 @@ void creeper_entity_t::render(float partial_ticks, bool transparency)
         path_pos.y = below;
         block_state.id = 56; // Diamond block
         vec3f chunk_pos = vec3f(path_pos.x & ~0xF, path_pos.y & ~0xF, path_pos.z & ~0xF);
-        transform_view(get_view_matrix(), chunk_pos);
+        transform_view(gertex::get_view_matrix(), chunk_pos);
         render_single_block_at(block_state, path_pos, false);
         render_single_block_at(block_state, path_pos, true);
     }
@@ -891,7 +891,7 @@ void item_entity_t::render(float partial_ticks, bool transparency)
             {
                 // Draw the block
                 item_rot.y = (ticks_existed + partial_ticks) * 4;
-                transform_view(get_view_matrix(), entity_position + anim_offset + dupe_offset * i, vec3f(0.25), item_rot, true);
+                transform_view(gertex::get_view_matrix(), entity_position + anim_offset + dupe_offset * i, vec3f(0.25), item_rot, true);
                 blockproperties_t props = properties(block.id);
                 if (bool(props.m_transparent) == transparency)
                     render_single_block(block, props.m_transparent);
@@ -900,7 +900,7 @@ void item_entity_t::render(float partial_ticks, bool transparency)
             {
                 // Draw the item
                 item_rot.z = 180;
-                transform_view(get_view_matrix(), entity_position + anim_offset + dupe_offset * i + vec3f(0, 0.125, 0), vec3f(0.5), item_rot, true);
+                transform_view(gertex::get_view_matrix(), entity_position + anim_offset + dupe_offset * i + vec3f(0, 0.125, 0), vec3f(0.5), item_rot, true);
 
                 if (transparency)
                     render_single_item(get_default_texture_index(BlockID(block.id)), true, light_level);
@@ -912,7 +912,7 @@ void item_entity_t::render(float partial_ticks, bool transparency)
 
             // Draw the item
             item_rot.z = 180;
-            transform_view(get_view_matrix(), entity_position + anim_offset + dupe_offset * i + vec3f(0, 0.125, 0), vec3f(0.5), item_rot, true);
+            transform_view(gertex::get_view_matrix(), entity_position + anim_offset + dupe_offset * i + vec3f(0, 0.125, 0), vec3f(0.5), item_rot, true);
 
             if (transparency)
                 render_single_item(item.texture_index, true, light_level);
@@ -1027,9 +1027,9 @@ void mp_player_entity_t::render(float partial_ticks, bool transparency)
     // The name tag should render in the transparent pass
     if (transparency)
     {
-        transform_view(get_view_matrix(), entity_position, vec3f(1), vec3f(0, 0, 0), true);
+        transform_view(gertex::get_view_matrix(), entity_position, vec3f(1), vec3f(0, 0, 0), true);
 
-        use_fog(false);
+        gertex::use_fog(false);
 
         // Enable direct colors
         GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
@@ -1055,7 +1055,7 @@ void mp_player_entity_t::render(float partial_ticks, bool transparency)
         draw_text_3d(vec3f(-0.5, 1.875, -0.5), player_name, GXColor{0xFF, 0xFF, 0xFF, 0x3F});
 
         // Render the name tag normally
-        use_fog(true);
+        gertex::use_fog(true);
         GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
         draw_text_3d(vec3f(-0.5, 1.875, -0.5), player_name, GXColor{0xFF, 0xFF, 0xFF, 0xFF});
 
@@ -1118,7 +1118,7 @@ void mp_player_entity_t::render(float partial_ticks, bool transparency)
     player_model.rot = vec3f(0, body_rotation_y, 0);
     player_model.head_rot = vec3f(entity_rotation.x, entity_rotation.y, 0);
 
-    set_color_multiply(get_lightmap_color(light_level));
+    gertex::set_color_mul(get_lightmap_color(light_level));
     player_model.render(accumulated_walk_distance, partial_ticks);
 }
 

@@ -2,27 +2,27 @@
 #include "blocks.hpp"
 #include "font_tile_widths.hpp"
 
-Mtx gui_block_matrix;
-Mtx gui_item_matrix;
+gertex::GXMatrix gui_block_matrix;
+gertex::GXMatrix gui_item_matrix;
 
 void gui::init_matrices()
 {
     // Prepare matrices for rendering GUI elements
     Mtx tmp_matrix;
     guMtxIdentity(tmp_matrix);
-    guMtxIdentity(gui_block_matrix);
-    guMtxIdentity(gui_item_matrix);
+    guMtxIdentity(gui_block_matrix.mtx);
+    guMtxIdentity(gui_item_matrix.mtx);
 
     guMtxRotDeg(tmp_matrix, 'x', 202.5F);
-    guMtxConcat(gui_block_matrix, tmp_matrix, gui_block_matrix);
+    guMtxConcat(gui_block_matrix.mtx, tmp_matrix, gui_block_matrix.mtx);
 
     guMtxRotDeg(tmp_matrix, 'y', 45.0F);
-    guMtxConcat(gui_block_matrix, tmp_matrix, gui_block_matrix);
+    guMtxConcat(gui_block_matrix.mtx, tmp_matrix, gui_block_matrix.mtx);
 
-    guMtxScaleApply(gui_block_matrix, gui_block_matrix, 0.65, 0.65, 0.65f);
-    guMtxTransApply(gui_block_matrix, gui_block_matrix, 0.0f, 0.0f, -10.0f);
+    guMtxScaleApply(gui_block_matrix.mtx, gui_block_matrix.mtx, 0.65, 0.65, 0.65f);
+    guMtxTransApply(gui_block_matrix.mtx, gui_block_matrix.mtx, 0.0f, 0.0f, -10.0f);
 
-    guMtxTransApply(gui_item_matrix, gui_item_matrix, 0.0f, 0.0f, -10.0f);
+    guMtxTransApply(gui_item_matrix.mtx, gui_item_matrix.mtx, 0.0f, 0.0f, -10.0f);
 }
 
 int gui::text_width(std::string str)
@@ -53,7 +53,7 @@ void gui::draw_text(int x, int y, std::string str, GXColor color)
     // Enable direct colors
     GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
 
-    GX_LoadPosMtxImm(gui_item_matrix, GX_PNMTX0);
+    gertex::use_matrix(gui_item_matrix);
 
     use_texture(font_texture);
 
@@ -110,7 +110,7 @@ void gui::draw_item(int x, int y, inventory::item_stack stack)
         if (!properties(item.id).m_fluid && (render_type == RenderType::full || render_type == RenderType::full_special || render_type == RenderType::slab))
         {
             // Translate the block to the correct position
-            guMtxCopy(gui_block_matrix, tmp_matrix);
+            guMtxCopy(gui_block_matrix.mtx, tmp_matrix);
             guMtxTransApply(tmp_matrix, tmp_matrix, x + 16, y + 16, 0.0f);
             GX_LoadPosMtxImm(tmp_matrix, GX_PNMTX0);
 
@@ -120,7 +120,7 @@ void gui::draw_item(int x, int y, inventory::item_stack stack)
         }
         else
         {
-            guMtxCopy(gui_item_matrix, tmp_matrix);
+            guMtxCopy(gui_item_matrix.mtx, tmp_matrix);
             guMtxTransApply(tmp_matrix, tmp_matrix, x + 16, y + 16, 0.0f);
             GX_LoadPosMtxImm(tmp_matrix, GX_PNMTX0);
 
@@ -132,7 +132,7 @@ void gui::draw_item(int x, int y, inventory::item_stack stack)
     else
     {
         use_texture(items_texture);
-        guMtxCopy(gui_item_matrix, tmp_matrix);
+        guMtxCopy(gui_item_matrix.mtx, tmp_matrix);
         guMtxTransApply(tmp_matrix, tmp_matrix, x + 16, y + 16, 0.0f);
         GX_LoadPosMtxImm(tmp_matrix, GX_PNMTX0);
 

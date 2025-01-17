@@ -31,10 +31,10 @@ public:
 class gui
 {
 public:
-    view_t viewport;
+    gertex::GXView viewport;
     gui() = delete;
     inventory::item_stack item_in_hand;
-    gui(const view_t &viewport) : viewport(viewport) {}
+    gui(const gertex::GXView &viewport) : viewport(viewport) {}
     virtual ~gui() = default;
     virtual void draw() = 0;
     virtual void update() = 0;
@@ -56,7 +56,7 @@ public:
     static void draw_container(int x, int y, inventory::container &container);
 };
 
-extern Mtx gui_block_matrix;
-extern Mtx gui_item_matrix;
+extern gertex::GXMatrix gui_block_matrix;
+extern gertex::GXMatrix gui_item_matrix;
 
 #endif
