@@ -1655,7 +1655,7 @@ void DrawHUD(gertex::GXView &viewport)
 
     // Restore the orthogonal position matrix
     gertex::pop_matrix();
-    gertex::load_matrix();
+    gertex::load_pos_matrix();
 
     // Enable direct colors as the previous call to draw_item may have changed the color mode
     GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
@@ -1703,7 +1703,7 @@ void DrawInventory(gertex::GXView &viewport)
 
     // Restore the orthogonal position matrix
     gertex::pop_matrix();
-    gertex::load_matrix();
+    gertex::load_pos_matrix();
 
     // Enable direct colors
     GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);

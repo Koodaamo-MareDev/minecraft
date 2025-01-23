@@ -69,9 +69,14 @@ namespace gertex
         return mtx;
     }
 
-    void load_matrix()
+    void load_pos_matrix()
     {
         GX_LoadPosMtxImm(state.mtx.mtx, GX_PNMTX0);
+    }
+
+    void load_proj_matrix()
+    {
+        GX_LoadProjectionMtx(state.proj_mtx.mtx, state.proj_mtx.ortho ? GX_ORTHOGRAPHIC : GX_PERSPECTIVE);
     }
 
     // Called internally to initialize the fog adjustment table
@@ -82,30 +87,41 @@ namespace gertex
         if (fog_init)
             return;
         static GXFogAdjTbl fog_adjust_table;
-        GX_InitFogAdjTable(&fog_adjust_table, view.width, state.projection_mtx);
+        GX_InitFogAdjTable(&fog_adjust_table, view.width, state.proj_mtx.mtx);
         GX_SetFogRangeAdj(GX_ENABLE, uint16_t(view.width) >> 1, &fog_adjust_table);
         fog_init = true;
     }
 
     void perspective(gertex::GXView view)
     {
-        // Prepare projection matrix for rendering the world
+        // Prepare the perspective matrix
         Mtx44 prespective_mtx;
         guPerspective(prespective_mtx, view.fov, view.aspect, view.near, view.far);
-        guMtx44Copy(prespective_mtx, state.projection_mtx);
-        GX_LoadProjectionMtx(state.projection_mtx, GX_PERSPECTIVE);
+        guMtx44Copy(prespective_mtx, state.proj_mtx.mtx);
+        
+        // Update the state
+        state.proj_mtx.ortho = false;
+        load_proj_matrix();
 
+        // Initialize the fog adjustment table (if not already initialized)
         init_fog(view);
     }
 
     void ortho(gertex::GXView view)
     {
-        // Prepare projection matrix for rendering GUI elements
+        // Prepare the orthogonal matrix
         Mtx44 ortho_mtx;
         guOrtho(ortho_mtx, 0, view.height, 0, view.width, 0, view.far);
-        GX_LoadProjectionMtx(ortho_mtx, GX_ORTHOGRAPHIC);
+        guMtx44Copy(ortho_mtx, state.proj_mtx.mtx);
+        
+        // Update the state
+        state.proj_mtx.ortho = true;
+        load_proj_matrix();
 
-        // Prepare position matrix for rendering GUI elements
+        // Typically, fog is not used in orthographic projections so we'll skip it
+
+        // FIXME: Not consistent with the rest of the code
+        // Construct a flat (2D) matrix
         Mtx flat_matrix;
         guMtxIdentity(flat_matrix);
         guMtxTransApply(flat_matrix, flat_matrix, 0.0F, 0.0F, -0.5F);
@@ -159,5 +175,11 @@ namespace gertex
 
     void GXState::apply()
     {
+        set_fog(fog);
+        set_blending(blend_mode);
+        set_color_add(color_add);
+        set_color_mul(color_multiply);
+        load_pos_matrix();
+        load_proj_matrix();
     }
 } // namespace gertex

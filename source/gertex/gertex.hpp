@@ -90,12 +90,23 @@ namespace gertex
         }
     };
 
+    struct GXProjMatrix
+    {
+        bool ortho;
+        Mtx44 mtx;
+        GXProjMatrix()
+        {
+            ortho = false;
+            guMtx44Identity(mtx);
+        }
+    };
+
     class GXState
     {
     public:
         std::stack<GXMatrix> matrix_stack;
         GXMatrix mtx;
-        Mtx44 projection_mtx;
+        GXProjMatrix proj_mtx;
         GXFog fog = {false, GXFogType::none, 0.0f, 0.0f, CAMERA_NEAR, CAMERA_FAR, GXColor{0, 0, 0, 0xFF}};
         GXBlendMode blend_mode = GXBlendMode::none;
         GXColor color_multiply = {0xFF, 0xFF, 0xFF, 0xFF};
@@ -115,7 +126,8 @@ namespace gertex
     void use_matrix(const GXMatrix &mtx, bool load = true);
     GXMatrix get_matrix();
     GXMatrix get_view_matrix();
-    void load_matrix();
+    void load_pos_matrix();
+    void load_proj_matrix();
     void perspective(GXView view);
     void ortho(GXView view);
     void set_blending(GXBlendMode mode);
