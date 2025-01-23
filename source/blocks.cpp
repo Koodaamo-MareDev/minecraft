@@ -515,7 +515,7 @@ void slab_aabb(const vec3i &pos, block_t *block, const aabb_t &other, std::vecto
     aabb.min = vec3f(pos.x, pos.y, pos.z);
     aabb.max = aabb.min + vec3f(1, 1, 1);
 
-    if ((block->meta & 1))
+    if ((block->meta & 8))
     {
         aabb.min.y += 0.5;
     }

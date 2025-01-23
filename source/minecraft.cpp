@@ -1132,10 +1132,10 @@ void EditBlocks()
                     {
                         bool same_as_target = targeted_block->get_blockid() == new_blockid;
 
-                        uint8_t new_meta = raycast_face.y == -1 ? 1 : 0;
+                        uint8_t new_meta = raycast_face.y == -1 ? 8 : 0;
                         new_meta ^= same_as_target;
 
-                        if (raycast_face.y != 0 && (new_meta ^ 1) == (targeted_block->meta & 1) && same_as_target)
+                        if (raycast_face.y != 0 && (new_meta ^ 8) == (targeted_block->meta & 8) && same_as_target)
                         {
                             targeted_block->set_blockid(BlockID(uint8_t(new_blockid) - 1));
                             targeted_block->meta = 0;

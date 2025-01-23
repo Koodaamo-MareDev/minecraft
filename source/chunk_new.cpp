@@ -1250,7 +1250,7 @@ int chunk_t::render_slab(block_t *block, const vec3i &pos)
     uint32_t side_index = top_index - 1;
     bool render_top = true;
     bool render_bottom = true;
-    bool top_half = block->meta & 1;
+    bool top_half = block->meta & 8;
     int vertexCount = 0;
     if (block->meta & 2)
     {
