@@ -92,7 +92,7 @@ void modelbox_t::render()
 {
     if (display_list && display_list_size)
     {
-        gertex::GXMatrix pos_mtx;
+        gertex::GXMatrix pos_mtx = gertex::get_matrix();
         gertex::push_matrix();
         if (pos.sqr_magnitude() > 0)
         {

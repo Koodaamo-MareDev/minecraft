@@ -1726,8 +1726,8 @@ void chunk_t::render_entities(float partial_ticks, bool transparency)
     use_texture(blockmap_texture);
 
     // Restore default colors
-    GX_SetTevKColor(GX_KCOLOR0, (GXColor){0, 0, 0, 255});
-    GX_SetTevKColor(GX_KCOLOR1, (GXColor){255, 255, 255, 255});
+    gertex::set_color_mul(GXColor{255, 255, 255, 255});
+    gertex::set_color_add(GXColor{0, 0, 0, 255});
 }
 
 uint32_t chunk_t::size()
