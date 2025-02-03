@@ -5,6 +5,7 @@
 #include <ogc/gx.h>
 #include "vec3f.hpp"
 #include "block.hpp"
+#include "gertex/gertex.hpp"
 
 #define BASE3D_POS_FRAC_BITS 5
 #define BASE3D_NRM_FRAC_BITS 4
@@ -161,6 +162,54 @@ inline void GX_VertexLitF(const vertex_property_t &vert, uint8_t light, uint8_t 
         return;
     constexpr float uv_invscale = 1. / BASE3D_UV_FRAC;
     GX_Position3f32(vert.pos.x, vert.pos.y, vert.pos.z);
+    GX_Normal1x8(face);
+    GX_Color1x8(light);
+    GX_TexCoord2f32(uv_invscale * vert.x_uv, uv_invscale * vert.y_uv);
+}
+/**
+ * @brief Draw a vertex with a transformation matrix
+ * 
+ * @param vert The vertex to draw
+ * @param mtx The transformation matrix to apply
+ * @param face The index of the face normal to use
+ * 
+ * @note This function is quite slow and should be used only when necessary
+ */
+inline void GX_VertexT(const vertex_property_t &vert, const gertex::GXMatrix &mtx, uint8_t face = 3)
+{
+    ++__group_vtxcount;
+    if (!base3d_is_drawing)
+        return;
+    guVector vec = vert.pos;
+    guVecMultiply(mtx.mtx, &vec, &vec);
+
+    constexpr float uv_invscale = 1. / BASE3D_UV_FRAC;
+    GX_Position3f32(vec.x, vec.y, vec.z);
+    GX_Normal1x8(face);
+    GX_Color4u8(vert.color_r, vert.color_g, vert.color_b, vert.color_a);
+    GX_TexCoord2f32(uv_invscale * vert.x_uv, uv_invscale * vert.y_uv);
+}
+
+/**
+ * @brief Draw a vertex with a transformation matrix
+ * 
+ * @param vert The vertex to draw
+ * @param mtx The transformation matrix
+ * @param light The light level to use
+ * @param face The index of the face normal to use
+ * 
+ * @note This function is quite slow and should be used only when necessary
+ */
+inline void GX_VertexLitT(const vertex_property_t &vert, const gertex::GXMatrix &mtx, uint8_t light, uint8_t face = 3)
+{
+    ++__group_vtxcount;
+    if (!base3d_is_drawing)
+        return;
+    guVector vec = vert.pos;
+    guVecMultiply(mtx.mtx, &vec, &vec);
+
+    constexpr float uv_invscale = 1. / BASE3D_UV_FRAC;
+    GX_Position3f32(vec.x, vec.y, vec.z);
     GX_Normal1x8(face);
     GX_Color1x8(light);
     GX_TexCoord2f32(uv_invscale * vert.x_uv, uv_invscale * vert.y_uv);
