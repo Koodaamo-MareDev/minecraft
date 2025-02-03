@@ -38,10 +38,20 @@ uint32_t get_face_texture_index(block_t *block, int face)
     if (!block)
         return 0;
     const int directionmap[] = {
+        FACE_NZ,
+        FACE_PX,
+        FACE_PZ,
+        FACE_NX};
+
+    const int facingmap[] = {
+        FACE_NY,
+        FACE_PY,
+        FACE_NZ,
+        FACE_PZ,
         FACE_NX,
         FACE_PX,
-        FACE_NZ,
-        FACE_PZ};
+    };
+
     BlockID blockid = block->get_blockid();
     // Have to handle differently for different blocks, e.g. grass, logs, crafting table
     switch (blockid)
@@ -109,24 +119,14 @@ uint32_t get_face_texture_index(block_t *block, int face)
     }
     case BlockID::chest:
     {
-        int block_direction = (block->meta) & 0x03;
+        int block_direction = block->meta % 6;
         if (face == FACE_NY || face == FACE_PY)
             return 25;
-        if (face == directionmap[block_direction])
+        if (face == facingmap[block_direction])
             return 27;
         return 26;
     }
-    case BlockID::dispenser:
-    {
-        int block_direction = (block->meta) & 0x03;
-        if (face == FACE_NY || face == FACE_PY)
-            return 62;
-        if (face == directionmap[block_direction])
-            return 46;
-        return 45;
-    }
     case BlockID::double_stone_slab:
-    case BlockID::stone_slab:
     {
         if (face == FACE_NY || face == FACE_PY)
             return 6;
@@ -138,9 +138,20 @@ uint32_t get_face_texture_index(block_t *block, int face)
             return 4;
         if (face == FACE_PY)
             return 43;
-        if (face == FACE_NX || face == FACE_PX)
+        if (face == FACE_NX || face == FACE_NZ)
             return 59;
         return 60;
+    }
+    case BlockID::dispenser:
+    case BlockID::furnace:
+    case BlockID::lit_furnace:
+    {
+        int block_direction = block->meta % 6;
+        if (face == FACE_NY || face == FACE_PY)
+            return blockid == BlockID::dispenser ? 62 : 0;
+        if (face == facingmap[block_direction])
+            return get_default_texture_index(blockid);
+        return 45;
     }
     case BlockID::piston:
     case BlockID::sticky_piston:
@@ -163,6 +174,16 @@ uint32_t get_face_texture_index(block_t *block, int face)
             return 64;
         return 226 - (((color & 0x07) << 4) | (color >> 3));
         break;
+    }
+    case BlockID::pumpkin:
+    case BlockID::lit_pumpkin:
+    {
+        if (face == FACE_NY || face == FACE_PY)
+            return 102;
+        int block_direction = (block->meta) & 0x03;
+        if (face == directionmap[block_direction])
+            return blockid == BlockID::lit_pumpkin ? 120 : 119;
+        return 118;
     }
     default:
         return get_default_texture_index(blockid);
@@ -519,7 +540,7 @@ void slab_aabb(const vec3i &pos, block_t *block, const aabb_t &other, std::vecto
     {
         aabb.min.y += 0.5;
     }
-    else if (!(block->meta & 2))
+    else
     {
         aabb.max.y -= 0.5;
     }
@@ -531,11 +552,29 @@ void slab_aabb(const vec3i &pos, block_t *block, const aabb_t &other, std::vecto
 void torch_aabb(const vec3i &pos, block_t *block, const aabb_t &other, std::vector<aabb_t> &aabb_list)
 {
     aabb_t aabb;
-    constexpr vfloat_t offset = 0.40625;
-    constexpr vfloat_t width = 0.1875;
-    constexpr vfloat_t height = 0.65625;
-    aabb.min = vec3f(pos.x + offset, pos.y, pos.z + offset);
+    constexpr vfloat_t offset = 0.35;
+    constexpr vfloat_t width = 0.3;
+    constexpr vfloat_t height = 0.6;
+    aabb.min = vec3f(pos.x + offset, pos.y + 0.2, pos.z + offset);
     aabb.max = aabb.min + vec3f(width, height, width);
+    switch (block->meta)
+    {
+    case 1:
+        aabb.translate(vec3f(-offset, 0, 0));
+        break;
+    case 2:
+        aabb.translate(vec3f(offset, 0, 0));
+        break;
+    case 3:
+        aabb.translate(vec3f(0, 0, -offset));
+        break;
+    case 4:
+        aabb.translate(vec3f(0, 0, offset));
+        break;
+    default:
+        aabb.translate(vec3f(0, -0.2, 0));
+        break;
+    }
 
     if (aabb.intersects(other))
         aabb_list.push_back(aabb);
@@ -604,8 +643,8 @@ blockproperties_t block_properties[256] = {
     blockproperties_t().id(BlockID::leaves).texture(186).sound(SoundType::grass).opacity(1).transparent(true).render_type(RenderType::full_special),
     blockproperties_t().id(BlockID::sponge).texture(48).sound(SoundType::grass),
     blockproperties_t().id(BlockID::glass).texture(49).sound(SoundType::glass).opacity(0).transparent(true),
-    blockproperties_t().id(BlockID::lapis_ore).texture(144).sound(SoundType::stone),
-    blockproperties_t().id(BlockID::lapis_block).texture(160).sound(SoundType::stone),
+    blockproperties_t().id(BlockID::lapis_ore).texture(160).sound(SoundType::stone),
+    blockproperties_t().id(BlockID::lapis_block).texture(144).sound(SoundType::stone),
     blockproperties_t().id(BlockID::dispenser).texture(46).sound(SoundType::stone).render_type(RenderType::full_special),
     blockproperties_t().id(BlockID::sandstone).texture(176).sound(SoundType::stone).render_type(RenderType::full_special),
     blockproperties_t().id(BlockID::note_block).texture(74).sound(SoundType::wood),
@@ -644,8 +683,8 @@ blockproperties_t block_properties[256] = {
     blockproperties_t().id(BlockID::crafting_table).texture(59).sound(SoundType::wood).render_type(RenderType::full_special),
     blockproperties_t().id(BlockID::wheat).texture(95).solid(false).opacity(0).transparent(true).sound(SoundType::grass).render_type(RenderType::cross).collision(CollisionType::none),
     blockproperties_t().id(BlockID::farmland).texture(86).sound(SoundType::dirt),
-    blockproperties_t().id(BlockID::furnace).texture(61).sound(SoundType::stone).render_type(RenderType::full_special),
-    blockproperties_t().id(BlockID::lit_furnace).texture(78).sound(SoundType::stone).render_type(RenderType::full_special),
+    blockproperties_t().id(BlockID::furnace).texture(44).sound(SoundType::stone).render_type(RenderType::full_special),
+    blockproperties_t().id(BlockID::lit_furnace).texture(61).sound(SoundType::stone).render_type(RenderType::full_special),
     blockproperties_t().id(BlockID::standing_sign).texture(4).solid(false).opacity(0).transparent(false).sound(SoundType::wood).render_type(RenderType::cross).collision(CollisionType::none),
     blockproperties_t().id(BlockID::wooden_door).texture(81).solid(false).opacity(0).transparent(true).sound(SoundType::wood).render_type(RenderType::cross).collision(CollisionType::none),
     blockproperties_t().id(BlockID::ladder).texture(83).solid(false).opacity(0).transparent(true).sound(SoundType::wood).render_type(RenderType::special).collision(CollisionType::none),
@@ -669,10 +708,12 @@ blockproperties_t block_properties[256] = {
     blockproperties_t().id(BlockID::reeds).texture(73).solid(false).opacity(0).transparent(true).sound(SoundType::grass).render_type(RenderType::cross).collision(CollisionType::none),
     blockproperties_t().id(BlockID::jukebox).texture(74).sound(SoundType::wood).render_type(RenderType::full_special),
     blockproperties_t().id(BlockID::fence).texture(4).solid(false).opacity(0).transparent(true).sound(SoundType::wood).render_type(RenderType::special),
-    blockproperties_t().id(BlockID::pumpkin).texture(118).solid(false).opacity(0).transparent(true).sound(SoundType::grass).render_type(RenderType::full_special),
+    blockproperties_t().id(BlockID::pumpkin).texture(118).opacity(0).sound(SoundType::wood).render_type(RenderType::full_special),
     blockproperties_t().id(BlockID::netherrack).texture(103).sound(SoundType::stone),
     blockproperties_t().id(BlockID::soul_sand).texture(104).sound(SoundType::sand),
     blockproperties_t().id(BlockID::glowstone).texture(105).sound(SoundType::glass).luminance(15),
+    blockproperties_t().id(BlockID::portal).texture(14).solid(false).opacity(0).transparent(true).luminance(11).sound(SoundType::glass).render_type(RenderType::special).collision(CollisionType::none),
+    blockproperties_t().id(BlockID::lit_pumpkin).texture(120).opacity(0).sound(SoundType::wood).render_type(RenderType::full_special),
     // Reserved for a fully white block.
     blockproperties_t().id(BlockID::reserved).texture(0).solid(false).opacity(0).transparent(true).luminance(15).sound(SoundType::cloth),
 

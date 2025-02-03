@@ -172,11 +172,7 @@ bool add_chunk(int32_t x, int32_t z)
     }
     return false;
 }
-
-inline bool in_range(int x, int min, int max)
-{
-    return x >= min && x <= max;
-}
+#define in_range(x, min, max) ((unsigned int)((x) - (min)) <= (unsigned int)((max) - (min)))
 
 /* The state must be initialized to non-zero */
 inline uint32_t fastrand()
@@ -1127,6 +1123,13 @@ int chunk_t::pre_render_block(block_t *block, const vec3i &pos, bool transparent
             break;
         }
     }
+    else
+    {
+        if (block->get_blockid() == BlockID::chest)
+        {
+            return render_chest(block, pos);
+        }
+    }
     int vertexCount = 0;
     for (uint8_t face = 0; face < 6; face++)
     {
@@ -1156,6 +1159,13 @@ int chunk_t::render_block(block_t *block, const vec3i &pos, bool transparent)
             break;
         }
     }
+    else
+    {
+        if (block->get_blockid() == BlockID::chest)
+        {
+            return render_chest(block, pos);
+        }
+    }
     int vertexCount = 0;
     if (properties(block->id).m_render_type == RenderType::full_special)
     {
@@ -1176,6 +1186,71 @@ int chunk_t::render_block(block_t *block, const vec3i &pos, bool transparent)
     return vertexCount;
 }
 
+int chunk_t::get_chest_texture_index(block_t *block, const vec3i &pos, uint8_t face)
+{
+    // Bottom and top faces are always the same
+    if (face == FACE_NY || face == FACE_PY)
+        return 25;
+
+    block_t *neighbors[4];
+    {
+        block_t *tmp_neighbors[6];
+        get_neighbors(pos, tmp_neighbors, this);
+        neighbors[0] = tmp_neighbors[0];
+        neighbors[1] = tmp_neighbors[1];
+        neighbors[2] = tmp_neighbors[4];
+        neighbors[3] = tmp_neighbors[5];
+    }
+
+    if (std::none_of(neighbors, neighbors + 4, [](block_t *block)
+                     { return block->get_blockid() == BlockID::chest; }))
+    {
+        // Single chest
+        uint8_t direction = FACE_PZ;
+        if (!(block->visibility_flags & (1 << FACE_PZ)) && (block->visibility_flags & (1 << FACE_NZ)))
+            direction = FACE_NZ;
+        if (!(block->visibility_flags & (1 << FACE_NX)) && (block->visibility_flags & (1 << FACE_PX)))
+            direction = FACE_PX;
+        if (!(block->visibility_flags & (1 << FACE_PX)) && (block->visibility_flags & (1 << FACE_NX)))
+            direction = FACE_NX;
+
+        return 26 + (face == direction);
+    }
+
+    // Double chest
+
+    if ((face != FACE_NZ && face != FACE_PZ) && neighbors[0]->get_blockid() != BlockID::chest && neighbors[1]->get_blockid() != BlockID::chest)
+    {
+        // X axis
+        bool half = neighbors[2]->get_blockid() == BlockID::chest;
+        uint8_t other_flags = neighbors[half ? 2 : 3]->visibility_flags;
+        uint8_t direction = FACE_PX;
+        if ((!(block->visibility_flags & (1 << FACE_PX)) || !(other_flags & (1 << FACE_PX))) && (block->visibility_flags & (1 << FACE_NX)) && (other_flags & (1 << FACE_NX)))
+            direction = FACE_NX;
+
+        if (face == FACE_NX)
+            half = !half;
+
+        return 26 + (face == direction ? 16 : 32) - half;
+    }
+    else if ((face != FACE_NX && face != FACE_PX) && neighbors[2]->get_blockid() != BlockID::chest && neighbors[3]->get_blockid() != BlockID::chest)
+    {
+        // Z axis
+        bool half = neighbors[0]->get_blockid() == BlockID::chest;
+
+        uint8_t other_flags = neighbors[half ? 0 : 1]->visibility_flags;
+        uint8_t direction = FACE_PZ;
+        if ((!(block->visibility_flags & (1 << FACE_PZ)) || !(other_flags & (1 << FACE_PZ))) && (block->visibility_flags & (1 << FACE_NZ)) && (other_flags & (1 << FACE_NZ)))
+            direction = FACE_NZ;
+
+        if (face == FACE_PZ)
+            half = !half;
+
+        return 26 + (face == direction ? 16 : 32) - half;
+    }
+    return 26;
+}
+
 int chunk_t::render_special(block_t *block, const vec3i &pos)
 {
     switch (block->get_blockid())
@@ -1189,6 +1264,17 @@ int chunk_t::render_special(block_t *block, const vec3i &pos)
         break;
     }
     return 0;
+}
+
+int chunk_t::render_chest(block_t *block, const vec3i &pos)
+{
+    int vertexCount = 0;
+    for (uint8_t face = 0; face < 6; face++)
+    {
+        if (block->get_opacity(face))
+            vertexCount += render_face(pos, face, get_chest_texture_index(block, pos, face), this, block);
+    }
+    return vertexCount;
 }
 
 int chunk_t::render_flat_ground(block_t *block, const vec3i &pos)
@@ -1248,20 +1334,35 @@ int chunk_t::render_slab(block_t *block, const vec3i &pos)
     vec3f vertex_pos(local_pos.x, local_pos.y, local_pos.z);
     uint32_t top_index = get_default_texture_index(block->get_blockid());
     uint32_t side_index = top_index - 1;
+    uint32_t bottom_index = top_index;
     bool render_top = true;
     bool render_bottom = true;
     bool top_half = block->meta & 8;
-    int vertexCount = 0;
-    if (block->meta & 2)
+    int slab_type = block->meta & 7;
+    switch (slab_type)
     {
-        for (uint8_t face = 0; face < 6; face++)
-        {
-            if (block->get_opacity(face))
-                vertexCount += render_face(pos, face, get_face_texture_index(block, face), this, block);
-        }
-        return vertexCount;
+    case 1: // Sandstone slab
+        top_index = 176;
+        side_index = 192;
+        bottom_index = 208;
+        break;
+    case 2: // Wooden slab
+        top_index = side_index = bottom_index = 4;
+        break;
+    case 3: // Cobblestone slab
+        top_index = side_index = bottom_index = 16;
+        break;
+    case 4: // Brick slab
+        top_index = side_index = bottom_index = 7;
+        break;
+    case 5: // Stone brick slab
+        top_index = side_index = bottom_index = 54;
+        break;
+    default:
+        break;
     }
-    else if (top_half)
+    int vertexCount = 0;
+    if (top_half)
     {
         vertex_pos = vertex_pos + vec3f(0, 0.5, 0);
         if (!block->get_opacity(FACE_PY))
@@ -1296,10 +1397,10 @@ int chunk_t::render_slab(block_t *block, const vec3i &pos)
     if (render_bottom)
     {
         lighting = get_face_light_index(pos, FACE_NY, this, block);
-        GX_VertexLit({vertex_pos + vec3f(-.5, -.5, -.5), TEXTURE_NX(top_index), TEXTURE_PY(top_index)}, lighting, FACE_NY);
-        GX_VertexLit({vertex_pos + vec3f(-.5, -.5, 0.5), TEXTURE_NX(top_index), TEXTURE_NY(top_index)}, lighting, FACE_NY);
-        GX_VertexLit({vertex_pos + vec3f(0.5, -.5, 0.5), TEXTURE_PX(top_index), TEXTURE_NY(top_index)}, lighting, FACE_NY);
-        GX_VertexLit({vertex_pos + vec3f(0.5, -.5, -.5), TEXTURE_PX(top_index), TEXTURE_PY(top_index)}, lighting, FACE_NY);
+        GX_VertexLit({vertex_pos + vec3f(-.5, -.5, -.5), TEXTURE_NX(bottom_index), TEXTURE_PY(bottom_index)}, lighting, FACE_NY);
+        GX_VertexLit({vertex_pos + vec3f(-.5, -.5, 0.5), TEXTURE_NX(bottom_index), TEXTURE_NY(bottom_index)}, lighting, FACE_NY);
+        GX_VertexLit({vertex_pos + vec3f(0.5, -.5, 0.5), TEXTURE_PX(bottom_index), TEXTURE_NY(bottom_index)}, lighting, FACE_NY);
+        GX_VertexLit({vertex_pos + vec3f(0.5, -.5, -.5), TEXTURE_PX(bottom_index), TEXTURE_PY(bottom_index)}, lighting, FACE_NY);
         vertexCount += 4;
     }
 
@@ -1337,35 +1438,58 @@ int chunk_t::render_slab(block_t *block, const vec3i &pos)
 
 int chunk_t::render_torch(block_t *block, const vec3i &pos)
 {
-    uint8_t lighting = block->light;
     vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
-    vec3f vertex_pos(local_pos.x, local_pos.y, local_pos.z);
+    vec3f vertex_pos(local_pos.x, local_pos.y + 0.1875, local_pos.z);
+    switch (block->meta & 0x7)
+    {
+    case 1: // Facing east
+        vertex_pos.x -= 0.125;
+        return render_torch_with_angle(block, vertex_pos, -0.4, 0);
+    case 2: // Facing west
+        vertex_pos.x += 0.125;
+        return render_torch_with_angle(block, vertex_pos, 0.4, 0);
+    case 3: // Facing south
+        vertex_pos.z -= 0.125;
+        return render_torch_with_angle(block, vertex_pos, 0, -0.4);
+    case 4: // Facing north
+        vertex_pos.z += 0.125;
+        return render_torch_with_angle(block, vertex_pos, 0, 0.4);
+    default: // Facing up
+        vertex_pos.y -= 0.1875;
+        return render_torch_with_angle(block, vertex_pos, 0, 0);
+    }
+}
+
+int chunk_t::render_torch_with_angle(block_t *block, const vec3f &vertex_pos, vfloat_t ax, vfloat_t az)
+{
+    uint8_t lighting = block->light;
     uint32_t texture_index = get_default_texture_index(block->get_blockid());
+
     // Negative X side
-    GX_VertexLit({vertex_pos + vec3f{-.0625f, -.5f, -.5f}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NX);
+    GX_VertexLit({vertex_pos + vec3f{-.0625f + ax, -.5f, -.5f + az}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NX);
     GX_VertexLit({vertex_pos + vec3f{-.0625f, 0.5f, -.5f}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_NX);
     GX_VertexLit({vertex_pos + vec3f{-.0625f, 0.5f, 0.5f}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_NX);
-    GX_VertexLit({vertex_pos + vec3f{-.0625f, -.5f, 0.5f}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NX);
+    GX_VertexLit({vertex_pos + vec3f{-.0625f + ax, -.5f, 0.5f + az}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NX);
     // Positive X side
-    GX_VertexLit({vertex_pos + vec3f{0.0625f, -.5f, 0.5f}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PX);
+    GX_VertexLit({vertex_pos + vec3f{0.0625f + ax, -.5f, 0.5f + az}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PX);
     GX_VertexLit({vertex_pos + vec3f{0.0625f, 0.5f, 0.5f}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PX);
     GX_VertexLit({vertex_pos + vec3f{0.0625f, 0.5f, -.5f}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PX);
-    GX_VertexLit({vertex_pos + vec3f{0.0625f, -.5f, -.5f}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PX);
+    GX_VertexLit({vertex_pos + vec3f{0.0625f + ax, -.5f, -.5f + az}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PX);
     // Negative Z side
-    GX_VertexLit({vertex_pos + vec3f{0.5f, -.5f, -.0625f}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NZ);
+    GX_VertexLit({vertex_pos + vec3f{0.5f + ax, -.5f, -.0625f + az}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NZ);
     GX_VertexLit({vertex_pos + vec3f{0.5f, 0.5f, -.0625f}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_NZ);
     GX_VertexLit({vertex_pos + vec3f{-.5f, 0.5f, -.0625f}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_NZ);
-    GX_VertexLit({vertex_pos + vec3f{-.5f, -.5f, -.0625f}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NZ);
+    GX_VertexLit({vertex_pos + vec3f{-.5f + ax, -.5f, -.0625f + az}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NZ);
     // Positive Z side
-    GX_VertexLit({vertex_pos + vec3f{-.5f, -.5f, 0.0625f}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PZ);
+    GX_VertexLit({vertex_pos + vec3f{-.5f + ax, -.5f, 0.0625f + az}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PZ);
     GX_VertexLit({vertex_pos + vec3f{-.5f, 0.5f, 0.0625f}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PZ);
     GX_VertexLit({vertex_pos + vec3f{0.5f, 0.5f, 0.0625f}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PZ);
-    GX_VertexLit({vertex_pos + vec3f{0.5f, -.5f, 0.0625f}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PZ);
+    GX_VertexLit({vertex_pos + vec3f{0.5f + ax, -.5f, 0.0625f + az}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PZ);
     // Top side
-    GX_VertexLit({vertex_pos + vec3f{0.0625f, 0.125f, -.0625f}, TEXTURE_X(texture_index) + 9 * BASE3D_UV_FRAC_LO, TEXTURE_Y(texture_index) + 8 * BASE3D_UV_FRAC_LO}, lighting, FACE_PY);
-    GX_VertexLit({vertex_pos + vec3f{0.0625f, 0.125f, 0.0625f}, TEXTURE_X(texture_index) + 9 * BASE3D_UV_FRAC_LO, TEXTURE_Y(texture_index) + 6 * BASE3D_UV_FRAC_LO}, lighting, FACE_PY);
-    GX_VertexLit({vertex_pos + vec3f{-.0625f, 0.125f, 0.0625f}, TEXTURE_X(texture_index) + 7 * BASE3D_UV_FRAC_LO, TEXTURE_Y(texture_index) + 6 * BASE3D_UV_FRAC_LO}, lighting, FACE_PY);
-    GX_VertexLit({vertex_pos + vec3f{-.0625f, 0.125f, -.0625f}, TEXTURE_X(texture_index) + 7 * BASE3D_UV_FRAC_LO, TEXTURE_Y(texture_index) + 8 * BASE3D_UV_FRAC_LO}, lighting, FACE_PY);
+    GX_VertexLit({vertex_pos + vec3f{0.0625f + ax * 0.375f, 0.125f, -.0625f + az * 0.375f}, TEXTURE_X(texture_index) + 9 * BASE3D_UV_FRAC_LO, TEXTURE_Y(texture_index) + 8 * BASE3D_UV_FRAC_LO}, lighting, FACE_PY);
+    GX_VertexLit({vertex_pos + vec3f{0.0625f + ax * 0.375f, 0.125f, 0.0625f + az * 0.375f}, TEXTURE_X(texture_index) + 9 * BASE3D_UV_FRAC_LO, TEXTURE_Y(texture_index) + 6 * BASE3D_UV_FRAC_LO}, lighting, FACE_PY);
+    GX_VertexLit({vertex_pos + vec3f{-.0625f + ax * 0.375f, 0.125f, 0.0625f + az * 0.375f}, TEXTURE_X(texture_index) + 7 * BASE3D_UV_FRAC_LO, TEXTURE_Y(texture_index) + 6 * BASE3D_UV_FRAC_LO}, lighting, FACE_PY);
+    GX_VertexLit({vertex_pos + vec3f{-.0625f + ax * 0.375f, 0.125f, -.0625f + az * 0.375f}, TEXTURE_X(texture_index) + 7 * BASE3D_UV_FRAC_LO, TEXTURE_Y(texture_index) + 8 * BASE3D_UV_FRAC_LO}, lighting, FACE_PY);
 
     return 20;
 }
