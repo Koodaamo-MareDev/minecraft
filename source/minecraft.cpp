@@ -11,6 +11,9 @@
 #include <fat.h>
 #include <ogc/conf.h>
 #include <stdarg.h>
+#include <sys/stat.h>
+#include "mcregion.hpp"
+#include "nbt/nbt.hpp"
 #include "chunk_new.hpp"
 #include "block.hpp"
 #include "blocks.hpp"
@@ -71,6 +74,8 @@ int fluidUpdateCount = 0;
 float lastStepDistance = 0;
 double deltaTime = 0.0;
 double partialTicks = 0.0;
+
+std::string world_name = "world";
 
 uint32_t total_chunks_size = 0;
 
@@ -134,6 +139,52 @@ void dbgprintf(const char *fmt, ...)
     VIDEO_Flush();
 #endif
 }
+
+// Function to create the full directory path
+int mkpath(const char *path, mode_t mode)
+{
+    char tmp[256]; // Temporary buffer to construct directories
+    char *p = NULL;
+    size_t len;
+
+    // Copy the path to a temporary buffer
+    strncpy(tmp, path, sizeof(tmp) - 1);
+    len = strlen(tmp);
+
+    // Remove the trailing slash if it exists
+    if (tmp[len - 1] == '/')
+    {
+        tmp[len - 1] = '\0';
+    }
+
+    // Create directories step by step
+    for (p = tmp + 1; *p; p++)
+    {
+        if (*p == '/')
+        {
+            *p = '\0'; // Temporarily end the string to isolate the directory
+
+            // Try to create the directory, ignore error if it already exists
+            if (mkdir(tmp, mode) != 0 && errno != EEXIST)
+            {
+                printf("Error creating directory %s: %s\n", tmp, strerror(errno));
+                return -1;
+            }
+
+            *p = '/'; // Restore the slash
+        }
+    }
+
+    // Finally, create the full path
+    if (mkdir(tmp, mode) != 0 && errno != EEXIST)
+    {
+        printf("Error creating directory %s: %s\n", tmp, strerror(errno));
+        return -1;
+    }
+
+    return 0;
+}
+void SaveWorld();
 void ResetWorld();
 void UpdateNetwork();
 void DestroyBlock(const vec3i &pos, block_t old_block);
@@ -358,7 +409,10 @@ int main(int argc, char **argv)
         viewport.far        // Far clipping plane
     };
     fatInitDefault();
-    chdir("/apps/minecraft/resources/");
+    std::string save_path = "/apps/minecraft/saves/" + world_name;
+    std::string region_path = save_path + "/region";
+    mkpath(region_path.c_str(), 0777);
+    chdir(save_path.c_str());
 
     printf("Render resolution: %f,%f, Widescreen: %s\n", viewport.width, viewport.height, viewport.widescreen ? "Yes" : "No");
     light_engine_init();
@@ -393,7 +447,7 @@ int main(int argc, char **argv)
     add_entity(player);
 
     gertex::GXFog fog = gertex::GXFog{true, gertex::GXFogType::linear, viewport.near, viewport.far, viewport.near, viewport.far, background};
-
+#ifdef MULTIPLAYER
     if (Crapper::initNetwork())
     {
         uint32_t dev_id = 0;
@@ -414,6 +468,7 @@ int main(int argc, char **argv)
             ResetWorld();
         }
     }
+#endif
     GX_SetArray(GX_VA_CLR0, light_map, 4 * sizeof(u8));
 
     while (!isExiting)
@@ -625,6 +680,8 @@ int main(int argc, char **argv)
     {
         client.disconnect();
     }
+    SaveWorld();
+    ResetWorld();
     printf("De-initializing network...\n");
     Crapper::deinitNetwork();
     printf("De-initializing light engine...\n");
@@ -1212,6 +1269,44 @@ void AddParticle(const particle_t &particle)
     particle_system.add_particle(particle);
 }
 
+void SaveWorld()
+{
+    // Save the chunk to disk if in singleplayer
+    if (!is_remote())
+    {
+        try
+        {
+            for (chunk_t *c : get_chunks())
+                c->serialize();
+        }
+        catch (std::exception &e)
+        {
+            printf("Failed to save chunk: %s\n", e.what());
+        }
+        NBTTagCompound level;
+        NBTTagCompound *level_data = (NBTTagCompound *)level.setTag("Data", new NBTTagCompound());
+        level_data->setTag("Player", player->serialize());
+        level_data->setTag("Time", new NBTTagLong(timeOfDay));
+        level_data->setTag("SpawnX", new NBTTagInt(0));
+        level_data->setTag("SpawnY", new NBTTagInt(skycast(vec3i(0, 0, 0), nullptr)));
+        level_data->setTag("SpawnZ", new NBTTagInt(0));
+        level_data->setTag("LastPlayed", new NBTTagLong(time(nullptr) * 1000LL));
+        level_data->setTag("LevelName", new NBTTagString("Wii World"));
+        level_data->setTag("RandomSeed", new NBTTagLong(0));
+        level_data->setTag("version", new NBTTagInt(19132));
+
+        std::ofstream file("level.dat", std::ios::binary);
+        if (file.is_open())
+        {
+            NBTBase::writeGZip(file, &level);
+            file.flush();
+            file.close();
+
+            printf("Saved world\n");
+        }
+    }
+}
+
 void ResetWorld()
 {
     has_loaded = false;
@@ -1227,6 +1322,8 @@ void ResetWorld()
         if (chunk)
             PrepareChunkRemoval(chunk);
     }
+    RemoveRedundantChunks();
+    mcr::cleanup();
     // Assume the world just started generating
     dirtscreen_text = "Building terrain...";
 }

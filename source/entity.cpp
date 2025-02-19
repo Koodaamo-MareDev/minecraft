@@ -365,6 +365,54 @@ void aabb_entity_t::render(float partial_ticks, bool transparency)
 #endif
 }
 
+NBTTagList *serialize_vec3d(vec3f vec)
+{
+    NBTTagList *result = new NBTTagList;
+    result->addTag(new NBTTagDouble(vec.x));
+    result->addTag(new NBTTagDouble(vec.y));
+    result->addTag(new NBTTagDouble(vec.z));
+    return result;
+}
+
+NBTTagList *serialize_vec2f(vec3f vec)
+{
+    NBTTagList *result = new NBTTagList;
+    result->addTag(new NBTTagFloat(vec.x));
+    result->addTag(new NBTTagFloat(vec.y));
+    return result;
+}
+
+NBTTagCompound *aabb_entity_t::serialize()
+{
+    NBTTagCompound *result = new NBTTagCompound;
+    if (this->local)
+    {
+        result->setTag("Inventory", new NBTTagList);
+        result->setTag("Dimension", new NBTTagInt(is_hell_world() ? -1 : 0));
+        result->setTag("Score", new NBTTagInt(0));
+        result->setTag("Sleeping", new NBTTagByte(0));
+        result->setTag("SleepTimer", new NBTTagShort(0));
+    }
+
+    vec3f pos(position.x, aabb.min.y + y_offset - y_size + 0.0001, position.z);
+    printf("Y: %lf\n", pos.y);
+
+    result->setTag("Motion", serialize_vec3d(velocity));
+    result->setTag("Pos", serialize_vec3d(pos));
+    result->setTag("Rotation", serialize_vec2f(rotation));
+
+    result->setTag("Air", new NBTTagShort(300));
+    result->setTag("AttackTime", new NBTTagShort(0));
+    result->setTag("DeathTime", new NBTTagShort(0));
+    result->setTag("FallDistance", new NBTTagFloat(0));
+    result->setTag("Fire", new NBTTagShort(-20));
+    result->setTag("Health", new NBTTagShort(health));
+    result->setTag("OnGround", new NBTTagByte(on_ground));
+    result->setTag("HurtTime", new NBTTagShort(0));
+
+    return result;
+}
+
 std::vector<aabb_t> aabb_entity_t::get_colliding_aabbs(const aabb_t &aabb)
 {
     std::vector<aabb_t> nearby_blocks;

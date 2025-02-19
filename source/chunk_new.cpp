@@ -28,6 +28,9 @@
 #include <malloc.h>
 #include <math.h>
 #include <stdio.h>
+#include <fstream>
+#include "nbt/nbt.hpp"
+#include "mcregion.hpp"
 extern bool isExiting;
 const vec3i face_offsets[] = {
     vec3i{-1, +0, +0},
@@ -40,7 +43,7 @@ void *get_aligned_pointer_32(void *ptr)
 {
     return (void *)((u64(ptr) + 0x1F) & (~0x1F));
 }
-int world_seed = 0;
+int64_t world_seed = 0;
 uint32_t world_tick = 0;
 ImprovedNoise improved_noise;
 mutex_t chunk_mutex;
@@ -1878,4 +1881,138 @@ chunk_t::~chunk_t()
             remove_entity(entity->entity_id);
         }
     }
+}
+
+void chunk_t::save(NBTTagCompound &compound)
+{
+    compound.setTag("xPos", new NBTTagInt(x));
+    compound.setTag("zPos", new NBTTagInt(z));
+    compound.setTag("LastUpdate", new NBTTagLong(1000));
+    compound.setTag("TerrainPopulated", new NBTTagByte(1));
+
+    std::vector<uint8_t> blocks = std::vector<uint8_t>(32768);
+    std::vector<uint8_t> data = std::vector<uint8_t>(16384);
+    std::vector<uint8_t> blocklight = std::vector<uint8_t>(16384);
+    std::vector<uint8_t> skylight = std::vector<uint8_t>(16384);
+    std::vector<uint8_t> heightmap = std::vector<uint8_t>(256);
+    for (int i = 0; i < 16384; i++)
+    {
+        uint32_t out_index = i << 1;
+        uint32_t iy = out_index & 0x7F;
+        uint32_t iz = (out_index >> 7) & 0xF;
+        uint32_t ix = (out_index >> 11) & 0xF;
+        uint32_t index1 = ix | (iz << 4) | (iy << 8);
+        uint32_t index2 = index1 | 0x100;
+
+        blocks[out_index] = blockstates[index1].id;
+        blocks[out_index | 1] = blockstates[index2].id;
+
+        data[i] = (blockstates[index1].meta & 0xF) | ((blockstates[index2].meta & 0xF) << 4);
+        blocklight[i] = (blockstates[index1].block_light) | (blockstates[index2].block_light << 4);
+        skylight[i] = (blockstates[index1].sky_light) | (blockstates[index2].sky_light << 4);
+    }
+    for (int i = 0; i < 256; i++)
+    {
+        heightmap[i] = lightcast(vec3i(i & 0xF, 0, i >> 4), this);
+    }
+    compound.setTag("Blocks", new NBTTagByteArray(blocks));
+    compound.setTag("Data", new NBTTagByteArray(data));
+    compound.setTag("BlockLight", new NBTTagByteArray(blocklight));
+    compound.setTag("SkyLight", new NBTTagByteArray(skylight));
+    compound.setTag("HeightMap", new NBTTagByteArray(heightmap));
+    compound.setTag("Entities", new NBTTagList());
+    compound.setTag("TileEntities", new NBTTagList());
+}
+
+void chunk_t::serialize()
+{
+    // Write the chunk using mcregion format
+
+    mcr::region *region = mcr::get_region(x >> 5, z >> 5);
+    if (!region)
+    {
+        throw std::runtime_error("Failed to get region for chunk " + std::to_string(x) + ", " + std::to_string(z));
+    }
+
+    std::fstream &chunk_file = region->open();
+
+    if (!chunk_file.is_open())
+    {
+        throw std::runtime_error("Failed to open region file for writing");
+    }
+
+    // Save the chunk data to an NBT compound
+    // Due to the way C++ manages memory, it's wise to fill in the compounds AFTER adding them to their parent
+    NBTTagCompound root_compound;
+    save(*(NBTTagCompound *)root_compound.setTag("Level", new NBTTagCompound));
+
+    // Write the uncompressed compound to a buffer
+    Crapper::ByteBuffer uncompressed_buffer;
+    root_compound.writeTag(uncompressed_buffer);
+
+    // Compress the data
+    uint32_t uncompressed_size = uncompressed_buffer.data.size();
+    uint8_t *compressed_data = new uint8_t[uncompressed_size];
+    mz_ulong compressed_size = uncompressed_size;
+
+    int result = mz_compress2(compressed_data, &compressed_size, uncompressed_buffer.data.data(), uncompressed_size, MZ_BEST_SPEED);
+
+    uncompressed_buffer.data.clear();
+    if (result != MZ_OK)
+    {
+        delete[] compressed_data;
+        throw std::runtime_error("Failed to compress chunk data");
+    }
+
+    Crapper::ByteBuffer buffer;
+    buffer.writeBytes(compressed_data, compressed_size);
+
+    delete[] compressed_data;
+
+    // Calculate the offset of the chunk in the file
+    uint16_t offset = (x & 0x1F) | ((z & 0x1F) << 5);
+
+    // Allocate the buffer in file
+    uint32_t chunk_offset = region->allocate(buffer.data.size() + 5, offset);
+    if (chunk_offset == 0)
+    {
+        throw std::runtime_error("Failed to allocate space for chunk");
+    }
+
+    // Write the header
+
+    // Calculate the location of the chunk in the file
+    uint32_t loc = (((buffer.data.size() + 5 + 4095) >> 12) & 0xFF) | (chunk_offset << 8);
+
+    // Write the chunk location
+    chunk_file.seekp(offset << 2);
+    chunk_file.write(reinterpret_cast<char *>(&loc), sizeof(uint32_t));
+
+    // Write the timestamp
+    uint32_t timestamp = 1000; // TODO: Get the current time
+    chunk_file.seekp((offset << 2) | 4096);
+    chunk_file.write(reinterpret_cast<char *>(&timestamp), sizeof(uint32_t));
+
+    // Get the length of the compressed data
+    uint32_t length = compressed_size + 1;
+
+    // Using zlib compression
+    uint8_t compression = 2;
+
+    // Write the chunk header
+    chunk_file.seekp(chunk_offset << 12);
+    chunk_file.write(reinterpret_cast<char *>(&length), sizeof(uint32_t));
+    chunk_file.write(reinterpret_cast<char *>(&compression), sizeof(uint8_t));
+
+    // Write the compressed data
+    chunk_file.write(reinterpret_cast<char *>(buffer.data.data()), buffer.data.size());
+    uint32_t pos = chunk_file.seekp(0, std::ios::end).tellp();
+    if ((pos & 0xFFF) != 0)
+    {
+        chunk_file.seekp(pos | 0xFFF);
+        uint8_t padding = 0;
+        chunk_file.write(reinterpret_cast<char *>(&padding), 1);
+    }
+
+    chunk_file.flush();
 }

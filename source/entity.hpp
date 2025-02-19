@@ -8,6 +8,7 @@
 #include "block.hpp"
 #include "model.hpp"
 #include "inventory.hpp"
+#include "nbt/nbt.hpp"
 #include <deque>
 
 constexpr vfloat_t ENTITY_GRAVITY = 9.8f;
@@ -104,6 +105,8 @@ public:
     {
         return sizeof(*this);
     }
+
+    virtual NBTTagCompound* serialize();
 
     std::vector<aabb_t> get_colliding_aabbs(const aabb_t &aabb);
 

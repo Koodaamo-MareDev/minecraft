@@ -12,6 +12,7 @@
 #include <vector>
 #include <deque>
 #include <map>
+#include <iostream>
 #define SIMULATION_DISTANCE 2
 #define RENDER_DISTANCE 4
 #define CHUNK_COUNT ((RENDER_DISTANCE) * (RENDER_DISTANCE + 1) * 4)
@@ -40,7 +41,7 @@ enum class ChunkGenStage : uint8_t
 
 extern guVector player_pos;
 extern uint32_t world_tick;
-extern int world_seed;
+extern int64_t world_seed;
 
 inline vec2i block_to_chunk_pos(const vec3i &pos)
 {
@@ -121,6 +122,8 @@ public:
         return this->player_taxicab_distance() < other.player_taxicab_distance();
     }
 };
+
+class NBTTagCompound;
 
 class chunk_t
 {
@@ -258,6 +261,9 @@ public:
     {
     }
     ~chunk_t();
+
+    void save(NBTTagCompound &stream);
+    void serialize();
 
 private:
 };

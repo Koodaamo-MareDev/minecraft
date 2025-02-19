@@ -138,7 +138,7 @@ void sound_system_t::update(vec3f head_right, vec3f head_position)
 
     if (frames_to_next_music <= 0)
     {
-        play_music(get_random_music());
+        play_music("/apps/minecraft/resources/" + get_random_music());
     }
 }
 

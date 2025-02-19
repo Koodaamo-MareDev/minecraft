@@ -18,7 +18,7 @@ include $(DEVKITPPC)/wii_rules
 #---------------------------------------------------------------------------------
 TARGET		:=	$(notdir $(CURDIR))
 BUILD		:=	build
-SOURCES		:=	source source/opensimplexnoise source/ported source/improvednoise source/fastnoise source/jvm source/jvm/extensions source/oggplayer source/crapper source/crapper/miniz source/gertex
+SOURCES		:=	source source/opensimplexnoise source/ported source/improvednoise source/fastnoise source/jvm source/jvm/extensions source/oggplayer source/crapper source/crapper/miniz source/gertex source/nbt
 DATA		:=
 TEXTURES	:=	textures
 INCLUDES	:=	source/ported
@@ -27,7 +27,7 @@ SOUND		:=	sound
 # options for code generation
 #---------------------------------------------------------------------------------
 
-CFLAGS	= -g -O2 -Wall $(MACHDEP) $(INCLUDE) -DMINIZ_NO_ARCHIVE_APIS
+CFLAGS	= -g -O2 -Wall $(MACHDEP) $(INCLUDE) -DMINIZ_NO_ARCHIVE_APIS -DMINIZ_NO_ZLIB_COMPATIBLE_NAMES
 CXXFLAGS	=	$(CFLAGS)
 
 LDFLAGS	=	-g $(MACHDEP) -Wl,-Map,$(notdir $@).map

@@ -77,6 +77,21 @@ inline int skycast(vec3i pos, chunk_t *chunk = nullptr)
     return pos.y;
 }
 
+// Highly optimized (and unsafe) version of skycast that only checks for sky light.
+inline int lightcast(vec3i pos, chunk_t *chunk = nullptr)
+{
+    block_t *block = nullptr;
+
+    // Starting from world height limit, cast a ray down that stops at the first block with sky light < 15.
+    for (pos.y = MAX_WORLD_Y; pos.y > 0; pos.y--)
+    {
+        block = chunk->get_block(pos);
+        if (!block || block->sky_light < 15)
+            break;
+    }
+    return pos.y + 1;
+}
+
 inline bool raycast(
     vec3f origin,
     vec3f direction,

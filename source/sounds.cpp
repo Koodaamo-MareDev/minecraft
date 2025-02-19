@@ -34,7 +34,7 @@ aiff_container *get_sound(std::string name)
     {
         return it->second;
     }
-    std::string path = "sound/" + name + ".aiff";
+    std::string path = "/apps/minecraft/resources/sound/" + name + ".aiff";
 
     FILE *file = fopen(path.c_str(), "rb");
     if (!file)
