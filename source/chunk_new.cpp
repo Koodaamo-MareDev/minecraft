@@ -2062,7 +2062,9 @@ void chunk_t::serialize()
 
     // Write the compressed data
     chunk_file.write(reinterpret_cast<char *>(buffer.data.data()), buffer.data.size());
-    uint32_t pos = chunk_file.seekp(0, std::ios::end).tellp();
+    chunk_file.flush();
+
+    uint32_t pos = chunk_file.seekg(0, std::ios::end).tellg();
     if ((pos & 0xFFF) != 0)
     {
         chunk_file.seekp(pos | 0xFFF);
