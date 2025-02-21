@@ -20,6 +20,18 @@ class NBTTagCompound;
 class NBTBase
 {
 public:
+    static const uint8_t TAG_End = 0;
+    static const uint8_t TAG_Byte = 1;
+    static const uint8_t TAG_Short = 2;
+    static const uint8_t TAG_Int = 3;
+    static const uint8_t TAG_Long = 4;
+    static const uint8_t TAG_Float = 5;
+    static const uint8_t TAG_Double = 6;
+    static const uint8_t TAG_Byte_Array = 7;
+    static const uint8_t TAG_String = 8;
+    static const uint8_t TAG_List = 9;
+    static const uint8_t TAG_Compound = 10;
+
     std::string name = "";
 
     virtual uint8_t getType() = 0;
@@ -52,7 +64,7 @@ class NBTTagEnd : public NBTBase
 public:
     uint8_t getType() override
     {
-        return 0;
+        return NBTBase::TAG_End;
     }
 
     void writeContents(Crapper::ByteBuffer &buffer) override {}
@@ -69,7 +81,7 @@ public:
 
     uint8_t getType() override
     {
-        return 1;
+        return NBTBase::TAG_Byte;
     }
 
     void writeContents(Crapper::ByteBuffer &buffer) override;
@@ -86,7 +98,7 @@ public:
 
     uint8_t getType() override
     {
-        return 2;
+        return NBTBase::TAG_Short;
     }
 
     void writeContents(Crapper::ByteBuffer &buffer) override;
@@ -103,7 +115,7 @@ public:
 
     uint8_t getType() override
     {
-        return 3;
+        return NBTBase::TAG_Int;
     }
 
     void writeContents(Crapper::ByteBuffer &buffer) override;
@@ -120,7 +132,7 @@ public:
 
     uint8_t getType() override
     {
-        return 4;
+        return NBTBase::TAG_Long;
     }
 
     void writeContents(Crapper::ByteBuffer &buffer) override;
@@ -137,7 +149,7 @@ public:
 
     uint8_t getType() override
     {
-        return 5;
+        return NBTBase::TAG_Float;
     }
 
     void writeContents(Crapper::ByteBuffer &buffer) override;
@@ -154,7 +166,7 @@ public:
 
     uint8_t getType() override
     {
-        return 6;
+        return NBTBase::TAG_Double;
     }
 
     void writeContents(Crapper::ByteBuffer &buffer) override;
@@ -176,7 +188,7 @@ public:
 
     uint8_t getType() override
     {
-        return 7;
+        return NBTBase::TAG_Byte_Array;
     }
 
     void writeContents(Crapper::ByteBuffer &buffer) override;
@@ -193,7 +205,7 @@ public:
 
     uint8_t getType() override
     {
-        return 8;
+        return NBTBase::TAG_String;
     }
 
     void writeContents(Crapper::ByteBuffer &buffer) override;
@@ -209,7 +221,7 @@ public:
 
     uint8_t getType() override
     {
-        return 9;
+        return NBTBase::TAG_List;
     }
 
     NBTBase *addTag(NBTBase *tag);
@@ -237,12 +249,34 @@ public:
 
     uint8_t getType() override
     {
-        return 10;
+        return NBTBase::TAG_Compound;
     }
 
     NBTBase *setTag(std::string key, NBTBase *tag);
 
     NBTBase *getTag(std::string key);
+
+    int8_t getByte(std::string key);
+
+    int16_t getShort(std::string key);
+
+    int32_t getInt(std::string key);
+
+    int64_t getLong(std::string key);
+
+    float getFloat(std::string key);
+
+    double getDouble(std::string key);
+
+    std::vector<int8_t> getByteArray(std::string key);
+
+    std::vector<uint8_t> getUByteArray(std::string key);
+
+    std::string getString(std::string key);
+
+    NBTTagList *getList(std::string key);
+
+    NBTTagCompound *getCompound(std::string key);
 
     void writeContents(Crapper::ByteBuffer &buffer) override;
 

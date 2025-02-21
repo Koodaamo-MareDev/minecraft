@@ -164,7 +164,16 @@ bool add_chunk(int32_t x, int32_t z)
         chunk_t *chunk = new chunk_t;
         chunk->x = x;
         chunk->z = z;
-        chunk->generation_stage = ChunkGenStage::empty;
+        mcr::region *region = mcr::get_region(x >> 5, z >> 5);
+        if (region->locations[(x & 31) | ((z & 31) << 5)] == 0)
+        {
+            chunk->generation_stage = ChunkGenStage::empty;
+        }
+        else
+        {
+            chunk->generation_stage = ChunkGenStage::loading;
+        }
+
         pending_chunks.push_back(chunk);
         std::sort(pending_chunks.begin(), pending_chunks.end(), chunk_sorter);
         return true;
@@ -371,8 +380,14 @@ void generate_chunk()
     if (pending_chunks.size() == 0)
         return;
     chunk_t *chunk = pending_chunks.back();
-    if (!chunk || chunk->generation_stage != ChunkGenStage::empty)
+    if (!chunk)
         return;
+    if (chunk->generation_stage != ChunkGenStage::empty)
+    {
+        if (chunk->generation_stage == ChunkGenStage::loading)
+            chunk->deserialize();
+        return;
+    }
     chunk->generation_stage = ChunkGenStage::heightmap;
 
     int x_offset = (chunk->x * 16);
@@ -1924,6 +1939,47 @@ void chunk_t::save(NBTTagCompound &compound)
     compound.setTag("TileEntities", new NBTTagList());
 }
 
+void chunk_t::load(NBTTagCompound &stream)
+{
+    std::vector<uint8_t> blocks = stream.getUByteArray("Blocks");
+    std::vector<uint8_t> data = stream.getUByteArray("Data");
+    std::vector<uint8_t> blocklight = stream.getUByteArray("BlockLight");
+    std::vector<uint8_t> skylight = stream.getUByteArray("SkyLight");
+    std::vector<uint8_t> heightmap = stream.getUByteArray("HeightMap");
+
+    if (blocks.size() != 32768 || data.size() != 16384 || blocklight.size() != 16384 || skylight.size() != 16384 || heightmap.size() != 256)
+    {
+        throw std::runtime_error("Invalid chunk data");
+    }
+
+    for (int i = 0; i < 16384; i++)
+    {
+        uint32_t in_index = i << 1;
+        uint32_t iy = in_index & 0x7F;
+        uint32_t iz = (in_index >> 7) & 0xF;
+        uint32_t ix = (in_index >> 11) & 0xF;
+        uint32_t index1 = ix | (iz << 4) | (iy << 8);
+        uint32_t index2 = index1 | 0x100;
+
+        blockstates[index1].set_blockid((BlockID)blocks[in_index]);
+        blockstates[index2].set_blockid((BlockID)blocks[in_index | 1]);
+
+        blockstates[index1].meta = data[i] & 0xF;
+        blockstates[index2].meta = (data[i] >> 4) & 0xF;
+
+        blockstates[index1].block_light = blocklight[i] & 0xF;
+        blockstates[index2].block_light = (blocklight[i] >> 4) & 0xF;
+
+        blockstates[index1].sky_light = skylight[i] & 0xF;
+        blockstates[index2].sky_light = (skylight[i] >> 4) & 0xF;
+    }
+
+    for (int i = 0; i < 256; i++)
+    {
+        height_map[i] = heightmap[(i >> 4) | (i & 0xF) << 4];
+    }
+}
+
 void chunk_t::serialize()
 {
     // Write the chunk using mcregion format
@@ -2015,4 +2071,110 @@ void chunk_t::serialize()
     }
 
     chunk_file.flush();
+}
+
+void chunk_t::deserialize()
+{
+    mcr::region *region = mcr::get_region(x >> 5, z >> 5);
+
+    // Calculate the offset of the chunk in the file
+    uint16_t offset = (x & 0x1F) | ((z & 0x1F) << 5);
+
+    // Check if the chunk is stored in the region
+    if (region->locations[offset] == 0)
+    {
+        return;
+    }
+
+    // Get the location data
+    uint32_t loc = region->locations[offset];
+
+    // Calculate the offset of the chunk in the file
+    uint32_t chunk_offset = loc >> 8;
+
+    // Open the region file
+    std::fstream &chunk_file = region->open();
+    if (!chunk_file.is_open())
+    {
+        printf("Failed to open region file for reading\n");
+        return;
+    }
+
+    // Read the chunk header
+    chunk_file.seekg(chunk_offset << 12);
+    uint32_t length;
+    uint8_t compression;
+    chunk_file.read(reinterpret_cast<char *>(&length), sizeof(uint32_t));
+    chunk_file.read(reinterpret_cast<char *>(&compression), sizeof(uint8_t));
+
+    // Read the compressed data
+    Crapper::ByteBuffer buffer;
+    buffer.data.resize(length - 1);
+    chunk_file.read(reinterpret_cast<char *>(buffer.data.data()), length - 1);
+
+    NBTTagCompound *compound = nullptr;
+    try
+    {
+        if (compression == 1)
+        {
+            // Read as gzip compressed data
+            compound = NBTBase::readGZip(buffer);
+        }
+        else if (compression == 2)
+        {
+            // Read as zlib compressed data
+            compound = NBTBase::readZlib(buffer);
+        }
+        else
+        {
+            throw std::runtime_error("Unsupported compression type");
+        }
+    }
+    catch (std::runtime_error &e)
+    {
+        printf("Failed to read chunk data: %s\n", e.what());
+
+        // Regenerate the chunk
+        this->generation_stage = ChunkGenStage::empty;
+        return;
+    }
+
+    try
+    {
+        // Load the chunk data
+        NBTTagCompound *level = compound->getCompound("Level");
+        if (!level)
+        {
+            throw std::runtime_error("Missing Level compound");
+        }
+
+        load(*level);
+    }
+    catch (std::runtime_error &e)
+    {
+        printf("Failed to load chunk data: %s\n", e.what());
+
+        // Regenerate the chunk
+        this->generation_stage = ChunkGenStage::empty;
+
+        // Clean up
+        delete compound;
+        return;
+    }
+    delete compound;
+
+    lit_state = 1;
+    generation_stage = ChunkGenStage::done;
+
+    // Mark chunk as dirty
+    for (int vbo_index = 0; vbo_index < VERTICAL_SECTION_COUNT; vbo_index++)
+    {
+        vbos[vbo_index].dirty = true;
+    }
+
+    // Add the chunk to the world
+    lock_t chunk_lock(chunk_mutex);
+    chunks.push_back(this);
+    pending_chunks.erase(std::find(pending_chunks.begin(), pending_chunks.end(), this));
+    chunk_lock.unlock();
 }

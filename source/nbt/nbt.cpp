@@ -9,28 +9,28 @@ NBTBase *NBTBase::createTag(uint8_t type)
 {
     switch (type)
     {
-    case 0:
-        return new NBTTagEnd();
-    case 1:
-        return new NBTTagByte();
-    case 2:
-        return new NBTTagShort();
-    case 3:
-        return new NBTTagInt();
-    case 4:
-        return new NBTTagLong();
-    case 5:
-        return new NBTTagFloat();
-    case 6:
-        return new NBTTagDouble();
-    case 7:
-        return new NBTTagByteArray();
-    case 8:
-        return new NBTTagString();
-    case 9:
-        return new NBTTagList();
-    case 10:
-        return new NBTTagCompound();
+    case NBTBase::TAG_End:
+        return new NBTTagEnd;
+    case NBTBase::TAG_Byte:
+        return new NBTTagByte;
+    case NBTBase::TAG_Short:
+        return new NBTTagShort;
+    case NBTBase::TAG_Int:
+        return new NBTTagInt;
+    case NBTBase::TAG_Long:
+        return new NBTTagLong;
+    case NBTBase::TAG_Float:
+        return new NBTTagFloat;
+    case NBTBase::TAG_Double:
+        return new NBTTagDouble;
+    case NBTBase::TAG_Byte_Array:
+        return new NBTTagByteArray;
+    case NBTBase::TAG_String:
+        return new NBTTagString;
+    case NBTBase::TAG_List:
+        return new NBTTagList;
+    case NBTBase::TAG_Compound:
+        return new NBTTagCompound;
     }
     return nullptr;
 }
@@ -41,31 +41,31 @@ NBTBase *NBTBase::copyTag(NBTBase *tag)
     NBTBase *newTag = createTag(type);
     switch (type)
     {
-    case 1:
+    case NBTBase::TAG_Byte:
         *(NBTTagByte *)newTag = *(NBTTagByte *)tag;
         break;
-    case 2:
+    case NBTBase::TAG_Short:
         *(NBTTagShort *)newTag = *(NBTTagShort *)tag;
         break;
-    case 3:
+    case NBTBase::TAG_Int:
         *(NBTTagInt *)newTag = *(NBTTagInt *)tag;
         break;
-    case 4:
+    case NBTBase::TAG_Long:
         *(NBTTagLong *)newTag = *(NBTTagLong *)tag;
         break;
-    case 5:
+    case NBTBase::TAG_Float:
         *(NBTTagFloat *)newTag = *(NBTTagFloat *)tag;
         break;
-    case 6:
+    case NBTBase::TAG_Double:
         *(NBTTagDouble *)newTag = *(NBTTagDouble *)tag;
         break;
-    case 7:
+    case NBTBase::TAG_Byte_Array:
         *(NBTTagByteArray *)newTag = *(NBTTagByteArray *)tag;
         break;
-    case 8:
+    case NBTBase::TAG_String:
         *(NBTTagString *)newTag = *(NBTTagString *)tag;
         break;
-    case 9:
+    case NBTBase::TAG_List:
     {
         NBTTagList *oldList = ((NBTTagList *)tag);
         NBTTagList *newList = ((NBTTagList *)newTag);
@@ -78,7 +78,7 @@ NBTBase *NBTBase::copyTag(NBTBase *tag)
         }
         break;
     }
-    case 10:
+    case NBTBase::TAG_Compound:
     {
         NBTTagCompound *oldCompound = ((NBTTagCompound *)tag);
         NBTTagCompound *newCompound = ((NBTTagCompound *)newTag);
@@ -99,7 +99,7 @@ void NBTBase::writeTag(Crapper::ByteBuffer &buffer)
 {
     uint8_t type = getType();
     buffer.writeByte(type);
-    if (type == 0)
+    if (type == NBTBase::TAG_End)
         return;
     buffer.writeString(name);
     writeContents(buffer);
@@ -115,9 +115,11 @@ void NBTBase::writeTag(std::ostream &stream)
 NBTBase *NBTBase::readTag(Crapper::ByteBuffer &buffer)
 {
     uint8_t type = buffer.readByte();
-    if (type == 0)
-        return new NBTTagEnd();
+    if (buffer.underflow)
+        throw std::runtime_error("Failed to read tag type");
     NBTBase *tag = createTag(type);
+    if (type == NBTBase::TAG_End)
+        return tag;
     tag->name = buffer.readString();
     tag->readContents(buffer);
     return tag;
@@ -137,24 +139,25 @@ NBTTagCompound *NBTBase::readGZip(Crapper::ByteBuffer &buffer)
     Crapper::ByteBuffer output_buffer;
     try
     {
-        uint8_t *decompressed_data = new uint8_t[512 * 1024]; // 512 KB buffer - should be enough for most NBT data
-        mz_ulong decompressed_size = output_buffer.data.size();
+        mz_ulong decompressed_size = 512 * 1024;
+        output_buffer.data.resize(decompressed_size); // 512 KB buffer - should be enough for most NBT data
 
         // Skip the GZIP header and footer
-        size_t ret = tinfl_decompress_mem_to_mem(decompressed_data, decompressed_size, buffer.data.data() + GZIP_HEADER_SIZE, buffer.data.size() - GZIP_HEADER_SIZE - GZIP_FOOTER_SIZE, 0);
+        size_t ret = tinfl_decompress_mem_to_mem(output_buffer.data.data(), decompressed_size, buffer.data.data() + GZIP_HEADER_SIZE, buffer.data.size() - GZIP_HEADER_SIZE - GZIP_FOOTER_SIZE, 0);
 
         if (ret != TINFL_DECOMPRESS_MEM_TO_MEM_FAILED)
         {
             decompressed_size = ret;
-            buffer.writeBytes(decompressed_data, decompressed_size);
-            delete[] decompressed_data;
-            NBTTagCompound *compound = new NBTTagCompound();
-            compound->readTag(buffer);
-            return compound;
+            output_buffer.data.resize(decompressed_size);
+            NBTBase *base = NBTBase::readTag(output_buffer);
+            if (base->getType() != NBTBase::TAG_Compound)
+            {
+                throw std::runtime_error("Root tag is not a compound tag");
+            }
+            return (NBTTagCompound *)base;
         }
         else
         {
-            delete[] decompressed_data;
             throw std::runtime_error("Failed to decompress data");
         }
     }
@@ -234,31 +237,28 @@ NBTTagCompound *NBTBase::readZlib(Crapper::ByteBuffer &buffer)
     Crapper::ByteBuffer output_buffer;
     try
     {
-        uint8_t *decompressed_data = new uint8_t[512 * 1024]; // 512 KB buffer - should be enough for most NBT data
-        mz_ulong decompressed_size = output_buffer.data.size();
-        int ret = mz_uncompress(decompressed_data, &decompressed_size, buffer.data.data(), buffer.data.size());
+        mz_ulong decompressed_size = 512 * 1024;
+        output_buffer.data.resize(decompressed_size); // 512 KB buffer - should be enough for most NBT data
+        int ret = mz_uncompress(output_buffer.data.data(), &decompressed_size, buffer.data.data(), buffer.data.size());
 
-        if (ret == MZ_OK)
+        if (ret == MZ_BUF_ERROR)
         {
-            buffer.writeBytes(decompressed_data, decompressed_size);
-        }
-        else if (ret == MZ_BUF_ERROR)
-        {
-            delete[] decompressed_data;
-            decompressed_data = new uint8_t[1024 * 1024]; // 1 MB buffer at most - otherwise just give up
-            ret = mz_uncompress(decompressed_data, &decompressed_size, buffer.data.data(), buffer.data.size());
+            decompressed_size = 1024 * 1024;
+            output_buffer.data.resize(decompressed_size);
+            ret = mz_uncompress(output_buffer.data.data(), &decompressed_size, buffer.data.data(), buffer.data.size());
         }
         if (ret == MZ_OK)
         {
-            output_buffer.writeBytes(decompressed_data, decompressed_size);
-            delete[] decompressed_data;
-            NBTTagCompound *compound = new NBTTagCompound();
-            compound->readTag(output_buffer);
-            return compound;
+            output_buffer.data.resize(decompressed_size);
+            NBTBase *base = NBTBase::readTag(output_buffer);
+            if (base->getType() != NBTBase::TAG_Compound)
+            {
+                throw std::runtime_error("Root tag is not a compound tag");
+            }
+            return (NBTTagCompound *)base;
         }
         else
         {
-            delete[] decompressed_data;
             throw std::runtime_error("Failed to decompress data");
         }
     }
@@ -491,6 +491,97 @@ NBTBase *NBTTagCompound::getTag(std::string key)
     return it->second;
 }
 
+int8_t NBTTagCompound::getByte(std::string key)
+{
+    NBTBase *tag = getTag(key);
+    if (tag && tag->getType() == NBTBase::TAG_Byte)
+        return ((NBTTagByte *)tag)->value;
+    return 0;
+}
+
+int16_t NBTTagCompound::getShort(std::string key)
+{
+    NBTBase *tag = getTag(key);
+    if (tag && tag->getType() == NBTBase::TAG_Short)
+        return ((NBTTagShort *)tag)->value;
+    return 0;
+}
+
+int32_t NBTTagCompound::getInt(std::string key)
+{
+    NBTBase *tag = getTag(key);
+    if (tag && tag->getType() == NBTBase::TAG_Int)
+        return ((NBTTagInt *)tag)->value;
+    return 0;
+}
+
+int64_t NBTTagCompound::getLong(std::string key)
+{
+    NBTBase *tag = getTag(key);
+    if (tag && tag->getType() == NBTBase::TAG_Long)
+        return ((NBTTagLong *)tag)->value;
+    return 0;
+}
+
+float NBTTagCompound::getFloat(std::string key)
+{
+    NBTBase *tag = getTag(key);
+    if (tag && tag->getType() == NBTBase::TAG_Float)
+        return ((NBTTagFloat *)tag)->value;
+    return 0;
+}
+
+double NBTTagCompound::getDouble(std::string key)
+{
+    NBTBase *tag = getTag(key);
+    if (tag && tag->getType() == NBTBase::TAG_Double)
+        return ((NBTTagDouble *)tag)->value;
+    return 0;
+}
+
+std::vector<int8_t> NBTTagCompound::getByteArray(std::string key)
+{
+    NBTBase *tag = getTag(key);
+    if (tag && tag->getType() == NBTBase::TAG_Byte_Array)
+        return ((NBTTagByteArray *)tag)->value;
+    return {};
+}
+
+std::vector<uint8_t> NBTTagCompound::getUByteArray(std::string key)
+{
+    NBTBase *tag = getTag(key);
+    if (tag && tag->getType() == NBTBase::TAG_Byte_Array)
+    {
+        std::vector<int8_t> &value = ((NBTTagByteArray *)tag)->value;
+        return std::vector<uint8_t>(value.begin(), value.end());
+    }
+    return {};
+}
+
+std::string NBTTagCompound::getString(std::string key)
+{
+    NBTBase *tag = getTag(key);
+    if (tag && tag->getType() == NBTBase::TAG_String)
+        return ((NBTTagString *)tag)->value;
+    return "";
+}
+
+NBTTagList *NBTTagCompound::getList(std::string key)
+{
+    NBTBase *tag = getTag(key);
+    if (tag && tag->getType() == NBTBase::TAG_List)
+        return (NBTTagList *)tag;
+    return nullptr;
+}
+
+NBTTagCompound *NBTTagCompound::getCompound(std::string key)
+{
+    NBTBase *tag = getTag(key);
+    if (tag && tag->getType() == NBTBase::TAG_Compound)
+        return (NBTTagCompound *)tag;
+    return nullptr;
+}
+
 void NBTTagCompound::writeContents(Crapper::ByteBuffer &buffer)
 {
     for (auto &&pair : value)
@@ -505,7 +596,7 @@ void NBTTagCompound::readContents(Crapper::ByteBuffer &buffer)
     while (true)
     {
         NBTBase *tag = NBTBase::readTag(buffer);
-        if (tag->getType() == 0)
+        if (tag->getType() == NBTBase::TAG_End)
         {
             delete tag;
             break;

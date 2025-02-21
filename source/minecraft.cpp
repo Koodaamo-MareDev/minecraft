@@ -185,6 +185,7 @@ int mkpath(const char *path, mode_t mode)
     return 0;
 }
 void SaveWorld();
+bool LoadWorld();
 void ResetWorld();
 void UpdateNetwork();
 void DestroyBlock(const vec3i &pos, block_t old_block);
@@ -469,6 +470,15 @@ int main(int argc, char **argv)
         }
     }
 #endif
+    if (!is_remote())
+    {
+        if (!LoadWorld())
+        {
+            printf("Failed to load world, creating new world...\n");
+            ResetWorld();
+        }
+    }
+
     GX_SetArray(GX_VA_CLR0, light_map, 4 * sizeof(u8));
 
     while (!isExiting)
@@ -551,7 +561,7 @@ int main(int argc, char **argv)
                 }
 
                 // FIXME: This is a hacky fix for player movement not working in unloaded chunks
-                if (!player->chunk)
+                if (!player->chunk && !show_dirtscreen)
                     player->tick();
 
                 // Update the player entity
@@ -1271,7 +1281,7 @@ void AddParticle(const particle_t &particle)
 
 void SaveWorld()
 {
-    // Save the chunk to disk if in singleplayer
+    // Save the world to disk if in singleplayer
     if (!is_remote())
     {
         try
@@ -1292,7 +1302,7 @@ void SaveWorld()
         level_data->setTag("SpawnZ", new NBTTagInt(0));
         level_data->setTag("LastPlayed", new NBTTagLong(time(nullptr) * 1000LL));
         level_data->setTag("LevelName", new NBTTagString("Wii World"));
-        level_data->setTag("RandomSeed", new NBTTagLong(0));
+        level_data->setTag("RandomSeed", new NBTTagLong(world_seed));
         level_data->setTag("version", new NBTTagInt(19132));
 
         std::ofstream file("level.dat", std::ios::binary);
@@ -1301,10 +1311,63 @@ void SaveWorld()
             NBTBase::writeGZip(file, &level);
             file.flush();
             file.close();
-
-            printf("Saved world\n");
         }
     }
+}
+
+bool LoadWorld()
+{
+    // Load the world from disk if in singleplayer
+    if (is_remote())
+        return false;
+    std::ifstream file("level.dat", std::ios::binary);
+    if (!file.is_open())
+        return false;
+    uint32_t file_size = file.seekg(0, std::ios::end).tellg();
+    file.seekg(0, std::ios::beg);
+    NBTTagCompound *level = nullptr;
+    try
+    {
+        level = NBTBase::readGZip(file, file_size);
+    }
+    catch (std::exception &e)
+    {
+        printf("Failed to load level.dat: %s\n", e.what());
+    }
+    file.close();
+
+    if (!level)
+        return false;
+
+    NBTTagCompound *level_data = level->getCompound("Data");
+    if (!level_data)
+    {
+        delete level;
+        return false;
+    }
+
+    int32_t version = level_data->getInt("version");
+    if (version != 19132)
+    {
+        printf("Unsupported level.dat version: %d\n", version);
+        delete level;
+        return false;
+    }
+
+    // For now, these are the only values we care about
+    timeOfDay = level_data->getLong("Time") % 24000;
+    world_seed = level_data->getLong("RandomSeed");
+
+    // Load the player data if it exists
+    NBTTagCompound *player_tag = level_data->getCompound("Player");
+    if (player_tag)
+        player->deserialize(player_tag);
+
+    // Clean up
+    delete level;
+
+    // Based on the player position, the chunks will be loaded around the player - see chunk_new.cpp
+    return true;
 }
 
 void ResetWorld()

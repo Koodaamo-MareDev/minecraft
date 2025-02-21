@@ -36,6 +36,7 @@ enum class ChunkGenStage : uint8_t
     done = 4,
 
     // Special values
+    loading = 128,
     invalid = 0xFF,
 };
 
@@ -263,7 +264,9 @@ public:
     ~chunk_t();
 
     void save(NBTTagCompound &stream);
+    void load(NBTTagCompound &stream);
     void serialize();
+    void deserialize();
 
 private:
 };

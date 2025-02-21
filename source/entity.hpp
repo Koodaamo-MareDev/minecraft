@@ -108,6 +108,8 @@ public:
 
     virtual NBTTagCompound* serialize();
 
+    virtual void deserialize(NBTTagCompound* nbt);
+
     std::vector<aabb_t> get_colliding_aabbs(const aabb_t &aabb);
 
     bool is_colliding_fluid(const aabb_t &aabb);

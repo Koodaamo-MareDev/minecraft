@@ -382,6 +382,27 @@ NBTTagList *serialize_vec2f(vec3f vec)
     return result;
 }
 
+vec3f deserialize_vec3d(NBTTagList *list)
+{
+    if (!list || list->tagType != NBTBase::TAG_Double || list->value.size() < 3)
+        return vec3f(0, 0, 0);
+    vec3f result;
+    result.x = ((NBTTagDouble *)list->getTag(0))->value;
+    result.y = ((NBTTagDouble *)list->getTag(1))->value;
+    result.z = ((NBTTagDouble *)list->getTag(2))->value;
+    return result;
+}
+
+vec3f deserialize_vec2f(NBTTagList *list)
+{
+    if (!list || list->tagType != NBTBase::TAG_Float || list->value.size() < 2)
+        return vec3f(0, 0, 0);
+    vec3f result;
+    result.x = ((NBTTagFloat *)list->getTag(0))->value;
+    result.y = ((NBTTagFloat *)list->getTag(1))->value;
+    return result;
+}
+
 NBTTagCompound *aabb_entity_t::serialize()
 {
     NBTTagCompound *result = new NBTTagCompound;
@@ -411,6 +432,26 @@ NBTTagCompound *aabb_entity_t::serialize()
     result->setTag("HurtTime", new NBTTagShort(0));
 
     return result;
+}
+
+void aabb_entity_t::deserialize(NBTTagCompound *nbt)
+{
+    if (this->local)
+    {
+        // TODO: Deserialize inventory
+        set_world_hell(nbt->getByte("Dimension") == -1);
+    }
+
+    vec3f pos = deserialize_vec3d(nbt->getList("Pos"));
+    vec3f motion = deserialize_vec3d(nbt->getList("Motion"));
+    vec3f rotation = deserialize_vec2f(nbt->getList("Rotation"));
+
+    teleport(pos);
+    velocity = motion;
+    this->rotation = rotation;
+
+    health = std::clamp(nbt->getShort("Health"), (int16_t)0, (int16_t)127);
+    on_ground = nbt->getByte("OnGround");
 }
 
 std::vector<aabb_t> aabb_entity_t::get_colliding_aabbs(const aabb_t &aabb)
