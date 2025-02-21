@@ -200,7 +200,7 @@ void DrawInventory(gertex::GXView &viewport);
 void DrawHUD(gertex::GXView &viewport);
 void DrawSelectedBlock();
 void DrawScene(bool transparency);
-void GenerateChunks(int count);
+int GenerateChunks(int count);
 void RemoveRedundantChunks();
 void PrepareChunkRemoval(chunk_t *chunk);
 void UpdateCamera(camera_t &camera);
@@ -486,7 +486,7 @@ int main(int argc, char **argv)
         u64 frame_start = time_get();
         float sky_multiplier = get_sky_multiplier();
         if (HWButton != -1)
-            break;
+            isExiting = true;
         GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, BASE3D_POS_FRAC_BITS);
         if (!is_hell_world())
         {
@@ -749,6 +749,15 @@ void UpdateLoadingStatus()
         }
     }
     show_dirtscreen = !has_loaded;
+
+    if (isExiting)
+    {
+        show_dirtscreen = true;
+        if (is_remote())
+            dirtscreen_text = "Quitting...";
+        else
+            dirtscreen_text = "Saving world...";
+    }
 }
 
 void GetInput()
@@ -1080,7 +1089,7 @@ inline void RecalcSectionWater(chunk_t *chunk, int section)
     chunk->has_fluid_updates[section] = (curr_fluid_count != 0);
 }
 
-void GenerateChunks(int count)
+int GenerateChunks(int count)
 {
     const int center_x = (int(std::floor(player_pos.x)) >> 4);
     const int center_z = (int(std::floor(player_pos.z)) >> 4);
@@ -1097,6 +1106,7 @@ void GenerateChunks(int count)
                 count--;
         }
     }
+    return count;
 }
 
 void RemoveRedundantChunks()
@@ -1565,7 +1575,16 @@ void UpdateChunkData(frustum_t &frustum, std::deque<chunk_t *> &chunks)
             if (chunk->generation_stage != ChunkGenStage::done)
                 continue;
 
-            bool visible = (hdistance <= std::max(RENDER_DISTANCE * 16 * fog_depth_multiplier, 16.0f));
+            int min_height = player_pos.y - 16;
+            for (int i = 0; i < 256; i++)
+            {
+                if (int(chunk->height_map[i]) < min_height)
+                    min_height = chunk->height_map[i];
+            }
+
+            float horizontal_multiplier = std::abs(xrot) < 60 ? 16 : 12;
+            float vertical_multiplier = std::abs(xrot) > 30 ? 12 : 8;
+            bool visible = (hdistance <= std::max(RENDER_DISTANCE * horizontal_multiplier * fog_depth_multiplier, 16.0f));
 
             // Tick chunks
             for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
@@ -1575,7 +1594,12 @@ void UpdateChunkData(frustum_t &frustum, std::deque<chunk_t *> &chunks)
                 vbo.y = j * 16;
                 vbo.z = chunk->z * 16;
                 float vdistance = std::abs(vbo.y - player_pos.y);
-                vbo.visible = visible && (vdistance <= std::max(RENDER_DISTANCE * 12 * fog_depth_multiplier, 16.0f));
+
+                vec3f vbo_offset = vec3f(vbo.x + 8, vbo.y + 8, vbo.z + 8) - player_pos;
+                vec3f forward = angles_to_vector(xrot, yrot);
+                bool behind = vbo_offset.x * forward.x + vbo_offset.y * forward.y + vbo_offset.z * forward.z < -16;
+
+                vbo.visible = visible && !behind && (vdistance <= std::max(RENDER_DISTANCE * vertical_multiplier * fog_depth_multiplier, 16.0f)) && (vbo.y + 16 >= min_height);
                 if (!is_remote() && chunk->has_fluid_updates[j] && vdistance <= SIMULATION_DISTANCE * 16 && tickCounter - lastWaterTick >= 5)
                     RecalcSectionWater(chunk, j);
             }
@@ -1739,14 +1763,16 @@ void UpdatePlayer()
 void UpdateScene(frustum_t &frustum)
 {
     std::deque<chunk_t *> &chunks = get_chunks();
+    bool should_update_vbos = true;
     if (!is_remote() && !light_engine_busy())
     {
-        GenerateChunks(1);
+        should_update_vbos = GenerateChunks(1);
     }
     RemoveRedundantChunks();
     EditBlocks();
     UpdateChunkData(frustum, chunks);
-    UpdateChunkVBOs(chunks);
+    if (should_update_vbos)
+        UpdateChunkVBOs(chunks);
 
     // Update the particle system
     particle_system.update(0.025);
