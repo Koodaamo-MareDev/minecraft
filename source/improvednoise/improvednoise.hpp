@@ -17,24 +17,15 @@
 class ImprovedNoise
 {
     float inv_u8[256];
+
 public:
     inline void Init(uint32_t seed)
     {
-        srandom(seed);
+        srand(seed);
 
         // Precompute the inverse of 0-255
         for (int i = 1; i < 256; i++)
             inv_u8[i] = 1.0f / i;
-    }
-    inline float fade(float t) { return t * t * t * (t * (t * 6 - 15) + 10); }
-    inline float lerp(float t, float a, float b) { return a + t * (b - a); }
-    inline float grad(int hash, float x, float y, float z)
-    {
-        int h = hash & 15;       // Convert low 4 bits of hash code into 12 simple
-        float u = h < 8 ? x : y; // gradient directions, and compute dot product.
-        float v = h < 4 ? y : h == 12 || h == 14 ? x
-                                                 : z; // Fix repeats at h = 12 to 15
-        return ((h & 1) ? -u : u) + ((h & 2) ? -v : v);
     }
 
     inline double GetNoise(double x, double z)
@@ -55,7 +46,7 @@ public:
         float inv_frequency = 1.0f / frequency;
         float half_amplitude = amplitude * 0.5f;
 
-        if(size.y == 1)
+        if (size.y == 1)
         {
             float _z = pos.z * inv_frequency;
             for (int32_t i = 0; i < size.z; i++, _z += inv_frequency)
@@ -100,7 +91,7 @@ public:
         T amplitude = 1.0f;
         T inv_frequency = 1.0f / frequency;
         T half_amplitude = amplitude * 0.5f;
-        if(size.y == 1)
+        if (size.y == 1)
         {
             float _z = pos.z * inv_frequency;
             for (int32_t i = 0; i < size.z; i++, _z += inv_frequency)
