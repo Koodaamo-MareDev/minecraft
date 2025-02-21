@@ -167,7 +167,7 @@ int fill_screen_texture(GXTexObj &texture, gertex::GXView &view, int32_t u1, int
     int cols = std::ceil(view.width / w);
     int rows = std::ceil(view.height / h);
 
-    constexpr uint8_t intensity = 31;
+    constexpr uint8_t intensity = 63;
 
     GX_BeginGroup(GX_QUADS, 4 * cols * rows);
 
