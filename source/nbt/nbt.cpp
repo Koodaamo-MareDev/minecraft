@@ -118,6 +118,8 @@ NBTBase *NBTBase::readTag(Crapper::ByteBuffer &buffer)
     if (buffer.underflow)
         throw std::runtime_error("Failed to read tag type");
     NBTBase *tag = createTag(type);
+    if (!tag)
+        throw std::runtime_error("Failed to create tag");
     if (type == NBTBase::TAG_End)
         return tag;
     tag->name = buffer.readString();
@@ -150,10 +152,14 @@ NBTTagCompound *NBTBase::readGZip(Crapper::ByteBuffer &buffer)
             decompressed_size = ret;
             output_buffer.data.resize(decompressed_size);
             NBTBase *base = NBTBase::readTag(output_buffer);
+            if (!base)
+                throw std::runtime_error("Failed to read tag");
             if (base->getType() != NBTBase::TAG_Compound)
             {
+                delete base;
                 throw std::runtime_error("Root tag is not a compound tag");
             }
+            
             return (NBTTagCompound *)base;
         }
         else
@@ -251,10 +257,14 @@ NBTTagCompound *NBTBase::readZlib(Crapper::ByteBuffer &buffer)
         {
             output_buffer.data.resize(decompressed_size);
             NBTBase *base = NBTBase::readTag(output_buffer);
+            if (!base)
+                throw std::runtime_error("Failed to read tag");
             if (base->getType() != NBTBase::TAG_Compound)
             {
+                delete base;
                 throw std::runtime_error("Root tag is not a compound tag");
             }
+
             return (NBTTagCompound *)base;
         }
         else
