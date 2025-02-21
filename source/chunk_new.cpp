@@ -565,7 +565,7 @@ void init_chunks()
 
 void *__chunk_generator_init_internal(void *)
 {
-    improved_noise.Init(world_seed = fastrand());
+    improved_noise.Init(world_seed);
 
     while (__chunk_generator_init_done)
     {

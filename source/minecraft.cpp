@@ -417,8 +417,8 @@ int main(int argc, char **argv)
 
     printf("Render resolution: %f,%f, Widescreen: %s\n", viewport.width, viewport.height, viewport.widescreen ? "Yes" : "No");
     light_engine_init();
-    srand(gettime());
     init_chunks();
+    srand(world_seed = gettime());
     printf("Initialized chunks.\n");
     VIDEO_Flush();
     VIDEO_WaitVSync();
@@ -1357,6 +1357,7 @@ bool LoadWorld()
     // For now, these are the only values we care about
     timeOfDay = level_data->getLong("Time") % 24000;
     world_seed = level_data->getLong("RandomSeed");
+    srand(world_seed);
 
     // Load the player data if it exists
     NBTTagCompound *player_tag = level_data->getCompound("Player");
