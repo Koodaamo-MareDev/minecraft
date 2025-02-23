@@ -42,7 +42,6 @@ enum class ChunkGenStage : uint8_t
 
 extern guVector player_pos;
 extern uint32_t world_tick;
-extern int64_t world_seed;
 
 inline vec2i block_to_chunk_pos(const vec3i &pos)
 {
@@ -282,7 +281,6 @@ void deinit_chunks();
 void print_chunk_status();
 bool has_pending_chunks();
 bool is_remote();
-void set_world_remote(bool remote);
 bool is_hell_world();
 void set_world_hell(bool hell);
 BlockID get_block_id_at(const vec3i &position, BlockID default_id = BlockID::air, chunk_t *near = nullptr);

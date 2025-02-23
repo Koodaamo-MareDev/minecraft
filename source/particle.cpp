@@ -2,7 +2,7 @@
 #include "chunk_new.hpp"
 #include "block.hpp"
 
-void particle_t::update(float dt)
+void particle::update(float dt)
 {
     if (!life_time)
         return;
@@ -91,7 +91,7 @@ void particle_t::update(float dt)
         life_time--;
 }
 
-void particle_system_t::update(float dt)
+void particle_system::update(float dt)
 {
     for (int i = 0; i < 256; i++)
     {
@@ -99,13 +99,13 @@ void particle_system_t::update(float dt)
     }
 }
 
-void particle_system_t::add_particle(particle_t particle)
+void particle_system::add_particle(particle part)
 {
     for (int i = 0; i < 256; i++)
     {
         if (particles[i].life_time == 0)
         {
-            particles[i] = particle;
+            particles[i] = part;
             return;
         }
     }

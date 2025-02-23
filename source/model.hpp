@@ -8,8 +8,6 @@
 #include "vec3f.hpp"
 #include "maths.hpp"
 
-extern int tickCounter;
-
 class modelbox_t
 {
 public:

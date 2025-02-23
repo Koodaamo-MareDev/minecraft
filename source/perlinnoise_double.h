@@ -178,20 +178,20 @@ static void init(void)
 	for (i = 0 ; i < B ; i++) {
 		p[i] = i;
 
-		g1[i] = (double)((random() & (B + BM)) - B) / B;
+		g1[i] = (double)((rand() & (B + BM)) - B) / B;
 
 		for (j = 0 ; j < 2 ; j++)
-			g2[i][j] = (double)((random() & (B + BM)) - B) / B;
+			g2[i][j] = (double)((rand() & (B + BM)) - B) / B;
 		normalize2(g2[i]);
 
 		for (j = 0 ; j < 3 ; j++)
-			g3[i][j] = (double)((random() & (B + BM)) - B) / B;
+			g3[i][j] = (double)((rand() & (B + BM)) - B) / B;
 		normalize3(g3[i]);
 	}
 
 	while (--i) {
 		k = p[i];
-		p[i] = p[j = random() & BM];
+		p[i] = p[j = rand() & BM];
 		p[j] = k;
 	}
 

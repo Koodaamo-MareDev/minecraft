@@ -8,19 +8,16 @@
 #include "miniz/miniz.h"
 #include "../sounds.hpp"
 #include "../sound.hpp"
+#include "../world.hpp"
 
-extern int timeOfDay;
-extern aabb_entity_t *player;
-extern inventory::container player_inventory;
 extern float xrot;
 extern float yrot;
 extern std::string dirtscreen_text;
 void PrepareChunkRemoval(chunk_t *chunk);
 void RemoveRedundantChunks();
 void ResetWorld();
-void set_world_remote(bool remote);
 void dbgprintf(const char *fmt, ...); // in minecraft.cpp
-void PlaySound(sound_t sound);        // in minecraft.cpp
+void PlaySound(sound sound);          // in minecraft.cpp
 namespace Crapper
 {
     bool initNetwork()
@@ -543,12 +540,12 @@ namespace Crapper
     {
         dbgprintf("Connecting to server %s:%d\n", host.c_str(), port);
         status = ErrorStatus::OK;
-        set_world_remote(true);
+        current_world->set_remote(true);
         connect(host, port);
 
         if (status != ErrorStatus::OK)
         {
-            set_world_remote(false);
+            current_world->set_remote(false);
             dbgprintf("Error connecting to server\n");
             return;
         }
@@ -557,7 +554,7 @@ namespace Crapper
 
         if (status != ErrorStatus::OK)
         {
-            set_world_remote(false);
+            current_world->set_remote(false);
             dbgprintf("Error connecting to server\n");
             return;
         }
@@ -635,8 +632,8 @@ namespace Crapper
         dbgprintf("Player entity ID: %d\n", entity_id);
         dbgprintf("World seed: %lld\n", seed);
 
-        if (player)
-            player->entity_id = entity_id;
+        if (current_world->player.m_entity)
+            current_world->player.m_entity->entity_id = entity_id;
         dirtscreen_text = "Downloading terrain...";
         login_success = true;
     }
@@ -672,9 +669,9 @@ namespace Crapper
             return;
         int32_t new_time = time % 24000;
         // Update the time of day if the difference is greater than half a second
-        if (std::abs(new_time - timeOfDay) > 10)
+        if (std::abs(new_time - current_world->time_of_day) > 10)
         {
-            timeOfDay = new_time;
+            current_world->time_of_day = new_time;
         }
     }
 
@@ -691,9 +688,9 @@ namespace Crapper
     {
         // Read entity health
         int16_t health = buffer.readShort();
-        if (player)
+        if (current_world->player.m_entity)
         {
-            player->health = health;
+            current_world->player.m_entity->health = health;
             if (health <= 0)
             {
                 sendRespawn();
@@ -738,11 +735,11 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        if (!player)
+        if (!current_world->player.m_entity)
             return;
 
-        player->teleport(vec3f(x, y, z));
-        player->on_ground = on_ground;
+        current_world->player.m_entity->teleport(vec3f(x, y, z));
+        current_world->player.m_entity->on_ground = on_ground;
     }
 
     void MinecraftClient::handlePlayerLook(ByteBuffer &buffer)
@@ -755,11 +752,11 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        if (!player)
+        if (!current_world->player.m_entity)
             return;
 
-        player->rotation = vec3f(-pitch, -yaw, 0);
-        player->on_ground = on_ground;
+        current_world->player.m_entity->rotation = vec3f(-pitch, -yaw, 0);
+        current_world->player.m_entity->on_ground = on_ground;
         xrot = pitch;
         yrot = yaw;
     }
@@ -778,12 +775,12 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        if (!player)
+        if (!current_world->player.m_entity)
             return;
 
-        player->teleport(vec3f(x, y, z));
-        player->rotation = vec3f(-pitch, -yaw, 0);
-        player->on_ground = on_ground;
+        current_world->player.m_entity->teleport(vec3f(x, y, z));
+        current_world->player.m_entity->rotation = vec3f(-pitch, -yaw, 0);
+        current_world->player.m_entity->on_ground = on_ground;
 
         // Mirror the packet back to the server
         sendPlayerPositionLook();
@@ -792,48 +789,48 @@ namespace Crapper
 
     void MinecraftClient::sendPlayerPositionLook()
     {
-        if (!player)
+        if (!current_world->player.m_entity)
             return;
 
         // Send player position and look packet
         ByteBuffer buffer;
         buffer.writeByte(0x0D); // Packet ID
-        buffer.writeDouble(player->position.x);
-        buffer.writeDouble(player->aabb.min.y);
-        buffer.writeDouble(player->position.y);
-        buffer.writeDouble(player->position.z);
-        buffer.writeFloat(180 - player->rotation.y); // Yaw
-        buffer.writeFloat(-player->rotation.x);      // Pitch
-        buffer.writeBool(player->on_ground);
+        buffer.writeDouble(current_world->player.m_entity->position.x);
+        buffer.writeDouble(current_world->player.m_entity->aabb.min.y);
+        buffer.writeDouble(current_world->player.m_entity->position.y);
+        buffer.writeDouble(current_world->player.m_entity->position.z);
+        buffer.writeFloat(180 - current_world->player.m_entity->rotation.y); // Yaw
+        buffer.writeFloat(-current_world->player.m_entity->rotation.x);      // Pitch
+        buffer.writeBool(current_world->player.m_entity->on_ground);
         send(buffer);
     }
 
     void MinecraftClient::sendPlayerPosition()
     {
-        if (!player)
+        if (!current_world->player.m_entity)
             return;
 
         // Send player position packet
         ByteBuffer buffer;
         buffer.writeByte(0x0B); // Packet ID
-        buffer.writeDouble(player->position.x);
-        buffer.writeDouble(player->position.y);
-        buffer.writeDouble(player->position.z);
-        buffer.writeBool(player->on_ground);
+        buffer.writeDouble(current_world->player.m_entity->position.x);
+        buffer.writeDouble(current_world->player.m_entity->position.y);
+        buffer.writeDouble(current_world->player.m_entity->position.z);
+        buffer.writeBool(current_world->player.m_entity->on_ground);
         send(buffer);
     }
 
     void MinecraftClient::sendPlayerLook()
     {
-        if (!player)
+        if (!current_world->player.m_entity)
             return;
 
         // Send player look packet
         ByteBuffer buffer;
         buffer.writeByte(0x0C);                      // Packet ID
-        buffer.writeFloat(180 - player->rotation.y); // Yaw
-        buffer.writeFloat(-player->rotation.x);      // Pitch
-        buffer.writeBool(player->on_ground);
+        buffer.writeFloat(180 - current_world->player.m_entity->rotation.y); // Yaw
+        buffer.writeFloat(-current_world->player.m_entity->rotation.x);      // Pitch
+        buffer.writeBool(current_world->player.m_entity->on_ground);
         send(buffer);
     }
 
@@ -1547,7 +1544,7 @@ namespace Crapper
             return;
         if (window_id == 0 && slot_id < 36 && slot_id >= 0)
         {
-            player_inventory[slot_id] = item;
+            current_world->player.m_inventory[slot_id] = item;
         }
     }
 
@@ -1592,7 +1589,7 @@ namespace Crapper
                 int slot_id = networkToClientSlot(i);
                 if (slot_id >= 0 && slot_id < 36)
                 {
-                    player_inventory[slot_id] = items[i];
+                    current_world->player.m_inventory[slot_id] = items[i];
                 }
             }
         }
@@ -1909,7 +1906,7 @@ namespace Crapper
         }
         if (status != ErrorStatus::OK)
         {
-            set_world_remote(false);
+            current_world->set_remote(false);
             buffer.data.clear();
         }
         bool last_message = buffer.underflow || status != ErrorStatus::OK;

@@ -10,7 +10,7 @@
 #include <asndlib.h>
 #include <string>
 
-class sound_t
+class sound
 {
 private:
     aiff *aiff_data = nullptr;
@@ -23,9 +23,9 @@ public:
     uint8_t right = 255;
     bool valid = false;
     int voice = -1;
-    sound_t() {}
-    sound_t(aiff_container &aiff_data);
-    sound_t(aiff_container* aiff_data);
+    sound() {}
+    sound(aiff_container &aiff_data);
+    sound(aiff_container* aiff_data);
 
     void set_aiff_data(aiff_container &aiff_data);
     void play();
@@ -34,21 +34,21 @@ public:
     void update(vec3f head_right, vec3f head_position);
 };
 
-class sound_system_t
+class sound_system
 {
 public:
     vec3f head_right = vec3f(1, 0, 0);
     vec3f head_position = vec3f(0, 0, 0);
 
-    sound_t sounds[15];
+    sound sounds[15];
     int frames_to_next_music = 0;
 
-    sound_system_t();
-    ~sound_system_t();
+    sound_system();
+    ~sound_system();
 
     void update(vec3f head_right, vec3f head_position);
 
-    void play_sound(sound_t sound);
+    void play_sound(sound sound);
 
     void play_music(std::string filename);
 

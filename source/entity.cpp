@@ -11,17 +11,16 @@
 #include "sounds.hpp"
 #include "inventory.hpp"
 #include "gui.hpp"
+#include "world.hpp"
 extern float wiimote_x;
 extern float wiimote_z;
 extern u32 wiimote_held;
-extern aabb_entity_t *player;
-extern inventory::container player_inventory;
 extern gui *current_gui;
 
 pathfinding_t pathfinder;
 
-void PlaySound(sound_t sound);                               // in minecraft.cpp
-void AddParticle(const particle_t &particle);                // in minecraft.cpp
+void PlaySound(sound sound);                                 // in minecraft.cpp
+void AddParticle(const particle &particle);                  // in minecraft.cpp
 void CreateExplosion(vec3f pos, float power, chunk_t *near); // in minecraft.cpp
 
 constexpr int item_pickup_ticks = 2;
@@ -151,13 +150,13 @@ void aabb_entity_t::tick()
             if (impact > 1.0)
                 impact = 1.0;
             javaport::Random rng;
-            sound_t sound = get_sound("splash");
+            sound sound = get_sound("splash");
             sound.position = position;
             sound.pitch = 0.6 + rng.nextFloat() * 0.8;
             sound.volume = impact;
             PlaySound(sound);
 
-            particle_t particle;
+            particle particle;
             particle.life_time = particle.max_life_time = 80;
             particle.physics = PPHYSIC_FLAG_COLLIDE;
             particle.type = PTYPE_GENERIC;
@@ -308,7 +307,7 @@ void aabb_entity_t::tick()
             {
                 if (!block_at_feet || !properties(block_at_feet->get_blockid()).m_fluid)
                 {
-                    sound_t sound = get_step_sound(block_at_feet->get_blockid());
+                    sound sound = get_step_sound(block_at_feet->get_blockid());
                     sound.position = feet_pos;
                     PlaySound(sound);
                     last_step_distance = 0;
@@ -633,7 +632,7 @@ exploding_block_entity_t::exploding_block_entity_t(block_t block_state, const ve
     // Play the fuse sound if there is a long enough fuse
     if (fuse > 45)
     {
-        sound_t sound = get_sound("fuse");
+        sound sound = get_sound("fuse");
         sound.position = get_position(0);
         sound.volume = 0.5;
         sound.pitch = 1.0;
@@ -708,7 +707,7 @@ void creeper_entity_t::tick()
                     continue;
                 for (aabb_entity_t *entity : chunk->entities)
                 {
-                    if (entity && !entity->dead && entity == player)
+                    if (entity && !entity->dead && entity == current_world->player.m_entity)
                     {
                         vec3f entity_position = entity->get_position(0);
                         vec3f direction = entity_position - position;
@@ -746,7 +745,7 @@ void creeper_entity_t::tick()
             }
             if (ticks_existed % 1200 == 300)
             {
-                sound_t sound = randomize_sound("cave", 13);
+                sound sound = randomize_sound("cave", 13);
                 sound.position = position;
                 sound.volume = 1.0;
                 sound.pitch = 1.0;
@@ -762,7 +761,7 @@ void creeper_entity_t::tick()
             // Play the fuse sound
             if (fuse == creeper_fuse)
             {
-                sound_t sound = get_sound("fuse");
+                sound sound = get_sound("fuse");
                 sound.position = position;
                 sound.volume = 0.5;
                 sound.pitch = 1.0;
@@ -950,9 +949,9 @@ void item_entity_t::render(float partial_ticks, bool transparency)
     vec3f item_rot = vec3f(0, 0, 0);
 
     // Get the direction towards the player
-    if (player)
+    if (current_world->player.m_entity)
     {
-        item_rot.y = player->rotation.y + 180;
+        item_rot.y = current_world->player.m_entity->rotation.y + 180;
     }
 
     // Lock the item rotation to the y-axis
@@ -1016,16 +1015,16 @@ void item_entity_t::resolve_collision(aabb_entity_t *b)
     if (dead || picked_up || ticks_existed < 20)
         return;
 
-    if (b == player)
+    if (b == current_world->player.m_entity)
     {
-        inventory::item_stack left_over = player_inventory.add(item_stack);
+        inventory::item_stack left_over = current_world->player.m_inventory.add(item_stack);
         if (left_over.count)
         {
             if (left_over.count != item_stack.count)
             {
                 // Play the pop sound if the player picks up at least one item
                 javaport::Random rng;
-                sound_t sound = get_sound("pop");
+                sound sound = get_sound("pop");
                 sound.position = position;
                 sound.volume = 0.5;
                 sound.pitch = rng.nextFloat() * 0.8 + 0.6;
@@ -1039,13 +1038,13 @@ void item_entity_t::resolve_collision(aabb_entity_t *b)
         {
             // Play the pop sound if the player picks up the stack
             javaport::Random rng;
-            sound_t sound = get_sound("pop");
+            sound sound = get_sound("pop");
             sound.position = position;
             sound.volume = 0.5;
             sound.pitch = rng.nextFloat() * 0.8 + 0.6;
             PlaySound(sound);
             picked_up = true;
-            pickup_pos = player->get_position(0) - vec3f(0, 0.5, 0);
+            pickup_pos = current_world->player.m_entity->get_position(0) - vec3f(0, 0.5, 0);
             ticks_existed = item_lifetime - item_pickup_ticks;
             if (current_gui)
                 current_gui->refresh();
@@ -1062,7 +1061,7 @@ void item_entity_t::pickup(vec3f pos)
 {
     // Play the pop sound if the player picks up the stack
     javaport::Random rng;
-    sound_t sound = get_sound("pop");
+    sound sound = get_sound("pop");
     sound.position = position;
     sound.volume = 0.5;
     sound.pitch = rng.nextFloat() * 0.8 + 0.6;
@@ -1092,8 +1091,8 @@ mp_player_entity_t::mp_player_entity_t(const vec3f &position, std::string player
 void mp_player_entity_t::hurt()
 {
     javaport::Random rng;
-    sound_t sound = get_sound("hurt");
-    sound.position = player->position;
+    sound sound = get_sound("hurt");
+    sound.position = current_world->player.m_entity->position;
     sound.volume = 0.5;
     sound.pitch = rng.nextFloat() * 0.8 + 0.6;
     PlaySound(sound);

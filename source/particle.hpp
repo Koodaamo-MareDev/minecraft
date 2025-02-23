@@ -15,7 +15,7 @@
 
 #include "entity.hpp"
 
-class particle_t : public entity_t
+class particle : public entity_t
 {
 public:
     uint8_t max_life_time;
@@ -47,30 +47,30 @@ public:
         };
     };
 
-    particle_t() : entity_t(), life_time(0), physics(0), type(0), size(64), brightness(255), u(0), v(0) {}
+    particle() : entity_t(), life_time(0), physics(0), type(0), size(64), brightness(255), u(0), v(0) {}
 
-    ~particle_t() {}
+    ~particle() {}
 
     void update(float dt);
 };
 
-class particle_system_t
+class particle_system
 {
 public:
-    particle_t particles[256];
+    particle particles[256];
 
-    particle_system_t()
+    particle_system()
     {
         for (int i = 0; i < 256; i++)
         {
-            particles[i] = particle_t();
+            particles[i] = particle();
         }
     }
 
     size_t size() { return 256; }
 
     void update(float dt);
-    void add_particle(particle_t particle);
+    void add_particle(particle part);
 };
 
 #endif

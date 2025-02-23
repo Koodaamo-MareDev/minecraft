@@ -1,18 +1,18 @@
 #include "sound.hpp"
 #include "timers.hpp"
 #include "sounds.hpp"
-sound_t::sound_t(aiff_container &aiff_data)
+sound::sound(aiff_container &aiff_data)
 {
     set_aiff_data(aiff_data);
 }
 
-sound_t::sound_t(aiff_container *aiff_data)
+sound::sound(aiff_container *aiff_data)
 {
     if (aiff_data)
         set_aiff_data(*aiff_data);
 }
 
-void sound_t::set_aiff_data(aiff_container &aiff_data)
+void sound::set_aiff_data(aiff_container &aiff_data)
 {
     this->valid = aiff_data.data != nullptr;
     if (!valid)
@@ -20,7 +20,7 @@ void sound_t::set_aiff_data(aiff_container &aiff_data)
     this->aiff_data = aiff_data.data;
 }
 
-void sound_t::play()
+void sound::play()
 {
     if (!valid)
         return;
@@ -34,7 +34,7 @@ void sound_t::play()
     ASND_PauseVoice(voice, 0);
 }
 
-void sound_t::pause()
+void sound::pause()
 {
     if (!valid)
         return;
@@ -42,7 +42,7 @@ void sound_t::pause()
         return;
 }
 
-void sound_t::stop()
+void sound::stop()
 {
     if (!valid)
         return;
@@ -50,7 +50,7 @@ void sound_t::stop()
         return;
 }
 
-void sound_t::update(vec3f head_right, vec3f head_position)
+void sound::update(vec3f head_right, vec3f head_position)
 {
     if (!valid)
         return;
@@ -108,18 +108,18 @@ void sound_t::update(vec3f head_right, vec3f head_position)
     ASND_ChangeVolumeVoice(voice, left, right);
 }
 
-sound_system_t::sound_system_t()
+sound_system::sound_system()
 {
     ASND_Init();
     ASND_Pause(0);
 }
 
-sound_system_t::~sound_system_t()
+sound_system::~sound_system()
 {
     ASND_End();
 }
 
-void sound_system_t::update(vec3f head_right, vec3f head_position)
+void sound_system::update(vec3f head_right, vec3f head_position)
 {
     this->head_position = head_position;
     this->head_right = head_right;
@@ -142,16 +142,16 @@ void sound_system_t::update(vec3f head_right, vec3f head_position)
     }
 }
 
-void sound_system_t::play_sound(sound_t sound)
+void sound_system::play_sound(sound snd)
 {
-    if (!sound.valid)
+    if (!snd.valid)
         return;
     for (int i = 0; i < 15; i++)
     {
-        sound_t &s = sounds[i];
+        sound &s = sounds[i];
         if (!s.valid || s.voice < 0)
         {
-            s = sound;
+            s = snd;
             s.play();
             s.update(head_right, head_position);
             return;
@@ -159,7 +159,7 @@ void sound_system_t::play_sound(sound_t sound)
     }
 }
 
-void sound_system_t::play_music(std::string filename)
+void sound_system::play_music(std::string filename)
 {
     // Ensure that the filename is not empty
     if (filename.empty())

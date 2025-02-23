@@ -31,9 +31,9 @@ bool is_fluid_overridable(BlockID id);
 float get_percent_air(int fluid_level);
 float get_fluid_height(vec3i pos, BlockID block_type, chunk_t *near = nullptr);
 
-sound_t get_step_sound(BlockID block_id);
-sound_t get_mine_sound(BlockID block_id);
-sound_t get_break_sound(BlockID block_id);
+sound get_step_sound(BlockID block_id);
+sound get_mine_sound(BlockID block_id);
+sound get_break_sound(BlockID block_id);
 
 inline bool is_flowing_fluid(BlockID id)
 {

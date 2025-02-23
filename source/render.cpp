@@ -1,5 +1,6 @@
 #include "render.hpp"
 #include "blocks.hpp"
+#include "world.hpp"
 
 #include "white_tpl.h"
 #include "clouds_tpl.h"
@@ -672,7 +673,7 @@ void draw_particle(camera_t &camera, vec3f pos, uint32_t texture_index, float si
     GX_EndGroup();
 }
 
-void draw_particles(camera_t &camera, particle_t *particles, int count)
+void draw_particles(camera_t &camera, particle *particles, int count)
 {
 
     // Bake vertex properties
@@ -699,7 +700,7 @@ void draw_particles(camera_t &camera, particle_t *particles, int count)
         int visible_count = 0;
         for (int i = 0; i < count; i++)
         {
-            particle_t &particle = particles[i];
+            particle &particle = particles[i];
             if (particle.life_time && particle.type == t)
                 visible_count++;
         }
@@ -728,7 +729,7 @@ void draw_particles(camera_t &camera, particle_t *particles, int count)
         // Draw particles
         for (int i = 0; i < count; i++)
         {
-            particle_t &particle = particles[i];
+            particle &particle = particles[i];
             if (particle.life_time && particle.type == t)
             {
                 for (int j = 0; j < 4; j++)
@@ -838,8 +839,8 @@ void draw_stars()
 
 float get_celestial_angle()
 {
-    int daytime_ticks = (timeOfDay % 24000);
-    float normalized_daytime = ((float)daytime_ticks + partialTicks) / 24000.0F - 0.25F;
+    int daytime_ticks = (current_world->time_of_day % 24000);
+    float normalized_daytime = ((float)daytime_ticks + current_world->partial_ticks) / 24000.0F - 0.25F;
     if (normalized_daytime < 0.0F)
     {
         ++normalized_daytime;
@@ -968,7 +969,7 @@ void draw_sky(GXColor background)
     dist = 108.0f * scale;
 
     // Reset transform and move the clouds
-    transform_view(gertex::get_view_matrix(), guVector{0, 0, float(((tickCounter % 40960) + partialTicks) * 0.05)});
+    transform_view(gertex::get_view_matrix(), guVector{0, 0, float(((current_world->ticks % 40960) + current_world->partial_ticks) * 0.05)});
 
     // Clouds are a bit yellowish white. They are also affected by the time
     float sky_multiplier = get_sky_multiplier();

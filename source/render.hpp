@@ -22,9 +22,6 @@
 
 extern guVector player_pos;
 extern float xrot, yrot;
-extern int tickCounter;
-extern int timeOfDay;
-extern double partialTicks;
 extern uint8_t light_map[1024];
 
 struct plane_t
@@ -101,7 +98,7 @@ GXColor get_lightmap_color(uint8_t light);
 
 void draw_particle(camera_t &camera, vec3f pos, uint32_t texture_index, float size, uint8_t brightness);
 
-void draw_particles(camera_t &camera, particle_t *particles, int count);
+void draw_particles(camera_t &camera, particle *particles, int count);
 
 void draw_stars();
 

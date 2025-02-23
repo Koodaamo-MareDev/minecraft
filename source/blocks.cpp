@@ -7,7 +7,7 @@
 #include "sounds.hpp"
 #include <cmath>
 
-void PlaySound(sound_t sound); // in minecraft.cpp
+void PlaySound(sound sound); // in minecraft.cpp
 int8_t get_block_opacity(BlockID blockid)
 {
     return block_properties[int(blockid)].m_opacity;
@@ -371,7 +371,7 @@ void update_fluid(block_t *block, vec3i pos, chunk_t *near)
                             // Play fizz sound when fluids collide.
                             if (is_fluid(block_id) && is_fluid(surround_id))
                             {
-                                sound_t sound = get_sound("fizz");
+                                sound sound = get_sound("fizz");
                                 sound.position = vec3f() + pos + surrounding_offset;
                                 sound.volume = 0.25;
                                 sound.pitch = 1.0;
@@ -719,10 +719,10 @@ blockproperties_t block_properties[256] = {
 
 };
 
-sound_t get_step_sound(BlockID block_id)
+sound get_step_sound(BlockID block_id)
 {
     blockproperties_t properties = block_properties[int(block_id)];
-    sound_t sound;
+    sound sound;
     switch (properties.m_sound_type)
     {
     case SoundType::cloth:
@@ -756,10 +756,10 @@ sound_t get_step_sound(BlockID block_id)
     return sound;
 }
 
-sound_t get_mine_sound(BlockID block_id)
+sound get_mine_sound(BlockID block_id)
 {
     blockproperties_t properties = block_properties[int(block_id)];
-    sound_t sound;
+    sound sound;
     switch (properties.m_sound_type)
     {
     case SoundType::cloth:
@@ -792,10 +792,10 @@ sound_t get_mine_sound(BlockID block_id)
     return sound;
 }
 
-sound_t get_break_sound(BlockID block_id)
+sound get_break_sound(BlockID block_id)
 {
     blockproperties_t properties = block_properties[int(block_id)];
-    sound_t sound;
+    sound sound;
     switch (properties.m_sound_type)
     {
     case SoundType::cloth:

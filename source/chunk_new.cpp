@@ -31,6 +31,7 @@
 #include <fstream>
 #include "nbt/nbt.hpp"
 #include "mcregion.hpp"
+#include "world.hpp"
 extern bool isExiting;
 const vec3i face_offsets[] = {
     vec3i{-1, +0, +0},
@@ -43,39 +44,29 @@ void *get_aligned_pointer_32(void *ptr)
 {
     return (void *)((u64(ptr) + 0x1F) & (~0x1F));
 }
-int64_t world_seed = 0;
-uint32_t world_tick = 0;
 ImprovedNoise improved_noise;
 mutex_t chunk_mutex;
 lwp_t __chunk_generator_thread_handle = (lwp_t)NULL;
 bool __chunk_generator_init_done = false;
 void *__chunk_generator_init_internal(void *);
-bool __remote_world = false;
-bool __hell_world = false;
 
 std::deque<chunk_t *> chunks;
 std::deque<chunk_t *> pending_chunks;
 
 bool is_remote()
 {
-    return __remote_world;
+    return current_world && current_world->is_remote();
 }
 
 bool is_hell_world()
 {
-    return __hell_world;
-}
-
-// NOTE: This function should only be used by the networking code.
-void set_world_remote(bool remote)
-{
-    __remote_world = remote;
+    return current_world && current_world->hell;
 }
 
 // Used to set the world to hell
 void set_world_hell(bool hell)
 {
-    if (__hell_world == hell)
+    if (current_world->hell == hell)
         return;
 
     // Stop processing any light updates
@@ -91,7 +82,7 @@ void set_world_hell(bool hell)
     // Disable sky light in hell
     set_skylight_enabled(!hell);
 
-    __hell_world = hell;
+    current_world->hell = hell;
 }
 
 bool has_pending_chunks()
@@ -340,7 +331,7 @@ void generate_ores(vec3i neighbor_pos, chunk_t *chunk, javaport::Random &rng)
 extern aabb_entity_t *player;
 void generate_features(chunk_t *chunk)
 {
-    javaport::Random rng(chunk->x * 0x4F9939F508L + chunk->z * 0x1F38D3E7L + world_seed);
+    javaport::Random rng(chunk->x * 0x4F9939F508L + chunk->z * 0x1F38D3E7L + current_world->seed);
     vec3i block_pos(chunk->x * 16, 0, chunk->z * 16);
     generate_ores(block_pos, chunk, rng);
     generate_trees(block_pos, chunk, rng);
@@ -410,7 +401,7 @@ void generate_chunk()
     // it's used for storing the noise value for later parts of the
     // terrain generation, like the altitude of trees and caves.
     vec3i noise_size(16, 1, 16);
-    javaport::Random rng(world_seed);
+    javaport::Random rng(current_world->seed);
     int32_t off_x = rng.nextInt(0xFFFFF);
     int32_t off_z = rng.nextInt(0xFFFFF);
     vec3i sand_off(off_x, 0, off_z);
@@ -479,7 +470,7 @@ void generate_chunk()
     {
         carved[i] = block->get_blockid();
     }
-    cavegen.generate(chunk, world_seed, carved);
+    cavegen.generate(chunk, current_world->seed, carved);
 
     block = chunk->blockstates;
     for (int32_t i = 0; i < 16 * 16 * WORLD_HEIGHT; i++, block++)
@@ -565,7 +556,7 @@ void init_chunks()
 
 void *__chunk_generator_init_internal(void *)
 {
-    improved_noise.Init(world_seed);
+    improved_noise.Init(current_world->seed);
 
     while (__chunk_generator_init_done)
     {
@@ -1770,13 +1761,13 @@ void chunk_t::update_entities()
         if (!entity)
             continue;
         // Workaround to prevent duplicate updates for entities that moved to a different chunk
-        if (entity->last_world_tick == world_tick)
+        if (entity->last_world_tick == current_world->ticks)
             continue;
 
         // Tick the entity
         entity->tick();
 
-        entity->last_world_tick = world_tick;
+        entity->last_world_tick = current_world->ticks;
     }
 
     if (!is_remote())
