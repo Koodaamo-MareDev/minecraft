@@ -19,6 +19,9 @@ class NBTTagCompound;
 
 class NBTBase
 {
+protected:
+    NBTBase() {}
+
 public:
     static const uint8_t TAG_End = 0;
     static const uint8_t TAG_Byte = 1;
