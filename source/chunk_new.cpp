@@ -33,29 +33,20 @@
 #include "mcregion.hpp"
 #include "world.hpp"
 const vec3i face_offsets[] = {
-    vec3i{-1, +0, +0},
-    vec3i{+1, +0, +0},
-    vec3i{+0, -1, +0},
-    vec3i{+0, +1, +0},
-    vec3i{+0, +0, -1},
-    vec3i{+0, +0, +1}};
-void *get_aligned_pointer_32(void *ptr)
-{
-    return (void *)((u64(ptr) + 0x1F) & (~0x1F));
-}
+    vec3i{-1, +0, +0},  // Negative X
+    vec3i{+1, +0, +0},  // Positive X
+    vec3i{+0, -1, +0},  // Negative Y
+    vec3i{+0, +1, +0},  // Positive Y
+    vec3i{+0, +0, -1},  // Negative Z
+    vec3i{+0, +0, +1}}; // Positive Z
+
 ImprovedNoise improved_noise;
 mutex_t chunk_mutex;
-lwp_t __chunk_generator_thread_handle = (lwp_t)NULL;
-bool __chunk_generator_init_done = false;
-void *__chunk_generator_init_internal(void *);
+static lwp_t chunk_generator_thread_handle = (lwp_t)NULL;
+static bool chunk_generator_thread_active = false;
 
 std::deque<chunk_t *> chunks;
 std::deque<chunk_t *> pending_chunks;
-
-bool is_hell_world()
-{
-    return current_world && current_world->hell;
-}
 
 // Used to set the world to hell
 void set_world_hell(bool hell)
@@ -64,7 +55,7 @@ void set_world_hell(bool hell)
         return;
 
     // Stop processing any light updates
-    light_engine_reset();
+    light_engine::reset();
     if (hell)
     {
         // Set the light map to the nether light map
@@ -74,7 +65,7 @@ void set_world_hell(bool hell)
     }
 
     // Disable sky light in hell
-    set_skylight_enabled(!hell);
+    light_engine::enable_skylight(!hell);
 
     current_world->hell = hell;
 }
@@ -483,7 +474,7 @@ void generate_chunk()
 
     // If the chunk generator has already been de-initialized
     // during generation, clean up the chunk and return
-    if (!__chunk_generator_init_done)
+    if (!chunk_generator_thread_active)
     {
         delete chunk;
         return;
@@ -519,18 +510,13 @@ void generate_chunk()
     chunk->generation_stage = ChunkGenStage::done;
 }
 
-void print_chunk_status()
-{
-    printf("Chunks: %d, Pending: %d", chunks.size(), pending_chunks.size());
-}
-
 void deinit_chunks()
 {
-    if (!__chunk_generator_init_done)
+    if (!chunk_generator_thread_active)
         return;
-    __chunk_generator_init_done = false;
-    pending_chunks.clear();
+    chunk_generator_thread_active = false;
     LWP_MutexDestroy(chunk_mutex);
+    LWP_JoinThread(chunk_generator_thread_handle, NULL);
 }
 
 void apply_noise_seed()
@@ -539,35 +525,35 @@ void apply_noise_seed()
 }
 
 // create chunk
-void init_chunks()
+void init_chunk_generator()
 {
-    if (__chunk_generator_init_done)
+    if (chunk_generator_thread_active)
         return;
-    __chunk_generator_init_done = true;
+    chunk_generator_thread_active = true;
     LWP_MutexInit(&chunk_mutex, false);
-    LWP_CreateThread(&__chunk_generator_thread_handle, /* thread handle */
-                     __chunk_generator_init_internal,  /* code */
-                     NULL,                             /* arg pointer for thread */
-                     NULL,                             /* stack base */
-                     128 * 1024,                       /* stack size */
-                     50 /* thread priority */);
-}
-
-void *__chunk_generator_init_internal(void *)
-{
-
-    while (__chunk_generator_init_done)
+    auto chunk_generator_thread = [](void *) -> void *
     {
-        while (pending_chunks.size() == 0)
+        while (chunk_generator_thread_active)
         {
-            usleep(100);
-            if (!__chunk_generator_init_done)
-                break;
+            while (pending_chunks.size() == 0)
+            {
+                usleep(100);
+                if (!chunk_generator_thread_active)
+                    break;
+            }
+            generate_chunk();
         }
-        generate_chunk();
-    }
-    chunks.clear();
-    return NULL;
+        pending_chunks.clear();
+        chunks.clear();
+        return NULL;
+    };
+
+    LWP_CreateThread(&chunk_generator_thread_handle,
+                     chunk_generator_thread,
+                     NULL,
+                     NULL,
+                     128 * 1024,
+                     50);
 }
 
 BlockID get_block_id_at(const vec3i &position, BlockID default_id, chunk_t *near)
@@ -659,7 +645,7 @@ void update_block_at(const vec3i &pos)
         }
     }
     chunk->update_height_map(pos);
-    update_light(pos, chunk);
+    light_engine::post(pos, chunk);
 }
 
 void update_neighbors(const vec3i &pos)
@@ -687,14 +673,14 @@ void chunk_t::light_up()
                 this->height_map[(x << 4) | z] = end_y + 1;
                 for (int y = MAX_WORLD_Y; y > end_y; y--)
                     this->get_block(vec3i(x, y, z))->sky_light = 15;
-                update_light(vec3i(chunkX + x, end_y + 1, chunkZ + z), this);
+                light_engine::post(vec3i(chunkX + x, end_y + 1, chunkZ + z), this);
 
                 // Update block lights
                 for (int y = 0; y < end_y; y++)
                 {
                     if (get_block_luminance(this->get_block(vec3i(x, y, z))->get_blockid()))
                     {
-                        update_light(vec3i(chunkX + x, y, chunkZ + z), this);
+                        light_engine::post(vec3i(chunkX + x, y, chunkZ + z), this);
                     }
                 }
             }
@@ -1877,12 +1863,15 @@ chunk_t::~chunk_t()
     {
         if (!entity)
             continue;
-        entity->chunk = nullptr;
-        if (!current_world->is_remote())
+        if (entity->chunk == this)
         {
-            // Remove the entity from the global entity list
-            // NOTE: This will also delete the entity as its chunk is nullptr
-            remove_entity(entity->entity_id);
+            entity->chunk = nullptr;
+            if (!current_world->is_remote())
+            {
+                // Remove the entity from the global entity list
+                // NOTE: This will also delete the entity as its chunk is nullptr
+                remove_entity(entity->entity_id);
+            }
         }
     }
 }
@@ -1891,8 +1880,7 @@ void chunk_t::save(NBTTagCompound &compound)
 {
     compound.setTag("xPos", new NBTTagInt(x));
     compound.setTag("zPos", new NBTTagInt(z));
-    compound.setTag("LastUpdate", new NBTTagLong(1000));
-    compound.setTag("TerrainPopulated", new NBTTagByte(1));
+    compound.setTag("LastUpdate", new NBTTagLong(current_world->ticks));
 
     std::vector<uint8_t> blocks = std::vector<uint8_t>(32768);
     std::vector<uint8_t> data = std::vector<uint8_t>(16384);
@@ -1997,22 +1985,20 @@ void chunk_t::serialize()
 
     // Compress the data
     uint32_t uncompressed_size = uncompressed_buffer.data.size();
-    uint8_t *compressed_data = new uint8_t[uncompressed_size];
     mz_ulong compressed_size = uncompressed_size;
 
-    int result = mz_compress2(compressed_data, &compressed_size, uncompressed_buffer.data.data(), uncompressed_size, MZ_BEST_SPEED);
+    Crapper::ByteBuffer buffer;
+    buffer.data.resize(uncompressed_size);
+
+    int result = mz_compress2(buffer.data.data(), &compressed_size, uncompressed_buffer.data.data(), uncompressed_size, MZ_BEST_SPEED);
 
     uncompressed_buffer.data.clear();
+
+    buffer.data.resize(compressed_size);
     if (result != MZ_OK)
     {
-        delete[] compressed_data;
         throw std::runtime_error("Failed to compress chunk data");
     }
-
-    Crapper::ByteBuffer buffer;
-    buffer.writeBytes(compressed_data, compressed_size);
-
-    delete[] compressed_data;
 
     // Calculate the offset of the chunk in the file
     uint16_t offset = (x & 0x1F) | ((z & 0x1F) << 5);
@@ -2097,6 +2083,18 @@ void chunk_t::deserialize()
     uint8_t compression;
     chunk_file.read(reinterpret_cast<char *>(&length), sizeof(uint32_t));
     chunk_file.read(reinterpret_cast<char *>(&compression), sizeof(uint8_t));
+
+    if (length >= 0x100000) // 1MB
+    {
+        printf("Resetting chunk because its length is too large: %u\n", length);
+
+        // Erase the chunk from the region
+        region->locations[offset] = 0;
+
+        // Regenerate the chunk
+        this->generation_stage = ChunkGenStage::empty;
+        return;
+    }
 
     // Read the compressed data
     Crapper::ByteBuffer buffer;

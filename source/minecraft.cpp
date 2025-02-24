@@ -317,12 +317,10 @@ int main(int argc, char **argv)
     fatInitDefault();
     current_world = new world;
 
-    printf("Render resolution: %f,%f, Widescreen: %s\n", viewport.width, viewport.height, viewport.widescreen ? "Yes" : "No");
-    light_engine_init();
-    init_chunks();
+    light_engine::init();
+    init_chunk_generator();
     current_world->seed = gettime();
     apply_noise_seed();
-    printf("Initialized chunks.\n");
     VIDEO_Flush();
     VIDEO_WaitVSync();
     GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
@@ -364,7 +362,6 @@ int main(int argc, char **argv)
     {
         if (!current_world->load())
         {
-            printf("Failed to load world, creating new world...\n");
             current_world->reset();
         }
     }
@@ -378,7 +375,7 @@ int main(int argc, char **argv)
         if (HWButton != -1)
             isExiting = true;
         GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, BASE3D_POS_FRAC_BITS);
-        if (!is_hell_world())
+        if (!current_world->hell)
         {
 #ifdef MONO_LIGHTING
             LightMapBlend(light_day_mono_rgba, light_night_mono_rgba, light_map, 255 - uint8_t(sky_multiplier * 255));
@@ -396,7 +393,7 @@ int main(int argc, char **argv)
 
         fog_depth_multiplier = flerp(fog_depth_multiplier, std::min(std::max(player_pos.y, 24.f) / 36.f, 1.0f), 0.05f);
 
-        float fog_multiplier = is_hell_world() ? 0.5f : 1.0f;
+        float fog_multiplier = current_world->hell ? 0.5f : 1.0f;
         if (current_world->player.in_fluid == BlockID::lava)
         {
             background = GXColor{0xFF, 0, 0, 0xFF};
@@ -456,7 +453,7 @@ int main(int argc, char **argv)
                 current_world->draw(camera);
 
             // Draw sky
-            if (current_world->player.in_fluid == BlockID::air && !is_hell_world())
+            if (current_world->player.in_fluid == BlockID::air && !current_world->hell)
                 draw_sky(background);
         }
 
@@ -503,20 +500,16 @@ int main(int argc, char **argv)
 
         fb ^= 1;
     }
-    if (client.status == Crapper::ErrorStatus::OK)
+    if (client.status == Crapper::ErrorStatus::OK && current_world->is_remote())
     {
         client.disconnect();
     }
     current_world->save();
     current_world->reset();
-    printf("De-initializing network...\n");
     Crapper::deinitNetwork();
-    printf("De-initializing light engine...\n");
-    light_engine_deinit();
-    printf("De-initializing chunk engine...\n");
+    light_engine::deinit();
     deinit_chunks();
     delete current_world;
-    printf("Exiting...");
     VIDEO_Flush();
     VIDEO_WaitVSync();
     if (HWButton != -1)

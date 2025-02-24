@@ -1,7 +1,7 @@
 #ifndef SYSTEM_TIME_HPP
 #define SYSTEM_TIME_HPP
 
-#include "../timers.hpp"
+#include <ogc/lwp_watchdog.h>
 
 namespace javaport
 {
@@ -10,7 +10,7 @@ namespace javaport
     public:
         static int64_t currentTimeMillis()
         {
-            return time_get();
+            return ticks_to_millisecs(gettime());
         }
     };
 }

@@ -889,7 +889,7 @@ float get_sky_multiplier()
 }
 GXColor get_sky_color(bool cave_darkness)
 {
-    if (is_hell_world())
+    if (current_world && current_world->hell)
         return GXColor{0x20, 0, 0, 0xFF};
 
     float elevation_brightness = std::pow(std::clamp((player_pos.y) * 0.03125f, 0.0f, 1.0f), 2.0f);

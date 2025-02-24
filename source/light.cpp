@@ -13,68 +13,61 @@
 #include <algorithm>
 #include <list>
 #include <cstdio>
-lwp_t __light_engine_thread_handle = (lwp_t)NULL;
-mutex_t light_mutex = (mutex_t)NULL;
-bool __light_engine_init_done = false;
-bool __light_engine_busy = false;
-bool __light_engine_use_skylight = true;
-std::deque<std::pair<vec3i, chunk_t *>> pending_light_updates;
-void set_skylight_enabled(bool enabled)
-{
-    __light_engine_use_skylight = enabled;
-}
-void light_engine_reset()
-{
-    pending_light_updates.clear();
-}
-void __update_light(std::pair<vec3i, chunk_t *>);
-void *__light_engine_init_internal(void *);
 
-void light_engine_init()
+lwp_t light_engine::thread_handle = 0;
+bool light_engine::thread_active = false;
+bool light_engine::use_skylight = true;
+std::deque<std::pair<vec3i, chunk_t *>> light_engine::pending_updates;
+
+void light_engine::init()
 {
-    if (__light_engine_init_done)
+    if (thread_active)
         return;
-    __light_engine_init_done = true;
-    LWP_MutexInit(&light_mutex, false);
-    LWP_CreateThread(&__light_engine_thread_handle, /* thread handle */
-                     __light_engine_init_internal,  /* code */
-                     NULL,                          /* arg pointer for thread */
-                     NULL,                          /* stack base */
-                     64 * 1024,                     /* stack size */
-                     50 /* thread priority */);
-}
-
-void *__light_engine_init_internal(void *)
-{
-    while (__light_engine_init_done)
+    thread_active = true;
+    auto light_engine_thread = [](void *) -> void *
     {
-        light_engine_loop();
-    }
-    return NULL;
+        while (thread_active)
+        {
+            loop();
+        }
+        return NULL;
+    };
+
+    LWP_CreateThread(&thread_handle,
+                     light_engine_thread,
+                     NULL,
+                     NULL,
+                     64 * 1024,
+                     50);
 }
 
-bool light_engine_busy()
+void light_engine::enable_skylight(bool enabled)
 {
-    return pending_light_updates.size() > 0;
+    use_skylight = enabled;
 }
 
-void light_engine_update()
+void light_engine::reset()
 {
+    pending_updates.clear();
 }
 
-void light_engine_loop()
+bool light_engine::busy()
+{
+    return pending_updates.size() > 0;
+}
+
+void light_engine::loop()
 {
     int updates = 0;
     uint64_t start = time_get();
-    while (pending_light_updates.size() > 0 && __light_engine_init_done)
+    while (pending_updates.size() > 0 && thread_active)
     {
-        __light_engine_busy = true;
-        std::pair<vec3i, chunk_t *> update = pending_light_updates.front();
-        pending_light_updates.pop_front();
-        chunk_t *chunk = update.second;
+        std::pair<vec3i, chunk_t *> current = pending_updates.front();
+        pending_updates.pop_front();
+        chunk_t *chunk = current.second;
         if (chunk)
         {
-            __update_light(update);
+            update(current);
             --chunk->light_update_count;
             if ((++updates & 1023) == 0)
             {
@@ -86,26 +79,24 @@ void light_engine_loop()
             }
         }
     }
-    __light_engine_busy = false;
     usleep(1000);
 }
-void light_engine_deinit()
+void light_engine::deinit()
 {
-    if (__light_engine_init_done)
+    if (thread_active)
     {
-        __light_engine_init_done = false;
-        pending_light_updates.clear();
-        LWP_JoinThread(__light_engine_thread_handle, NULL);
-        LWP_MutexDestroy(light_mutex);
+        thread_active = false;
+        pending_updates.clear();
+        LWP_JoinThread(thread_handle, NULL);
     }
 }
 
-void update_light(vec3i pos, chunk_t *chunk)
+void light_engine::post(vec3i pos, chunk_t *chunk)
 {
     if (!chunk || pos.y > MAX_WORLD_Y || pos.y < 0)
         return;
     ++chunk->light_update_count;
-    pending_light_updates.push_back(std::make_pair(pos, chunk));
+    pending_updates.push_back(std::make_pair(pos, chunk));
 }
 
 /*
@@ -125,7 +116,7 @@ static inline int8_t MAX_I8(int8_t a, int8_t b)
  *  faster than any other implementation that I could find online.
  */
 
-void __update_light(std::pair<vec3i, chunk_t *> update)
+void light_engine::update(const std::pair<vec3i, chunk_t *> &update)
 {
     std::deque<std::pair<vec3i, chunk_t *>> light_updates;
     std::deque<chunk_t *> chunks = get_chunks();
@@ -133,11 +124,8 @@ void __update_light(std::pair<vec3i, chunk_t *> update)
     light_updates.push_back(update);
     while (light_updates.size() > 0)
     {
-        if (!__light_engine_init_done)
-        {
-            light_updates.clear();
+        if (!thread_active)
             return;
-        }
         std::pair item = light_updates.back();
         vec3i pos = item.first;
         chunk_t *chunk = item.second;
@@ -159,7 +147,7 @@ void __update_light(std::pair<vec3i, chunk_t *> update)
         uint8_t new_skylight = 0;
         uint8_t new_blocklight = properties(block->id).m_luminance;
 
-        if (__light_engine_use_skylight && pos.y >= chunk->height_map[map_index])
+        if (use_skylight && pos.y >= chunk->height_map[map_index])
             new_skylight = 0xF;
 
         block_t *neighbors[6];

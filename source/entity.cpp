@@ -412,7 +412,7 @@ NBTTagCompound *aabb_entity_t::serialize()
     if (this->local)
     {
         result->setTag("Inventory", new NBTTagList);
-        result->setTag("Dimension", new NBTTagInt(is_hell_world() ? -1 : 0));
+        result->setTag("Dimension", new NBTTagInt(-int(current_world->hell)));
         result->setTag("Score", new NBTTagInt(0));
         result->setTag("Sleeping", new NBTTagByte(0));
         result->setTag("SleepTimer", new NBTTagShort(0));

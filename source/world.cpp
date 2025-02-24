@@ -60,7 +60,7 @@ void world::tick()
 void world::update()
 {
     bool should_update_vbos = true;
-    if (!is_remote() && !light_engine_busy())
+    if (!is_remote() && !light_engine::busy())
     {
         should_update_vbos = prepare_chunks(1);
     }
@@ -147,7 +147,7 @@ void world::update_fluids(chunk_t *chunk, int section)
 {
     auto int_to_blockpos = [](ptrdiff_t x) -> vec3i
     {
-        return vec3i(x & 0xF, (x >> 4) & 0xF, (x >> 8) & 0xF);
+        return vec3i(x & 0xF, (x >> 8) & MAX_WORLD_Y, (x >> 4) & 0xF);
     };
 
     static std::vector<std::vector<block_t *>> fluid_levels(8);
@@ -192,7 +192,7 @@ void world::update_vbos()
 {
     static std::vector<chunkvbo_t *> vbos_to_update;
     std::vector<chunkvbo_t *> vbos_to_rebuild;
-    if (!light_engine_busy())
+    if (!light_engine::busy())
     {
         for (chunk_t *&chunk : get_chunks())
         {

@@ -5,14 +5,24 @@
 #include "chunk_new.hpp"
 #include <cstdint>
 #include <ogc/gu.h>
+class light_engine
+{
+private:
+    static void update(const std::pair<vec3i, chunk_t *> &update);
 
-bool light_engine_busy();
-void light_engine_init();
-void light_engine_deinit();
-void light_engine_loop();
-void light_engine_update();
-void light_engine_reset();
-void update_light(vec3i pos, chunk_t* chunk);
-void set_skylight_enabled(bool enabled);
+    static lwp_t thread_handle;
+    static bool thread_active;
+    static bool use_skylight;
+    static std::deque<std::pair<vec3i, chunk_t *>> pending_updates;
 
+public:
+    static void init();
+    static void deinit();
+    static void loop();
+    static void reset();
+    static void post(vec3i pos, chunk_t *chunk);
+    static void enable_skylight(bool enabled);
+    static bool busy();
+};
+// namespace light_engine
 #endif

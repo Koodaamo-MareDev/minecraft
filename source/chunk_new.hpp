@@ -14,7 +14,7 @@
 #include <map>
 #include <iostream>
 #define SIMULATION_DISTANCE 2
-#define RENDER_DISTANCE 5
+#define RENDER_DISTANCE 4
 #define CHUNK_COUNT ((RENDER_DISTANCE) * (RENDER_DISTANCE + 1) * 4)
 #define GENERATION_DISTANCE (RENDER_DISTANCE - 1)
 #define VERTICAL_SECTION_COUNT 8
@@ -131,8 +131,6 @@ public:
     int x = 0;
     int z = 0;
     ChunkGenStage generation_stage = ChunkGenStage::empty;
-    uint32_t chunk_seed_x;
-    uint32_t chunk_seed_z;
     uint8_t lit_state = 0;
     block_t blockstates[16 * 16 * WORLD_HEIGHT] = {0};
     uint8_t height_map[16 * 16] = {0};
@@ -248,7 +246,7 @@ public:
     int render_flat_ground(block_t *block, const vec3i &pos);
     int render_chest(block_t *block, const vec3i &pos);
     int render_torch(block_t *block, const vec3i &pos);
-    int render_torch_with_angle(block_t* block, const vec3f& vertex_pos, vfloat_t ax, vfloat_t az);
+    int render_torch_with_angle(block_t *block, const vec3f &vertex_pos, vfloat_t ax, vfloat_t az);
     int render_cross(block_t *block, const vec3i &pos);
     int render_slab(block_t *block, const vec3i &pos);
 
@@ -269,19 +267,14 @@ public:
 
 private:
 };
-// 0 = -x, -z
-// 1 = +x, -z
-// 2 = +x, +z
-// 3 = -x, +z
+
 extern const vec3i face_offsets[];
 extern mutex_t chunk_mutex;
 std::deque<chunk_t *> &get_chunks();
 void apply_noise_seed();
-void init_chunks();
+void init_chunk_generator();
 void deinit_chunks();
-void print_chunk_status();
 bool has_pending_chunks();
-bool is_hell_world();
 void set_world_hell(bool hell);
 BlockID get_block_id_at(const vec3i &position, BlockID default_id = BlockID::air, chunk_t *near = nullptr);
 block_t *get_block_at(const vec3i &vec, chunk_t *near = nullptr);
@@ -292,7 +285,6 @@ chunk_t *get_chunk(int32_t x, int32_t z);
 chunk_t *get_chunk(const vec2i &pos);
 bool add_chunk(int32_t x, int32_t z);
 void generate_chunk();
-void *get_aligned_pointer_32(void *ptr);
 void get_neighbors(const vec3i &pos, block_t **neighbors, chunk_t *near = nullptr);
 void update_block_at(const vec3i &pos);
 void update_neighbors(const vec3i &pos);
