@@ -15,8 +15,6 @@ constexpr vfloat_t ENTITY_GRAVITY = 9.8f;
 
 constexpr uint8_t creeper_fuse = 20;
 
-bool is_remote();
-
 class chunk_t;
 
 class entity_t
@@ -106,9 +104,9 @@ public:
         return sizeof(*this);
     }
 
-    virtual NBTTagCompound* serialize();
+    virtual NBTTagCompound *serialize();
 
-    virtual void deserialize(NBTTagCompound* nbt);
+    virtual void deserialize(NBTTagCompound *nbt);
 
     std::vector<aabb_t> get_colliding_aabbs(const aabb_t &aabb);
 
@@ -129,6 +127,16 @@ public:
     virtual bool should_jump()
     {
         return false;
+    }
+
+    vec3i get_head_blockpos()
+    {
+        return vec3i(std::floor(position.x), std::floor(aabb.min.y + y_offset), std::floor(position.z));
+    }
+
+    vec3i get_foot_blockpos()
+    {
+        return vec3i(std::floor(position.x), std::floor(aabb.min.y - y_size), std::floor(position.z));
     }
 
     vec3f simple_pathfind(vec3f target);

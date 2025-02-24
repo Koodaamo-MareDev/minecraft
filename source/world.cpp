@@ -18,6 +18,7 @@ extern Crapper::MinecraftClient client;
 extern bool should_destroy_block;
 extern bool should_place_block;
 extern bool show_dirtscreen;
+extern std::string dirtscreen_text;
 extern int mkpath(const char *path, mode_t mode);
 
 world::world()
@@ -847,7 +848,7 @@ void world::save()
         NBTTagCompound level;
         NBTTagCompound *level_data = (NBTTagCompound *)level.setTag("Data", new NBTTagCompound());
         level_data->setTag("Player", player.m_entity->serialize());
-        level_data->setTag("Time", new NBTTagLong(time_of_day));
+        level_data->setTag("Time", new NBTTagLong(ticks));
         level_data->setTag("SpawnX", new NBTTagInt(0));
         level_data->setTag("SpawnY", new NBTTagInt(skycast(vec3i(0, 0, 0), nullptr)));
         level_data->setTag("SpawnZ", new NBTTagInt(0));
@@ -906,9 +907,12 @@ bool world::load()
     }
 
     // For now, these are the only values we care about
-    time_of_day = level_data->getLong("Time") % 24000;
+    ticks = level_data->getLong("Time");
+    last_entity_tick = ticks;
+    last_fluid_tick = ticks;
+    time_of_day = ticks % 24000;
     seed = level_data->getLong("RandomSeed");
-    srand(seed);
+    apply_noise_seed();
     printf("Loaded world with seed: %lld\n", seed);
 
     // Load the player data if it exists
@@ -925,8 +929,12 @@ bool world::load()
 
 void world::reset()
 {
+    dirtscreen_text = "Building terrain...";
     loaded = false;
     time_of_day = 0;
+    ticks = 0;
+    last_entity_tick = 0;
+    last_fluid_tick = 0;
     hell = false;
     remote = false;
     if (player.m_entity)
@@ -968,10 +976,6 @@ void world::update_entities()
             chunk->update_entities();
         }
 
-        // FIXME: This is a hacky fix for player movement not working in unloaded chunks
-        if (!player.m_entity->chunk && !show_dirtscreen)
-            player.m_entity->tick();
-
         // Update the player entity
         update_player();
         for (auto &&e : world_entities)
@@ -987,6 +991,10 @@ void world::update_entities()
 
 void world::update_player()
 {
+    // Tick the player entity even in unloaded chunks
+    if (!player.m_entity->chunk && !show_dirtscreen)
+        player.m_entity->tick();
+
     // FIXME: This is a temporary fix for an crash with an unknown cause
 #ifdef CLIENT_COLLISION
     if (is_remote())
@@ -1029,7 +1037,7 @@ void world::update_player()
         }
     }
 #endif
-    vec3i block_pos = vec3i(std::floor(player.m_entity->position.x), std::floor(player.m_entity->aabb.min.y + player.m_entity->y_offset), std::floor(player.m_entity->position.z));
+    vec3i block_pos = player.m_entity->get_head_blockpos();
     block_t *block = get_block_at(block_pos);
     if (block && properties(block->id).m_fluid && block_pos.y + 2 - get_fluid_height(block_pos, block->get_blockid(), player.m_entity->chunk) >= player.m_entity->aabb.min.y + player.m_entity->y_offset)
     {

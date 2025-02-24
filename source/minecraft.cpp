@@ -46,35 +46,20 @@
 #endif
 
 #define DEFAULT_FIFO_SIZE (256 * 1024)
-#define CLASSIC_CONTROLLER_THRESHOLD 4
-#define MAX_PARTICLES 100
 #define LOOKAROUND_SENSITIVITY 180.0f
-#define MOVEMENT_SPEED 15
-#define JUMP_HEIGHT 1.25f
 #define DIRECTIONAL_LIGHT GX_ENABLE
 // #define NO_LOADING_SCREEN
 
-f32 xrot = 0.0f;
-f32 yrot = 0.0f;
-aabb_entity_t *player = nullptr;
-guVector player_pos = {0.F, 80.0F, 0.F};
 void *frameBuffer[3] = {NULL, NULL, NULL};
 static GXRModeObj *rmode = NULL;
 
-bool draw_block_outline = false;
-vec3i raycast_pos;
-vec3i raycast_face;
-std::vector<aabb_t> block_bounds;
+f32 xrot = 0.0f;
+f32 yrot = 0.0f;
+guVector player_pos = {0.F, 80.0F, 0.F};
 
 world *current_world = nullptr;
 
 int frameCounter = 0;
-int timeOfDay = 0;
-int lastEntityTick = 0;
-int lastWaterTick = 0;
-int fluidUpdateCount = 0;
-
-uint32_t total_chunks_size = 0;
 
 u32 wiimote_down = 0;
 u32 wiimote_held = 0;
@@ -100,6 +85,7 @@ inventory::item_stack *selected_item = nullptr;
 int cursor_x = 0;
 int cursor_y = 0;
 bool show_dirtscreen = true;
+std::string dirtscreen_text = "Loading...";
 
 gui *current_gui = nullptr;
 
@@ -108,7 +94,6 @@ float fog_light_multiplier = 1.0f;
 
 Crapper::MinecraftClient client;
 Crapper::ByteBuffer receive_buffer;
-std::string dirtscreen_text = "Loading...";
 
 void dbgprintf(const char *fmt, ...)
 {
@@ -172,7 +157,6 @@ int mkpath(const char *path, mode_t mode)
 
     return 0;
 }
-void ResetWorld();
 void UpdateNetwork();
 void CreateExplosion(vec3f pos, float power, chunk_t *near);
 void UpdateLoadingStatus();
@@ -181,8 +165,6 @@ void HandleGUI(gertex::GXView &viewport);
 void UpdateInventory(gertex::GXView &viewport);
 void DrawInventory(gertex::GXView &viewport);
 void DrawHUD(gertex::GXView &viewport);
-void RemoveRedundantChunks();
-void PrepareChunkRemoval(chunk_t *chunk);
 void UpdateCamera(camera_t &camera);
 void PrepareTEV();
 void GetInput();
@@ -204,21 +186,8 @@ void WiimotePowerPressed(s32 chan)
     HWButton = SYS_POWEROFF;
 }
 
-s8 has_retraced = 0;
-void RenderDone(u32 enterCount)
-{
-    has_retraced = 1;
-}
 uint8_t light_map[1024] ATTRIBUTE_ALIGN(32) = {0};
 
-GXColor ColorBlend(GXColor color0, GXColor color1, float factor)
-{
-    float inv_factor = 1.0f - factor;
-    return GXColor{uint8_t((color0.r * inv_factor) + (color1.r * factor)),
-                   uint8_t((color0.g * inv_factor) + (color1.g * factor)),
-                   uint8_t((color0.b * inv_factor) + (color1.b * factor)),
-                   uint8_t((color0.a * inv_factor) + (color1.a * factor))};
-}
 void LightMapBlend(const uint8_t *src0, const uint8_t *src1, uint8_t *dst, uint8_t factor)
 {
     uint8_t inv_factor = 255 - factor;
@@ -347,12 +316,12 @@ int main(int argc, char **argv)
     };
     fatInitDefault();
     current_world = new world;
-    player = current_world->player.m_entity;
 
     printf("Render resolution: %f,%f, Widescreen: %s\n", viewport.width, viewport.height, viewport.widescreen ? "Yes" : "No");
     light_engine_init();
     init_chunks();
-    srand(current_world->seed = gettime());
+    current_world->seed = gettime();
+    apply_noise_seed();
     printf("Initialized chunks.\n");
     VIDEO_Flush();
     VIDEO_WaitVSync();
@@ -362,7 +331,6 @@ int main(int argc, char **argv)
     player_pos.x = 0;
     player_pos.y = -1000;
     player_pos.z = 0;
-    VIDEO_SetPostRetraceCallback(&RenderDone);
     init_face_normals();
     PrepareTEV();
 
@@ -388,16 +356,16 @@ int main(int argc, char **argv)
         else
         {
             // Reset the world if the connection failed
-            ResetWorld();
+            current_world->reset();
         }
     }
 #endif
-    if (!is_remote())
+    if (!current_world->is_remote())
     {
         if (!current_world->load())
         {
             printf("Failed to load world, creating new world...\n");
-            ResetWorld();
+            current_world->reset();
         }
     }
 
@@ -422,7 +390,7 @@ int main(int argc, char **argv)
         }
         background = get_sky_color();
 
-        block_t *block = get_block_at(vec3i(std::floor(player->position.x), std::floor(player->aabb.min.y + player->y_offset), std::floor(player->position.z)));
+        block_t *block = get_block_at(current_world->player.m_entity->get_head_blockpos());
         if (block)
             fog_light_multiplier = flerp(fog_light_multiplier, std::pow(0.9f, (15.0f - block->sky_light)), 0.05f);
 
@@ -449,13 +417,13 @@ int main(int argc, char **argv)
 
         UpdateLightDir();
 
-        UpdateNetwork();
-
         GetInput();
 
         for (uint32_t i = current_world->last_entity_tick, count = 0; i < current_world->ticks && count < 10; i++, count++)
         {
             update_textures();
+
+            UpdateNetwork();
 
             if (current_world)
                 current_world->tick();
@@ -467,10 +435,6 @@ int main(int argc, char **argv)
 
         UpdateCamera(camera);
 
-        // Wrap the player around the world
-        if (!is_remote() && player->aabb.min.y < -750)
-            player->teleport(vec3f(player->position.x, 256, player->position.z));
-
         if (current_world)
             current_world->update();
 
@@ -479,8 +443,8 @@ int main(int argc, char **argv)
         gertex::perspective(viewport);
 
         // Set fog near and far distances
-        fog.start = fog_multiplier * fog_depth_multiplier * (GENERATION_DISTANCE - is_remote()) * 8.0f;
-        fog.end = fog_multiplier * fog_depth_multiplier * (GENERATION_DISTANCE - is_remote()) * 16.0f;
+        fog.start = fog_multiplier * fog_depth_multiplier * GENERATION_DISTANCE * 8.0f;
+        fog.end = fog.start * 2.0f;
 
         // Enable fog
         gertex::set_fog(fog);
@@ -582,7 +546,7 @@ void UpdateLoadingStatus()
     if (!current_world->loaded)
     {
         // Check if a 3x3 chunk area around the player is loaded
-        vec3i player_chunk_pos = vec3i(int(player_pos.x), int(player_pos.y), int(player_pos.z));
+        vec3i player_chunk_pos = current_world->player.m_entity->get_foot_blockpos();
         for (int x = -1; x <= 1 && !is_loading; x++)
         {
             for (int z = -1; z <= 1 && !is_loading; z++)
@@ -615,7 +579,7 @@ void UpdateLoadingStatus()
     if (isExiting)
     {
         show_dirtscreen = true;
-        if (is_remote())
+        if (current_world->is_remote())
             dirtscreen_text = "Quitting...";
         else
             dirtscreen_text = "Saving world...";
@@ -632,13 +596,8 @@ void GetInput()
         isExiting = true;
     if ((raw_wiimote_down & WPAD_BUTTON_1))
     {
-        printf("PRIM_CHUNK_MEMORY: %d B\n", total_chunks_size);
         printf("SPEED: %f, %f\n", wiimote_x, wiimote_z);
         printf("POS: %f, %f, %f\n", player_pos.x, player_pos.y, player_pos.z);
-    }
-    if ((raw_wiimote_down & WPAD_BUTTON_2))
-    {
-        current_world->ticks += 6000;
     }
 
     expansion_t expansion;
@@ -761,17 +720,20 @@ void GetInput()
         target_x -= left_stick.y * sin(DegToRad(yrot));
         target_z -= left_stick.y * cos(DegToRad(yrot));
 
-        yrot -= right_stick.x * current_world->delta_time * sensitivity;
-        xrot += right_stick.y * current_world->delta_time * sensitivity;
+        if (current_world)
+        {
+            yrot -= right_stick.x * current_world->delta_time * sensitivity;
+            xrot += right_stick.y * current_world->delta_time * sensitivity;
 
-        if (yrot > 360.f)
-            yrot -= 360.f;
-        if (yrot < 0)
-            yrot += 360.f;
-        if (xrot > 90.f)
-            xrot = 90.f;
-        if (xrot < -90.f)
-            xrot = -90.f;
+            if (yrot > 360.f)
+                yrot -= 360.f;
+            if (yrot < 0)
+                yrot += 360.f;
+            if (xrot > 90.f)
+                xrot = 90.f;
+            if (xrot < -90.f)
+                xrot = -90.f;
+        }
 
         wiimote_x = target_x;
         wiimote_z = target_z;
@@ -807,19 +769,19 @@ void GetInput()
     if (raw_wiimote_down & WPAD_CLASSIC_BUTTON_ZL)
     {
         selected_hotbar_slot = (selected_hotbar_slot + 8) % 9;
-        if (is_remote())
+        if (current_world->is_remote())
             client.sendBlockItemSwitch(selected_hotbar_slot);
     }
     if (raw_wiimote_down & WPAD_CLASSIC_BUTTON_ZR)
     {
         selected_hotbar_slot = (selected_hotbar_slot + 1) % 9;
-        if (is_remote())
+        if (current_world->is_remote())
             client.sendBlockItemSwitch(selected_hotbar_slot);
     }
 
     if ((raw_wiimote_down & WPAD_CLASSIC_BUTTON_LEFT))
     {
-        if (!is_remote())
+        if (!current_world->is_remote())
         {
             vec3i block_pos;
             vec3i face;
@@ -904,18 +866,9 @@ void Render(guVector chunkPos, void *buffer, u32 length)
     GX_CallDispList(buffer, length); // Draw the box
 }
 
-void RemoveRedundantChunks()
-{
-    current_world->cleanup_chunks();
-}
-
-void PrepareChunkRemoval(chunk_t *chunk)
-{
-    current_world->remove_chunk(chunk);
-}
-
 void UpdateCamera(camera_t &camera)
 {
+    aabb_entity_t *player = current_world->player.m_entity;
     player_pos = player->get_position(std::fmod(current_world->partial_ticks, 1)) - vec3f(0.5, 0.5, 0.5);
 
     // View bobbing
@@ -961,24 +914,15 @@ void AddParticle(const particle &part)
         current_world->add_particle(part);
 }
 
-void ResetWorld()
-{
-    // Assume the world just started generating
-    show_dirtscreen = true;
-    dirtscreen_text = "Building terrain...";
-    if (current_world)
-        current_world->reset();
-}
-
 void UpdateNetwork()
 {
-    if (client.status != Crapper::ErrorStatus::OK)
+    if (client.status != Crapper::ErrorStatus::OK || !current_world->is_remote())
         return;
     // Receive packets
     client.receive(receive_buffer);
 
-    // Handle packets
-    for (int i = 0; i < 10 && client.status == Crapper::ErrorStatus::OK; i++)
+    // Handle up to 100 packets
+    for (int i = 0; i < 100 && client.status == Crapper::ErrorStatus::OK; i++)
     {
         if (client.handlePacket(receive_buffer))
             break;
@@ -989,23 +933,24 @@ void UpdateNetwork()
     if (client.status != Crapper::ErrorStatus::OK)
     {
         // Reset the world if the connection is lost
-        ResetWorld();
+        current_world->reset();
         return;
     }
     if (!client.login_success)
         return;
 
     // Send keep alive every 2700 frames (every 45 seconds)
-    if (frameCounter % 2700 == 0)
+    if (current_world->ticks % 900 == 0)
         client.sendKeepAlive();
 
-    // Send the player's position and look every 12 frames (5 times per second)
-    if (frameCounter % 9 == 0 && frameCounter != 0)
+    // Send the player's position and look every 3 ticks
+    if (current_world->ticks % 3 == 0 && frameCounter != 0)
         client.sendPlayerPositionLook();
 
     // Send the player's grounded status if it has changed
-    if (frameCounter > 0 && client.on_ground != player->on_ground)
-        client.sendGrounded(player->on_ground);
+    bool on_ground = current_world->player.m_entity->on_ground;
+    if (frameCounter > 0 && client.on_ground != on_ground)
+        client.sendGrounded(on_ground);
 }
 
 void UpdateInventory(gertex::GXView &viewport)
@@ -1074,7 +1019,7 @@ void DrawHUD(gertex::GXView &viewport)
     GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
 
     // Draw the player's health above the hotbar. The texture size is 9x9 but they overlap by 1 pixel.
-    int health = player ? int8_t(player->health) : 0;
+    int health = current_world->player.m_entity->health;
 
     // Empty hearts
     for (int i = 0; i < 10; i++)

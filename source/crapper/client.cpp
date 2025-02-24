@@ -13,9 +13,6 @@
 extern float xrot;
 extern float yrot;
 extern std::string dirtscreen_text;
-void PrepareChunkRemoval(chunk_t *chunk);
-void RemoveRedundantChunks();
-void ResetWorld();
 void dbgprintf(const char *fmt, ...); // in minecraft.cpp
 void PlaySound(sound sound);          // in minecraft.cpp
 namespace Crapper
@@ -1273,10 +1270,10 @@ namespace Crapper
             if (chunk)
             {
                 // Mark chunk for removal
-                PrepareChunkRemoval(chunk);
+                current_world->remove_chunk(chunk);
 
                 // Also trigger a cleanup immediately
-                RemoveRedundantChunks();
+                current_world->cleanup_chunks();
             }
         }
 #ifdef PREALLOCATE_CHUNKS

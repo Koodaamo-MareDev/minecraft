@@ -22,6 +22,7 @@ public:
     inline void Init(uint32_t seed)
     {
         srand(seed);
+        init();
 
         // Precompute the inverse of 0-255
         for (int i = 1; i < 256; i++)

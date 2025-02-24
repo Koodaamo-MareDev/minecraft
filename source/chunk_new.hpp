@@ -276,11 +276,11 @@ private:
 extern const vec3i face_offsets[];
 extern mutex_t chunk_mutex;
 std::deque<chunk_t *> &get_chunks();
+void apply_noise_seed();
 void init_chunks();
 void deinit_chunks();
 void print_chunk_status();
 bool has_pending_chunks();
-bool is_remote();
 bool is_hell_world();
 void set_world_hell(bool hell);
 BlockID get_block_id_at(const vec3i &position, BlockID default_id = BlockID::air, chunk_t *near = nullptr);

@@ -1,6 +1,7 @@
 #include "gui_survival.hpp"
 #include "entity.hpp"
-extern aabb_entity_t *player;
+#include "world.hpp"
+
 gui_survival::gui_survival(const gertex::GXView &viewport, inventory::container &container) : gui(viewport), linked_container(container)
 {
     init_matrices();
@@ -200,17 +201,11 @@ void gui_survival::close()
     // Drop the item in hand
     if (!item_in_hand.empty())
     {
-        if (!player)
-            return;
+        aabb_entity_t *player = current_world->player.m_entity;
         item_entity_t *item_entity = new item_entity_t(player->get_position(0), item_in_hand);
         item_entity->velocity = angles_to_vector(player->rotation.x, player->rotation.y) * 0.5;
         item_entity->chunk = get_chunk_from_pos(vec3i(std::floor(player->position.x), std::floor(player->position.y), std::floor(player->position.z)));
-
-        // Probably unnecessary but better safe than sorry
-        if (item_entity->chunk)
-            item_entity->chunk->entities.push_back(item_entity);
-        else
-            delete item_entity;
+        add_entity(item_entity);
     }
 }
 

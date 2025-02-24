@@ -6,7 +6,6 @@
 #include <cstdint>
 #include <ogc/gu.h>
 
-extern guVector player_pos;
 bool light_engine_busy();
 void light_engine_init();
 void light_engine_deinit();

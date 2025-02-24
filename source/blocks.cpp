@@ -5,6 +5,7 @@
 #include "chunk_new.hpp"
 #include "light.hpp"
 #include "sounds.hpp"
+#include "world.hpp"
 #include <cmath>
 
 void PlaySound(sound sound); // in minecraft.cpp
@@ -516,7 +517,7 @@ void default_destroy(const vec3i &pos, const block_t &old_block)
 
 void spawn_tnt_destroy(const vec3i &pos, const block_t &old_block)
 {
-    if (!is_remote())
+    if (!current_world->is_remote())
         add_entity(new exploding_block_entity_t(old_block, pos, 80));
 }
 

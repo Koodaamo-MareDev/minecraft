@@ -36,7 +36,7 @@ bool aabb_entity_t::collides(aabb_entity_t *other)
 
 bool aabb_entity_t::can_remove()
 {
-    if (is_remote())
+    if (current_world->is_remote())
     {
         return dead && !local;
     }
@@ -102,7 +102,7 @@ void aabb_entity_t::tick()
     ticks_existed++;
     prev_rotation = rotation;
     prev_position = position;
-    if (is_remote() && !local && !simulate_offline)
+    if (current_world->is_remote() && !local && !simulate_offline)
     {
         return;
     }
@@ -265,7 +265,7 @@ void aabb_entity_t::tick()
             movement.x = wiimote_x;
             movement.z = wiimote_z;
         }
-        else if (!is_remote())
+        else if (!current_world->is_remote())
         {
             jumping = on_ground && should_jump();
         }
@@ -314,6 +314,10 @@ void aabb_entity_t::tick()
                 }
             }
         }
+    }
+    if (local && !current_world->is_remote() && aabb.min.y < -750)
+    {
+        teleport(vec3f(position.x, 256, position.z));
     }
 }
 void aabb_entity_t::animate()
@@ -567,7 +571,7 @@ void falling_block_entity_t::tick()
 {
     if (dead)
         return;
-    if (!fall_time && !is_remote())
+    if (!fall_time && !current_world->is_remote())
     {
         update_neighbors(vec3i(std::floor(position.x), std::floor(position.y), std::floor(position.z)));
     }
@@ -579,7 +583,7 @@ void falling_block_entity_t::tick()
         vec3f current_pos = get_position(0);
         vec3i int_pos = vec3i(std::floor(current_pos.x), std::floor(current_pos.y), std::floor(current_pos.z));
         block_t *block = get_block_at(int_pos, chunk);
-        if (block && !is_remote())
+        if (block && !current_world->is_remote())
         {
             // Update the block
             *block = this->block_state;
@@ -910,7 +914,7 @@ void item_entity_t::tick()
         return;
     aabb_entity_t::tick();
 
-    if (is_remote())
+    if (current_world->is_remote())
         return;
 
     if (ticks_existed >= 6000)
@@ -1010,12 +1014,12 @@ void item_entity_t::render(float partial_ticks, bool transparency)
 
 void item_entity_t::resolve_collision(aabb_entity_t *b)
 {
-    if (is_remote())
+    if (current_world->is_remote())
         return;
     if (dead || picked_up || ticks_existed < 20)
         return;
 
-    if (b == current_world->player.m_entity)
+    if (b->local)
     {
         inventory::item_stack left_over = current_world->player.m_inventory.add(item_stack);
         if (left_over.count)
@@ -1044,7 +1048,7 @@ void item_entity_t::resolve_collision(aabb_entity_t *b)
             sound.pitch = rng.nextFloat() * 0.8 + 0.6;
             PlaySound(sound);
             picked_up = true;
-            pickup_pos = current_world->player.m_entity->get_position(0) - vec3f(0, 0.5, 0);
+            pickup_pos = b->get_position(0) - vec3f(0, 0.5, 0);
             ticks_existed = item_lifetime - item_pickup_ticks;
             if (current_gui)
                 current_gui->refresh();

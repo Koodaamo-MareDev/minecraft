@@ -32,7 +32,6 @@
 #include "nbt/nbt.hpp"
 #include "mcregion.hpp"
 #include "world.hpp"
-extern bool isExiting;
 const vec3i face_offsets[] = {
     vec3i{-1, +0, +0},
     vec3i{+1, +0, +0},
@@ -52,11 +51,6 @@ void *__chunk_generator_init_internal(void *);
 
 std::deque<chunk_t *> chunks;
 std::deque<chunk_t *> pending_chunks;
-
-bool is_remote()
-{
-    return current_world && current_world->is_remote();
-}
 
 bool is_hell_world()
 {
@@ -328,7 +322,7 @@ void generate_ores(vec3i neighbor_pos, chunk_t *chunk, javaport::Random &rng)
     generate_ore_type(neighbor_pos, BlockID::gold_ore, gold_count, 32, chunk, rng);
     generate_ore_type(neighbor_pos, BlockID::diamond_ore, diamond_count, 12, chunk, rng);
 }
-extern aabb_entity_t *player;
+
 void generate_features(chunk_t *chunk)
 {
     javaport::Random rng(chunk->x * 0x4F9939F508L + chunk->z * 0x1F38D3E7L + current_world->seed);
@@ -539,6 +533,11 @@ void deinit_chunks()
     LWP_MutexDestroy(chunk_mutex);
 }
 
+void apply_noise_seed()
+{
+    improved_noise.Init(current_world->seed);
+}
+
 // create chunk
 void init_chunks()
 {
@@ -556,7 +555,6 @@ void init_chunks()
 
 void *__chunk_generator_init_internal(void *)
 {
-    improved_noise.Init(current_world->seed);
 
     while (__chunk_generator_init_done)
     {
@@ -636,7 +634,7 @@ void update_block_at(const vec3i &pos)
     chunk_t *chunk = get_chunk_from_pos(pos);
     if (!chunk)
         return;
-    if (!is_remote())
+    if (!current_world->is_remote())
     {
         block_t *block = chunk->get_block(pos);
         blockproperties_t prop = properties(block->id);
@@ -1770,7 +1768,7 @@ void chunk_t::update_entities()
         entity->last_world_tick = current_world->ticks;
     }
 
-    if (!is_remote())
+    if (!current_world->is_remote())
     {
         // Resolve collisions with current chunk and neighboring chunks' entities
         for (int i = 0; i <= 6; i++)
@@ -1788,7 +1786,7 @@ void chunk_t::update_entities()
                         if (entity != this_entity && entity->collides(this_entity))
                         {
                             // Resolve the collision - always resolve from the perspective of the non-player entity
-                            if (this_entity == player)
+                            if (this_entity->local)
                                 entity->resolve_collision(this_entity);
                             else
                                 this_entity->resolve_collision(entity);
@@ -1880,7 +1878,7 @@ chunk_t::~chunk_t()
         if (!entity)
             continue;
         entity->chunk = nullptr;
-        if (!is_remote())
+        if (!current_world->is_remote())
         {
             // Remove the entity from the global entity list
             // NOTE: This will also delete the entity as its chunk is nullptr
