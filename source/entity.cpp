@@ -19,10 +19,6 @@ extern gui *current_gui;
 
 pathfinding_t pathfinder;
 
-void PlaySound(sound sound);                                 // in minecraft.cpp
-void AddParticle(const particle &particle);                  // in minecraft.cpp
-void CreateExplosion(vec3f pos, float power, chunk_t *near); // in minecraft.cpp
-
 constexpr int item_pickup_ticks = 2;
 constexpr int item_lifetime = 6000;
 
@@ -154,7 +150,7 @@ void aabb_entity_t::tick()
             sound.position = position;
             sound.pitch = 0.6 + rng.nextFloat() * 0.8;
             sound.volume = impact;
-            PlaySound(sound);
+            current_world->play_sound(sound);
 
             particle particle;
             particle.life_time = particle.max_life_time = 80;
@@ -178,7 +174,7 @@ void aabb_entity_t::tick()
                 // Randomize life time
                 particle.life_time = particle.max_life_time - (rand() % 20);
 
-                AddParticle(particle);
+                current_world->add_particle(particle);
             }
             particle.physics |= PPHYSIC_FLAG_GRAVITY;
             particle.v = 16;
@@ -194,7 +190,7 @@ void aabb_entity_t::tick()
                 // Randomize life time
                 particle.life_time = particle.max_life_time - (rand() % 20);
 
-                AddParticle(particle);
+                current_world->add_particle(particle);
             }
         }
         in_water = true;
@@ -309,7 +305,7 @@ void aabb_entity_t::tick()
                 {
                     sound sound = get_step_sound(block_at_feet->get_blockid());
                     sound.position = feet_pos;
-                    PlaySound(sound);
+                    current_world->play_sound(sound);
                     last_step_distance = 0;
                 }
             }
@@ -640,7 +636,7 @@ exploding_block_entity_t::exploding_block_entity_t(block_t block_state, const ve
         sound.position = get_position(0);
         sound.volume = 0.5;
         sound.pitch = 1.0;
-        PlaySound(sound);
+        current_world->play_sound(sound);
     }
 }
 
@@ -657,7 +653,7 @@ void exploding_block_entity_t::tick()
     if (!fuse)
     {
         dead = true;
-        CreateExplosion(position + vec3i(0, 0.5625, 0), 3, chunk);
+        current_world->create_explosion(position + vec3i(0, 0.5625, 0), 3, chunk);
     }
 }
 
@@ -753,7 +749,7 @@ void creeper_entity_t::tick()
                 sound.position = position;
                 sound.volume = 1.0;
                 sound.pitch = 1.0;
-                PlaySound(sound);
+                current_world->play_sound(sound);
             }
         }
         // Explode if the player is too close
@@ -769,13 +765,13 @@ void creeper_entity_t::tick()
                 sound.position = position;
                 sound.volume = 0.5;
                 sound.pitch = 1.0;
-                PlaySound(sound);
+                current_world->play_sound(sound);
             }
 
             if (!fuse)
             {
                 dead = true;
-                CreateExplosion(get_position(0), 3, nullptr);
+                current_world->create_explosion(get_position(0), 3, nullptr);
             }
             else
             {
@@ -1032,7 +1028,7 @@ void item_entity_t::resolve_collision(aabb_entity_t *b)
                 sound.position = position;
                 sound.volume = 0.5;
                 sound.pitch = rng.nextFloat() * 0.8 + 0.6;
-                PlaySound(sound);
+                current_world->play_sound(sound);
                 if (current_gui)
                     current_gui->refresh();
             }
@@ -1046,7 +1042,7 @@ void item_entity_t::resolve_collision(aabb_entity_t *b)
             sound.position = position;
             sound.volume = 0.5;
             sound.pitch = rng.nextFloat() * 0.8 + 0.6;
-            PlaySound(sound);
+            current_world->play_sound(sound);
             picked_up = true;
             pickup_pos = b->get_position(0) - vec3f(0, 0.5, 0);
             ticks_existed = item_lifetime - item_pickup_ticks;
@@ -1069,7 +1065,7 @@ void item_entity_t::pickup(vec3f pos)
     sound.position = position;
     sound.volume = 0.5;
     sound.pitch = rng.nextFloat() * 0.8 + 0.6;
-    PlaySound(sound);
+    current_world->play_sound(sound);
 
     // Mark the item as picked up
     picked_up = true;
@@ -1099,7 +1095,7 @@ void mp_player_entity_t::hurt()
     sound.position = current_world->player.m_entity->position;
     sound.volume = 0.5;
     sound.pitch = rng.nextFloat() * 0.8 + 0.6;
-    PlaySound(sound);
+    current_world->play_sound(sound);
 }
 
 void mp_player_entity_t::tick()

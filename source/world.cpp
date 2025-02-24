@@ -35,10 +35,13 @@ world::world()
     player.m_entity->y_size = 0;
     player.m_entity->teleport(vec3f(0.5, -999, 0.5));
     add_entity(player.m_entity);
+
+    light_engine::init();
 }
 
 world::~world()
 {
+    light_engine::deinit();
     delete player.m_entity;
 }
 

@@ -8,7 +8,6 @@
 #include "world.hpp"
 #include <cmath>
 
-void PlaySound(sound sound); // in minecraft.cpp
 int8_t get_block_opacity(BlockID blockid)
 {
     return block_properties[int(blockid)].m_opacity;
@@ -376,7 +375,7 @@ void update_fluid(block_t *block, vec3i pos, chunk_t *near)
                                 sound.position = vec3f() + pos + surrounding_offset;
                                 sound.volume = 0.25;
                                 sound.pitch = 1.0;
-                                PlaySound(sound);
+                                current_world->play_sound(sound);
                             }
                         }
                     }

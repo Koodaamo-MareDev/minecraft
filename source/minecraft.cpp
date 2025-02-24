@@ -1,38 +1,17 @@
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstdio>
+#include <cstdlib>
 #include <string.h>
-#include <malloc.h>
-#include <math.h>
-#include <gccore.h>
-#include <vector>
-#include <algorithm>
+#include <cmath>
 #include <wiiuse/wpad.h>
-#include <ogc/lwp_watchdog.h>
 #include <fat.h>
 #include <ogc/conf.h>
 #include <stdarg.h>
 #include <sys/stat.h>
-#include "mcregion.hpp"
-#include "nbt/nbt.hpp"
-#include "chunk_new.hpp"
-#include "block.hpp"
-#include "blocks.hpp"
-#include "brightness_values.h"
-#include "vec3i.hpp"
+#include "block_id.hpp"
 #include "timers.hpp"
-#include "texturedefs.h"
 #include "raycast.hpp"
-#include "light.hpp"
-#include "texanim.hpp"
-#include "base3d.hpp"
-#include "render.hpp"
 #include "render_gui.hpp"
-#include "lock.hpp"
-#include "asynclib.hpp"
-#include "particle.hpp"
-#include "sound.hpp"
 #include "inventory.hpp"
-#include "gui.hpp"
 #include "gui_survival.hpp"
 #include "crapper/client.hpp"
 #include "world.hpp"
@@ -158,7 +137,6 @@ int mkpath(const char *path, mode_t mode)
     return 0;
 }
 void UpdateNetwork();
-void CreateExplosion(vec3f pos, float power, chunk_t *near);
 void UpdateLoadingStatus();
 void UpdateLightDir();
 void HandleGUI(gertex::GXView &viewport);
@@ -210,7 +188,6 @@ int main(int argc, char **argv)
     void *gpfifo = NULL;
     GXColor background = GXColor{0, 0, 0, 0xFF};
 
-    async_lib::init();
     VIDEO_Init();
     WPAD_Init();
     rmode = VIDEO_GetPreferredMode(NULL);
@@ -317,7 +294,6 @@ int main(int argc, char **argv)
     fatInitDefault();
     current_world = new world;
 
-    light_engine::init();
     init_chunk_generator();
     current_world->seed = gettime();
     apply_noise_seed();
@@ -507,9 +483,8 @@ int main(int argc, char **argv)
     current_world->save();
     current_world->reset();
     Crapper::deinitNetwork();
-    light_engine::deinit();
-    deinit_chunks();
     delete current_world;
+    deinit_chunks();
     VIDEO_Flush();
     VIDEO_WaitVSync();
     if (HWButton != -1)
@@ -518,14 +493,6 @@ int main(int argc, char **argv)
         SYS_ResetSystem(HWButton, 0, 0);
     }
     return 0;
-}
-
-void CreateExplosion(vec3f pos, float power, chunk_t *chunk)
-{
-    if (current_world)
-    {
-        current_world->create_explosion(pos, power, chunk);
-    }
 }
 
 void UpdateLoadingStatus()
@@ -782,7 +749,7 @@ void GetInput()
             {
                 block_pos = block_pos + face;
                 vec3f pos = vec3f(block_pos.x, block_pos.y, block_pos.z) + vec3f(0.5, 0.5, 0.5);
-                CreateExplosion(pos, 3, get_chunk_from_pos(block_pos));
+                current_world->create_explosion(pos, 3, get_chunk_from_pos(block_pos));
             }
         }
     }
@@ -893,18 +860,6 @@ void UpdateCamera(camera_t &camera)
     camera.rot.y = yrot;
     player->rotation.x = xrot;
     player->rotation.y = yrot;
-}
-
-void PlaySound(sound snd)
-{
-    if (current_world)
-        current_world->play_sound(snd);
-}
-
-void AddParticle(const particle &part)
-{
-    if (current_world)
-        current_world->add_particle(part);
 }
 
 void UpdateNetwork()

@@ -14,7 +14,6 @@ extern float xrot;
 extern float yrot;
 extern std::string dirtscreen_text;
 void dbgprintf(const char *fmt, ...); // in minecraft.cpp
-void PlaySound(sound sound);          // in minecraft.cpp
 namespace Crapper
 {
     bool initNetwork()
