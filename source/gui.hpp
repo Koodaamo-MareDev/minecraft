@@ -45,6 +45,7 @@ public:
     static void init_matrices();
     static int text_width(std::string str);
     static void draw_text(int x, int y, std::string str, GXColor color = {255, 255, 255, 255});
+    static void draw_text_with_shadow(int x, int y, std::string str, GXColor color = {255, 255, 255, 255});
     static void draw_item(int x, int y, inventory::item_stack item);
 
     /**

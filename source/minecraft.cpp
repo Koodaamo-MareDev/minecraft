@@ -835,7 +835,7 @@ void HandleGUI(gertex::GXView &viewport)
         fill_screen_texture(blockmap_texture, viewport, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index), TEXTURE_PX(texture_index), TEXTURE_PY(texture_index));
 
         // Draw the status text
-        gui::draw_text((viewport.width - gui::text_width(dirtscreen_text)) / 2, viewport.height / 2, dirtscreen_text, GXColor{255, 255, 255, 255});
+        gui::draw_text_with_shadow((viewport.width - gui::text_width(dirtscreen_text)) / 2, viewport.height / 2, dirtscreen_text);
     }
     else
     {

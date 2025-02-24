@@ -85,6 +85,14 @@ void gui::draw_text(int x, int y, std::string str, GXColor color)
     }
 }
 
+void gui::draw_text_with_shadow(int x, int y, std::string str, GXColor color)
+{
+    GXColor shadow = color * 0.25;
+    shadow.a = color.a;
+    draw_text(x + 2, y + 2, str, shadow);
+    draw_text(x, y, str, color);
+}
+
 void gui::draw_item(int x, int y, inventory::item_stack stack)
 {
     if (stack.empty())
@@ -146,8 +154,7 @@ void gui::draw_item(int x, int y, inventory::item_stack stack)
     {
         std::string count_str = std::to_string(stack.count);
         int count_width = text_width(count_str);
-        draw_text(x + 36 - count_width, y + 18, count_str, {64, 64, 64, 255});
-        draw_text(x + 34 - count_width, y + 16, count_str);
+        draw_text_with_shadow(x + 34 - count_width, y + 16, count_str);
     }
 }
 
