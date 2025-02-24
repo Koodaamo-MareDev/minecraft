@@ -182,8 +182,8 @@ class NBTTagByteArray : public NBTBase
 public:
     std::vector<int8_t> value;
 
-    NBTTagByteArray(std::vector<int8_t> value = {}) : value(value) {}
-    NBTTagByteArray(std::vector<uint8_t> value)
+    NBTTagByteArray(const std::vector<int8_t> &value = {}) : value(value) {}
+    NBTTagByteArray(const std::vector<uint8_t> &value)
     {
         this->value.resize(value.size());
         std::memcpy(this->value.data(), value.data(), value.size());
