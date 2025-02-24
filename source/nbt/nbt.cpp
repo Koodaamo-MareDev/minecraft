@@ -92,6 +92,11 @@ NBTBase *NBTBase::copyTag(NBTBase *tag)
     }
     }
 
+    if (!newTag)
+        throw std::runtime_error("Failed to copy tag (is the game running low on memory?)");
+
+    newTag->name = tag->name;
+
     return newTag;
 }
 
