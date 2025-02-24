@@ -36,6 +36,11 @@ world::world()
     add_entity(player.m_entity);
 }
 
+world::~world()
+{
+    delete player.m_entity;
+}
+
 bool world::is_remote()
 {
     return remote;

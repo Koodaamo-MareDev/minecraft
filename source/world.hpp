@@ -54,6 +54,7 @@ public:
     std::string name = "world";
 
     world();
+    ~world();
 
     bool is_remote();
     void set_remote(bool value);
