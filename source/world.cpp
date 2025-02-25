@@ -13,12 +13,12 @@
 #include "raycast.hpp"
 #include "nbt/nbt.hpp"
 #include "light.hpp"
+#include "gui_dirtscreen.hpp"
 
 extern Crapper::MinecraftClient client;
 extern bool should_destroy_block;
 extern bool should_place_block;
-extern bool show_dirtscreen;
-extern std::string dirtscreen_text;
+extern gui *current_gui;
 extern int mkpath(const char *path, mode_t mode);
 
 world::world()
@@ -579,8 +579,6 @@ void world::draw(camera_t &camera)
     // Draw chunks
     GX_SetAlphaCompare(GX_GEQUAL, 1, GX_AOP_AND, GX_ALWAYS, 0);
     draw_scene(false);
-
-    draw_selected_block();
 }
 
 void world::draw_scene(bool opaque)
@@ -932,7 +930,9 @@ bool world::load()
 
 void world::reset()
 {
-    dirtscreen_text = "Building terrain...";
+    gui_dirtscreen *dirtscreen = new gui_dirtscreen(gertex::GXView());
+    dirtscreen->set_text("Loading level");
+    gui::set_gui(dirtscreen);
     loaded = false;
     time_of_day = 0;
     ticks = 0;
@@ -995,7 +995,7 @@ void world::update_entities()
 void world::update_player()
 {
     // Tick the player entity even in unloaded chunks
-    if (!player.m_entity->chunk && !show_dirtscreen)
+    if (!player.m_entity->chunk && loaded)
         player.m_entity->tick();
 
     // FIXME: This is a temporary fix for an crash with an unknown cause

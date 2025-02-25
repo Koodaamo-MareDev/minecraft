@@ -98,7 +98,7 @@ namespace gertex
         Mtx44 prespective_mtx;
         guPerspective(prespective_mtx, view.fov, view.aspect, view.near, view.far);
         guMtx44Copy(prespective_mtx, state.proj_mtx.mtx);
-        
+
         // Update the state
         state.proj_mtx.ortho = false;
         load_proj_matrix();
@@ -113,7 +113,7 @@ namespace gertex
         Mtx44 ortho_mtx;
         guOrtho(ortho_mtx, 0, view.height, 0, view.width, 0, view.far);
         guMtx44Copy(ortho_mtx, state.proj_mtx.mtx);
-        
+
         // Update the state
         state.proj_mtx.ortho = true;
         load_proj_matrix();
@@ -182,4 +182,5 @@ namespace gertex
         load_pos_matrix();
         load_proj_matrix();
     }
+    GXView *GXView::default_view = nullptr;
 } // namespace gertex

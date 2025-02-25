@@ -36,6 +36,8 @@ namespace gertex
         float aspect = CAMERA_WIDTH / CAMERA_HEIGHT;
         float yscale = 1.2f;
         bool widescreen = false;
+        static GXView *default_view;
+
         GXView(float width, float height, bool widescreen, float fov, float near, float far, float yscale)
         {
 
@@ -48,10 +50,21 @@ namespace gertex
             this->near = near;
             this->far = far;
             this->widescreen = widescreen;
+            if (!default_view)
+                default_view = this;
         }
 
         GXView()
         {
+            if (!default_view)
+                return;
+            *this = *default_view;
+        }
+
+        ~GXView()
+        {
+            if (default_view == this)
+                default_view = nullptr;
         }
     };
 

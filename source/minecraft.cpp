@@ -13,6 +13,7 @@
 #include "render_gui.hpp"
 #include "inventory.hpp"
 #include "gui_survival.hpp"
+#include "gui_dirtscreen.hpp"
 #include "crapper/client.hpp"
 #include "world.hpp"
 
@@ -58,15 +59,10 @@ float prev_left_shoulder = 0;
 float prev_right_shoulder = 0;
 bool should_destroy_block = false;
 bool should_place_block = false;
-int selected_hotbar_slot = 0;
 inventory::item_stack *selected_item = nullptr;
 
 int cursor_x = 0;
 int cursor_y = 0;
-bool show_dirtscreen = true;
-std::string dirtscreen_text = "Loading...";
-
-gui *current_gui = nullptr;
 
 float fog_depth_multiplier = 1.0f;
 float fog_light_multiplier = 1.0f;
@@ -140,8 +136,8 @@ void UpdateNetwork();
 void UpdateLoadingStatus();
 void UpdateLightDir();
 void HandleGUI(gertex::GXView &viewport);
-void UpdateInventory(gertex::GXView &viewport);
-void DrawInventory(gertex::GXView &viewport);
+void UpdateGUI(gertex::GXView &viewport);
+void DrawGUI(gertex::GXView &viewport);
 void DrawHUD(gertex::GXView &viewport);
 void UpdateCamera(camera_t &camera);
 void PrepareTEV();
@@ -295,6 +291,7 @@ int main(int argc, char **argv)
     current_world = new world;
 
     init_chunk_generator();
+    current_world->reset();
     current_world->seed = gettime();
     apply_noise_seed();
     VIDEO_Flush();
@@ -322,12 +319,7 @@ int main(int argc, char **argv)
         client.joinServer("desktop-marcus.local", 25566);
         if (client.status != Crapper::ErrorStatus::OK)
             client.joinServer("mc.okayu.zip", 25566);
-        if (client.status == Crapper::ErrorStatus::OK)
-        {
-            // Display status message
-            dirtscreen_text = "Logging in...";
-        }
-        else
+        if (client.status != Crapper::ErrorStatus::OK)
         {
             // Reset the world if the connection failed
             current_world->reset();
@@ -349,7 +341,12 @@ int main(int argc, char **argv)
         u64 frame_start = time_get();
         float sky_multiplier = get_sky_multiplier();
         if (HWButton != -1)
+        {
+            gui_dirtscreen *dirtscreen = new gui_dirtscreen(viewport);
+            dirtscreen->set_text("Saving world...");
+            gui::set_gui(dirtscreen);
             isExiting = true;
+        }
         GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, BASE3D_POS_FRAC_BITS);
         if (!current_world->hell)
         {
@@ -422,15 +419,17 @@ int main(int argc, char **argv)
         // Enable fog
         gertex::set_fog(fog);
 
-        if (!show_dirtscreen)
+        // Draw the scene
+        if (current_world && current_world->loaded)
         {
-            // Draw the scene
-            if (current_world)
-                current_world->draw(camera);
-
+            current_world->draw(camera);
             // Draw sky
             if (current_world->player.in_fluid == BlockID::air && !current_world->hell)
                 draw_sky(background);
+
+            GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, BASE3D_POS_FRAC_BITS);
+            use_texture(blockmap_texture);
+            current_world->draw_selected_block();
         }
 
         gertex::ortho(viewport);
@@ -505,44 +504,43 @@ void UpdateLoadingStatus()
     bool is_loading = false;
     if (!current_world->loaded)
     {
+        uint8_t loading_progress = 0;
         // Check if a 3x3 chunk area around the player is loaded
         vec3i player_chunk_pos = current_world->player.m_entity->get_foot_blockpos();
-        for (int x = -1; x <= 1 && !is_loading; x++)
+        for (int x = -1; x <= 1; x++)
         {
-            for (int z = -1; z <= 1 && !is_loading; z++)
+            for (int z = -1; z <= 1; z++)
             {
                 vec3i chunk_pos = player_chunk_pos + vec3i(x * 16, 0, z * 16);
                 chunk_t *chunk = get_chunk_from_pos(chunk_pos);
                 if (!chunk || chunk->generation_stage != ChunkGenStage::done)
                 {
-                    is_loading = true;
-                    break;
+                    continue;
                 }
+
                 // Check if the vbos near the player are visible and dirty
-                for (int i = (player_chunk_pos.y / 16) - 1; i < (player_chunk_pos.y / 16) + 1; i++)
+                for (int i = (player_chunk_pos.y / 16) - 1; i <= (player_chunk_pos.y / 16) + 1; i++)
                 {
-                    if (chunk->vbos[i].visible && (chunk->vbos[i].dirty || chunk->vbos[i].cached_solid != chunk->vbos[i].solid || chunk->vbos[i].cached_transparent != chunk->vbos[i].transparent))
+                    if (chunk->vbos[i].visible)
                     {
-                        is_loading = true;
-                        break;
+                        loading_progress++;
                     }
                 }
             }
         }
+        is_loading = loading_progress < 27;
+        // Display the loading screen
+        gui_dirtscreen *dirtscreen = dynamic_cast<gui_dirtscreen *>(gui::get_gui());
+        if (dirtscreen)
+        {
+            dirtscreen->set_text("Loading level\n\nBuilding terrain\n");
+            dirtscreen->set_progress(loading_progress, 27);
+        }
         if (!is_loading)
         {
             current_world->loaded = true;
+            gui::set_gui(nullptr);
         }
-    }
-    show_dirtscreen = !current_world->loaded;
-
-    if (isExiting)
-    {
-        show_dirtscreen = true;
-        if (current_world->is_remote())
-            dirtscreen_text = "Quitting...";
-        else
-            dirtscreen_text = "Saving world...";
     }
 }
 
@@ -673,7 +671,7 @@ void GetInput()
         right_stick.y = 0;
     }
 
-    if (!current_gui)
+    if (!gui::get_gui())
     {
         float target_x = left_stick.x * sin(DegToRad(yrot + 90));
         float target_z = left_stick.x * cos(DegToRad(yrot + 90));
@@ -728,15 +726,15 @@ void GetInput()
     }
     if (raw_wiimote_down & WPAD_CLASSIC_BUTTON_ZL)
     {
-        selected_hotbar_slot = (selected_hotbar_slot + 8) % 9;
+        current_world->player.selected_hotbar_slot = (current_world->player.selected_hotbar_slot + 8) % 9;
         if (current_world->is_remote())
-            client.sendBlockItemSwitch(selected_hotbar_slot);
+            client.sendBlockItemSwitch(current_world->player.selected_hotbar_slot);
     }
     if (raw_wiimote_down & WPAD_CLASSIC_BUTTON_ZR)
     {
-        selected_hotbar_slot = (selected_hotbar_slot + 1) % 9;
+        current_world->player.selected_hotbar_slot = (current_world->player.selected_hotbar_slot + 1) % 9;
         if (current_world->is_remote())
-            client.sendBlockItemSwitch(selected_hotbar_slot);
+            client.sendBlockItemSwitch(current_world->player.selected_hotbar_slot);
     }
 
     if ((raw_wiimote_down & WPAD_CLASSIC_BUTTON_LEFT))
@@ -774,30 +772,19 @@ void HandleGUI(gertex::GXView &viewport)
 {
     if ((raw_wiimote_down & WPAD_CLASSIC_BUTTON_X) != 0)
     {
-        if (current_gui)
+        if (current_world && current_world->loaded)
         {
-            current_gui->close();
-            delete current_gui;
-            current_gui = nullptr;
-        }
-        else
-        {
-            if (current_world)
+            if (gui::get_gui())
             {
-                current_gui = new gui_survival(viewport, current_world->player.m_inventory);
+                gui::set_gui(nullptr);
+            }
+            else
+            {
+                gui::set_gui(new gui_survival(viewport, current_world->player.m_inventory));
             }
         }
     }
-    if (show_dirtscreen)
-    {
-        // Fill the screen with the dirt texture
-        int texture_index = get_default_texture_index(BlockID::dirt);
-        fill_screen_texture(blockmap_texture, viewport, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index), TEXTURE_PX(texture_index), TEXTURE_PY(texture_index));
-
-        // Draw the status text
-        gui::draw_text_with_shadow((viewport.width - gui::text_width(dirtscreen_text)) / 2, viewport.height / 2, dirtscreen_text);
-    }
-    else
+    if (current_world->loaded)
     {
         // Draw the underwater overlay
         static vec3f pan_underwater_texture(0, 0, 0);
@@ -812,9 +799,9 @@ void HandleGUI(gertex::GXView &viewport)
         draw_textured_quad(vignette_texture, 0, 0, viewport.width, viewport.height, 0, 0, 256, 256);
 
         DrawHUD(viewport);
-        UpdateInventory(viewport);
-        DrawInventory(viewport);
     }
+    UpdateGUI(viewport);
+    DrawGUI(viewport);
 }
 
 void Render(guVector chunkPos, void *buffer, u32 length)
@@ -901,9 +888,9 @@ void UpdateNetwork()
         client.sendGrounded(on_ground);
 }
 
-void UpdateInventory(gertex::GXView &viewport)
+void UpdateGUI(gertex::GXView &viewport)
 {
-    if (!current_gui)
+    if (!gui::get_gui())
         return;
 
     cursor_x += left_stick.x * 8;
@@ -915,7 +902,7 @@ void UpdateInventory(gertex::GXView &viewport)
         cursor_x = std::clamp(cursor_x, 0, int(viewport.width));
         cursor_y = std::clamp(cursor_y, 0, int(viewport.height));
     }
-    current_gui->update();
+    gui::get_gui()->update();
 }
 
 void DrawHUD(gertex::GXView &viewport)
@@ -945,7 +932,7 @@ void DrawHUD(gertex::GXView &viewport)
     draw_textured_quad(icons_texture, (viewport.width - 364) / 2, viewport.height - 44, 364, 44, 56, 9, 238, 31);
 
     // Draw the hotbar selection
-    draw_textured_quad(icons_texture, (viewport.width - 364) / 2 + selected_hotbar_slot * 40 - 2, viewport.height - 46, 48, 48, 56, 31, 80, 55);
+    draw_textured_quad(icons_texture, (viewport.width - 364) / 2 + current_world->player.selected_hotbar_slot * 40 - 2, viewport.height - 46, 48, 48, 56, 31, 80, 55);
 
     if (current_world)
     {
@@ -988,13 +975,14 @@ void DrawHUD(gertex::GXView &viewport)
     }
 }
 
-void DrawInventory(gertex::GXView &viewport)
+void DrawGUI(gertex::GXView &viewport)
 {
-    if (!current_gui)
+    gui *m_gui = gui::get_gui();
+    if (!m_gui)
         return;
 
     // This is required as blocks require a dummy chunk to be rendered
-    if (!get_chunks().size())
+    if (!get_chunks().size() && m_gui->use_cursor())
         return;
 
     // Disable depth testing for GUI elements
@@ -1005,7 +993,8 @@ void DrawInventory(gertex::GXView &viewport)
     gertex::push_matrix();
 
     // Draw the GUI elements
-    current_gui->draw();
+    m_gui->viewport = viewport;
+    gui::get_gui()->draw();
 
     // Restore the orthogonal position matrix
     gertex::pop_matrix();
@@ -1014,8 +1003,11 @@ void DrawInventory(gertex::GXView &viewport)
     // Enable direct colors
     GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
 
+    if (!gui::get_gui()->use_cursor())
+        return;
+
     // Draw the cursor
-    if (wiimote_ir_visible && !current_gui->contains(cursor_x, cursor_y))
+    if (wiimote_ir_visible && !gui::get_gui()->contains(cursor_x, cursor_y))
         draw_textured_quad(icons_texture, cursor_x - 7, cursor_y - 3, 32, 48, 32, 32, 48, 56);
     else
         draw_textured_quad(icons_texture, cursor_x - 16, cursor_y - 16, 32, 32, 0, 32, 32, 64);

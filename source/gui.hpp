@@ -41,6 +41,7 @@ public:
     virtual bool contains(int x, int y) = 0;
     virtual void close() = 0;
     virtual void refresh() {}
+    virtual bool use_cursor() { return true; }
 
     static void init_matrices();
     static int text_width(std::string str);
@@ -55,6 +56,24 @@ public:
      * NOTE: It is up to the user to draw the background.
      **/
     static void draw_container(int x, int y, inventory::container &container);
+
+    static gui *get_gui()
+    {
+        return current_gui;
+    }
+
+    static void set_gui(gui *gui)
+    {
+        if (current_gui)
+        {
+            current_gui->close();
+            delete current_gui;
+        }
+        current_gui = gui;
+    }
+
+protected:
+    static gui *current_gui;
 };
 
 extern gertex::GXMatrix gui_block_matrix;

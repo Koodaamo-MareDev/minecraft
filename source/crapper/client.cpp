@@ -9,10 +9,10 @@
 #include "../sounds.hpp"
 #include "../sound.hpp"
 #include "../world.hpp"
+#include "../gui_dirtscreen.hpp"
 
 extern float xrot;
 extern float yrot;
-extern std::string dirtscreen_text;
 void dbgprintf(const char *fmt, ...); // in minecraft.cpp
 namespace Crapper
 {
@@ -630,7 +630,13 @@ namespace Crapper
 
         if (current_world->player.m_entity)
             current_world->player.m_entity->entity_id = entity_id;
-        dirtscreen_text = "Downloading terrain...";
+
+        gui_dirtscreen *dirtscreen = dynamic_cast<gui_dirtscreen *>(gui::get_gui());
+        if (!dirtscreen)
+            dirtscreen = new gui_dirtscreen(gertex::GXView());
+        dirtscreen->set_text("Loading level\n\nDownloading terrain");
+        dirtscreen->set_progress(0, 0);
+        gui::set_gui(dirtscreen);
         login_success = true;
     }
 
@@ -823,7 +829,7 @@ namespace Crapper
 
         // Send player look packet
         ByteBuffer buffer;
-        buffer.writeByte(0x0C);                      // Packet ID
+        buffer.writeByte(0x0C);                                              // Packet ID
         buffer.writeFloat(180 - current_world->player.m_entity->rotation.y); // Yaw
         buffer.writeFloat(-current_world->player.m_entity->rotation.x);      // Pitch
         buffer.writeBool(current_world->player.m_entity->on_ground);
@@ -1614,7 +1620,14 @@ namespace Crapper
         std::string message = buffer.readString();
         if (buffer.underflow)
             return;
-        dirtscreen_text = "Disconnected from server\nReason: " + message;
+
+        gui_dirtscreen *dirtscreen = dynamic_cast<gui_dirtscreen *>(gui::get_gui());
+        if (!dirtscreen)
+            dirtscreen = new gui_dirtscreen(gertex::GXView());
+        dirtscreen->set_text("Connection lost\n\n" + message);
+        dirtscreen->set_progress(0, 0);
+        gui::set_gui(dirtscreen);
+
         status = ErrorStatus::RECEIVE_ERROR;
     }
 
@@ -1891,7 +1904,14 @@ namespace Crapper
         default:
         {
             dbgprintf("Unknown packet ID: 0x%02X\n", packet_id);
-            dirtscreen_text = "Disconnected\nReason: Received unknown packet " + std::to_string(packet_id);
+
+            gui_dirtscreen *dirtscreen = dynamic_cast<gui_dirtscreen *>(gui::get_gui());
+            if (!dirtscreen)
+                dirtscreen = new gui_dirtscreen(gertex::GXView());
+            dirtscreen->set_text("Connection Lost\n\nReason: Received unknown packet " + std::to_string(packet_id));
+            dirtscreen->set_progress(0, 0);
+            gui::set_gui(dirtscreen);
+
             status = ErrorStatus::RECEIVE_ERROR;
             break;
         }

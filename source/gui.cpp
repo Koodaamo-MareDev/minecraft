@@ -5,6 +5,8 @@
 gertex::GXMatrix gui_block_matrix;
 gertex::GXMatrix gui_item_matrix;
 
+gui *gui::current_gui = nullptr;
+
 void gui::init_matrices()
 {
     // Prepare matrices for rendering GUI elements

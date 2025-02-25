@@ -15,7 +15,6 @@
 extern float wiimote_x;
 extern float wiimote_z;
 extern u32 wiimote_held;
-extern gui *current_gui;
 
 pathfinding_t pathfinder;
 
@@ -1029,8 +1028,8 @@ void item_entity_t::resolve_collision(aabb_entity_t *b)
                 sound.volume = 0.5;
                 sound.pitch = rng.nextFloat() * 0.8 + 0.6;
                 current_world->play_sound(sound);
-                if (current_gui)
-                    current_gui->refresh();
+                if (gui::get_gui())
+                    gui::get_gui()->refresh();
             }
             item_stack = left_over;
         }
@@ -1046,8 +1045,8 @@ void item_entity_t::resolve_collision(aabb_entity_t *b)
             picked_up = true;
             pickup_pos = b->get_position(0) - vec3f(0, 0.5, 0);
             ticks_existed = item_lifetime - item_pickup_ticks;
-            if (current_gui)
-                current_gui->refresh();
+            if (gui::get_gui())
+                gui::get_gui()->refresh();
         }
     }
 }
