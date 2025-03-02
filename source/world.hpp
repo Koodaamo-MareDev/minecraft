@@ -10,14 +10,14 @@
 #include "inventory.hpp"
 
 class chunk_t;
-class aabb_entity_t;
+class entity_physical;
 class aabb_t;
 class camera_t;
 
 class player_properties
 {
 public:
-    aabb_entity_t *m_entity = nullptr;
+    entity_player_local *m_entity = nullptr;
     BlockID in_fluid = BlockID::air;
     vec3f view_bob_offset = vec3f(0, 0, 0);
     vec3f view_bob_screen_offset = vec3f(0, 0, 0);

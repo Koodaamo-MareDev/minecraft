@@ -201,8 +201,8 @@ void gui_survival::close()
     // Drop the item in hand
     if (!item_in_hand.empty())
     {
-        aabb_entity_t *player = current_world->player.m_entity;
-        item_entity_t *item_entity = new item_entity_t(player->get_position(0), item_in_hand);
+        entity_physical *player = current_world->player.m_entity;
+        entity_item *item_entity = new entity_item(player->get_position(0), item_in_hand);
         item_entity->velocity = angles_to_vector(player->rotation.x, player->rotation.y) * 0.5;
         item_entity->chunk = get_chunk_from_pos(vec3i(std::floor(player->position.x), std::floor(player->position.y), std::floor(player->position.z)));
         add_entity(item_entity);

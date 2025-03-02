@@ -517,7 +517,7 @@ void default_destroy(const vec3i &pos, const block_t &old_block)
 void spawn_tnt_destroy(const vec3i &pos, const block_t &old_block)
 {
     if (!current_world->is_remote())
-        add_entity(new exploding_block_entity_t(old_block, pos, 80));
+        add_entity(new entity_explosive_block(old_block, pos, 80));
 }
 
 void default_aabb(const vec3i &pos, block_t *block, const aabb_t &other, std::vector<aabb_t> &aabb_list)

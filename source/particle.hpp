@@ -15,7 +15,7 @@
 
 #include "entity.hpp"
 
-class particle : public entity_t
+class particle : public entity_base
 {
 public:
     uint8_t max_life_time;
@@ -47,7 +47,7 @@ public:
         };
     };
 
-    particle() : entity_t(), life_time(0), physics(0), type(0), size(64), brightness(255), u(0), v(0) {}
+    particle() : entity_base(), life_time(0), physics(0), type(0), size(64), brightness(255), u(0), v(0) {}
 
     ~particle() {}
 

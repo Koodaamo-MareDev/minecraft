@@ -112,6 +112,8 @@ public:
     bool has_solid_fluid = false;
     bool has_transparent_fluid = false;
 
+    bool has_updated = false;
+
     int player_taxicab_distance()
     {
         return std::abs((this->x & ~15) - (int(std::floor(player_pos.x)) & ~15)) + std::abs((this->y & ~15) - (int(std::floor(player_pos.y)) & ~15)) + std::abs((this->z & ~15) - (int(std::floor(player_pos.z)) & ~15));
@@ -138,7 +140,7 @@ public:
     chunkvbo_t vbos[VERTICAL_SECTION_COUNT] = {0};
     uint8_t has_fluid_updates[VERTICAL_SECTION_COUNT] = {1};
     uint32_t light_update_count = 0;
-    std::vector<aabb_entity_t *> entities;
+    std::vector<entity_physical *> entities;
 
     /**
      * Get block - wraps around the chunk if out of bounds
@@ -289,8 +291,8 @@ void get_neighbors(const vec3i &pos, block_t **neighbors, chunk_t *near = nullpt
 void update_block_at(const vec3i &pos);
 void update_neighbors(const vec3i &pos);
 vec3f get_fluid_direction(block_t *block, vec3i pos, chunk_t *chunk = nullptr);
-std::map<int32_t, aabb_entity_t *> &get_entities();
-void add_entity(aabb_entity_t *entity);
+std::map<int32_t, entity_physical *> &get_entities();
+void add_entity(entity_physical *entity);
 void remove_entity(int32_t entity_id);
-aabb_entity_t *get_entity_by_id(int32_t entity_id);
+entity_physical *get_entity_by_id(int32_t entity_id);
 #endif

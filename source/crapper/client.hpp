@@ -191,6 +191,7 @@ namespace Crapper
         void handlePlayerPosition(ByteBuffer &buffer);
         void handlePlayerLook(ByteBuffer &buffer);
         void handlePlayerPositionLook(ByteBuffer &buffer);
+        void handleUseBed(ByteBuffer &buffer);
         void handleNamedEntitySpawn(ByteBuffer &buffer);
         void handlePickupSpawn(ByteBuffer &buffer);
         void handleCollect(ByteBuffer &buffer);

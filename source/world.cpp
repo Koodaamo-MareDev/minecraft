@@ -29,11 +29,7 @@ world::world()
     chdir(save_path.c_str());
 
     // Add the player to the world - it should persist until the game is closed
-    player.m_entity = new aabb_entity_t(0.6, 1.8);
-    player.m_entity->local = true;
-    player.m_entity->y_offset = 1.62;
-    player.m_entity->y_size = 0;
-    player.m_entity->teleport(vec3f(0.5, -999, 0.5));
+    player.m_entity = new entity_player_local(vec3f(0.5, -999, 0.5));
     add_entity(player.m_entity);
 
     light_engine::init();
@@ -269,6 +265,7 @@ void world::update_vbos()
                 // Set the cached buffer to the new buffer
                 vbo.cached_transparent = vbo.transparent;
             }
+            vbo.has_updated = true;
         }
         vbos_to_update.clear();
     }
@@ -507,7 +504,7 @@ void world::spawn_drop(const vec3i &pos, const block_t *old_block, inventory::it
     // Drop items
     javaport::Random rng;
     vec3f item_pos = vec3f(pos.x, pos.y, pos.z) + vec3f(0.5);
-    item_entity_t *entity = new item_entity_t(item_pos, item);
+    entity_item *entity = new entity_item(item_pos, item);
     entity->ticks_existed = 10; // Halves the pickup delay (20 ticks / 2 = 10)
     entity->velocity = vec3f(rng.nextFloat() - .5f, rng.nextFloat(), rng.nextFloat() - .5f) * 0.25f;
     chunk->entities.push_back(entity);
@@ -848,7 +845,7 @@ void world::save()
         }
         NBTTagCompound level;
         NBTTagCompound *level_data = (NBTTagCompound *)level.setTag("Data", new NBTTagCompound());
-        level_data->setTag("Player", player.m_entity->serialize());
+        player.m_entity->serialize((NBTTagCompound *)level_data->setTag("Player", new NBTTagCompound));
         level_data->setTag("Time", new NBTTagLong(ticks));
         level_data->setTag("SpawnX", new NBTTagInt(0));
         level_data->setTag("SpawnY", new NBTTagInt(skycast(vec3i(0, 0, 0), nullptr)));
@@ -957,10 +954,10 @@ void world::update_entities()
 {
 
     // Find a chunk for any lingering entities
-    std::map<int32_t, aabb_entity_t *> &world_entities = get_entities();
+    std::map<int32_t, entity_physical *> &world_entities = get_entities();
     for (auto &&e : world_entities)
     {
-        aabb_entity_t *entity = e.second;
+        entity_physical *entity = e.second;
         if (!entity->chunk)
         {
             vec3i int_pos = vec3i(int(std::floor(entity->position.x)), 0, int(std::floor(entity->position.z)));
@@ -983,7 +980,7 @@ void world::update_entities()
         update_player();
         for (auto &&e : world_entities)
         {
-            aabb_entity_t *entity = e.second;
+            entity_physical *entity = e.second;
             if (!entity || entity->dead)
                 continue;
             // Tick the entity animations
@@ -1008,7 +1005,7 @@ void world::update_player()
             // Resolve collisions with neighboring chunks' entities
             for (auto &&e : get_entities())
             {
-                aabb_entity_t *&entity = e.second;
+                entity_physical *&entity = e.second;
 
                 // Ensure entity is not null
                 if (!entity)

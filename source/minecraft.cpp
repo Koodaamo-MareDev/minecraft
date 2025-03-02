@@ -815,7 +815,7 @@ void Render(guVector chunkPos, void *buffer, u32 length)
 
 void UpdateCamera(camera_t &camera)
 {
-    aabb_entity_t *player = current_world->player.m_entity;
+    entity_player_local *player = current_world->player.m_entity;
     player_pos = player->get_position(std::fmod(current_world->partial_ticks, 1)) - vec3f(0.5, 0.5, 0.5);
 
     // View bobbing

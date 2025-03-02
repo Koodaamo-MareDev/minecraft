@@ -90,9 +90,9 @@ std::deque<chunk_t *> &get_chunks()
     return chunks;
 }
 
-std::map<int32_t, aabb_entity_t *> &get_entities()
+std::map<int32_t, entity_physical *> &get_entities()
 {
-    static std::map<int32_t, aabb_entity_t *> world_entities;
+    static std::map<int32_t, entity_physical *> world_entities;
     return world_entities;
 }
 
@@ -637,7 +637,7 @@ void update_block_at(const vec3i &pos)
             {
                 if (block_below == BlockID::air || properties(block_below).m_fluid)
                 {
-                    chunk->entities.push_back(new falling_block_entity_t(*block, pos));
+                    chunk->entities.push_back(new entity_falling_block(*block, pos));
                     block->set_blockid(BlockID::air);
                     block->meta = 0;
                 }
@@ -1523,9 +1523,9 @@ vec3f get_fluid_direction(block_t *block, vec3i pos, chunk_t *chunk)
     return direction.normalize();
 }
 
-void add_entity(aabb_entity_t *entity)
+void add_entity(entity_physical *entity)
 {
-    std::map<int32_t, aabb_entity_t *> &world_entities = get_entities();
+    std::map<int32_t, entity_physical *> &world_entities = get_entities();
     world_entities[entity->entity_id] = entity;
     vec3i entity_pos = vec3i(int(std::floor(entity->position.x)), int(std::floor(entity->position.y)), int(std::floor(entity->position.z)));
     entity->chunk = get_chunk_from_pos(entity_pos);
@@ -1535,13 +1535,13 @@ void add_entity(aabb_entity_t *entity)
 
 void remove_entity(int32_t entity_id)
 {
-    aabb_entity_t *entity = get_entity_by_id(entity_id);
+    entity_physical *entity = get_entity_by_id(entity_id);
     if (!entity)
     {
         printf("Removing unknown entity %d\n", entity_id);
         return;
     }
-    if (entity->local)
+    if (dynamic_cast<entity_player_local *>(entity))
     {
         printf("Attempt to remove the player entity\n");
         return;
@@ -1549,14 +1549,14 @@ void remove_entity(int32_t entity_id)
     entity->dead = true;
     if (!entity->chunk)
     {
-        std::map<int32_t, aabb_entity_t *> &world_entities = get_entities();
+        std::map<int32_t, entity_physical *> &world_entities = get_entities();
         if (world_entities.find(entity_id) != world_entities.end())
             world_entities.erase(entity_id);
         delete entity;
     }
 }
 
-aabb_entity_t *get_entity_by_id(int32_t entity_id)
+entity_physical *get_entity_by_id(int32_t entity_id)
 {
     try
     {
@@ -1740,7 +1740,7 @@ int chunk_t::render_fluid(block_t *block, const vec3i &pos)
 void chunk_t::update_entities()
 {
     // Update entities
-    for (aabb_entity_t *&entity : entities)
+    for (entity_physical *&entity : entities)
     {
         if (!entity)
             continue;
@@ -1764,15 +1764,15 @@ void chunk_t::update_entities()
             chunk_t *neighbor = (i == 6 ? this : get_chunk(this->x + face_offsets[i].x, this->z + face_offsets[i].z));
             if (neighbor)
             {
-                for (aabb_entity_t *&entity : neighbor->entities)
+                for (entity_physical *&entity : neighbor->entities)
                 {
-                    for (aabb_entity_t *&this_entity : this->entities)
+                    for (entity_physical *&this_entity : this->entities)
                     {
                         // Prevent entities from colliding with themselves
                         if (entity != this_entity && entity->collides(this_entity))
                         {
                             // Resolve the collision - always resolve from the perspective of the non-player entity
-                            if (this_entity->local)
+                            if (dynamic_cast<entity_player_local *>(this_entity))
                                 entity->resolve_collision(this_entity);
                             else
                                 this_entity->resolve_collision(entity);
@@ -1784,7 +1784,7 @@ void chunk_t::update_entities()
     }
 
     // Get a list of entities that are out of bounds
-    entities.erase(std::remove_if(entities.begin(), entities.end(), [&](aabb_entity_t *&entity)
+    entities.erase(std::remove_if(entities.begin(), entities.end(), [&](entity_physical *&entity)
                                   {
         vec3i entity_pos = vec3i(int(std::floor(entity->position.x)), 0, int(std::floor(entity->position.z)));
         chunk_t* new_chunk = get_chunk_from_pos(entity_pos);
@@ -1803,9 +1803,9 @@ void chunk_t::update_entities()
         }
         return false; }),
                    entities.end());
-    std::map<int32_t, aabb_entity_t *> &world_entities = get_entities();
+    std::map<int32_t, entity_physical *> &world_entities = get_entities();
     // Remove entities that can be removed
-    entities.erase(std::remove_if(entities.begin(), entities.end(), [&](aabb_entity_t *&entity)
+    entities.erase(std::remove_if(entities.begin(), entities.end(), [&](entity_physical *&entity)
                                   {
         if (entity->can_remove())
         {
@@ -1828,7 +1828,7 @@ void chunk_t::update_entities()
 
 void chunk_t::render_entities(float partial_ticks, bool transparency)
 {
-    for (aabb_entity_t *&entity : entities)
+    for (entity_physical *&entity : entities)
     {
         // Make sure the entity is valid
         if (!entity)
@@ -1852,14 +1852,14 @@ uint32_t chunk_t::size()
     uint32_t base_size = sizeof(chunk_t);
     for (int i = 0; i < VERTICAL_SECTION_COUNT; i++)
         base_size += this->vbos[i].cached_solid.length + this->vbos[i].cached_transparent.length + sizeof(chunkvbo_t);
-    for (aabb_entity_t *&entity : entities)
+    for (entity_physical *&entity : entities)
         base_size += entity->size();
     return base_size;
 }
 
 chunk_t::~chunk_t()
 {
-    for (aabb_entity_t *&entity : entities)
+    for (entity_physical *&entity : entities)
     {
         if (!entity)
             continue;

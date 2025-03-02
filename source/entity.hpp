@@ -17,19 +17,19 @@ constexpr uint8_t creeper_fuse = 20;
 
 class chunk_t;
 
-class entity_t
+class entity_base
 {
 public:
     vec3f position;
     vec3f velocity;
 
-    entity_t() : position(0, 0, 0), velocity(0, 0, 0) {}
-    entity_t(vec3f position, vec3f velocity) : position(position), velocity(velocity) {}
-    entity_t(vec3f position) : position(position), velocity(0, 0, 0) {}
-    virtual ~entity_t() {}
+    entity_base() : position(0, 0, 0), velocity(0, 0, 0) {}
+    entity_base(vec3f position, vec3f velocity) : position(position), velocity(velocity) {}
+    entity_base(vec3f position) : position(position), velocity(0, 0, 0) {}
+    virtual ~entity_base() {}
 };
 
-class aabb_entity_t : public entity_t
+class entity_physical : public entity_base
 {
 public:
     enum class drag_phase_t : bool
@@ -50,10 +50,8 @@ public:
     vfloat_t height = 0;
     vfloat_t y_offset = 0;
     vfloat_t y_size = 0;
-    vfloat_t last_step_distance = 0;
     vfloat_t gravity = 0.08;
     chunk_t *chunk = nullptr;
-    bool local = false;
     bool on_ground = false;
     bool in_water = false;
     bool jumping = false;
@@ -64,24 +62,23 @@ public:
     vec3i server_pos = vec3i(0, 0, 0);
     vec3f animation_pos = vec3f(0, 0, 0);
     vec3f animation_rot = vec3f(0, 0, 0);
-    vfloat_t accumulated_walk_distance = 0;
     uint8_t animation_tick = 0;
-    uint8_t health = 20;
-    uint16_t holding_item = 0;
     drag_phase_t drag_phase = drag_phase_t::before_friction;
     uint8_t light_level = 0;
-    std::deque<vec3i> path;
-    vec3i last_goal = vec3i(0, 0, 0);
 
-    aabb_entity_t(float width, float height) : entity_t(), width(width), height(height) {}
+    entity_physical() : entity_base()
+    {
+        width = 1;
+        height = 1;
+    }
 
-    ~aabb_entity_t() {}
+    ~entity_physical() {}
 
-    virtual bool collides(aabb_entity_t *other);
+    virtual bool collides(entity_physical *other);
 
-    bool can_remove();
+    virtual bool can_remove();
 
-    virtual void resolve_collision(aabb_entity_t *b);
+    virtual void resolve_collision(entity_physical *b);
 
     void teleport(vec3f pos);
 
@@ -90,8 +87,6 @@ public:
 
     // NOTE: The position should be provided in 1/32ths of a block
     void set_server_pos_rot(vec3i pos, vec3f rot, uint8_t ticks);
-
-    virtual void hurt();
 
     virtual void tick();
 
@@ -104,7 +99,7 @@ public:
         return sizeof(*this);
     }
 
-    virtual NBTTagCompound *serialize();
+    virtual void serialize(NBTTagCompound *);
 
     virtual void deserialize(NBTTagCompound *nbt);
 
@@ -138,49 +133,87 @@ public:
     {
         return vec3i(std::floor(position.x), std::floor(aabb.min.y - y_size), std::floor(position.z));
     }
+};
 
+class entity_living : virtual public entity_physical
+{
+public:
+    uint16_t health = 20;
+    uint16_t max_health = 20;
+    uint16_t holding_item = 0;
+    vfloat_t last_step_distance = 0;
+    vfloat_t accumulated_walk_distance = 0;
+    vfloat_t body_rotation_y = 0.0;
+
+    entity_living() : entity_physical() {}
+
+    virtual void hurt(uint16_t damage);
+
+    virtual void tick();
+
+    virtual void animate();
+
+    virtual void render(float partial_ticks, bool transparency);
+
+    virtual void serialize(NBTTagCompound *);
+    virtual void deserialize(NBTTagCompound *nbt);
+};
+
+class entity_pathfinder : virtual public entity_physical
+{
+public:
+    entity_pathfinder() {}
+    entity_physical *follow_entity = nullptr;
+    std::deque<vec3i> path;
+    vec3i last_goal = vec3i(0, 0, 0);
     vec3f simple_pathfind(vec3f target);
 };
 
-class falling_block_entity_t : public aabb_entity_t
+class entity_explosive : virtual public entity_physical
+{
+public:
+    uint16_t fuse = 80;
+    float power = 4.0;
+    entity_explosive() {}
+
+    virtual void tick();
+
+    virtual void explode();
+};
+
+class entity_falling_block : virtual public entity_physical
 {
 public:
     uint16_t fall_time = 0;
     block_t block_state;
-    falling_block_entity_t(block_t block_state, const vec3i &position);
+    entity_falling_block(block_t block_state, const vec3i &position);
 
     size_t size()
     {
         return sizeof(*this);
     }
 
-    virtual void resolve_collision(aabb_entity_t *b) {}
+    virtual void resolve_collision(entity_physical *b) {}
 
     virtual void tick();
 
     virtual void render(float partial_ticks, bool transparency);
 };
 
-class exploding_block_entity_t : public falling_block_entity_t
+class entity_explosive_block : public entity_falling_block, public entity_explosive
 {
 public:
-    uint16_t fuse = 80;
-    exploding_block_entity_t(block_t block_state, const vec3i &position, uint16_t fuse);
+    entity_explosive_block(block_t block_state, const vec3i &position, uint16_t fuse);
 
     virtual void tick();
 
     virtual void render(float partial_ticks, bool transparency);
 };
 
-class creeper_entity_t : public aabb_entity_t
+class entity_creeper : public entity_pathfinder, public entity_explosive, public entity_living
 {
 public:
-    vec3f body_rotation;
-    uint8_t fuse = creeper_fuse;
-
-    aabb_entity_t *follow_entity = nullptr;
-
-    creeper_entity_t(const vec3f &position);
+    entity_creeper(const vec3f &position);
 
     virtual void tick();
 
@@ -189,19 +222,19 @@ public:
     virtual bool should_jump();
 };
 
-class item_entity_t : public aabb_entity_t
+class entity_item : public entity_physical
 {
 public:
     inventory::item_stack item_stack;
-    item_entity_t(const vec3f &position, const inventory::item_stack &item_stack);
+    entity_item(const vec3f &position, const inventory::item_stack &item_stack);
 
     virtual void tick();
 
     virtual void render(float partial_ticks, bool transparency);
 
-    virtual void resolve_collision(aabb_entity_t *b);
+    virtual void resolve_collision(entity_physical *b);
 
-    virtual bool collides(aabb_entity_t *other);
+    virtual bool collides(entity_physical *other);
 
     virtual void pickup(vec3f pos);
 
@@ -210,21 +243,47 @@ private:
     vec3f pickup_pos;
 };
 
-class mp_player_entity_t : public aabb_entity_t
+class entity_player : public entity_living
 {
 public:
-    std::string player_name = "";
-    vfloat_t body_rotation_y = 0.0;
-    vfloat_t last_speed = 0.0;
-    mp_player_entity_t(const vec3f &position, std::string player_name);
+    int selected_hotbar_slot = 0;
+    bool in_bed = false;
+    vec3i bed_pos = vec3i(0, 0, 0);
 
-    virtual void hurt();
+    entity_player(const vec3f &position);
+
+    virtual void hurt(uint16_t damage);
+};
+
+class entity_player_local : public entity_player
+{
+public:
+    entity_player_local(const vec3f &position);
+
+    virtual void serialize(NBTTagCompound *result);
+
+    virtual void deserialize(NBTTagCompound *result);
 
     virtual void tick();
 
     virtual void render(float partial_ticks, bool transparency);
 
     virtual void animate();
+
+    virtual bool should_jump();
+
+    virtual bool can_remove();
+};
+
+class entity_player_mp : public entity_player
+{
+public:
+    std::string player_name = "";
+    entity_player_mp(const vec3f &position, std::string player_name);
+
+    virtual void tick();
+
+    virtual void render(float partial_ticks, bool transparency);
 };
 
 #endif

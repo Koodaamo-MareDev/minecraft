@@ -13,7 +13,7 @@ namespace inventory
 
     item item_list[512];
 
-    void default_on_use(item &item, vec3i pos, vec3i face, aabb_entity_t *entity)
+    void default_on_use(item &item, vec3i pos, vec3i face, entity_physical *entity)
     {
         // Do nothing
     }

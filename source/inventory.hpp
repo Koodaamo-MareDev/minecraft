@@ -9,7 +9,7 @@
 #include "block_id.hpp"
 #include <stdexcept>
 
-class aabb_entity_t;
+class entity_physical;
 
 namespace inventory
 {
@@ -35,7 +35,7 @@ namespace inventory
     };
 
     class item;
-    void default_on_use(item &item, vec3i pos, vec3i face, aabb_entity_t *entity);
+    void default_on_use(item &item, vec3i pos, vec3i face, entity_physical *entity);
 
     void init_items();
 
@@ -47,9 +47,9 @@ namespace inventory
         uint8_t texture_index = 0;
         tool_type tool = none;
         tool_tier tier = wood;
-        std::function<void(item &, vec3i, vec3i, aabb_entity_t *)> on_use = default_on_use;
+        std::function<void(item &, vec3i, vec3i, entity_physical *)> on_use = default_on_use;
 
-        item(uint16_t id = 0, uint8_t max_stack = 64, std::function<void(item &, vec3i, vec3i, aabb_entity_t *)> on_use = default_on_use) : id(id), max_stack(max_stack), on_use(on_use) {}
+        item(uint16_t id = 0, uint8_t max_stack = 64, std::function<void(item &, vec3i, vec3i, entity_physical *)> on_use = default_on_use) : id(id), max_stack(max_stack), on_use(on_use) {}
 
         bool is_block() const
         {

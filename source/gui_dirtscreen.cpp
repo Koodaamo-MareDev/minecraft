@@ -18,7 +18,7 @@ void gui_dirtscreen::draw()
     if (max_progress > 0)
     {
         draw_colored_quad((viewport.width - 200) / 2, 272, 200, 4, 0x80, 0x80, 0x80, 0xFF);
-        draw_colored_quad((viewport.width - 200) / 2, 272, progress * 200 / max_progress, 4, 0x80, 0xFF, 0x80, 0xFF);
+        draw_colored_quad((viewport.width - 200) / 2, 272, int(progress) * 200 / int(max_progress), 4, 0x80, 0xFF, 0x80, 0xFF);
     }
 }
 

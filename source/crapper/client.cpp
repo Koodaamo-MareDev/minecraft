@@ -48,28 +48,34 @@ namespace Crapper
 
     void ByteBuffer::writeLong(int64_t value)
     {
-        data.push_back((value >> 56) & 0xFF);
-        data.push_back((value >> 48) & 0xFF);
-        data.push_back((value >> 40) & 0xFF);
-        data.push_back((value >> 32) & 0xFF);
-        data.push_back((value >> 24) & 0xFF);
-        data.push_back((value >> 16) & 0xFF);
-        data.push_back((value >> 8) & 0xFF);
-        data.push_back(value & 0xFF);
+        uint8_t temp[8];
+        temp[0] = (value >> 56) & 0xFF;
+        temp[1] = (value >> 48) & 0xFF;
+        temp[2] = (value >> 40) & 0xFF;
+        temp[3] = (value >> 32) & 0xFF;
+        temp[4] = (value >> 24) & 0xFF;
+        temp[5] = (value >> 16) & 0xFF;
+        temp[6] = (value >> 8) & 0xFF;
+        temp[7] = value & 0xFF;
+        writeBytes(temp, 8);
     }
 
     void ByteBuffer::writeInt(int32_t value)
     {
-        data.push_back((value >> 24) & 0xFF);
-        data.push_back((value >> 16) & 0xFF);
-        data.push_back((value >> 8) & 0xFF);
-        data.push_back(value & 0xFF);
+        uint8_t temp[4];
+        temp[0] = (value >> 24) & 0xFF;
+        temp[1] = (value >> 16) & 0xFF;
+        temp[2] = (value >> 8) & 0xFF;
+        temp[3] = value & 0xFF;
+        writeBytes(temp, 4);
     }
 
     void ByteBuffer::writeShort(int16_t value)
     {
-        data.push_back((value >> 8) & 0xFF);
-        data.push_back(value & 0xFF);
+        uint8_t temp[2];
+        temp[0] = (value >> 8) & 0xFF;
+        temp[1] = value & 0xFF;
+        writeBytes(temp, 2);
     }
 
     void ByteBuffer::writeByte(uint8_t value)
@@ -80,10 +86,7 @@ namespace Crapper
     void ByteBuffer::writeString(const std::string &value)
     {
         writeShort(value.size());
-        for (size_t i = 0; i < value.size(); i++)
-        {
-            data.push_back(value[i]);
-        }
+        writeBytes((const uint8_t *)value.c_str(), value.size());
     }
 
     void ByteBuffer::writeBytes(const uint8_t *value, size_t length)
@@ -789,6 +792,27 @@ namespace Crapper
         dbgprintf("Player position: %f %f %f and look: %f %f\n", x, y, z, yaw, pitch);
     }
 
+    void MinecraftClient::handleUseBed(ByteBuffer &buffer)
+    {
+        // Read use bed
+        int32_t entity_id = buffer.readInt();
+        int8_t in_bed = buffer.readByte();
+        int32_t x = buffer.readInt();
+        uint8_t y = buffer.readByte();
+        int32_t z = buffer.readInt();
+
+        if (buffer.underflow)
+            return;
+
+        entity_physical *entity = get_entity_by_id(entity_id);
+        entity_player *player = dynamic_cast<entity_player *>(entity);
+        if (player)
+        {
+            player->in_bed = in_bed;
+            player->bed_pos = vec3i(x, y, z);
+        }
+    }
+
     void MinecraftClient::sendPlayerPositionLook()
     {
         if (!current_world->player.m_entity)
@@ -895,14 +919,13 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        mp_player_entity_t *entity = new mp_player_entity_t(vec3f(x, y, z), player_name);
+        entity_player_mp *entity = new entity_player_mp(vec3f(x, y, z), player_name);
         entity->set_server_pos_rot(vec3i(x, y, z), vec3f(pitch, -yaw, 0), 0);
         entity->teleport(vec3f(x / 32.0, y / 32.0 + 1.0 / 64.0, z / 32.0));
         entity->holding_item = item;
 
         entity->entity_id = entity_id;
         add_entity(entity);
-        printf("Added player %s\n", player_name.c_str());
     }
 
     void MinecraftClient::handlePickupSpawn(ByteBuffer &buffer)
@@ -922,7 +945,7 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        item_entity_t *entity = new item_entity_t(vec3f(x, y, z), inventory::item_stack(item, count, meta));
+        entity_item *entity = new entity_item(vec3f(x, y, z), inventory::item_stack(item, count, meta));
         entity->set_server_position(vec3i(x, y, z));
         entity->teleport(vec3f(x / 32.0, y / 32.0 + 1.0 / 64.0, z / 32.0));
         entity->entity_id = entity_id;
@@ -938,15 +961,15 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        aabb_entity_t *pickup_entity = get_entity_by_id(item_entity_id);
+        entity_physical *pickup_entity = get_entity_by_id(item_entity_id);
 
-        aabb_entity_t *entity = get_entity_by_id(entity_id);
+        entity_physical *entity = get_entity_by_id(entity_id);
 
         // Make sure the entities exists and the picked up entity is an item entity
         if (!pickup_entity || pickup_entity->type != 1 || !entity)
             return;
 
-        item_entity_t *item_entity = (item_entity_t *)pickup_entity;
+        entity_item *item_entity = (entity_item *)pickup_entity;
         item_entity->pickup(entity->get_position(0) - vec3f(0, 0.5, 0));
     }
 
@@ -962,18 +985,18 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        aabb_entity_t *entity = nullptr;
+        entity_physical *entity = nullptr;
         switch (type)
         {
         case 70:
-            entity = new falling_block_entity_t(block_t{uint8_t(BlockID::sand), 0x7F, 0}, vec3i(x / 32, y / 32, z / 32));
+            entity = new entity_falling_block(block_t{uint8_t(BlockID::sand), 0x7F, 0}, vec3i(x / 32, y / 32, z / 32));
             break;
         case 71:
-            entity = new falling_block_entity_t(block_t{uint8_t(BlockID::gravel), 0x7F, 0}, vec3i(x / 32, y / 32, z / 32));
+            entity = new entity_falling_block(block_t{uint8_t(BlockID::gravel), 0x7F, 0}, vec3i(x / 32, y / 32, z / 32));
             break;
 
         default:
-            entity = new aabb_entity_t(1.0, 1.0);
+            entity = new entity_physical();
             dbgprintf("Generic vehicle %d spawned at %f %f %f with entity type %d\n", entity_id, x, y, z, type);
             break;
         }
@@ -1041,7 +1064,9 @@ namespace Crapper
         }
 #endif
         // Create mob entity
-        aabb_entity_t *entity = new aabb_entity_t(0.6, 1.8);
+        entity_physical *entity = new entity_living();
+        entity->width = 0.6;
+        entity->height = 1.8;
         entity->set_server_pos_rot(vec3i(x, y, z), vec3f(pitch * (360.0 / 256), yaw * (-360.0 / 256), 0), 0);
         entity->teleport(vec3f(x / 32.0, y / 32.0 + 1.0 / 64.0, z / 32.0));
         entity->entity_id = entity_id;
@@ -1062,7 +1087,7 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        aabb_entity_t *entity = new aabb_entity_t(1, 1);
+        entity_physical *entity = new entity_physical();
         entity->teleport(vec3f(x, y, z));
         entity->entity_id = entity_id;
         add_entity(entity);
@@ -1081,7 +1106,7 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        aabb_entity_t *entity = get_entity_by_id(entity_id);
+        entity_physical *entity = get_entity_by_id(entity_id);
         if (!entity)
         {
             return;
@@ -1122,7 +1147,7 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        aabb_entity_t *entity = get_entity_by_id(entity_id);
+        entity_physical *entity = get_entity_by_id(entity_id);
         if (!entity)
         {
             return;
@@ -1140,7 +1165,7 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        aabb_entity_t *entity = get_entity_by_id(entity_id);
+        entity_physical *entity = get_entity_by_id(entity_id);
         if (!entity)
         {
             return;
@@ -1161,7 +1186,7 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        aabb_entity_t *entity = get_entity_by_id(entity_id);
+        entity_physical *entity = get_entity_by_id(entity_id);
         if (!entity)
         {
             return;
@@ -1182,7 +1207,7 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        aabb_entity_t *entity = get_entity_by_id(entity_id);
+        entity_physical *entity = get_entity_by_id(entity_id);
         if (!entity)
         {
             return;
@@ -1199,14 +1224,16 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        aabb_entity_t *entity = get_entity_by_id(entity_id);
+        entity_physical *entity = get_entity_by_id(entity_id);
         if (!entity)
         {
             return;
         }
         if (status == 2)
         {
-            entity->hurt();
+            entity_living *living_entity = dynamic_cast<entity_living *>(entity);
+            if (living_entity)
+                living_entity->hurt(0);
         }
         dbgprintf("Entity %d status: %d\n", entity_id, status);
     }
@@ -1220,7 +1247,7 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        aabb_entity_t *entity = get_entity_by_id(entity_id);
+        entity_physical *entity = get_entity_by_id(entity_id);
         if (!entity)
         {
             dbgprintf("Unknown entity %d\n", entity_id);
@@ -1231,7 +1258,7 @@ namespace Crapper
             dbgprintf("Entity %d stopped riding entity\n", entity_id);
             return;
         }
-        aabb_entity_t *vehicle = get_entity_by_id(vehicle_id);
+        entity_physical *vehicle = get_entity_by_id(vehicle_id);
         if (!vehicle)
         {
             dbgprintf("Entity %d started riding unknown entity %d\n", entity_id, vehicle_id);
@@ -1250,7 +1277,7 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        aabb_entity_t *entity = get_entity_by_id(entity_id);
+        entity_physical *entity = get_entity_by_id(entity_id);
         if (!entity)
         {
             return;
@@ -1746,6 +1773,12 @@ namespace Crapper
         {
             // Handle packet 0x0D (player position and look)
             handlePlayerPositionLook(buffer);
+            break;
+        }
+        case 0x11:
+        {
+            // Handle packet 0x11 (use bed)
+            handleUseBed(buffer);
             break;
         }
         case 0x12:
