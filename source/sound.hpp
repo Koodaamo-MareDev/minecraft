@@ -1,14 +1,13 @@
 #ifndef SOUND_HPP
 #define SOUND_HPP
 
-#include "vec3f.hpp"
-#include "aiff.hpp"
-#include "render.hpp"
-#include "oggplayer/oggplayer.h"
+#include <math/vec3f.hpp>
 #include <ogc/gu.h>
 #include <cmath>
 #include <asndlib.h>
 #include <string>
+#include <auxio/aiff.hpp>
+#include <auxio/oggplayer.h>
 
 class sound
 {

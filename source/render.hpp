@@ -1,17 +1,8 @@
 #ifndef _RENDER_HPP_
 #define _RENDER_HPP_
-#include "vec3i.hpp"
-#include "vec3f.hpp"
 
-#include "ported/JavaRandom.hpp"
-#include "chunk_new.hpp"
-#include "texturedefs.h"
-#include "base3d.hpp"
-#include "texanim.hpp"
-#include "base3d.hpp"
-#include "particle.hpp"
-#include "gertex/gertex.hpp"
-
+#include <math/vec3i.hpp>
+#include <math/vec3f.hpp>
 #include <stack>
 #include <cstdint>
 #include <algorithm>
@@ -19,6 +10,13 @@
 #include <ogc/gx.h>
 #include <ogc/tpl.h>
 #include <ogcsys.h>
+
+#include "chunk.hpp"
+#include "texturedefs.h"
+#include "base3d.hpp"
+#include "texanim.hpp"
+#include "particle.hpp"
+#include "gertex/gertex.hpp"
 
 extern guVector player_pos;
 extern float xrot, yrot;

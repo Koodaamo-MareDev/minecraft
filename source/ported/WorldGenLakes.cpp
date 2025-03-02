@@ -1,5 +1,5 @@
 #include "WorldGenLakes.hpp"
-#include "../chunk_new.hpp"
+#include "../chunk.hpp"
 namespace javaport
 {
     bool WorldGenLakes::generate(Random &rng, vec3i pos)

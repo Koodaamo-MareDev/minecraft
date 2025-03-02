@@ -1,12 +1,14 @@
 #include "entity.hpp"
+
+#include <math/math_utils.h>
+
 #include "raycast.hpp"
-#include "chunk_new.hpp"
+#include "chunk.hpp"
 #include "render.hpp"
 #include "render_gui.hpp"
 #include "blocks.hpp"
 #include "light.hpp"
 #include "particle.hpp"
-#include "maths.hpp"
 #include "pathfinding.hpp"
 #include "sounds.hpp"
 #include "inventory.hpp"

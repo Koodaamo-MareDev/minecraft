@@ -2,6 +2,7 @@
 #define WORLD_GEN_LIQUIDS_HPP
 
 #include "WorldGenerator.hpp"
+#include "../block_id.hpp"
 namespace javaport
 {
     class WorldGenLiquids : public WorldGenerator

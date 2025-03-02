@@ -1,4 +1,4 @@
-#include "JavaRandom.hpp"
+#include "Random.hpp"
 #include "SystemTime.hpp"
 namespace javaport
 {

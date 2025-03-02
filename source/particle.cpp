@@ -1,5 +1,5 @@
 #include "particle.hpp"
-#include "chunk_new.hpp"
+#include "chunk.hpp"
 #include "block.hpp"
 
 void particle::update(float dt)

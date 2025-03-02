@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <ogc/gx.h>
 
-#include "vec3i.hpp"
+#include <math/vec3i.hpp>
 #include "texturedefs.h"
 #include "render.hpp"
 #include "base3d.hpp"

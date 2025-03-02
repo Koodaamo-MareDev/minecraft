@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 #include <cstring>
-#include "../vec3i.hpp"
+#include <math/vec3i.hpp>
 namespace Crapper
 {
     bool initNetwork();

@@ -2,11 +2,12 @@
 #define WORLD_HPP
 
 #include <string>
-#include "vec3i.hpp"
-#include "vec3f.hpp"
+#include <math/vec3i.hpp>
+#include <math/vec3f.hpp>
+#include <math/math_utils.h>
+
 #include "particle.hpp"
 #include "sound.hpp"
-#include "maths.hpp"
 #include "inventory.hpp"
 
 class chunk_t;

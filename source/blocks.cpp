@@ -1,12 +1,16 @@
 #include "blocks.hpp"
+
+#include <math/vec3i.hpp>
+#include <cmath>
+#include <ported/Random.hpp>
+
 #include "block.hpp"
 #include "blockmap_alpha.h"
-#include "vec3i.hpp"
-#include "chunk_new.hpp"
 #include "light.hpp"
 #include "sounds.hpp"
 #include "world.hpp"
-#include <cmath>
+
+class chunk_t;
 
 int8_t get_block_opacity(BlockID blockid)
 {

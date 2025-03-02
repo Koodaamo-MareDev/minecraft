@@ -1,6 +1,7 @@
 #ifndef WORLD_GEN_LAKES_HPP
 #define WORLD_GEN_LAKES_HPP
 
+#include "../block_id.hpp"
 #include "WorldGenerator.hpp"
 namespace javaport
 {

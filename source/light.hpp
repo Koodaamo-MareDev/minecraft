@@ -1,8 +1,8 @@
 #ifndef _LIGHT_HPP_
 #define _LIGHT_HPP_
 
-#include "vec3i.hpp"
-#include "chunk_new.hpp"
+#include <math/vec3i.hpp>
+#include "chunk.hpp"
 #include <cstdint>
 #include <ogc/gu.h>
 class light_engine

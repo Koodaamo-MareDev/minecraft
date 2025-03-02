@@ -1,7 +1,7 @@
 #ifndef SOUNDS_HPP
 #define SOUNDS_HPP
 
-#include "aiff.hpp"
+#include <auxio/aiff.hpp>
 #include <map>
 #include <vector>
 #include <string>

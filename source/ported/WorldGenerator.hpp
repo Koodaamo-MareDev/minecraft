@@ -1,7 +1,9 @@
 #ifndef WORLD_GENERATOR_HPP
 #define WORLD_GENERATOR_HPP
-#include "../chunk_new.hpp"
-#include "JavaRandom.hpp"
+
+#include <math/vec3i.hpp>
+
+#include "Random.hpp"
 namespace javaport
 {
     class WorldGenerator

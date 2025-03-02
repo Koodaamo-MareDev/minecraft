@@ -2,8 +2,10 @@
 #define _BLOCKS_HPP_
 
 #include <cstddef>
+#include <math/vec3i.hpp>
+
+#include "block.hpp"
 #include "block_id.hpp"
-#include "vec3i.hpp"
 #include "sounds.hpp"
 #include "sound.hpp"
 

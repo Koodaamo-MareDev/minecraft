@@ -3,12 +3,13 @@
 
 #include <cmath>
 #include <vector>
-#include "vec3f.hpp"
-#include "vec3i.hpp"
-#include "chunk_new.hpp"
+#include <math/vec3f.hpp>
+#include <math/vec3i.hpp>
+#include <math/math_utils.h>
+#include <ported/Random.hpp>
+
+#include "chunk.hpp"
 #include "blocks.hpp"
-#include "ported/JavaRandom.hpp"
-#include "maths.hpp"
 
 template <typename T>
 inline int sgn(T val)

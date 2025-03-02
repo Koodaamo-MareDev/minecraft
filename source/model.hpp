@@ -5,8 +5,8 @@
 #include <malloc.h>
 #include <ogcsys.h>
 #include <ogc/gx.h>
-#include "vec3f.hpp"
-#include "maths.hpp"
+#include <math/vec3f.hpp>
+#include <math/math_utils.h>
 
 class modelbox_t
 {

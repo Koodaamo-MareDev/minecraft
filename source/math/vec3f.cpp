@@ -1,6 +1,6 @@
 #include "vec3f.hpp"
 #include "vec3i.hpp" // Include the necessary header for vec3i if needed
-#include "maths.hpp"
+#include <math/math_utils.h>
 
 #if HW_RVL
 #include "ogc/gx.h"

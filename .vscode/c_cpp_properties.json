@@ -8,6 +8,7 @@
                 "C:\\devkitPro\\portlibs\\ppc\\include",
                 "C:\\devkitPro\\portlibs\\ppc\\include\\freetype2",
                 "${workspaceFolder}\\source",
+                "${workspaceFolder}\\source\\thirdparty",
                 "${workspaceFolder}\\build"
             ],
             "defines": [

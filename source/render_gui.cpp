@@ -1,5 +1,5 @@
 #include "render_gui.hpp"
-#include "vec2i.hpp"
+#include <math/vec2i.hpp>
 #include "font_tile_widths.hpp"
 int draw_textured_quad(GXTexObj &texture, int32_t x, int32_t y, int32_t w, int32_t h, uint32_t u1, uint32_t v1, uint32_t u2, uint32_t v2, float scale)
 {

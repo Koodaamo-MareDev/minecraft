@@ -6,9 +6,9 @@
 #include <vector>
 #include <functional>
 #include "block_id.hpp"
-#include "aabb.hpp"
-#include "vec3f.hpp"
-#include "vec3i.hpp"
+#include <math/aabb.hpp>
+#include <math/vec3f.hpp>
+#include <math/vec3i.hpp>
 #include "inventory.hpp"
 
 #define FACE_NX 0

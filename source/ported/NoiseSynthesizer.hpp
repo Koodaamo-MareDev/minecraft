@@ -5,16 +5,15 @@
 #include <cstdint>
 #include <cmath>
 #include <functional>
-#include "../vec3f.hpp"
-#include "../ported/JavaRandom.hpp"
+#include <math/vec3f.hpp>
+
+#include "Random.hpp"
 #include "../perlinnoise_double.h"
 
-// Adapted from Ken Perlin's Improved Noise reference implementation:
-// https://cs.nyu.edu/~perlin/noise/
-// https://mrl.nyu.edu/~perlin/noise/improved-noise.pdf
+// Noise generator that internally uses Ken Perlin's noise algorithm
 // Added support for noise sets, octaves, and seeded noise generation by Marcus Erkkilä
 
-class ImprovedNoise
+class NoiseSynthesizer
 {
     float inv_u8[256];
 

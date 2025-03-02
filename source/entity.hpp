@@ -3,13 +3,14 @@
 
 #include <vector>
 #include <wiiuse/wpad.h>
-#include "vec3f.hpp"
-#include "aabb.hpp"
+#include <math/vec3f.hpp>
+#include <math/aabb.hpp>
+#include <deque>
+
 #include "block.hpp"
 #include "model.hpp"
 #include "inventory.hpp"
 #include "nbt/nbt.hpp"
-#include <deque>
 
 constexpr vfloat_t ENTITY_GRAVITY = 9.8f;
 

@@ -1,6 +1,11 @@
 #ifndef MATHS_HPP
 #define MATHS_HPP
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 inline static float Q_rsqrt(float number)
 {
     union
@@ -44,5 +49,9 @@ inline static double lerpd(double a, double b, double t)
 {
     return a + t * (b - a);
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

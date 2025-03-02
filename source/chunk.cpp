@@ -1,18 +1,16 @@
-#include "chunk_new.hpp"
+#include "chunk.hpp"
 #include "blocks.hpp"
 #include "texturedefs.h"
-#include "vec2i.hpp"
-#include "vec3i.hpp"
+#include <math/vec2i.hpp>
+#include <math/vec3i.hpp>
 #include "blocks.hpp"
 #include "timers.hpp"
 #include "light.hpp"
-#include "fastnoise/fastnoiselite.h"
-#include "improvednoise/improvednoise.hpp"
 #include "base3d.hpp"
 #include "render.hpp"
 #include "raycast.hpp"
 #include "lock.hpp"
-#include "asynclib.hpp"
+#include "ported/NoiseSynthesizer.hpp"
 #include "ported/MapGenCaves.hpp"
 #include "ported/WorldGenLiquids.hpp"
 #include "ported/WorldGenLakes.hpp"
@@ -40,7 +38,7 @@ const vec3i face_offsets[] = {
     vec3i{+0, +0, -1},  // Negative Z
     vec3i{+0, +0, +1}}; // Positive Z
 
-ImprovedNoise improved_noise;
+NoiseSynthesizer improved_noise;
 mutex_t chunk_mutex;
 static lwp_t chunk_generator_thread_handle = (lwp_t)NULL;
 static bool chunk_generator_thread_active = false;

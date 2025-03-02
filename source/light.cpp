@@ -1,6 +1,6 @@
 #include "light.hpp"
-#include "chunk_new.hpp"
-#include "vec3i.hpp"
+#include "chunk.hpp"
+#include <math/vec3i.hpp>
 #include "blocks.hpp"
 #include "block.hpp"
 #include "raycast.hpp"

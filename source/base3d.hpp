@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <cmath>
 #include <ogc/gx.h>
-#include "vec3f.hpp"
+#include <math/vec3f.hpp>
 #include "block.hpp"
 #include "gertex/gertex.hpp"
 

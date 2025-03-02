@@ -1,4 +1,7 @@
 #include "render.hpp"
+
+#include <ported/Random.hpp>
+
 #include "blocks.hpp"
 #include "world.hpp"
 

@@ -4,10 +4,10 @@
 #include <cstdint>
 #include <functional>
 #include <array>
-
-#include "vec3i.hpp"
-#include "block_id.hpp"
 #include <stdexcept>
+#include <math/vec3i.hpp>
+
+#include "block_id.hpp"
 
 class entity_physical;
 

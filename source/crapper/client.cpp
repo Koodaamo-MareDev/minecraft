@@ -1,11 +1,12 @@
 #include "client.hpp"
+
 #include <network.h>   // Wii network library
-#include <sys/fcntl.h> // For F_GETFL and F_SETFL
+#include <miniz/miniz.h>
+
 #include "../inventory.hpp"
 #include "../entity.hpp"
-#include "../chunk_new.hpp"
+#include "../chunk.hpp"
 #include "../lock.hpp"
-#include "miniz/miniz.h"
 #include "../sounds.hpp"
 #include "../sound.hpp"
 #include "../world.hpp"

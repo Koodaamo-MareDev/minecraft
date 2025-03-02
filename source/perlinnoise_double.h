@@ -5,11 +5,11 @@
 extern "C" {
 #endif
 
-#include "maths.hpp"
-
 /* coherent noise function over 1, 2 or 3 dimensions */
 /* (copyright Ken Perlin) */
 /* Optimized by Marcus Erkkilä */
+
+#include <math/math_utils.h>
 
 #include <stdlib.h>
 #include <stdio.h>

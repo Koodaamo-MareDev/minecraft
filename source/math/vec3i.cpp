@@ -1,6 +1,6 @@
 #include "vec3i.hpp"
 #include "vec3f.hpp" // Include the necessary header for vec3f if needed
-#include "maths.hpp"
+#include <math/math_utils.h>
 bool vec3i::operator==(vec3i const &a) const
 {
     return x == a.x && y == a.y && z == a.z;

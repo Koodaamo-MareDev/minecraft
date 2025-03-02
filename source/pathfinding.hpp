@@ -1,14 +1,14 @@
 #ifndef PATHFINDING_HPP
 #define PATHFINDING_HPP
 
-#include "vec3f.hpp"
-#include "aabb.hpp"
-#include "chunk_new.hpp"
-#include "maths.hpp"
-
 #include <map>
 #include <queue>
 #include <deque>
+#include <math/vec3f.hpp>
+#include <math/aabb.hpp>
+#include <math/math_utils.h>
+
+#include "chunk.hpp"
 
 class pathfinding_t
 {

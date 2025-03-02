@@ -1,6 +1,6 @@
 #include "vec2i.hpp"
 
-#include "maths.hpp"
+#include <math/math_utils.h>
 
 bool vec2i::operator==(vec2i const &a) const
 {

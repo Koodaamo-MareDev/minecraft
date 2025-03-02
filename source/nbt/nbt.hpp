@@ -8,7 +8,7 @@
 #include <iostream>
 #include <bit>
 #include "../crapper/client.hpp"    // For ByteBuffer
-#include "../crapper/miniz/miniz.h" // For compression and decompression (RFC 1950 and RFC 1952)
+#include <miniz/miniz.h> // For compression and decompression (RFC 1950 and RFC 1952)
 
 // Gzip format constants for compression and decompression
 constexpr size_t GZIP_HEADER_SIZE = 10;

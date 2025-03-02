@@ -1,11 +1,6 @@
 #ifndef _CHUNK_NEW_HPP_
 #define _CHUNK_NEW_HPP_
 
-#include "vec2i.hpp"
-#include "vec3i.hpp"
-#include "vec3f.hpp"
-#include "block.hpp"
-#include "entity.hpp"
 #include <ogc/mutex.h>
 #include <ogc/gu.h>
 #include <cstddef>
@@ -13,6 +8,12 @@
 #include <deque>
 #include <map>
 #include <iostream>
+#include <math/vec2i.hpp>
+#include <math/vec3i.hpp>
+#include <math/vec3f.hpp>
+
+#include "block.hpp"
+#include "entity.hpp"
 #define SIMULATION_DISTANCE 2
 #define RENDER_DISTANCE 4
 #define CHUNK_COUNT ((RENDER_DISTANCE) * (RENDER_DISTANCE + 1) * 4)
