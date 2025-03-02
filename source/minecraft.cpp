@@ -59,7 +59,6 @@ float prev_left_shoulder = 0;
 float prev_right_shoulder = 0;
 bool should_destroy_block = false;
 bool should_place_block = false;
-inventory::item_stack *selected_item = nullptr;
 
 int cursor_x = 0;
 int cursor_y = 0;
@@ -505,8 +504,16 @@ void UpdateLoadingStatus()
     if (!current_world->loaded)
     {
         uint8_t loading_progress = 0;
+
         // Check if a 3x3 chunk area around the player is loaded
+
         vec3i player_chunk_pos = current_world->player.m_entity->get_foot_blockpos();
+
+        int min_y = std::max(0, (player_chunk_pos.y >> 4) - 1);
+        int max_y = std::min(VERTICAL_SECTION_COUNT - 1, (player_chunk_pos.y >> 4) + 1);
+        int rows = max_y - min_y + 1;
+        int required = rows * 9;
+
         for (int x = -1; x <= 1; x++)
         {
             for (int z = -1; z <= 1; z++)
@@ -518,23 +525,24 @@ void UpdateLoadingStatus()
                     continue;
                 }
 
-                // Check if the vbos near the player are visible and dirty
-                for (int i = (player_chunk_pos.y / 16) - 1; i <= (player_chunk_pos.y / 16) + 1; i++)
+                // Check if the vbos near the player are up to date
+                for (int i = min_y; i <= max_y; i++)
                 {
-                    if (chunk->vbos[i].visible)
-                    {
+                    if (chunk->vbos[i].has_updated)
                         loading_progress++;
-                    }
+                    else if (!chunk->vbos[i].visible)
+                        required--;
                 }
             }
         }
-        is_loading = loading_progress < 27;
+
+        is_loading = loading_progress < required;
         // Display the loading screen
         gui_dirtscreen *dirtscreen = dynamic_cast<gui_dirtscreen *>(gui::get_gui());
         if (dirtscreen)
         {
-            dirtscreen->set_text("Loading level\n\nBuilding terrain\n");
-            dirtscreen->set_progress(loading_progress, 27);
+            dirtscreen->set_text("Loading level\n\n\nBuilding terrain");
+            dirtscreen->set_progress(loading_progress, required);
         }
         if (!is_loading)
         {
