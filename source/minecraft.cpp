@@ -67,7 +67,7 @@ float fog_depth_multiplier = 1.0f;
 float fog_light_multiplier = 1.0f;
 
 Crapper::MinecraftClient client;
-Crapper::ByteBuffer receive_buffer;
+ByteBuffer receive_buffer;
 
 void dbgprintf(const char *fmt, ...)
 {

@@ -100,7 +100,7 @@ NBTBase *NBTBase::copyTag(NBTBase *tag)
     return newTag;
 }
 
-void NBTBase::writeTag(Crapper::ByteBuffer &buffer)
+void NBTBase::writeTag(ByteBuffer &buffer)
 {
     uint8_t type = getType();
     buffer.writeByte(type);
@@ -112,12 +112,12 @@ void NBTBase::writeTag(Crapper::ByteBuffer &buffer)
 
 void NBTBase::writeTag(std::ostream &stream)
 {
-    Crapper::ByteBuffer buffer;
+    ByteBuffer buffer;
     writeTag(buffer);
     stream.write(reinterpret_cast<const char *>(buffer.data.data()), buffer.data.size());
 }
 
-NBTBase *NBTBase::readTag(Crapper::ByteBuffer &buffer)
+NBTBase *NBTBase::readTag(ByteBuffer &buffer)
 {
     uint8_t type = buffer.readByte();
     if (buffer.underflow)
@@ -135,15 +135,15 @@ NBTBase *NBTBase::readTag(Crapper::ByteBuffer &buffer)
 NBTBase *NBTBase::readTag(std::istream &stream)
 {
     // Read all bytes from stream
-    Crapper::ByteBuffer buffer;
+    ByteBuffer buffer;
     buffer.data = std::vector<uint8_t>((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
 
     return readTag(buffer);
 }
 
-NBTTagCompound *NBTBase::readGZip(Crapper::ByteBuffer &buffer)
+NBTTagCompound *NBTBase::readGZip(ByteBuffer &buffer)
 {
-    Crapper::ByteBuffer output_buffer;
+    ByteBuffer output_buffer;
     try
     {
         mz_ulong decompressed_size = 512 * 1024;
@@ -181,7 +181,7 @@ NBTTagCompound *NBTBase::readGZip(Crapper::ByteBuffer &buffer)
 NBTTagCompound *NBTBase::readGZip(std::istream &stream, uint32_t len)
 {
     // Read entire file into memory
-    Crapper::ByteBuffer buffer;
+    ByteBuffer buffer;
     buffer.data.resize(len);
     stream.read(reinterpret_cast<char *>(buffer.data.data()), len);
 
@@ -189,9 +189,9 @@ NBTTagCompound *NBTBase::readGZip(std::istream &stream, uint32_t len)
     return readGZip(buffer);
 }
 
-void NBTBase::writeGZip(Crapper::ByteBuffer &buffer, NBTTagCompound *compound)
+void NBTBase::writeGZip(ByteBuffer &buffer, NBTTagCompound *compound)
 {
-    Crapper::ByteBuffer output_buffer;
+    ByteBuffer output_buffer;
     compound->writeTag(output_buffer);
     try
     {
@@ -236,16 +236,16 @@ void NBTBase::writeGZip(Crapper::ByteBuffer &buffer, NBTTagCompound *compound)
 
 void NBTBase::writeGZip(std::ostream &stream, NBTTagCompound *compound)
 {
-    Crapper::ByteBuffer buffer;
+    ByteBuffer buffer;
     writeGZip(buffer, compound);
 
     // Write Gzip stream
     stream.write(reinterpret_cast<const char *>(buffer.data.data()), buffer.data.size());
 }
 
-NBTTagCompound *NBTBase::readZlib(Crapper::ByteBuffer &buffer)
+NBTTagCompound *NBTBase::readZlib(ByteBuffer &buffer)
 {
-    Crapper::ByteBuffer output_buffer;
+    ByteBuffer output_buffer;
     try
     {
         mz_ulong decompressed_size = 512 * 1024;
@@ -285,15 +285,15 @@ NBTTagCompound *NBTBase::readZlib(Crapper::ByteBuffer &buffer)
 
 NBTTagCompound *NBTBase::readZlib(std::istream &stream, uint32_t len)
 {
-    Crapper::ByteBuffer buffer;
+    ByteBuffer buffer;
     buffer.data.resize(len);
     stream.read(reinterpret_cast<char *>(buffer.data.data()), len);
     return readZlib(buffer);
 }
 
-void NBTBase::writeZlib(Crapper::ByteBuffer &buffer, NBTTagCompound *compound)
+void NBTBase::writeZlib(ByteBuffer &buffer, NBTTagCompound *compound)
 {
-    Crapper::ByteBuffer output_buffer;
+    ByteBuffer output_buffer;
     compound->writeTag(output_buffer);
     try
     {
@@ -323,7 +323,7 @@ void NBTBase::writeZlib(Crapper::ByteBuffer &buffer, NBTTagCompound *compound)
 
 void NBTBase::writeZlib(std::ostream &stream, NBTTagCompound *compound)
 {
-    Crapper::ByteBuffer buffer;
+    ByteBuffer buffer;
     compound->writeTag(buffer);
     try
     {
@@ -351,85 +351,85 @@ void NBTBase::writeZlib(std::ostream &stream, NBTTagCompound *compound)
     }
 }
 
-void NBTTagByte::writeContents(Crapper::ByteBuffer &buffer)
+void NBTTagByte::writeContents(ByteBuffer &buffer)
 {
     buffer.writeByte(value);
 }
 
-void NBTTagByte::readContents(Crapper::ByteBuffer &buffer)
+void NBTTagByte::readContents(ByteBuffer &buffer)
 {
     value = buffer.readByte();
 }
 
-void NBTTagShort::writeContents(Crapper::ByteBuffer &buffer)
+void NBTTagShort::writeContents(ByteBuffer &buffer)
 {
     buffer.writeShort(value);
 }
 
-void NBTTagShort::readContents(Crapper::ByteBuffer &buffer)
+void NBTTagShort::readContents(ByteBuffer &buffer)
 {
     value = buffer.readShort();
 }
 
-void NBTTagInt::writeContents(Crapper::ByteBuffer &buffer)
+void NBTTagInt::writeContents(ByteBuffer &buffer)
 {
     buffer.writeInt(value);
 }
 
-void NBTTagInt::readContents(Crapper::ByteBuffer &buffer)
+void NBTTagInt::readContents(ByteBuffer &buffer)
 {
     value = buffer.readInt();
 }
 
-void NBTTagLong::writeContents(Crapper::ByteBuffer &buffer)
+void NBTTagLong::writeContents(ByteBuffer &buffer)
 {
     buffer.writeLong(value);
 }
 
-void NBTTagLong::readContents(Crapper::ByteBuffer &buffer)
+void NBTTagLong::readContents(ByteBuffer &buffer)
 {
     value = buffer.readLong();
 }
 
-void NBTTagFloat::writeContents(Crapper::ByteBuffer &buffer)
+void NBTTagFloat::writeContents(ByteBuffer &buffer)
 {
     buffer.writeFloat(value);
 }
 
-void NBTTagFloat::readContents(Crapper::ByteBuffer &buffer)
+void NBTTagFloat::readContents(ByteBuffer &buffer)
 {
     value = buffer.readFloat();
 }
 
-void NBTTagDouble::writeContents(Crapper::ByteBuffer &buffer)
+void NBTTagDouble::writeContents(ByteBuffer &buffer)
 {
     buffer.writeDouble(value);
 }
 
-void NBTTagDouble::readContents(Crapper::ByteBuffer &buffer)
+void NBTTagDouble::readContents(ByteBuffer &buffer)
 {
     value = buffer.readDouble();
 }
 
-void NBTTagByteArray::writeContents(Crapper::ByteBuffer &buffer)
+void NBTTagByteArray::writeContents(ByteBuffer &buffer)
 {
     buffer.writeInt(value.size() & 0x7FFFFFFF);
     buffer.writeBytes((uint8_t *)value.data(), value.size());
 }
 
-void NBTTagByteArray::readContents(Crapper::ByteBuffer &buffer)
+void NBTTagByteArray::readContents(ByteBuffer &buffer)
 {
     int32_t length = buffer.readInt() & 0x7FFFFFFF;
     value.resize(length);
     buffer.readBytes((uint8_t *)value.data(), length);
 }
 
-void NBTTagString::writeContents(Crapper::ByteBuffer &buffer)
+void NBTTagString::writeContents(ByteBuffer &buffer)
 {
     buffer.writeString(value);
 }
 
-void NBTTagString::readContents(Crapper::ByteBuffer &buffer)
+void NBTTagString::readContents(ByteBuffer &buffer)
 {
     value = buffer.readString();
 }
@@ -455,7 +455,7 @@ NBTBase *NBTTagList::getTag(uint32_t index)
     return value[index];
 }
 
-void NBTTagList::writeContents(Crapper::ByteBuffer &buffer)
+void NBTTagList::writeContents(ByteBuffer &buffer)
 {
     buffer.writeByte(tagType);
     buffer.writeInt(value.size() & 0x7FFFFFFF);
@@ -465,7 +465,7 @@ void NBTTagList::writeContents(Crapper::ByteBuffer &buffer)
     }
 }
 
-void NBTTagList::readContents(Crapper::ByteBuffer &buffer)
+void NBTTagList::readContents(ByteBuffer &buffer)
 {
     tagType = buffer.readByte();
     int32_t length = buffer.readInt() & 0x7FFFFFFF;
@@ -597,7 +597,7 @@ NBTTagCompound *NBTTagCompound::getCompound(std::string key)
     return nullptr;
 }
 
-void NBTTagCompound::writeContents(Crapper::ByteBuffer &buffer)
+void NBTTagCompound::writeContents(ByteBuffer &buffer)
 {
     for (auto &&pair : value)
     {
@@ -606,7 +606,7 @@ void NBTTagCompound::writeContents(Crapper::ByteBuffer &buffer)
     buffer.writeByte(0);
 }
 
-void NBTTagCompound::readContents(Crapper::ByteBuffer &buffer)
+void NBTTagCompound::readContents(ByteBuffer &buffer)
 {
     while (true)
     {

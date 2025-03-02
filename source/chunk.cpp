@@ -1978,14 +1978,14 @@ void chunk_t::serialize()
     save(*(NBTTagCompound *)root_compound.setTag("Level", new NBTTagCompound));
 
     // Write the uncompressed compound to a buffer
-    Crapper::ByteBuffer uncompressed_buffer;
+    ByteBuffer uncompressed_buffer;
     root_compound.writeTag(uncompressed_buffer);
 
     // Compress the data
     uint32_t uncompressed_size = uncompressed_buffer.data.size();
     mz_ulong compressed_size = uncompressed_size;
 
-    Crapper::ByteBuffer buffer;
+    ByteBuffer buffer;
     buffer.data.resize(uncompressed_size);
 
     int result = mz_compress2(buffer.data.data(), &compressed_size, uncompressed_buffer.data.data(), uncompressed_size, MZ_BEST_SPEED);
@@ -2095,7 +2095,7 @@ void chunk_t::deserialize()
     }
 
     // Read the compressed data
-    Crapper::ByteBuffer buffer;
+    ByteBuffer buffer;
     buffer.data.resize(length - 1);
     chunk_file.read(reinterpret_cast<char *>(buffer.data.data()), length - 1);
 

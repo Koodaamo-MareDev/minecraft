@@ -7,7 +7,7 @@
 #include <cstdint>
 #include <iostream>
 #include <bit>
-#include "../crapper/client.hpp"    // For ByteBuffer
+#include <ported/ByteBuffer.hpp>
 #include <miniz/miniz.h> // For compression and decompression (RFC 1950 and RFC 1952)
 
 // Gzip format constants for compression and decompression
@@ -41,22 +41,22 @@ public:
     static NBTBase *createTag(uint8_t type);
     static NBTBase *copyTag(NBTBase *tag);
 
-    void writeTag(Crapper::ByteBuffer &buffer);
+    void writeTag(ByteBuffer &buffer);
     void writeTag(std::ostream &stream);
-    virtual void writeContents(Crapper::ByteBuffer &buffer) = 0;
+    virtual void writeContents(ByteBuffer &buffer) = 0;
 
-    static NBTBase *readTag(Crapper::ByteBuffer &buffer);
+    static NBTBase *readTag(ByteBuffer &buffer);
     static NBTBase *readTag(std::istream &stream);
-    virtual void readContents(Crapper::ByteBuffer &buffer) = 0;
+    virtual void readContents(ByteBuffer &buffer) = 0;
 
-    static NBTTagCompound *readGZip(Crapper::ByteBuffer &buffer);
+    static NBTTagCompound *readGZip(ByteBuffer &buffer);
     static NBTTagCompound *readGZip(std::istream &stream, uint32_t len);
-    static void writeGZip(Crapper::ByteBuffer &buffer, NBTTagCompound *compound);
+    static void writeGZip(ByteBuffer &buffer, NBTTagCompound *compound);
     static void writeGZip(std::ostream &stream, NBTTagCompound *compound);
 
-    static NBTTagCompound *readZlib(Crapper::ByteBuffer &buffer);
+    static NBTTagCompound *readZlib(ByteBuffer &buffer);
     static NBTTagCompound *readZlib(std::istream &stream, uint32_t len);
-    static void writeZlib(Crapper::ByteBuffer &buffer, NBTTagCompound *compound);
+    static void writeZlib(ByteBuffer &buffer, NBTTagCompound *compound);
     static void writeZlib(std::ostream &stream, NBTTagCompound *compound);
 
     virtual ~NBTBase() {}
@@ -70,9 +70,9 @@ public:
         return NBTBase::TAG_End;
     }
 
-    void writeContents(Crapper::ByteBuffer &buffer) override {}
+    void writeContents(ByteBuffer &buffer) override {}
 
-    void readContents(Crapper::ByteBuffer &buffer) override {}
+    void readContents(ByteBuffer &buffer) override {}
 };
 
 class NBTTagByte : public NBTBase
@@ -87,9 +87,9 @@ public:
         return NBTBase::TAG_Byte;
     }
 
-    void writeContents(Crapper::ByteBuffer &buffer) override;
+    void writeContents(ByteBuffer &buffer) override;
 
-    void readContents(Crapper::ByteBuffer &buffer) override;
+    void readContents(ByteBuffer &buffer) override;
 };
 
 class NBTTagShort : public NBTBase
@@ -104,9 +104,9 @@ public:
         return NBTBase::TAG_Short;
     }
 
-    void writeContents(Crapper::ByteBuffer &buffer) override;
+    void writeContents(ByteBuffer &buffer) override;
 
-    void readContents(Crapper::ByteBuffer &buffer) override;
+    void readContents(ByteBuffer &buffer) override;
 };
 
 class NBTTagInt : public NBTBase
@@ -121,9 +121,9 @@ public:
         return NBTBase::TAG_Int;
     }
 
-    void writeContents(Crapper::ByteBuffer &buffer) override;
+    void writeContents(ByteBuffer &buffer) override;
 
-    void readContents(Crapper::ByteBuffer &buffer) override;
+    void readContents(ByteBuffer &buffer) override;
 };
 
 class NBTTagLong : public NBTBase
@@ -138,9 +138,9 @@ public:
         return NBTBase::TAG_Long;
     }
 
-    void writeContents(Crapper::ByteBuffer &buffer) override;
+    void writeContents(ByteBuffer &buffer) override;
 
-    void readContents(Crapper::ByteBuffer &buffer) override;
+    void readContents(ByteBuffer &buffer) override;
 };
 
 class NBTTagFloat : public NBTBase
@@ -155,9 +155,9 @@ public:
         return NBTBase::TAG_Float;
     }
 
-    void writeContents(Crapper::ByteBuffer &buffer) override;
+    void writeContents(ByteBuffer &buffer) override;
 
-    void readContents(Crapper::ByteBuffer &buffer) override;
+    void readContents(ByteBuffer &buffer) override;
 };
 
 class NBTTagDouble : public NBTBase
@@ -172,9 +172,9 @@ public:
         return NBTBase::TAG_Double;
     }
 
-    void writeContents(Crapper::ByteBuffer &buffer) override;
+    void writeContents(ByteBuffer &buffer) override;
 
-    void readContents(Crapper::ByteBuffer &buffer) override;
+    void readContents(ByteBuffer &buffer) override;
 };
 
 class NBTTagByteArray : public NBTBase
@@ -194,9 +194,9 @@ public:
         return NBTBase::TAG_Byte_Array;
     }
 
-    void writeContents(Crapper::ByteBuffer &buffer) override;
+    void writeContents(ByteBuffer &buffer) override;
 
-    void readContents(Crapper::ByteBuffer &buffer) override;
+    void readContents(ByteBuffer &buffer) override;
 };
 
 class NBTTagString : public NBTBase
@@ -211,9 +211,9 @@ public:
         return NBTBase::TAG_String;
     }
 
-    void writeContents(Crapper::ByteBuffer &buffer) override;
+    void writeContents(ByteBuffer &buffer) override;
 
-    void readContents(Crapper::ByteBuffer &buffer) override;
+    void readContents(ByteBuffer &buffer) override;
 };
 
 class NBTTagList : public NBTBase
@@ -231,9 +231,9 @@ public:
 
     NBTBase *getTag(uint32_t index);
 
-    void writeContents(Crapper::ByteBuffer &buffer) override;
+    void writeContents(ByteBuffer &buffer) override;
 
-    void readContents(Crapper::ByteBuffer &buffer) override;
+    void readContents(ByteBuffer &buffer) override;
 
     ~NBTTagList()
     {
@@ -281,9 +281,9 @@ public:
 
     NBTTagCompound *getCompound(std::string key);
 
-    void writeContents(Crapper::ByteBuffer &buffer) override;
+    void writeContents(ByteBuffer &buffer) override;
 
-    void readContents(Crapper::ByteBuffer &buffer) override;
+    void readContents(ByteBuffer &buffer) override;
 
     ~NBTTagCompound()
     {

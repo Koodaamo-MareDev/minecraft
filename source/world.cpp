@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <unistd.h>
 #include <ported/Random.hpp>
+#include <crapper/client.hpp>
 
 #include "world.hpp"
 #include "chunk.hpp"
