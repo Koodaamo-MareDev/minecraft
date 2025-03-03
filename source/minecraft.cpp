@@ -323,6 +323,10 @@ int main(int argc, char **argv)
     };
     current_world = new world;
 
+    // Add the player to the world - it should persist until the game is closed
+    current_world->player.m_entity = new entity_player_local(vec3f(0.5, -999, 0.5));
+    add_entity(current_world->player.m_entity);
+
     init_chunk_generator();
     current_world->reset();
     current_world->seed = gettime();
@@ -427,6 +431,21 @@ int main(int argc, char **argv)
             update_textures();
 
             UpdateNetwork();
+
+            if ((wiimote_down & WPAD_CLASSIC_BUTTON_LEFT))
+            {
+                if (!current_world->is_remote())
+                {
+                    vec3i block_pos;
+                    vec3i face;
+                    if (raycast(vec3f(player_pos.x + .5, player_pos.y + .5, player_pos.z + .5), angles_to_vector(xrot, yrot), 128, &block_pos, &face))
+                    {
+                        block_pos = block_pos + face;
+                        vec3f pos = vec3f(block_pos.x, block_pos.y, block_pos.z) + vec3f(0.5, 0.5, 0.5);
+                        current_world->create_explosion(pos, 3, get_chunk_from_pos(block_pos));
+                    }
+                }
+            }
 
             if (current_world)
                 current_world->tick();
@@ -777,21 +796,6 @@ void GetInput()
         current_world->player.selected_hotbar_slot = (current_world->player.selected_hotbar_slot + 1) % 9;
         if (current_world->is_remote())
             client.sendBlockItemSwitch(current_world->player.selected_hotbar_slot);
-    }
-
-    if ((raw_wiimote_down & WPAD_CLASSIC_BUTTON_LEFT))
-    {
-        if (!current_world->is_remote())
-        {
-            vec3i block_pos;
-            vec3i face;
-            if (raycast(vec3f(player_pos.x + .5, player_pos.y + .5, player_pos.z + .5), angles_to_vector(xrot, yrot), 128, &block_pos, &face))
-            {
-                block_pos = block_pos + face;
-                vec3f pos = vec3f(block_pos.x, block_pos.y, block_pos.z) + vec3f(0.5, 0.5, 0.5);
-                current_world->create_explosion(pos, 3, get_chunk_from_pos(block_pos));
-            }
-        }
     }
 }
 

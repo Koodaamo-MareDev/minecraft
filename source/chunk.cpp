@@ -635,7 +635,7 @@ void update_block_at(const vec3i &pos)
             {
                 if (block_below == BlockID::air || properties(block_below).m_fluid)
                 {
-                    chunk->entities.push_back(new entity_falling_block(*block, pos));
+                    add_entity(new entity_falling_block(*block, pos));
                     block->set_blockid(BlockID::air);
                     block->meta = 0;
                 }
@@ -720,10 +720,10 @@ void chunk_t::recalculate_visibility(block_t *block, vec3i pos)
             continue;
         }
 
-        if (other_block->id != block->id || !is_face_transparent(get_face_texture_index(block, i)))
+        if (other_block->id != block->id || !properties(block->id).m_transparent)
         {
             RenderType other_rt = properties(other_block->id).m_render_type;
-            visibility |= ((other_rt != RenderType::full && other_rt != RenderType::full_special) || is_face_transparent(get_face_texture_index(other_block, i ^ 1))) << i;
+            visibility |= ((other_rt != RenderType::full && other_rt != RenderType::full_special) || properties(other_block->id).m_transparent) << i;
         }
     }
     block->visibility_flags = visibility;
@@ -1524,6 +1524,15 @@ vec3f get_fluid_direction(block_t *block, vec3i pos, chunk_t *chunk)
 void add_entity(entity_physical *entity)
 {
     std::map<int32_t, entity_physical *> &world_entities = get_entities();
+
+    // If the world is local, assign a unique entity ID to prevent conflicts
+    if (!current_world->is_remote())
+    {
+        while (world_entities.find(entity->entity_id) != world_entities.end())
+        {
+            entity->entity_id++;
+        }
+    }
     world_entities[entity->entity_id] = entity;
     vec3i entity_pos = vec3i(int(std::floor(entity->position.x)), int(std::floor(entity->position.y)), int(std::floor(entity->position.z)));
     entity->chunk = get_chunk_from_pos(entity_pos);

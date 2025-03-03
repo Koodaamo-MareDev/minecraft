@@ -613,7 +613,7 @@ inline void explode_raycast(vec3f origin, vec3f direction, float intensity, chun
                     break;
                 if (block->get_blockid() == BlockID::tnt)
                 {
-                    get_chunk_from_pos(block_pos)->entities.push_back(new entity_explosive_block(*block, block_pos, rand() % 20 + 10));
+                    add_entity(new entity_explosive_block(*block, block_pos, rand() % 20 + 10));
                 }
                 block->set_blockid(BlockID::air);
                 block->meta = 0;

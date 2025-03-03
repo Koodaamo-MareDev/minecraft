@@ -5,7 +5,6 @@
 #include <ported/Random.hpp>
 
 #include "block.hpp"
-#include "blockmap_alpha.h"
 #include "light.hpp"
 #include "sounds.hpp"
 #include "world.hpp"
@@ -15,11 +14,6 @@ class chunk_t;
 int8_t get_block_opacity(BlockID blockid)
 {
     return block_properties[int(blockid)].m_opacity;
-}
-
-bool is_face_transparent(uint8_t texture_index)
-{
-    return blockmap_alpha[texture_index] == 0;
 }
 
 bool is_solid(BlockID block_id)

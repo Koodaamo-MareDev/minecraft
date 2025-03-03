@@ -30,10 +30,6 @@ world::world()
     mkpath(region_path.c_str(), 0777);
     chdir(save_path.c_str());
 
-    // Add the player to the world - it should persist until the game is closed
-    player.m_entity = new entity_player_local(vec3f(0.5, -999, 0.5));
-    add_entity(player.m_entity);
-
     light_engine::init();
 }
 
@@ -509,7 +505,7 @@ void world::spawn_drop(const vec3i &pos, const block_t *old_block, inventory::it
     entity_item *entity = new entity_item(item_pos, item);
     entity->ticks_existed = 10; // Halves the pickup delay (20 ticks / 2 = 10)
     entity->velocity = vec3f(rng.nextFloat() - .5f, rng.nextFloat(), rng.nextFloat() - .5f) * 0.25f;
-    chunk->entities.push_back(entity);
+    add_entity(entity);
 }
 
 void world::create_explosion(vec3f pos, float power, chunk_t *near)
@@ -733,7 +729,7 @@ void world::draw_selected_block()
         // Get the texture index of the selected block
         texture_index = get_default_texture_index(BlockID(player.selected_item->id));
 
-        // Use the blockmap texture
+        // Use the terrain texture
         use_texture(terrain_texture);
         texbuf = (char *)MEM_PHYSICAL_TO_K0(GX_GetTexObjData(&terrain_texture));
     }

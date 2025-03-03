@@ -16,8 +16,6 @@ class chunk_t;
 
 int8_t get_block_opacity(BlockID blockid);
 
-bool is_face_transparent(uint8_t texture_index);
-
 uint8_t get_block_luminance(BlockID block_id);
 
 uint32_t get_default_texture_index(BlockID blockid);

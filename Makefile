@@ -62,7 +62,7 @@ export DEPSDIR	:=	$(CURDIR)/$(BUILD)
 #---------------------------------------------------------------------------------
 # automatically build a list of object files for our project
 #---------------------------------------------------------------------------------
-ALPHAMAPSRC	:=	blockmap.png
+ALPHAMAPSRC	:=	
 ALPHAMAPFILES	:=	$(ALPHAMAPSRC:.png=_alpha.h)
 LIGHTMAPSRC	:=	light_day.png light_night.png light_day_mono.png light_night_mono.png light_nether.png
 LIGHTMAPFILES	:=	$(LIGHTMAPSRC:.png=_rgba.h)
