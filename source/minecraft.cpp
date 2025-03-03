@@ -175,6 +175,38 @@ float flerp(float a, float b, float f)
     return a + f * (b - a);
 }
 
+void init_fail(std::string message)
+{
+    if (frameBuffer[0])
+        free(frameBuffer[0]);
+
+    if (!rmode)
+        rmode = VIDEO_GetPreferredMode(NULL);
+
+    VIDEO_Configure(rmode);
+
+    frameBuffer[0] = MEM_K0_TO_K1(SYS_AllocateFramebuffer(rmode));
+
+    CON_Init(frameBuffer[0], 0, 0, rmode->fbWidth, rmode->xfbHeight, rmode->fbWidth * VI_DISPLAY_PIX_SZ);
+
+    VIDEO_ClearFrameBuffer(rmode, frameBuffer[0], COLOR_BLACK);
+    printf("Initialization failed: %s\n\nPress the power or reset button to exit.\n", message.c_str());
+
+    VIDEO_SetNextFramebuffer(frameBuffer[0]);
+    VIDEO_SetBlack(FALSE);
+    VIDEO_Flush();
+
+    while (1)
+    {
+        if (HWButton != -1)
+        {
+            SYS_ResetSystem(HWButton, 0, 0);
+            exit(0);
+        }
+        VIDEO_WaitVSync();
+    }
+}
+
 int main(int argc, char **argv)
 {
     u32 fb = 0;
@@ -189,6 +221,9 @@ int main(int argc, char **argv)
     SYS_SetPowerCallback(WiiPowerPressed);
     SYS_SetResetCallback(WiiResetPressed);
     WPAD_SetPowerButtonCallback(WiimotePowerPressed);
+
+    if (!fatInitDefault())
+        init_fail("Failed to initialize FAT filesystem");
 
     // Allocate the fifo buffer
     gpfifo = memalign(32, DEFAULT_FIFO_SIZE);
@@ -286,7 +321,6 @@ int main(int argc, char **argv)
         viewport.near,      // Near clipping plane
         viewport.far        // Far clipping plane
     };
-    fatInitDefault();
     current_world = new world;
 
     init_chunk_generator();
@@ -427,7 +461,7 @@ int main(int argc, char **argv)
                 draw_sky(background);
 
             GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, BASE3D_POS_FRAC_BITS);
-            use_texture(blockmap_texture);
+            use_texture(terrain_texture);
             current_world->draw_selected_block();
         }
 

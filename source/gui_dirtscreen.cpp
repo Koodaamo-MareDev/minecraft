@@ -9,7 +9,7 @@ void gui_dirtscreen::draw()
 {
     // Fill the screen with the dirt texture
     int texture_index = properties(BlockID::dirt).m_texture_index;
-    fill_screen_texture(blockmap_texture, viewport, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index), TEXTURE_PX(texture_index), TEXTURE_PY(texture_index));
+    fill_screen_texture(terrain_texture, viewport, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index), TEXTURE_PX(texture_index), TEXTURE_PY(texture_index));
 
     for (size_t i = 0; i < text_lines.size(); i++)
     {

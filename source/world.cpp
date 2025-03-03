@@ -584,7 +584,7 @@ void world::draw_scene(bool opaque)
 {
     std::deque<chunk_t *> &chunks = get_chunks();
     // Use terrain texture
-    use_texture(blockmap_texture);
+    use_texture(terrain_texture);
 
     // Enable indexed colors
     GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
@@ -734,8 +734,8 @@ void world::draw_selected_block()
         texture_index = get_default_texture_index(BlockID(player.selected_item->id));
 
         // Use the blockmap texture
-        use_texture(blockmap_texture);
-        texbuf = (char *)MEM_PHYSICAL_TO_K0(GX_GetTexObjData(&blockmap_texture));
+        use_texture(terrain_texture);
+        texbuf = (char *)MEM_PHYSICAL_TO_K0(GX_GetTexObjData(&terrain_texture));
     }
     else
     {

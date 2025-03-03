@@ -291,7 +291,7 @@ void entity_physical::render(float partial_ticks, bool transparency)
         transform_view(gertex::get_view_matrix(), entity_position - vec3f(0.5, 0.5, 0.5), (aabb.max - aabb.min));
 
         // Restore default texture
-        use_texture(blockmap_texture);
+        use_texture(terrain_texture);
         render_single_block(block_state, transparency);
     }
 #endif
@@ -514,7 +514,7 @@ void entity_falling_block::render(float partial_ticks, bool transparency)
         block_state.light = block_at_pos->light;
     block_state.visibility_flags = 0x7F;
 
-    use_texture(blockmap_texture);
+    use_texture(terrain_texture);
 
     // Draw the selected block
     if (on_ground || fall_time <= 1)
@@ -583,7 +583,7 @@ void entity_explosive_block::render(float partial_ticks, bool transparency)
     render_single_block(block_state, false);
     render_single_block(block_state, true);
 
-    use_texture(blockmap_texture);
+    use_texture(terrain_texture);
 }
 
 entity_creeper::entity_creeper(const vec3f &position) : entity_explosive(), entity_living()
@@ -771,7 +771,7 @@ void entity_creeper::render(float partial_ticks, bool transparency)
         block_state.visibility_flags = 0x7F;
         block_state.meta = 0;
         block_state.light = 0xFF;
-        use_texture(blockmap_texture);
+        use_texture(terrain_texture);
         for (size_t i = 0; i < path.size(); i++)
         {
             vec3i path_pos = path[i];
@@ -876,7 +876,7 @@ void entity_item::render(float partial_ticks, bool transparency)
     {
         if (item.is_block())
         {
-            use_texture(blockmap_texture);
+            use_texture(terrain_texture);
 
             if (!properties(item.id).m_fluid && (render_type == RenderType::full || render_type == RenderType::full_special || render_type == RenderType::slab))
             {

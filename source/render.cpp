@@ -2,24 +2,12 @@
 
 #include <ported/Random.hpp>
 
+#include "pnguin/png_loader.hpp"
+
 #include "blocks.hpp"
 #include "world.hpp"
 
 #include "white_tpl.h"
-#include "clouds_tpl.h"
-#include "sun_tpl.h"
-#include "moon_tpl.h"
-#include "blockmap_tpl.h"
-#include "particles_tpl.h"
-#include "icons_tpl.h"
-#include "container_tpl.h"
-#include "underwater_tpl.h"
-#include "vignette_tpl.h"
-#include "creeper_tpl.h"
-#include "font_tpl.h"
-#include "items_tpl.h"
-#include "inventory_tpl.h"
-#include "char_tpl.h"
 
 const GXColor sky_color = {0x88, 0xBB, 0xFF, 0xFF};
 
@@ -27,7 +15,7 @@ GXTexObj white_texture;
 GXTexObj clouds_texture;
 GXTexObj sun_texture;
 GXTexObj moon_texture;
-GXTexObj blockmap_texture;
+GXTexObj terrain_texture;
 GXTexObj particles_texture;
 GXTexObj icons_texture;
 GXTexObj container_texture;
@@ -43,35 +31,49 @@ GXTexObj inventory_texture;
 water_texanim_t water_still_anim;
 lava_texanim_t lava_still_anim;
 
-void init_texture(GXTexObj &texture, const void *data_src, uint32_t data_len)
+void init_missing_texture(GXTexObj &texture)
 {
-    TPLFile tpl_file;
-    TPL_OpenTPLFromMemory(&tpl_file, (void *)data_src, data_len);
-    TPL_GetTexture(&tpl_file, 0, &texture);
+    void *texture_buf = memalign(32, 64); // 4x4 RGBA texture
+    memset(texture_buf, 0xFF, 64);
+    DCFlushRange(texture_buf, 64);
+
+    GX_InitTexObj(&texture, texture_buf, 4, 4, GX_TF_RGBA8, GX_CLAMP, GX_CLAMP, GX_FALSE);
     GX_InitTexObjFilterMode(&texture, GX_NEAR, GX_NEAR);
-    GX_InitTexObjWrapMode(&texture, GX_MIRROR, GX_MIRROR);
-    TPL_CloseTPLFile(&tpl_file);
+}
+
+void init_png_texture(GXTexObj &texture, const std::string &filename)
+{
+    try
+    {
+        pnguin::PNGFile png_file("/apps/minecraft/resources/textures/" + filename);
+        png_file.to_tpl(texture);
+    }
+    catch (std::exception &e)
+    {
+        printf("Failed to load %s: %s\n", filename.c_str(), e.what());
+        init_missing_texture(texture);
+    }
 }
 
 void init_textures()
 {
 
     // Basic textures
-    init_texture(white_texture, white_tpl, white_tpl_size);
-    init_texture(clouds_texture, clouds_tpl, clouds_tpl_size);
-    init_texture(sun_texture, sun_tpl, sun_tpl_size);
-    init_texture(moon_texture, moon_tpl, moon_tpl_size);
-    init_texture(particles_texture, particles_tpl, particles_tpl_size);
-    init_texture(blockmap_texture, blockmap_tpl, blockmap_tpl_size);
-    init_texture(icons_texture, icons_tpl, icons_tpl_size);
-    init_texture(container_texture, container_tpl, container_tpl_size);
-    init_texture(underwater_texture, underwater_tpl, underwater_tpl_size);
-    init_texture(vignette_texture, vignette_tpl, vignette_tpl_size);
-    init_texture(creeper_texture, creeper_tpl, creeper_tpl_size);
-    init_texture(player_texture, char_tpl, char_tpl_size);
-    init_texture(font_texture, font_tpl, font_tpl_size);
-    init_texture(items_texture, items_tpl, items_tpl_size);
-    init_texture(inventory_texture, inventory_tpl, inventory_tpl_size);
+    init_missing_texture(white_texture);
+    init_png_texture(clouds_texture, "clouds.png");
+    init_png_texture(sun_texture, "sun.png");
+    init_png_texture(moon_texture, "moon.png");
+    init_png_texture(particles_texture, "particles.png");
+    init_png_texture(terrain_texture, "terrain.png");
+    init_png_texture(icons_texture, "icons.png");
+    init_png_texture(container_texture, "container.png");
+    init_png_texture(underwater_texture, "underwater.png");
+    init_png_texture(vignette_texture, "vignette.png");
+    init_png_texture(creeper_texture, "creeper.png");
+    init_png_texture(player_texture, "char.png");
+    init_png_texture(font_texture, "font.png");
+    init_png_texture(items_texture, "items.png");
+    init_png_texture(inventory_texture, "inventory.png");
 
     GX_InitTexObjWrapMode(&clouds_texture, GX_REPEAT, GX_REPEAT);
     GX_InitTexObjWrapMode(&underwater_texture, GX_REPEAT, GX_REPEAT);
@@ -80,7 +82,7 @@ void init_textures()
     // Animated textures
 
     // Lava
-    lava_still_anim.target = MEM_PHYSICAL_TO_K1(GX_GetTexObjData(&blockmap_texture));
+    lava_still_anim.target = MEM_PHYSICAL_TO_K1(GX_GetTexObjData(&terrain_texture));
     lava_still_anim.dst_width = 256;
     lava_still_anim.tile_width = 16;
     lava_still_anim.tile_height = 16;
@@ -90,7 +92,7 @@ void init_textures()
     lava_still_anim.flow_dst_y = 224;
 
     // Water
-    water_still_anim.target = MEM_PHYSICAL_TO_K1(GX_GetTexObjData(&blockmap_texture));
+    water_still_anim.target = MEM_PHYSICAL_TO_K1(GX_GetTexObjData(&terrain_texture));
     water_still_anim.dst_width = 256;
     water_still_anim.tile_width = 16;
     water_still_anim.tile_height = 16;
@@ -105,8 +107,8 @@ void update_textures()
     water_still_anim.update();
     lava_still_anim.update();
 
-    static void *texture_buf = MEM_PHYSICAL_TO_K1(GX_GetTexObjData(&blockmap_texture));
-    static uint32_t texture_buflen = GX_GetTexBufferSize(GX_GetTexObjWidth(&blockmap_texture), GX_GetTexObjHeight(&blockmap_texture), GX_GetTexObjFmt(&blockmap_texture), GX_FALSE, GX_FALSE);
+    static void *texture_buf = MEM_PHYSICAL_TO_K1(GX_GetTexObjData(&terrain_texture));
+    static uint32_t texture_buflen = GX_GetTexBufferSize(GX_GetTexObjWidth(&terrain_texture), GX_GetTexObjHeight(&terrain_texture), GX_GetTexObjFmt(&terrain_texture), GX_FALSE, GX_FALSE);
     DCFlushRange(texture_buf, texture_buflen);
     GX_InvalidateTexAll();
 }
@@ -722,7 +724,7 @@ void draw_particles(camera_t &camera, particle *particles, int count)
             GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
         }
 
-        use_texture(t == 0 ? blockmap_texture : particles_texture);
+        use_texture(t == 0 ? terrain_texture : particles_texture);
 
         // Use floats for vertex positions
         GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_F32, 0);

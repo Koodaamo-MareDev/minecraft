@@ -8,7 +8,7 @@ extern GXTexObj white_texture;
 extern GXTexObj clouds_texture;
 extern GXTexObj sun_texture;
 extern GXTexObj moon_texture;
-extern GXTexObj blockmap_texture;
+extern GXTexObj terrain_texture;
 extern GXTexObj particles_texture;
 extern GXTexObj icons_texture;
 extern GXTexObj container_texture;

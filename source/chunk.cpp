@@ -1838,7 +1838,7 @@ void chunk_t::render_entities(float partial_ticks, bool transparency)
     }
 
     // Restore default texture
-    use_texture(blockmap_texture);
+    use_texture(terrain_texture);
 
     // Restore default colors
     gertex::set_color_mul(GXColor{255, 255, 255, 255});

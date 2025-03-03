@@ -112,7 +112,7 @@ void gui::draw_item(int x, int y, inventory::item_stack stack)
 
     if (item.is_block())
     {
-        use_texture(blockmap_texture);
+        use_texture(terrain_texture);
 
         block_t block = {uint8_t(item.id & 0xFF), 0x7F, uint8_t(stack.meta & 0xFF), 0xF, 0xF};
 
