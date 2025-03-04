@@ -630,15 +630,13 @@ void update_block_at(const vec3i &pos)
         if (prop.m_fall)
         {
             BlockID block_below = get_block_id_at(pos + vec3i(0, -1, 0), BlockID::stone, chunk);
-            // Hopefully this prevents crashes caused by fluids colliding with falling blocks far away
-            if (chunk->player_taxicab_distance() < SIMULATION_DISTANCE * 16)
+            if (block_below == BlockID::air || properties(block_below).m_fluid)
             {
-                if (block_below == BlockID::air || properties(block_below).m_fluid)
-                {
-                    add_entity(new entity_falling_block(*block, pos));
-                    block->set_blockid(BlockID::air);
-                    block->meta = 0;
-                }
+                add_entity(new entity_falling_block(*block, pos));
+                block->set_blockid(BlockID::air);
+                block->meta = 0;
+
+                update_neighbors(pos);
             }
         }
     }
@@ -1746,28 +1744,13 @@ int chunk_t::render_fluid(block_t *block, const vec3i &pos)
 
 void chunk_t::update_entities()
 {
-    // Update entities
-    for (entity_physical *&entity : entities)
-    {
-        if (!entity)
-            continue;
-        // Workaround to prevent duplicate updates for entities that moved to a different chunk
-        if (entity->last_world_tick == current_world->ticks)
-            continue;
-
-        // Tick the entity
-        entity->tick();
-
-        entity->last_world_tick = current_world->ticks;
-    }
-
     if (!current_world->is_remote())
     {
         // Resolve collisions with current chunk and neighboring chunks' entities
         for (int i = 0; i <= 6; i++)
         {
-            if (i == FACE_NY || i == FACE_PY)
-                continue;
+            if (i == FACE_NY)
+                i += 2;
             chunk_t *neighbor = (i == 6 ? this : get_chunk(this->x + face_offsets[i].x, this->z + face_offsets[i].z));
             if (neighbor)
             {
@@ -1790,47 +1773,38 @@ void chunk_t::update_entities()
         }
     }
 
-    // Get a list of entities that are out of bounds
-    entities.erase(std::remove_if(entities.begin(), entities.end(), [&](entity_physical *&entity)
-                                  {
-        vec3i entity_pos = vec3i(int(std::floor(entity->position.x)), 0, int(std::floor(entity->position.z)));
-        chunk_t* new_chunk = get_chunk_from_pos(entity_pos);
+    // Move entities to the correct chunk
+    auto out_of_bounds_selector = [&](entity_physical *&entity)
+    {
+        chunk_t *new_chunk = get_chunk_from_pos(entity->get_foot_blockpos());
         if (new_chunk != entity->chunk)
         {
+            entity->chunk = new_chunk;
             if (new_chunk)
-            {
-                entity->chunk = new_chunk;
                 new_chunk->entities.push_back(entity);
-            }
-            else
+            return true;
+        }
+        return false;
+    };
+
+    // For any moved entities, remove them from the current chunk
+    entities.erase(std::remove_if(entities.begin(), entities.end(), out_of_bounds_selector), entities.end());
+
+    // When in multiplayer, the server will handle entity removal
+    if (!current_world->is_remote())
+    {
+        auto remove_selector = [&](entity_physical *&entity)
+        {
+            if (entity->can_remove())
             {
                 entity->chunk = nullptr;
+                remove_entity(entity->entity_id);
+                return true;
             }
-            return true;
-        }
-        return false; }),
-                   entities.end());
-    std::map<int32_t, entity_physical *> &world_entities = get_entities();
-    // Remove entities that can be removed
-    entities.erase(std::remove_if(entities.begin(), entities.end(), [&](entity_physical *&entity)
-                                  {
-        if (entity->can_remove())
-        {
-            // Remove the entity from the global entity list
-            try
-            {
-                if (world_entities.at(entity->entity_id) == entity)
-                    world_entities.erase(entity->entity_id);
-            }
-            catch (std::out_of_range &)
-            {
-                printf("Attempted to remove entity that doesn't exist. The entity list may have desynced.\n");
-            }
-            delete entity;
-            return true;
-        }
-        return false; }),
-                   entities.end());
+            return false;
+        };
+        entities.erase(std::remove_if(entities.begin(), entities.end(), remove_selector), entities.end());
+    }
 }
 
 void chunk_t::render_entities(float partial_ticks, bool transparency)

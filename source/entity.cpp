@@ -33,8 +33,6 @@ bool entity_physical::collides(entity_physical *other)
 
 bool entity_physical::can_remove()
 {
-    if (current_world->is_remote())
-        return dead;
     if (!chunk)
         return true;
     vec3f entity_pos = get_position(0);
@@ -88,7 +86,6 @@ void entity_physical::set_server_pos_rot(vec3i pos, vec3f rot, uint8_t ticks)
 
 void entity_physical::tick()
 {
-    ticks_existed++;
     prev_rotation = rotation;
     prev_position = position;
     if (current_world->is_remote() && !simulate_offline)
@@ -131,7 +128,7 @@ void entity_physical::tick()
             }
         }
     }
-    if (water_movement)
+    if (use_fluid_physics() && water_movement)
     {
         if (!in_water)
         {
@@ -192,7 +189,7 @@ void entity_physical::tick()
     {
         in_water = false;
     }
-    if (water_movement || lava_movement)
+    if (use_fluid_physics() && (water_movement || lava_movement))
     {
         float old_y = position.y;
 
@@ -465,7 +462,6 @@ vec3f entity_pathfinder::simple_pathfind(vec3f target)
 
 entity_falling_block::entity_falling_block(block_t block_state, const vec3i &position) : entity_physical(), block_state(block_state)
 {
-    chunk = get_chunk_from_pos(position);
     teleport(vec3f(position.x, position.y, position.z) + vec3f(0.5, 0, 0.5));
     this->walk_sound = false;
     this->drag_phase = drag_phase_t::after_friction;
@@ -476,21 +472,14 @@ entity_falling_block::entity_falling_block(block_t block_state, const vec3i &pos
 }
 void entity_falling_block::tick()
 {
-    if (dead)
-        return;
-    if (!fall_time && !current_world->is_remote())
-    {
-        update_neighbors(vec3i(std::floor(position.x), std::floor(position.y), std::floor(position.z)));
-    }
     fall_time++;
     entity_physical::tick();
-    if (on_ground)
+    if (on_ground && !current_world->is_remote())
     {
         dead = true; // Mark for removal
-        vec3f current_pos = get_position(0);
-        vec3i int_pos = vec3i(std::floor(current_pos.x), std::floor(current_pos.y), std::floor(current_pos.z));
+        vec3i int_pos = get_foot_blockpos();
         block_t *block = get_block_at(int_pos, chunk);
-        if (block && !current_world->is_remote())
+        if (block)
         {
             // Update the block
             *block = this->block_state;
@@ -498,7 +487,6 @@ void entity_falling_block::tick()
             update_block_at(int_pos);
             update_neighbors(int_pos);
         }
-        teleport(vec3f(int_pos.x, int_pos.y, int_pos.z) + vec3f(0.5, 0, 0.5));
     }
 }
 
@@ -555,10 +543,8 @@ entity_explosive_block::entity_explosive_block(block_t block_state, const vec3i 
 
 void entity_explosive_block::tick()
 {
-    if (dead)
-        return;
 
-    entity_falling_block::tick();
+    entity_physical::tick();
     entity_explosive::tick();
 }
 
@@ -602,8 +588,6 @@ entity_creeper::entity_creeper(const vec3f &position) : entity_explosive(), enti
 
 void entity_creeper::tick()
 {
-    if (dead)
-        return;
 
     if (!follow_entity)
     {
@@ -611,10 +595,10 @@ void entity_creeper::tick()
         {
             for (int z = position.z - 16; z <= position.z + 16 && !follow_entity; z += 16)
             {
-                chunk_t *chunk = get_chunk_from_pos(vec3i(x, 0, z));
-                if (!chunk)
+                chunk_t *curr_chunk = get_chunk_from_pos(vec3i(x, 0, z));
+                if (!curr_chunk)
                     continue;
-                for (entity_physical *entity : chunk->entities)
+                for (entity_physical *entity : curr_chunk->entities)
                 {
                     if (entity && !entity->dead && entity == current_world->player.m_entity)
                     {
@@ -794,7 +778,6 @@ void entity_creeper::render(float partial_ticks, bool transparency)
 
 entity_item::entity_item(const vec3f &position, const inventory::item_stack &item_stack) : entity_physical()
 {
-    chunk = get_chunk_from_pos(vec3i(std::floor(position.x), std::floor(position.y), std::floor(position.z)));
     this->walk_sound = false;
     this->gravity = 0.04;
     this->y_offset = 0.125;
@@ -809,8 +792,6 @@ entity_item::entity_item(const vec3f &position, const inventory::item_stack &ite
 
 void entity_item::tick()
 {
-    if (dead)
-        return;
     entity_physical::tick();
 
     if (current_world->is_remote())
@@ -823,9 +804,6 @@ void entity_item::tick()
 void entity_item::render(float partial_ticks, bool transparency)
 {
     if (!chunk)
-        return;
-
-    if (dead)
         return;
 
     vec3f entity_position = get_position(partial_ticks);
@@ -981,9 +959,6 @@ void entity_item::pickup(vec3f pos)
 
 void entity_explosive::tick()
 {
-    if (dead)
-        return;
-
     if (!fuse)
         explode();
     else
@@ -1005,8 +980,6 @@ void entity_living::hurt(uint16_t damage)
 
 void entity_living::tick()
 {
-    if (dead)
-        return;
     entity_physical::tick();
     if (walk_sound)
     {

@@ -496,9 +496,6 @@ void world::spawn_drop(const vec3i &pos, const block_t *old_block, inventory::it
 {
     if (item.empty())
         return;
-    chunk_t *chunk = get_chunk_from_pos(pos);
-    if (!chunk)
-        return;
     // Drop items
     javaport::Random rng;
     vec3f item_pos = vec3f(pos.x, pos.y, pos.z) + vec3f(0.5);
@@ -960,13 +957,26 @@ void world::update_entities()
         {
             vec3i int_pos = vec3i(int(std::floor(entity->position.x)), 0, int(std::floor(entity->position.z)));
             entity->chunk = get_chunk_from_pos(int_pos);
-            if (entity->chunk)
+            if (entity->chunk && std::find(entity->chunk->entities.begin(), entity->chunk->entities.end(), entity) == entity->chunk->entities.end())
                 entity->chunk->entities.push_back(entity);
         }
     }
 
     if (loaded)
     {
+        for (auto &&e : world_entities)
+        {
+            entity_physical *entity = e.second;
+
+            if (!entity || entity->dead)
+                continue;
+            
+            // Tick the entity
+            entity->tick();
+
+            entity->ticks_existed++;
+        }
+
         // Update the entities of the world
         for (chunk_t *&chunk : get_chunks())
         {

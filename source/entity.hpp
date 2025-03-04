@@ -40,7 +40,6 @@ public:
     };
     int32_t entity_id = 0;
     uint8_t type = 0;
-    uint32_t last_world_tick = 0;
     uint32_t ticks_existed = 0;
     aabb_t aabb;
     vec3f rotation = vec3f(0, 0, 0);
@@ -125,6 +124,11 @@ public:
         return false;
     }
 
+    virtual bool use_fluid_physics()
+    {
+        return true;
+    }
+
     vec3i get_head_blockpos()
     {
         return vec3i(std::floor(position.x), std::floor(aabb.min.y + y_offset), std::floor(position.z));
@@ -199,6 +203,11 @@ public:
     virtual void tick();
 
     virtual void render(float partial_ticks, bool transparency);
+
+    virtual bool use_fluid_physics()
+    {
+        return false;
+    }
 };
 
 class entity_explosive_block : public entity_falling_block, public entity_explosive
@@ -223,7 +232,7 @@ public:
     virtual bool should_jump();
 };
 
-class entity_item : public entity_physical
+class entity_item : virtual public entity_physical
 {
 public:
     inventory::item_stack item_stack;

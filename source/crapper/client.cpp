@@ -1,6 +1,6 @@
 #include "client.hpp"
 
-#include <network.h>   // Wii network library
+#include <network.h> // Wii network library
 #include <miniz/miniz.h>
 
 #include "../inventory.hpp"
@@ -790,7 +790,9 @@ namespace Crapper
         if (!pickup_entity || pickup_entity->type != 1 || !entity)
             return;
 
-        entity_item *item_entity = (entity_item *)pickup_entity;
+        entity_item *item_entity = dynamic_cast<entity_item *>(pickup_entity);
+        if (!item_entity)
+            return;
         item_entity->pickup(entity->get_position(0) - vec3f(0, 0.5, 0));
     }
 
@@ -891,7 +893,6 @@ namespace Crapper
         entity->set_server_pos_rot(vec3i(x, y, z), vec3f(pitch * (360.0 / 256), yaw * (-360.0 / 256), 0), 0);
         entity->teleport(vec3f(x / 32.0, y / 32.0 + 1.0 / 64.0, z / 32.0));
         entity->entity_id = entity_id;
-        entity->chunk = get_chunk_from_pos(vec3i(x, y, z));
         add_entity(entity);
     }
 
