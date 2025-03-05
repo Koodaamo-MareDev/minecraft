@@ -12,21 +12,14 @@
                 "${workspaceFolder}\\build"
             ],
             "defines": [
-                "_DEBUG",
-                "UNICODE",
-                "_UNICODE",
-                "HW_RVL",
-                "__wii__",
-                "GEKKO",
-                "MINIZ_NO_ZLIB_COMPATIBLE_NAMES",
-                "MINIZ_NO_ARCHIVE_APIS"
+                "HW_RVL"
             ],
             "windowsSdkVersion": "10.0.19041.0",
             "compilerPath": "C:/devkitPro/devkitPPC/bin/powerpc-eabi-g++.exe",
             "cStandard": "c17",
             "cppStandard": "c++17",
-            "intelliSenseMode": "${default}",
-            "mergeConfigurations": false,
+            "intelliSenseMode": "linux-gcc-arm",
+            "mergeConfigurations": true,
             "browse": {
                 "path": [
                     "${workspaceFolder}"
