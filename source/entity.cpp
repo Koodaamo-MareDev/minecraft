@@ -271,7 +271,6 @@ void entity_physical::animate()
 }
 void entity_physical::render(float partial_ticks, bool transparency)
 {
-#define DEBUG_ENTITIES
 #ifdef DEBUG_ENTITIES
     if (chunk)
     {
