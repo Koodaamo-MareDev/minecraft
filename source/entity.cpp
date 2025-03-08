@@ -275,6 +275,7 @@ void entity_physical::render(float partial_ticks, bool transparency)
     if (chunk)
     {
         vec3f entity_position = get_position(partial_ticks);
+        entity_position.y = (aabb.max.y + aabb.min.y) * 0.5;
         vec3i block_pos = vec3i(std::floor(entity_position.x), std::floor(entity_position.y + 0.5), std::floor(entity_position.z));
         block_t *block = get_block_at(block_pos, chunk);
         if (block && !properties(block->id).m_solid)
@@ -283,7 +284,6 @@ void entity_physical::render(float partial_ticks, bool transparency)
         }
         // Render a mob spawner at the entity's position
         block_t block_state = {uint8_t(BlockID::bricks), 0x7F, 0, light_level};
-        entity_position.y = aabb.min.y + (aabb.max.y - aabb.min.y) * 0.5;
         transform_view(gertex::get_view_matrix(), entity_position - vec3f(0.5, 0.5, 0.5), (aabb.max - aabb.min));
 
         // Restore default texture
@@ -739,6 +739,7 @@ void entity_creeper::render(float partial_ticks, bool transparency)
     creeper_model.speed = h_velocity.magnitude() * 30;
 
     creeper_model.pos = entity_position - vec3f(0.5, 0.5, 0.5);
+    creeper_model.pos.y += y_offset;
     creeper_model.rot.y = body_rotation_y;
     creeper_model.head_rot = vec3f(entity_rotation.x, entity_rotation.y, 0);
 
@@ -1263,6 +1264,7 @@ void entity_player_mp::render(float partial_ticks, bool transparency)
     }
 
     player_model.pos = entity_position - vec3f(0.5);
+    player_model.pos.y += y_offset;
     player_model.rot = vec3f(0, body_rotation_y, 0);
     player_model.head_rot = vec3f(entity_rotation.x, entity_rotation.y, 0);
 
