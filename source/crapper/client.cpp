@@ -886,8 +886,17 @@ namespace Crapper
             }
         }
 #endif
-        // Create mob entity
-        entity_physical *entity = new entity_living();
+        // Create entity based on type
+        entity_physical *entity = nullptr;
+        switch (type)
+        {
+        case 50:
+            entity = new entity_creeper(vec3f(x, y, z) / 32.0);
+            break;
+        default:
+            entity = new entity_living();
+            break;
+        }
         entity->width = 0.6;
         entity->height = 1.8;
         entity->set_server_pos_rot(vec3i(x, y, z), vec3f(pitch * (360.0 / 256), yaw * (-360.0 / 256), 0), 0);
