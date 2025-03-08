@@ -917,7 +917,7 @@ bool world::load()
     // Clean up
     delete level;
 
-    // Based on the player position, the chunks will be loaded around the player - see chunk_new.cpp
+    // Based on the player position, the chunks will be loaded around the player - see chunk.cpp
     return true;
 }
 
