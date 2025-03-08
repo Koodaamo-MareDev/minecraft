@@ -507,6 +507,7 @@ void world::spawn_drop(const vec3i &pos, const block_t *old_block, inventory::it
 
 void world::create_explosion(vec3f pos, float power, chunk_t *near)
 {
+    if (!is_remote())
     explode(pos, power * 0.75f, near);
 
     javaport::Random rng;
