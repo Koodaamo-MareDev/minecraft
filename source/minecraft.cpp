@@ -590,17 +590,22 @@ void UpdateLoadingStatus()
         }
 
         is_loading = loading_progress < required;
-        // Display the loading screen
+
         gui_dirtscreen *dirtscreen = dynamic_cast<gui_dirtscreen *>(gui::get_gui());
         if (dirtscreen)
         {
-            dirtscreen->set_text("Loading level\n\n\nBuilding terrain");
-            dirtscreen->set_progress(loading_progress, required);
-        }
-        if (!is_loading)
-        {
-            current_world->loaded = true;
-            gui::set_gui(nullptr);
+            if (is_loading)
+            {
+                // Update the loading screen
+                dirtscreen->set_text("Loading level\n\n\nBuilding terrain (" + std::to_string(loading_progress) + "/" + std::to_string(required) + ")");
+                dirtscreen->set_progress(loading_progress, required);
+            }
+            else
+            {
+                // The world is loaded - remove the loading screen
+                current_world->loaded = true;
+                gui::set_gui(nullptr);
+            }
         }
     }
 }

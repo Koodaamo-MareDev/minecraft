@@ -453,14 +453,32 @@ namespace Crapper
         dbgprintf("World seed: %lld\n", seed);
 
         if (current_world->player.m_entity)
-            current_world->player.m_entity->entity_id = entity_id;
+        {
+            if (current_world->player.m_entity->chunk)
+            {
+                dbgprintf("Player entity already exists in a chunk even though no chunks should be loaded yet. This must be a bug!!!\n");
+                status = ErrorStatus::RECEIVE_ERROR;
+                return;
+            }
 
-        gui_dirtscreen *dirtscreen = dynamic_cast<gui_dirtscreen *>(gui::get_gui());
-        if (!dirtscreen)
-            dirtscreen = new gui_dirtscreen(gertex::GXView());
-        dirtscreen->set_text("Loading level\n\nDownloading terrain");
-        dirtscreen->set_progress(0, 0);
-        gui::set_gui(dirtscreen);
+            // Remove the old player entity
+            remove_entity(current_world->player.m_entity->entity_id);
+        }
+
+        // Create a new player entity
+        current_world->player.m_entity = new entity_player_local(vec3f(0.5, -999, 0.5));
+        current_world->player.m_entity->entity_id = entity_id;
+        add_entity(current_world->player.m_entity);
+
+        if (!current_world->loaded)
+        {
+            gui_dirtscreen *dirtscreen = dynamic_cast<gui_dirtscreen *>(gui::get_gui());
+            if (!dirtscreen)
+                dirtscreen = new gui_dirtscreen(gertex::GXView());
+            dirtscreen->set_text("Loading level\n\nDownloading terrain");
+            dirtscreen->set_progress(0, 0);
+            gui::set_gui(dirtscreen);
+        }
         login_success = true;
     }
 
