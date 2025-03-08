@@ -1546,11 +1546,6 @@ void remove_entity(int32_t entity_id)
         printf("Removing unknown entity %d\n", entity_id);
         return;
     }
-    if (dynamic_cast<entity_player_local *>(entity))
-    {
-        printf("Attempt to remove the player entity\n");
-        return;
-    }
     entity->dead = true;
     if (!entity->chunk)
     {
