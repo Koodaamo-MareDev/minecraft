@@ -1357,6 +1357,33 @@ namespace Crapper
         }
     }
 
+    void MinecraftClient::handleExplosion(ByteBuffer &buffer)
+    {
+        // Read explosion
+        double x = buffer.readDouble();
+        double y = buffer.readDouble();
+        double z = buffer.readDouble();
+        float radius = buffer.readFloat();
+        uint32_t record_count = buffer.readInt();
+
+        if (buffer.underflow)
+            return;
+
+        for (uint32_t i = 0; i < record_count; i++)
+        {
+            // Ignore the records for now
+            buffer.readByte();
+            buffer.readByte();
+            buffer.readByte();
+        }
+
+        if (buffer.underflow)
+            return;
+
+        // Create explosion effect
+        current_world->create_explosion(vec3f(x, y, z), radius, nullptr);
+    }
+
     int MinecraftClient::clientToNetworkSlot(int slot_id)
     {
         if (slot_id < 9)
@@ -1730,6 +1757,11 @@ namespace Crapper
         {
             // Handle packet 0x35 (block change)
             handleBlockChange(buffer);
+            break;
+        }
+        case 0x3C:
+        {
+            handleExplosion(buffer);
             break;
         }
         case 0x67:
