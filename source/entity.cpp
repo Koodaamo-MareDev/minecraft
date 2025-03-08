@@ -1127,7 +1127,6 @@ void entity_player::hurt(uint16_t damage)
 entity_player_local::entity_player_local(const vec3f &position) : entity_player(position)
 {
     simulate_offline = true;
-    printf("Local player created, width: %f, height: %f\n", width, height);
     teleport(position);
 }
 
