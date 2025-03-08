@@ -353,7 +353,7 @@ int main(int argc, char **argv)
         ES_GetDeviceID(&dev_id);
         client.username = "Wii_" + std::to_string(dev_id);
 
-        client.joinServer("desktop-marcus.local", 25566);
+        client.joinServer("desktop-marcus.local", 25565);
         if (client.status != Crapper::ErrorStatus::OK)
             client.joinServer("mc.okayu.zip", 25566);
         if (client.status != Crapper::ErrorStatus::OK)
