@@ -587,6 +587,11 @@ entity_creeper::entity_creeper(const vec3f &position) : entity_explosive(), enti
 
 void entity_creeper::tick()
 {
+    if (current_world->is_remote())
+    {
+        entity_physical::tick();
+        return;
+    }
 
     if (!follow_entity)
     {
