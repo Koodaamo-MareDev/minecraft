@@ -166,6 +166,7 @@ namespace Crapper
         void handleMapChunk(ByteBuffer &buffer);
         void handleBlockChange(ByteBuffer &buffer);
         void handleMultiBlockChange(ByteBuffer &buffer);
+        void handleExplosion(ByteBuffer &buffer);
         void handleWindowItems(ByteBuffer &buffer);
         void handleUpdateSign(ByteBuffer &buffer);
         void handleKick(ByteBuffer &buffer);
