@@ -848,6 +848,8 @@ void HandleGUI(gertex::GXView &viewport)
     }
     UpdateGUI(viewport);
     DrawGUI(viewport);
+
+    gui::draw_text_with_shadow(0, 0, "Memory: " + std::to_string(current_world->memory_usage) + " B");
 }
 
 void Render(guVector chunkPos, void *buffer, u32 length)
