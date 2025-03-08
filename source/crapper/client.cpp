@@ -845,7 +845,7 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        dbgprintf("Mob %d spawned at %f %f %f with entity type %d\n", entity_id, x, y, z, type);
+        dbgprintf("Mob %d spawned at %f %f %f with entity type %d\n", entity_id, x / 32., y / 32., z / 32., int(type & 0xFF));
 #ifdef DEBUGENTITIES
         // Print metadata
         for (size_t i = 0; i < metadata.metadata.size(); i++)
