@@ -1130,7 +1130,7 @@ void entity_player::hurt(uint16_t damage)
     sound sound = get_sound("hurt");
     sound.position = current_world->player.m_entity->position;
     sound.volume = 0.5;
-    sound.pitch = rng.nextFloat() * 0.8 + 0.6;
+    sound.pitch = rng.nextFloat() * 0.4 + 0.8;
     current_world->play_sound(sound);
 }
 
