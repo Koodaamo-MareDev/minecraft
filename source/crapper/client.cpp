@@ -1378,7 +1378,7 @@ namespace Crapper
                 continue;
             }
             block_t *block = chunk->get_block(pos);
-            block->id = types[i];
+            block->set_blockid(BlockID(types[i]));
             block->meta = metas[i];
             update_block_at(pos);
         }
