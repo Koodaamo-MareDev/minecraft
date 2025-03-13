@@ -619,6 +619,32 @@ void flat_aabb(const vec3i &pos, block_t *block, const aabb_t &other, std::vecto
         aabb_list.push_back(aabb);
 }
 
+void door_aabb(const vec3i &pos, block_t *block, const aabb_t &other, std::vector<aabb_t> &aabb_list)
+{
+    aabb_t aabb;
+    aabb.min = vec3f(pos.x, pos.y, pos.z);
+    aabb.max = aabb.min + vec3f(1, 1, 1);
+
+    bool open = block->meta & 4;
+    uint8_t direction = block->meta & 3;
+    if (!open)
+        direction = (direction + 3) & 3;
+
+    constexpr vfloat_t door_thickness = 0.1875;
+
+    if (direction == 0)
+        aabb.max.z -= 1 - door_thickness;
+    else if (direction == 1)
+        aabb.min.x += 1 - door_thickness;
+    else if (direction == 2)
+        aabb.min.z += 1 - door_thickness;
+    else if (direction == 3)
+        aabb.max.x -= 1 - door_thickness;
+
+    if (aabb.intersects(other))
+        aabb_list.push_back(aabb);
+}
+
 blockproperties_t block_properties[256] = {
     blockproperties_t().id(BlockID::air).opacity(0).solid(false).transparent(true).collision(CollisionType::none).valid_item(false),
     blockproperties_t().id(BlockID::stone).texture(0).sound(SoundType::stone),
@@ -684,14 +710,14 @@ blockproperties_t block_properties[256] = {
     blockproperties_t().id(BlockID::furnace).texture(44).sound(SoundType::stone).render_type(RenderType::full_special),
     blockproperties_t().id(BlockID::lit_furnace).texture(61).sound(SoundType::stone).render_type(RenderType::full_special),
     blockproperties_t().id(BlockID::standing_sign).texture(4).solid(false).opacity(0).transparent(false).sound(SoundType::wood).render_type(RenderType::cross).collision(CollisionType::none),
-    blockproperties_t().id(BlockID::wooden_door).texture(81).solid(false).opacity(0).transparent(true).sound(SoundType::wood).render_type(RenderType::cross).collision(CollisionType::none),
+    blockproperties_t().id(BlockID::wooden_door).texture(81).solid(false).opacity(0).transparent(true).sound(SoundType::wood).render_type(RenderType::special).aabb(door_aabb),
     blockproperties_t().id(BlockID::ladder).texture(83).solid(false).opacity(0).transparent(true).sound(SoundType::wood).render_type(RenderType::special).collision(CollisionType::none),
     blockproperties_t().id(BlockID::rail).texture(128).opacity(0).transparent(true).solid(false).sound(SoundType::metal).aabb(flat_aabb).render_type(RenderType::flat_ground).collision(CollisionType::none),
     blockproperties_t().id(BlockID::stone_stairs).texture(16).solid(false).sound(SoundType::stone),
     blockproperties_t().id(BlockID::wall_sign).texture(4).solid(false).opacity(0).transparent(false).sound(SoundType::wood).render_type(RenderType::cross).collision(CollisionType::none),
     blockproperties_t().id(BlockID::lever).texture(96).solid(false).opacity(0).transparent(true).sound(SoundType::wood).render_type(RenderType::special).collision(CollisionType::none).aabb(flat_aabb),
     blockproperties_t().id(BlockID::stone_pressure_plate).texture(0).solid(false).opacity(0).transparent(true).sound(SoundType::stone).aabb(flat_aabb).render_type(RenderType::flat_ground).collision(CollisionType::none),
-    blockproperties_t().id(BlockID::iron_door).texture(82).solid(false).opacity(0).transparent(true).sound(SoundType::metal).render_type(RenderType::cross),
+    blockproperties_t().id(BlockID::iron_door).texture(82).solid(false).opacity(0).transparent(true).sound(SoundType::metal).render_type(RenderType::special).aabb(door_aabb),
     blockproperties_t().id(BlockID::wooden_pressure_plate).texture(4).solid(false).opacity(0).transparent(true).sound(SoundType::wood).aabb(flat_aabb).render_type(RenderType::flat_ground).collision(CollisionType::none),
     blockproperties_t().id(BlockID::redstone_ore).texture(51).sound(SoundType::stone),
     blockproperties_t().id(BlockID::lit_redstone_ore).texture(51).sound(SoundType::stone).luminance(9),

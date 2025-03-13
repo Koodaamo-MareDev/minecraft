@@ -250,6 +250,7 @@ public:
     int render_chest(block_t *block, const vec3i &pos);
     int render_torch(block_t *block, const vec3i &pos);
     int render_torch_with_angle(block_t *block, const vec3f &vertex_pos, vfloat_t ax, vfloat_t az);
+    int render_door(block_t *block, const vec3i pos);
     int render_cross(block_t *block, const vec3i &pos);
     int render_slab(block_t *block, const vec3i &pos);
 
