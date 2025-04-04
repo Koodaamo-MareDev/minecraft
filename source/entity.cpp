@@ -925,15 +925,8 @@ void entity_item::resolve_collision(entity_physical *b)
     else
     {
         // Play the pop sound if the player picks up the stack
-        javaport::Random rng;
-        sound sound = get_sound("pop");
-        sound.position = position;
-        sound.volume = 0.5;
-        sound.pitch = rng.nextFloat() * 0.8 + 0.6;
-        current_world->play_sound(sound);
-        picked_up = true;
-        pickup_pos = b->get_position(0) - vec3f(0, 0.5, 0);
-        ticks_existed = item_lifetime - item_pickup_ticks;
+        pickup(b->get_position(0) - vec3f(0, 0.5, 0));
+        
         if (gui::get_gui())
             gui::get_gui()->refresh();
     }
