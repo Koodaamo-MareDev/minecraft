@@ -1103,7 +1103,7 @@ void entity_living::animate()
 
 entity_player::entity_player(const vec3f &position) : entity_living()
 {
-    this->width = 0.6;
+    this->width = 0.6f;
     this->height = 1.8;
     this->health = 20;
     this->walk_sound = true;
