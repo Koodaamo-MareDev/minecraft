@@ -18,16 +18,16 @@ include $(DEVKITPPC)/wii_rules
 #---------------------------------------------------------------------------------
 TARGET		:=	$(notdir $(CURDIR))
 BUILD		:=	build
-SOURCES		:=	source source/crapper source/gertex source/improvednoise source/math source/nbt source/pnguin source/auxio source/ported source/thirdparty/miniz
-DATA		:=
+SOURCES		:=	source source/crapper source/gertex source/math source/nbt source/pnguin source/auxio source/ported source/thirdparty/miniz
 TEXTURES	:=	textures
 INCLUDES	:=	source source/thirdparty
-SOUND		:=	sound
+DEFINES		:=	-DMINIZ_NO_ARCHIVE_APIS -DMINIZ_NO_ZLIB_COMPATIBLE_NAMES
+BUILD_FEAT	:=	-DMULTIPLAYER
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
 
-CFLAGS	= -g -O2 -Wall $(MACHDEP) $(INCLUDE) -DMINIZ_NO_ARCHIVE_APIS -DMINIZ_NO_ZLIB_COMPATIBLE_NAMES -DMULTIPLAYER
+CFLAGS	= -g -O2 -Wall $(MACHDEP) $(INCLUDE) $(DEFINES) $(BUILD_FEAT)
 CXXFLAGS	=	$(CFLAGS)
 
 LDFLAGS	=	-g $(MACHDEP) -Wl,-Map,$(notdir $@).map
@@ -53,27 +53,21 @@ ifneq ($(BUILD),$(notdir $(CURDIR)))
 export OUTPUT	:=	$(CURDIR)/$(TARGET)
 
 export VPATH	:=	$(foreach dir,$(SOURCES),$(CURDIR)/$(dir)) \
-					$(foreach dir,$(DATA),$(CURDIR)/$(dir)) \
-					$(foreach dir,$(TEXTURES),$(CURDIR)/$(dir)) \
-					$(foreach dir,$(SOUND),$(CURDIR)/$(dir))
+					$(foreach dir,$(TEXTURES),$(CURDIR)/$(dir))
 
 export DEPSDIR	:=	$(CURDIR)/$(BUILD)
 
 #---------------------------------------------------------------------------------
 # automatically build a list of object files for our project
 #---------------------------------------------------------------------------------
-ALPHAMAPSRC	:=	
-ALPHAMAPFILES	:=	$(ALPHAMAPSRC:.png=_alpha.h)
 LIGHTMAPSRC	:=	light_day.png light_night.png light_day_mono.png light_night_mono.png light_nether.png
 LIGHTMAPFILES	:=	$(LIGHTMAPSRC:.png=_rgba.h)
 CFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
 CPPFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
 sFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
 SFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.S)))
-BINFILES	:=	$(foreach dir,$(DATA),$(notdir $(wildcard $(dir)/*.*)))
 SCFFILES	:=	$(foreach dir,$(TEXTURES),$(notdir $(wildcard $(dir)/*.scf)))
 TPLFILES	:=	$(SCFFILES:.scf=.tpl)
-AIFFFILES	:=	$(foreach dir,$(SOUND),$(notdir $(wildcard $(dir)/*.aiff)))
 
 #---------------------------------------------------------------------------------
 # use CXX for linking C++ projects, CC for standard C
@@ -86,9 +80,9 @@ endif
 
 export OFILES_BIN	:=	$(addsuffix .o,$(BINFILES)) $(addsuffix .o,$(TPLFILES)) $(addsuffix .o,$(AIFFFILES))
 export OFILES_SOURCES := $(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(sFILES:.s=.o) $(SFILES:.S=.o)
-export OFILES := $(OFILES_BIN) $(OFILES_SOURCES) $(addsuffix _alpha.c,$(basename $(ALPHAMAPSRC))) $(addsuffix _rgba.c,$(basename $(LIGHTMAPSRC))) brightness_values.c
+export OFILES := $(OFILES_BIN) $(OFILES_SOURCES) $(addsuffix _rgba.c,$(basename $(LIGHTMAPSRC))) brightness_values.c
 
-export HFILES := $(addsuffix .h,$(subst .,_,$(BINFILES))) $(addsuffix .h,$(subst .,_,$(TPLFILES))) $(addsuffix .h,$(subst .,_,$(AIFFFILES))) $(ALPHAMAPFILES) $(LIGHTMAPFILES) brightness_values.h font_tile_widths.hpp
+export HFILES := $(addsuffix .h,$(subst .,_,$(BINFILES))) $(addsuffix .h,$(subst .,_,$(TPLFILES))) $(LIGHTMAPFILES) brightness_values.h font_tile_widths.hpp
 
 #---------------------------------------------------------------------------------
 # build a list of include paths
@@ -130,10 +124,6 @@ $(OUTPUT).elf: $(OFILES)
 
 $(OFILES_SOURCES) : $(HFILES)
 
-%_alpha.h %_alpha.c : %.png
-	@echo $(notdir $<)
-	@python ../extract_alpha.py $<
-
 %_rgba.h %_rgba.c : %.png
 	@echo $(notdir $<)
 	@python ../extract_rgba.py $<
@@ -143,27 +133,12 @@ brightness_values.h brightness_values.c :
 font_tile_widths.hpp : font.png
 	@echo $(notdir $<)
 	@python ../gen_font_tile_widths.py $<
-#---------------------------------------------------------------------------------
-# This rule links in binary data with the .bin extension
-#---------------------------------------------------------------------------------
-%.bin.o	%_bin.h :	%.bin
-#---------------------------------------------------------------------------------
-	@echo $(notdir $<)
-	@$(bin2o)
 
 #---------------------------------------------------------------------------------
 %.tpl.o	%_tpl.h :	%.tpl
 #---------------------------------------------------------------------------------
 	@echo $(notdir $<)
 	@$(bin2o)
-
-#---------------------------------------------------------------------------------
-%.aiff.o	%_aiff.h :	%.aiff
-#---------------------------------------------------------------------------------
-	@echo $(notdir $<)
-	@$(bin2o)
-	@python ../unconstify.py ../$(BUILD)/$(addsuffix .h,$(subst .,_,$(notdir $<)))
-
 
 -include $(DEPSDIR)/*.d
 

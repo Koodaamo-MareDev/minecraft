@@ -7,8 +7,6 @@
 #include "blocks.hpp"
 #include "world.hpp"
 
-#include "white_tpl.h"
-
 const GXColor sky_color = {0x88, 0xBB, 0xFF, 0xFF};
 
 GXTexObj white_texture;
