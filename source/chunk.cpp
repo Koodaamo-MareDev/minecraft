@@ -463,7 +463,7 @@ void generate_chunk()
 
     chunk->generation_stage = ChunkGenStage::features;
 
-    usleep(100);
+    LWP_YieldThread();
 
     index = 0;
     for (int z = 0; z < 16; z++)
@@ -494,7 +494,7 @@ void generate_chunk()
             if (neighbor)
             {
                 generate_features(neighbor);
-                usleep(100);
+                LWP_YieldThread();
 
                 // Update the VBOs of the neighboring chunks
                 for (int i = 0; i < VERTICAL_SECTION_COUNT; i++)
@@ -535,7 +535,7 @@ void init_chunk_generator()
         {
             while (pending_chunks.size() == 0)
             {
-                usleep(100);
+                LWP_YieldThread();
                 if (!chunk_generator_thread_active)
                     break;
             }
