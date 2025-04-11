@@ -1000,10 +1000,6 @@ void world::update_entities()
 
 void world::update_player()
 {
-    // Tick the player entity even in unloaded chunks
-    if (!player.m_entity->chunk && loaded)
-        player.m_entity->tick();
-
     // FIXME: This is a temporary fix for an crash with an unknown cause
 #ifdef CLIENT_COLLISION
     if (is_remote())
