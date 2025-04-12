@@ -119,7 +119,7 @@ static inline int8_t MAX_I8(int8_t a, int8_t b)
 void light_engine::update(const std::pair<vec3i, chunk_t *> &update)
 {
     std::deque<std::pair<vec3i, chunk_t *>> light_updates;
-    std::deque<chunk_t *> chunks = get_chunks();
+    std::deque<chunk_t *> &chunks = get_chunks();
     vec3i coords = update.first;
     light_updates.push_back(update);
     while (light_updates.size() > 0)
