@@ -150,6 +150,9 @@ namespace gertex
         case GXBlendMode::additive:
             GX_SetBlendMode(GX_BM_BLEND, GX_BL_ONE, GX_BL_ONE, GX_LO_NOOP);
             break;
+        case GXBlendMode::inverse:
+            GX_SetBlendMode(GX_BM_LOGIC, 0x00, 0x00, GX_LO_INV);
+            break;
         default:
             break;
         }
