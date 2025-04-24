@@ -5,8 +5,6 @@ namespace gertex
     GXState state;
     void use_fog(bool use)
     {
-        if (state.fog.enabled == use)
-            return;
         state.fog.enabled = use;
         GX_SetFog(state.fog.enabled ? uint8_t(state.fog.type) : GX_FOG_NONE, state.fog.start, state.fog.end, state.fog.near, state.fog.far, state.fog.color);
     }
@@ -131,8 +129,6 @@ namespace gertex
 
     void set_blending(GXBlendMode mode)
     {
-        if (mode == state.blend_mode)
-            return;
         state.blend_mode = mode;
         switch (mode)
         {
@@ -149,8 +145,6 @@ namespace gertex
 
     void set_color_add(GXColor color)
     {
-        if (state.color_add == color)
-            return;
         state.color_add = color;
         GX_SetTevKColor(GX_KCOLOR0, color);
     }
@@ -162,8 +156,6 @@ namespace gertex
 
     void set_color_mul(GXColor color)
     {
-        if (state.color_multiply == color)
-            return;
         state.color_multiply = color;
         GX_SetTevKColor(GX_KCOLOR1, color);
     }
