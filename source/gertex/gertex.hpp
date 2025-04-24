@@ -131,6 +131,8 @@ namespace gertex
         void apply();
     };
 
+    void set_state(const GXState &state);
+    const GXState get_state();
     void use_fog(bool use);
     void set_fog(const GXFog &fog);
     void pop_matrix();

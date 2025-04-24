@@ -3,6 +3,18 @@
 namespace gertex
 {
     GXState state;
+
+    void set_state(const GXState &new_state)
+    {
+        state = new_state;
+        state.apply();
+    }
+
+    const GXState get_state()
+    {
+        return state;
+    }
+
     void use_fog(bool use)
     {
         state.fog.enabled = use;
