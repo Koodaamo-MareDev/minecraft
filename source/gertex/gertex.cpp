@@ -180,12 +180,27 @@ namespace gertex
         return state.color_multiply;
     }
 
+    void set_alpha_cutoff(uint8_t cutoff)
+    {
+        state.alpha_cutoff = cutoff;
+        if (!cutoff)
+            GX_SetAlphaCompare(GX_ALWAYS, 0, GX_AOP_AND, GX_ALWAYS, 0);
+        else
+            GX_SetAlphaCompare(GX_GEQUAL, cutoff, GX_AOP_AND, GX_ALWAYS, 0);
+    }
+
+    uint8_t get_alpha_cutoff()
+    {
+        return state.alpha_cutoff;
+    }
+
     void GXState::apply()
     {
         set_fog(fog);
         set_blending(blend_mode);
         set_color_add(color_add);
         set_color_mul(color_multiply);
+        set_alpha_cutoff(alpha_cutoff);
         load_pos_matrix();
         load_proj_matrix();
     }

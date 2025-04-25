@@ -125,6 +125,7 @@ namespace gertex
         GXBlendMode blend_mode = GXBlendMode::none;
         GXColor color_multiply = {0xFF, 0xFF, 0xFF, 0xFF};
         GXColor color_add = {0, 0, 0, 0xFF};
+        uint8_t alpha_cutoff = 0;
         GXState()
         {
         }
@@ -151,6 +152,8 @@ namespace gertex
     GXColor get_color_add();
     void set_color_mul(GXColor color);
     GXColor get_color_mul();
+    void set_alpha_cutoff(uint8_t cutoff);
+    uint8_t get_alpha_cutoff();
 } // namespace gortex
 
 inline bool operator==(const GXColor &lhs, const GXColor &rhs)
