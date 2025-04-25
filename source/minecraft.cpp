@@ -564,8 +564,8 @@ void UpdateLoadingStatus()
 
         int min_y = std::max(0, (player_chunk_pos.y >> 4) - 1);
         int max_y = std::min(VERTICAL_SECTION_COUNT - 1, (player_chunk_pos.y >> 4) + 1);
-        int rows = max_y - min_y + 1;
-        int required = rows * 9;
+        int required = 0;
+        int chunk_count = 0;
 
         for (int x = -1; x <= 1; x++)
         {
@@ -577,19 +577,25 @@ void UpdateLoadingStatus()
                 {
                     continue;
                 }
+                
+                chunk_count++;
 
                 // Check if the vbos near the player are up to date
                 for (int i = min_y; i <= max_y; i++)
                 {
-                    if (chunk->vbos[i].has_updated)
-                        loading_progress++;
-                    else if (!chunk->vbos[i].visible)
-                        required--;
+                    if (chunk->vbos[i].visible)
+                    {
+                        required++;
+                        if (chunk->vbos[i].has_updated)
+                        {
+                            loading_progress++;
+                        }
+                    }
                 }
             }
         }
 
-        is_loading = loading_progress < required;
+        is_loading = loading_progress < required || chunk_count < 9;
 
         gui_dirtscreen *dirtscreen = dynamic_cast<gui_dirtscreen *>(gui::get_gui());
         if (dirtscreen)
@@ -597,7 +603,7 @@ void UpdateLoadingStatus()
             if (is_loading)
             {
                 // Update the loading screen
-                dirtscreen->set_text("Loading level\n\n\nBuilding terrain (" + std::to_string(loading_progress) + "/" + std::to_string(required) + ")");
+                dirtscreen->set_text("Loading level\n\n\nBuilding terrain");
                 dirtscreen->set_progress(loading_progress, required);
             }
             else
