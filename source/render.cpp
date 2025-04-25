@@ -959,7 +959,7 @@ void draw_sky(GXColor background)
     // Use default blend mode
     gertex::set_blending(gertex::GXBlendMode::normal);
     GX_SetAlphaUpdate(GX_TRUE);
-    GX_SetAlphaCompare(GX_ALWAYS, 0, GX_AOP_OR, GX_ALWAYS, 0);
+    gertex::set_alpha_cutoff(0);
     GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_FALSE);
 
     // Here we use 0 fractional bits for the position data, because we're drawing large objects.

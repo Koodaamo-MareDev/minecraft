@@ -557,11 +557,11 @@ void world::draw(camera_t &camera)
     GX_SetAlphaUpdate(GX_TRUE);
 
     // Draw particles
-    GX_SetAlphaCompare(GX_GEQUAL, 1, GX_AOP_AND, GX_ALWAYS, 0);
+    gertex::set_alpha_cutoff(1);
     draw_particles(camera, m_particle_system.particles, m_particle_system.size());
 
     // Draw chunks
-    GX_SetAlphaCompare(GX_ALWAYS, 0, GX_AOP_OR, GX_ALWAYS, 0);
+    gertex::set_alpha_cutoff(0);
     draw_scene(true);
 
     // Prepare transparent rendering parameters
@@ -570,7 +570,7 @@ void world::draw(camera_t &camera)
     GX_SetAlphaUpdate(GX_FALSE);
 
     // Draw chunks
-    GX_SetAlphaCompare(GX_GEQUAL, 1, GX_AOP_AND, GX_ALWAYS, 0);
+    gertex::set_alpha_cutoff(1);
     draw_scene(false);
 }
 
