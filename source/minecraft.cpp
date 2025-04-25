@@ -970,7 +970,20 @@ void DrawHUD(gertex::GXView &viewport)
     int crosshair_x = int(viewport.width - 32) >> 1;
     int crosshair_y = int(viewport.height - 32) >> 1;
 
+    // Save the current state
+    gertex::GXState state = gertex::get_state();
+
+    // Use inverse blending for the crosshair
+    gertex::set_blending(gertex::GXBlendMode::inverse);
+    
+    // Only draw when fully opaque
+    gertex::set_alpha_cutoff(255);
+    
+    // Draw the crosshair
     draw_textured_quad(icons_texture, crosshair_x, crosshair_y, 32, 32, 0, 0, 16, 16);
+
+    // Restore the state
+    gertex::set_state(state);
 
     // Draw IR cursor if visible
     if (wiimote_ir_visible)
