@@ -18,7 +18,7 @@
             "compilerPath": "C:/devkitPro/devkitPPC/bin/powerpc-eabi-g++.exe",
             "cStandard": "c17",
             "cppStandard": "c++17",
-            "intelliSenseMode": "linux-gcc-arm",
+            "intelliSenseMode": "gcc-arm",
             "mergeConfigurations": true,
             "browse": {
                 "path": [
