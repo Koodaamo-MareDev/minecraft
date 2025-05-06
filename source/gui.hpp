@@ -64,7 +64,7 @@ public:
 
     static void set_gui(gui *gui)
     {
-        if (current_gui)
+        if (current_gui && current_gui != gui)
         {
             current_gui->close();
             delete current_gui;
