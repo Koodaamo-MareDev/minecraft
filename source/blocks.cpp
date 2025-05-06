@@ -522,6 +522,21 @@ void default_destroy(const vec3i &pos, const block_t &old_block)
 {
 }
 
+// Turns broken ice into water unless it's floating in the air.
+void melt_destroy(const vec3i &pos, const block_t &old_block)
+{
+    if (!current_world->is_remote())
+    {
+        if (pos.y > 0)
+        {
+            if (get_block_id_at(pos - vec3i(0, 1, 0), BlockID::air) != BlockID::air)
+            {
+                set_block_at(pos, BlockID::water);
+            }
+        }
+    }
+}
+
 void spawn_tnt_destroy(const vec3i &pos, const block_t &old_block)
 {
     if (!current_world->is_remote())
@@ -735,7 +750,7 @@ blockproperties_t block_properties[256] = {
     blockproperties_t().id(BlockID::redstone_torch).texture(99).solid(false).opacity(0).transparent(true).luminance(7).sound(SoundType::stone).aabb(torch_aabb).render_type(RenderType::special).collision(CollisionType::none),
     blockproperties_t().id(BlockID::stone_button).texture(0).solid(false).opacity(0).transparent(false).sound(SoundType::stone).aabb(flat_aabb).render_type(RenderType::special).collision(CollisionType::none),
     blockproperties_t().id(BlockID::snow_layer).texture(66).solid(false).opacity(0).transparent(false).sound(SoundType::cloth).aabb(flat_aabb).render_type(RenderType::flat_ground).collision(CollisionType::none),
-    blockproperties_t().id(BlockID::ice).texture(67).solid(true).opacity(3).transparent(false).sound(SoundType::glass).slipperiness(0.98),
+    blockproperties_t().id(BlockID::ice).texture(67).solid(true).opacity(3).transparent(false).sound(SoundType::glass).slipperiness(0.98).drops(std::bind(no_drop, std::placeholders::_1)).destroy(std::bind(melt_destroy, std::placeholders::_1, std::placeholders::_2)),
     blockproperties_t().id(BlockID::snow_block).texture(66).solid(false).opacity(0).transparent(true).sound(SoundType::cloth).render_type(RenderType::flat_ground).collision(CollisionType::none),
     blockproperties_t().id(BlockID::cactus).texture(69).solid(false).opacity(0).transparent(true).sound(SoundType::grass).render_type(RenderType::special),
     blockproperties_t().id(BlockID::clay).texture(72).sound(SoundType::dirt),
