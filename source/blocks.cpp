@@ -499,6 +499,16 @@ inventory::item_stack default_drop(const block_t &old_block)
     return inventory::item_stack(old_block.id, 1, old_block.meta);
 }
 
+inventory::item_stack fixed_drop(const block_t &old_block, inventory::item_stack item)
+{
+    return item;
+}
+
+inventory::item_stack no_drop(const block_t &old_block)
+{
+    return inventory::item_stack(BlockID::air, 0);
+}
+
 // Randomly drops items with a count between 1 and the original count.
 inventory::item_stack random_drop(const block_t &old_block, inventory::item_stack item)
 {
@@ -647,8 +657,8 @@ void door_aabb(const vec3i &pos, block_t *block, const aabb_t &other, std::vecto
 
 blockproperties_t block_properties[256] = {
     blockproperties_t().id(BlockID::air).opacity(0).solid(false).transparent(true).collision(CollisionType::none).valid_item(false),
-    blockproperties_t().id(BlockID::stone).texture(0).sound(SoundType::stone),
-    blockproperties_t().id(BlockID::grass).texture(202).sound(SoundType::grass).render_type(RenderType::full_special).drops(std::bind(random_drop, std::placeholders::_1, inventory::item_stack(BlockID::dirt, 1))),
+    blockproperties_t().id(BlockID::stone).texture(0).sound(SoundType::stone).drops(std::bind(fixed_drop, std::placeholders::_1, inventory::item_stack(BlockID::cobblestone, 1))),
+    blockproperties_t().id(BlockID::grass).texture(202).sound(SoundType::grass).render_type(RenderType::full_special).drops(std::bind(fixed_drop, std::placeholders::_1, inventory::item_stack(BlockID::dirt, 1))),
     blockproperties_t().id(BlockID::dirt).texture(2).sound(SoundType::dirt),
     blockproperties_t().id(BlockID::cobblestone).texture(16).sound(SoundType::stone),
     blockproperties_t().id(BlockID::planks).texture(4).sound(SoundType::wood),
@@ -666,7 +676,7 @@ blockproperties_t block_properties[256] = {
     blockproperties_t().id(BlockID::wood).texture(20).sound(SoundType::wood).render_type(RenderType::full_special),
     blockproperties_t().id(BlockID::leaves).texture(186).sound(SoundType::grass).opacity(1).transparent(true).render_type(RenderType::full_special),
     blockproperties_t().id(BlockID::sponge).texture(48).sound(SoundType::grass),
-    blockproperties_t().id(BlockID::glass).texture(49).sound(SoundType::glass).opacity(0).transparent(true),
+    blockproperties_t().id(BlockID::glass).texture(49).sound(SoundType::glass).opacity(0).transparent(true).drops(std::bind(no_drop, std::placeholders::_1)),
     blockproperties_t().id(BlockID::lapis_ore).texture(160).sound(SoundType::stone),
     blockproperties_t().id(BlockID::lapis_block).texture(144).sound(SoundType::stone),
     blockproperties_t().id(BlockID::dispenser).texture(46).sound(SoundType::stone).render_type(RenderType::full_special),
@@ -692,13 +702,13 @@ blockproperties_t block_properties[256] = {
     blockproperties_t().id(BlockID::double_stone_slab).texture(6).sound(SoundType::stone).render_type(RenderType::full_special),
     blockproperties_t().id(BlockID::stone_slab).texture(6).opacity(0).solid(false).transparent(true).sound(SoundType::stone).aabb(slab_aabb).render_type(RenderType::slab),
     blockproperties_t().id(BlockID::bricks).texture(7).sound(SoundType::stone),
-    blockproperties_t().id(BlockID::tnt).texture(8).sound(SoundType::grass).render_type(RenderType::full_special).destroy(spawn_tnt_destroy).drops(std::bind(random_drop, std::placeholders::_1, inventory::item_stack())),
+    blockproperties_t().id(BlockID::tnt).texture(8).sound(SoundType::grass).render_type(RenderType::full_special).destroy(spawn_tnt_destroy).drops(std::bind(no_drop, std::placeholders::_1)),
     blockproperties_t().id(BlockID::bookshelf).texture(35).sound(SoundType::wood).render_type(RenderType::full_special),
     blockproperties_t().id(BlockID::mossy_cobblestone).texture(36).sound(SoundType::stone),
     blockproperties_t().id(BlockID::obsidian).texture(37).sound(SoundType::stone).blast_resistance(-1),
     blockproperties_t().id(BlockID::torch).texture(80).solid(false).opacity(0).transparent(true).luminance(14).sound(SoundType::wood).aabb(torch_aabb).render_type(RenderType::special).collision(CollisionType::none),
     blockproperties_t().id(BlockID::fire).texture(31).solid(false).opacity(0).transparent(true).luminance(15).sound(SoundType::cloth),
-    blockproperties_t().id(BlockID::mob_spawner).texture(65).solid(false).opacity(0).transparent(true).sound(SoundType::metal),
+    blockproperties_t().id(BlockID::mob_spawner).texture(65).solid(false).opacity(0).transparent(true).sound(SoundType::metal).drops(std::bind(no_drop, std::placeholders::_1)),
     blockproperties_t().id(BlockID::oak_stairs).texture(4).solid(false).sound(SoundType::wood),
     blockproperties_t().id(BlockID::chest).texture(27).sound(SoundType::wood).render_type(RenderType::full_special),
     blockproperties_t().id(BlockID::redstone_wire).texture(164).solid(false).opacity(0).transparent(true).sound(SoundType::stone).aabb(flat_aabb).render_type(RenderType::flat_ground).valid_item(false).collision(CollisionType::none),
@@ -706,7 +716,7 @@ blockproperties_t block_properties[256] = {
     blockproperties_t().id(BlockID::diamond_block).texture(24).sound(SoundType::metal),
     blockproperties_t().id(BlockID::crafting_table).texture(59).sound(SoundType::wood).render_type(RenderType::full_special),
     blockproperties_t().id(BlockID::wheat).texture(95).solid(false).opacity(0).transparent(true).sound(SoundType::grass).render_type(RenderType::cross).collision(CollisionType::none),
-    blockproperties_t().id(BlockID::farmland).texture(86).sound(SoundType::dirt),
+    blockproperties_t().id(BlockID::farmland).texture(86).sound(SoundType::dirt).drops(std::bind(fixed_drop, std::placeholders::_1, inventory::item_stack(BlockID::dirt, 1))),
     blockproperties_t().id(BlockID::furnace).texture(44).sound(SoundType::stone).render_type(RenderType::full_special),
     blockproperties_t().id(BlockID::lit_furnace).texture(61).sound(SoundType::stone).render_type(RenderType::full_special),
     blockproperties_t().id(BlockID::standing_sign).texture(4).solid(false).opacity(0).transparent(false).sound(SoundType::wood).render_type(RenderType::cross).collision(CollisionType::none),
