@@ -16,6 +16,7 @@
 #include "gui_dirtscreen.hpp"
 #include "crapper/client.hpp"
 #include "world.hpp"
+#include "config.hpp"
 
 #ifdef MONO_LIGHTING
 #include "light_day_mono_rgba.h"
@@ -38,6 +39,8 @@ f32 yrot = 0.0f;
 guVector player_pos = {0.F, 80.0F, 0.F};
 
 world *current_world = nullptr;
+
+configuration config;
 
 int frameCounter = 0;
 
@@ -224,7 +227,15 @@ int main(int argc, char **argv)
 
     if (!fatInitDefault())
         init_fail("Failed to initialize FAT filesystem");
-
+    try
+    {
+        // Attempt to load the configuration file from the default location
+        config.load();
+    }
+    catch (std::exception &e)
+    {
+        printf("Using config defaults. %s\n", e.what());
+    }
     // Allocate the fifo buffer
     gpfifo = memalign(32, DEFAULT_FIFO_SIZE);
     memset(gpfifo, 0, DEFAULT_FIFO_SIZE);
@@ -311,7 +322,7 @@ int main(int argc, char **argv)
     cursor_x = viewport.width / 2;
     cursor_y = viewport.height / 2;
 
-    f32 FOV = 90;
+    f32 FOV = config.get<float>("fov", 90.0f);
 
     camera_t camera = {
         {0.0f, 0.0f, 0.0f},
@@ -536,6 +547,7 @@ int main(int argc, char **argv)
     Crapper::deinitNetwork();
     delete current_world;
     deinit_chunks();
+    config.save();
     VIDEO_Flush();
     VIDEO_WaitVSync();
     if (HWButton != -1)
@@ -634,7 +646,8 @@ void GetInput()
     WPAD_Expansion(0, &expansion);
     left_stick = vec3f(0, 0, 0);
     right_stick = vec3f(0, 0, 0);
-    float sensitivity = LOOKAROUND_SENSITIVITY;
+    static float sensitivity = config.get("look_sensitivity", 360.0f);
+    static float deadzone = std::min(float(config.get("joystick_deadzone", 0.1f)), 0.5f);
     if (expansion.type == WPAD_EXP_NONE || expansion.type == WPAD_EXP_UNKNOWN)
     {
         return;
@@ -731,13 +744,13 @@ void GetInput()
         left_stick.y = float(int(expansion.classic.ljs.pos.y) - int(expansion.classic.ljs.center.y)) * 2 / (int(expansion.classic.ljs.max.y) - 2 - int(expansion.classic.ljs.min.y));
     }
 
-    if (left_stick.magnitude() < 0.1)
+    if (left_stick.magnitude() < deadzone)
     {
         left_stick.x = 0;
         left_stick.y = 0;
     }
 
-    if (right_stick.magnitude() < 0.1)
+    if (right_stick.magnitude() < deadzone)
     {
         right_stick.x = 0;
         right_stick.y = 0;
