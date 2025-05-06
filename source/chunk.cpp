@@ -1537,9 +1537,6 @@ int chunk_t::render_door(block_t *block, const vec3i pos)
 
     for (int i = 0; i < 4; i++)
     {
-        //if ((direction == 0 || direction == 2) ^ (i < 2))
-        //    continue;
-
         int mirrorFlag = (direction >> 1) + ((i & 1) ^ direction);
         mirrorFlag += open;
         if ((mirrorFlag & 1) != 0)
