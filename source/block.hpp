@@ -320,16 +320,14 @@ public:
 
     int8_t get_cast_skylight()
     {
-        int8_t opacity = properties(id).m_opacity;
-        int8_t cast_light = int8_t(sky_light) - std::max(opacity, int8_t(1));
-        return std::max(cast_light, int8_t(0));
+        uint8_t opacity = properties(id).m_opacity;
+        return sky_light <= opacity ? 0 : sky_light - opacity;
     }
 
     int8_t get_cast_blocklight()
     {
-        int8_t opacity = properties(id).m_opacity;
-        int8_t cast_light = int8_t(block_light) - std::max(opacity, int8_t(1));
-        return std::max(cast_light, int8_t(0));
+        uint8_t opacity = properties(id).m_opacity;
+        return block_light <= opacity ? 0 : block_light - opacity;
     }
 
     void get_aabb(const vec3i &pos, const aabb_t &other, std::vector<aabb_t> &aabb_list)
