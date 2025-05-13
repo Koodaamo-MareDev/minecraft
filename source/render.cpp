@@ -953,8 +953,8 @@ void draw_sky(GXColor background)
     GX_Vertex(vertex_property_t(vec3f(-size, -dist, +size), 0, BASE3D_UV_FRAC));
     GX_EndGroup();
 
-    // Enable fog but place it further away.
-    gertex::set_fog(gertex::GXFog{true, gertex::GXFogType::linear, RENDER_DISTANCE * 2 * 16 - 16, RENDER_DISTANCE * 3 * 16 - 16, gertex::CAMERA_NEAR, gertex::CAMERA_FAR, background});
+    // Enable fog
+    gertex::use_fog(true);
 
     // Use default blend mode
     gertex::set_blending(gertex::GXBlendMode::normal);
