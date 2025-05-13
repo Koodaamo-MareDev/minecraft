@@ -121,7 +121,9 @@ void world::update_chunks()
                 vec3f forward = angles_to_vector(xrot, yrot);
                 bool behind = vbo_offset.x * forward.x + vbo_offset.y * forward.y + vbo_offset.z * forward.z < -16;
 
-                vbo.visible = visible && !behind && (vdistance <= std::max(RENDER_DISTANCE * vertical_multiplier, 16.0f)) && (vbo.y + 16 >= min_height);
+                bool above_ground = player_pos.y >= min_height;
+
+                vbo.visible = visible && !behind && (above_ground || (vdistance <= std::max(RENDER_DISTANCE * vertical_multiplier, 16.0f))) && (vbo.y + 16 >= min_height);
                 if (!is_remote() && chunk->has_fluid_updates[j] && vdistance <= SIMULATION_DISTANCE * 16 && ticks - last_fluid_tick >= 5)
                     update_fluids(chunk, j);
             }
