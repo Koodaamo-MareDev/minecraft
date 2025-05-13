@@ -16,7 +16,7 @@ namespace javaport
         virtual void populate(int32_t chunkX, int32_t chunkZ, int32_t x, int32_t z, BlockID *out) {}
 
     protected:
-        const static int32_t maxDist = 8;
+        int32_t maxDist = 8;
         Random rng;
     };
 }

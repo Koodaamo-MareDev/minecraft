@@ -12,6 +12,7 @@
 #include "lock.hpp"
 #include "ported/NoiseSynthesizer.hpp"
 #include "ported/MapGenCaves.hpp"
+#include "ported/MapGenTerrain.hpp"
 #include "ported/WorldGenLiquids.hpp"
 #include "ported/WorldGenLakes.hpp"
 #include "model.hpp"
@@ -236,7 +237,8 @@ inline void generate_trees(vec3i pos, chunk_t *chunk, javaport::Random &rng)
 {
     static uint32_t tree_positions[WORLDGEN_TREE_ATTEMPTS];
     treerand(pos.x, pos.z, tree_positions, WORLDGEN_TREE_ATTEMPTS);
-    for (uint32_t c = 0; c < WORLDGEN_TREE_ATTEMPTS; c++)
+    uint32_t max_trees = WORLDGEN_TREE_ATTEMPTS * std::clamp(improved_noise.GetNoise(pos.x / 128.0f, pos.z / 128.0f) * 0.625f + 0.5f, 0.0, 1.0);
+    for (uint32_t c = 0; c < max_trees; c++)
     {
         uint32_t tree_value = tree_positions[c];
         vec3i tree_pos((tree_value & 15), 0, ((tree_value >> 24) & 15));
@@ -250,6 +252,33 @@ inline void generate_trees(vec3i pos, chunk_t *chunk, javaport::Random &rng)
         {
             int tree_height = (tree_value >> 28) & 3;
             plant_tree(tree_pos, 3 + tree_height, chunk);
+        }
+    }
+}
+
+void generate_flowers(vec3i pos, chunk_t *chunk, javaport::Random &rng)
+{
+    uint32_t flower_positions[16];
+    treerand(pos.x + 1, pos.z - 3, flower_positions, 16);
+    uint32_t max_trees = 16 * std::clamp(improved_noise.GetNoise((pos.x - 121.47f) / 128.0f, (pos.z + 121.47f) / 128.0f) * 0.625f + 0.5f, 0.0, 1.0);
+    for (uint32_t c = 0; c < max_trees; c++)
+    {
+        uint32_t flower_value = flower_positions[c];
+        vec3i flower_pos((flower_value & 15), 0, ((flower_value >> 24) & 15));
+
+        // Place the trees on above ground.
+        flower_pos.y = chunk->terrain_map[flower_pos.x | (flower_pos.z << 4)];
+        flower_pos += vec3i(pos.x, 1, pos.z);
+        // Trees should only grow on top of the sea level
+        if (flower_pos.y >= 64)
+        {
+            block_t *block = chunk->get_block(flower_pos - vec3i(0, 1, 0));
+            if (block->get_blockid() != BlockID::grass)
+                continue;
+            block = chunk->get_block(flower_pos);
+            if (block->get_blockid() != BlockID::air)
+                continue;
+            block->set_blockid((flower_value & 1) ? BlockID::dandelion : BlockID::rose);
         }
     }
 }
@@ -318,7 +347,7 @@ void generate_features(chunk_t *chunk)
     vec3i block_pos(chunk->x * 16, 0, chunk->z * 16);
     generate_ores(block_pos, chunk, rng);
     generate_trees(block_pos, chunk, rng);
-
+    generate_flowers(block_pos, chunk, rng);
     if (rng.nextInt(4) == 0)
     {
         javaport::WorldGenLakes lake_gen(BlockID::water);
@@ -362,113 +391,100 @@ void generate_chunk()
             chunk->deserialize();
         return;
     }
-    chunk->generation_stage = ChunkGenStage::heightmap;
 
-    int x_offset = (chunk->x * 16);
-    int z_offset = (chunk->z * 16);
-    int index = 0;
+    static BlockID blocks[16 * 16 * WORLD_HEIGHT];
 
-    // This is used to limit the height of cave noise to minimize
-    // the amount of unnecessary calls to the noise generator.
-    uint8_t max_height = 0;
+    // Initialize the blocks to air
+    std::fill_n(blocks, 16 * 16 * WORLD_HEIGHT, BlockID::air);
 
-    static float terrain_noise[256];
-    static float sand_noise[256];
-
-    vec3i noise_block_pos(x_offset, 512, z_offset);
-    vec3f noise_pos(x_offset - 1, 384, z_offset - 1);
-    noise_pos.x++;
-    noise_pos.z++;
-    noise_pos.y = 512;
-    // The chunk's heightmap is used differently here. In particular,
-    // it's used for storing the noise value for later parts of the
-    // terrain generation, like the altitude of trees and caves.
-    vec3i noise_size(16, 1, 16);
-    javaport::Random rng(current_world->seed);
-    int32_t off_x = rng.nextInt(0xFFFFF);
-    int32_t off_z = rng.nextInt(0xFFFFF);
-    vec3i sand_off(off_x, 0, off_z);
-
-    improved_noise.GetNoiseSet(noise_pos, noise_size, 32, 2, terrain_noise);
-    improved_noise.GetNoiseSet(noise_pos + sand_off, noise_size, 24, 1, sand_noise);
-
-    index = 0;
-    for (int z = 0; z < 16; z++)
     {
-        for (int x = 0; x < 16; x++, index++)
+        // Generate the terrain
+        javaport::MapGenTerrain terrain_gen(improved_noise);
+        terrain_gen.generate(chunk, current_world->seed, blocks);
+    }
+
+    {
+        // Generate the caves
+        javaport::MapGenCaves cavegen;
+        cavegen.generate(chunk, current_world->seed, blocks);
+    }
+
+    for (int32_t i = 16 * 16 * WORLD_HEIGHT - 1; i >= 16 * 16 * 64; i--)
+    {
+        if (blocks[i] == BlockID::air && blocks[i - 256] == BlockID::stone)
         {
-            vfloat_t dist = 0;
-            uint8_t height = uint8_t((dist + terrain_noise[index]) * 32) + 48;
-            chunk->terrain_map[index] = height;
-            max_height = std::max(height, max_height);
-            bool generate_sand = sand_noise[index] > 0.5;
-            for (int y = std::max(63, int(height)); y >= 0; y--)
+            blocks[i - 256] = BlockID::grass;
+            for (int j = 2; j < 4; j++)
             {
-                BlockID id = BlockID::air;
-                // Coat with grass (or sand if near sea level)
-                if (y == height)
+                if (blocks[i - (j << 8)] == BlockID::stone)
                 {
-                    id = height < 63 ? BlockID::dirt : BlockID::grass;
-                    if (generate_sand && in_range(y, 59, 64))
-                        id = BlockID::sand;
-                    else
-                        generate_sand = false;
+                    blocks[i - (j << 8)] = BlockID::dirt;
                 }
-                // Add some dirt (or sand if near sea level)
-                else if (in_range(y, height - 2, height - 1))
-                {
-                    id = BlockID::dirt;
-                    if (generate_sand && in_range(height, 59, 64))
-                        id = BlockID::sand;
-                }
-                // Place water
-                else if (height < 63 && in_range(y, height + 1, 63))
-                    id = BlockID::water;
-                // Place stone or sandstone
-                else if (in_range(y, 5, height - 3))
-                {
-                    id = BlockID::stone;
-                    if (generate_sand && in_range(y, height - 4, height - 3))
-                        id = BlockID::sandstone;
-                }
-                // Randomize bedrock
-                else if (in_range(y, 1, 4))
-                    id = (fastrand() & 1) ? BlockID::bedrock : BlockID::stone;
-                // Bottom layer is bedrock
-                else if (!y)
-                    id = BlockID::bedrock;
-                chunk->set_block(vec3i(x, y, z), id);
             }
         }
     }
-    chunk->generation_stage = ChunkGenStage::cavegen;
 
-    // Carve caves
-    javaport::MapGenCaves cavegen;
+    static float sand_noise[16 * 16];
+    improved_noise.GetNoiseSet(vec3f(chunk->x * 16 - 193.514f, 0, chunk->z * 16 + 37.314f), vec3i(16, 1, 16), 131.134f, 2, sand_noise);
 
-    static BlockID carved[16 * 16 * WORLD_HEIGHT];
+    for (int32_t i = 0; i < 16 * 16; i++)
+    {
+        if (sand_noise[i & 0xFF] > 0.3f)
+            continue;
+        for (int32_t y = 60; y < WORLD_HEIGHT; y++)
+        {
+            int index = (y << 8) | i;
+            if (blocks[index] == BlockID::grass)
+            {
+                blocks[index] = BlockID::sand;
+                int j;
+                for (j = 1; j < 4; j++, index -= 256)
+                {
+                    if (blocks[index] == BlockID::dirt)
+                    {
+                        blocks[index] = BlockID::sand;
+                    }
+                }
+                for (; j < 6; j++, index -= 256)
+                {
+                    if (blocks[index] == BlockID::stone)
+                    {
+                        blocks[index] = BlockID::sandstone;
+                    }
+                }
+            }
+        }
+    }
+
+    int index;
+
+    // Generate the bedrock layer
+    for (index = 0; index < 256; index++)
+    {
+        blocks[index] = BlockID::bedrock;
+    }
+
+    // Randomize the additional bedrock layers (1-4)
+    for (; index < 1280; index++)
+    {
+        if (fastrand() & 1)
+            blocks[index] = BlockID::bedrock;
+    }
 
     block_t *block = chunk->blockstates;
     for (int32_t i = 0; i < 16 * 16 * WORLD_HEIGHT; i++, block++)
     {
-        carved[i] = block->get_blockid();
-    }
-    cavegen.generate(chunk, current_world->seed, carved);
-
-    block = chunk->blockstates;
-    for (int32_t i = 0; i < 16 * 16 * WORLD_HEIGHT; i++, block++)
-    {
-        block->set_blockid(carved[i]);
+        block->set_blockid(blocks[i]);
     }
 
     chunk->generation_stage = ChunkGenStage::features;
 
-    LWP_YieldThread();
+    usleep(100);
 
     index = 0;
     for (int z = 0; z < 16; z++)
         for (int x = 0; x < 16; x++, index++)
-            chunk->terrain_map[index] = skycast(vec3i(x, chunk->terrain_map[index], z), chunk);
+            chunk->terrain_map[index] = skycast(vec3i(x, 0, z), chunk);
 
     // If the chunk generator has already been de-initialized
     // during generation, clean up the chunk and return

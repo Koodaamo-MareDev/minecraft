@@ -31,10 +31,8 @@
 enum class ChunkGenStage : uint8_t
 {
     empty = 0,
-    heightmap = 1,
-    cavegen = 2,
-    features = 3,
-    done = 4,
+    features = 1,
+    done = 2,
 
     // Special values
     loading = 128,
