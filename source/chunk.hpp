@@ -15,7 +15,7 @@
 #include "block.hpp"
 #include "entity.hpp"
 #define SIMULATION_DISTANCE 2
-#define RENDER_DISTANCE 4
+#define RENDER_DISTANCE 5
 #define CHUNK_COUNT ((RENDER_DISTANCE) * (RENDER_DISTANCE + 1) * 4)
 #define GENERATION_DISTANCE (RENDER_DISTANCE - 1)
 #define VERTICAL_SECTION_COUNT 8
