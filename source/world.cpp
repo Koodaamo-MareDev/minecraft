@@ -16,6 +16,7 @@
 #include "nbt/nbt.hpp"
 #include "light.hpp"
 #include "gui_dirtscreen.hpp"
+#include "chunkprovider.hpp"
 
 extern Crapper::MinecraftClient client;
 extern bool should_destroy_block;
@@ -37,6 +38,8 @@ world::~world()
 {
     light_engine::deinit();
     delete player.m_entity;
+    if (chunk_provider)
+        delete chunk_provider;
 }
 
 bool world::is_remote()
@@ -908,7 +911,18 @@ bool world::load()
     last_fluid_tick = ticks;
     time_of_day = ticks % 24000;
     seed = level_data->getLong("RandomSeed");
-    apply_noise_seed();
+
+    // Stop the chunk manager
+    deinit_chunk_manager();
+
+    // Re-initialize the chunk provider
+    if (chunk_provider)
+        delete chunk_provider;
+    chunk_provider = new chunkprovider_overworld(seed);
+
+    // Start the chunk manager using the chunk provider
+    init_chunk_manager(chunk_provider);
+
     printf("Loaded world with seed: %lld\n", seed);
 
     // Load the player data if it exists
@@ -923,8 +937,32 @@ bool world::load()
     return true;
 }
 
+void world::create()
+{
+    // Create a new world
+    if (is_remote())
+        return;
+
+    // Stop the chunk manager
+    deinit_chunk_manager();
+
+    // Create a new world with a random seed
+    seed = javaport::Random().nextLong();
+
+    // Re-initialize the chunk provider
+    if (chunk_provider)
+        delete chunk_provider;
+    chunk_provider = new chunkprovider_overworld(seed);
+
+    // Start the chunk manager using the chunk provider
+    init_chunk_manager(chunk_provider);
+}
+
 void world::reset()
 {
+    // Stop the chunk manager
+    deinit_chunk_manager();
+
     gui_dirtscreen *dirtscreen = new gui_dirtscreen(gertex::GXView());
     dirtscreen->set_text("Loading level");
     gui::set_gui(dirtscreen);
@@ -938,7 +976,6 @@ void world::reset()
     if (player.m_entity)
         player.m_entity->chunk = nullptr;
     player.m_inventory.clear();
-    lock_t chunk_lock(chunk_mutex);
     for (chunk_t *chunk : get_chunks())
     {
         if (chunk)
@@ -946,6 +983,9 @@ void world::reset()
     }
     cleanup_chunks();
     mcr::cleanup();
+
+    // Start the chunk manager without a chunk provider
+    init_chunk_manager(nullptr);
 }
 
 void world::update_entities()

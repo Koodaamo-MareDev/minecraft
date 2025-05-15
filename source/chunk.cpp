@@ -10,11 +10,7 @@
 #include "render.hpp"
 #include "raycast.hpp"
 #include "lock.hpp"
-#include "ported/NoiseSynthesizer.hpp"
-#include "ported/MapGenCaves.hpp"
-#include "ported/MapGenTerrain.hpp"
-#include "ported/WorldGenLiquids.hpp"
-#include "ported/WorldGenLakes.hpp"
+#include "chunkprovider.hpp"
 #include "model.hpp"
 #include "light_nether_rgba.h"
 #include <tuple>
@@ -39,10 +35,9 @@ const vec3i face_offsets[] = {
     vec3i{+0, +0, -1},  // Negative Z
     vec3i{+0, +0, +1}}; // Positive Z
 
-NoiseSynthesizer improved_noise;
 mutex_t chunk_mutex;
-static lwp_t chunk_generator_thread_handle = (lwp_t)NULL;
-static bool chunk_generator_thread_active = false;
+static lwp_t chunk_manager_thread_handle = (lwp_t)NULL;
+static bool chunk_manager_thread_active = false;
 
 std::deque<chunk_t *> chunks;
 std::deque<chunk_t *> pending_chunks;
@@ -159,412 +154,64 @@ bool add_chunk(int32_t x, int32_t z)
     }
     return false;
 }
-#define in_range(x, min, max) ((unsigned int)((x) - (min)) <= (unsigned int)((max) - (min)))
 
-/* The state must be initialized to non-zero */
-inline uint32_t fastrand()
+void deinit_chunk_manager()
 {
-    /* Algorithm "xor" from p. 4 of Marsaglia, "Xorshift RNGs" */
-    static uint32_t x = 1;
-    x ^= x << 13;
-    x ^= x >> 17;
-    x ^= x << 5;
-    return x;
-}
-
-/* The state must be initialized to non-zero */
-inline void treerand(int x, int z, uint32_t *output, uint32_t count)
-{
-    float v = float(z * (x + 327) + z) + 0.19f;
-    uint32_t a;
-    memcpy(&a, &v, 4);
-    /* Algorithm "xor" from p. 4 of Marsaglia, "Xorshift RNGs" */
-    while (count-- > 0)
-    {
-        a ^= a << 13;
-        a ^= a >> 17;
-        a ^= a << 5;
-        *(output++) = a;
-    }
-}
-
-inline void plant_tree(vec3i position, int height, chunk_t *chunk)
-{
-    block_t *base_block = get_block_at(position - vec3i(0, 1, 0), chunk);
-    if (!base_block)
+    if (!chunk_manager_thread_active)
         return;
-    BlockID base_id = base_block->get_blockid();
-    if (base_id != BlockID::grass && base_id != BlockID::dirt)
-        return;
-
-    // Place dirt below tree
-    base_block->set_blockid(BlockID::dirt);
-
-    // Place wide part of leaves
-    for (int x = -2; x <= 2; x++)
-    {
-        for (int y = height - 3; y < height - 1; y++)
-            for (int z = -2; z <= 2; z++)
-            {
-                vec3i leaves_pos = position + vec3i(x, y, z);
-                replace_air_at(leaves_pos, BlockID::leaves, chunk);
-            }
-    }
-    // Place narrow part of leaves
-    for (int x = -1; x <= 1; x++)
-    {
-        for (int y = height - 1; y <= height; y++)
-        {
-            for (int z = -1; z <= 1; z++)
-            {
-                vec3i leaves_off = vec3i(x, y, z);
-                // Place the leaves in a "+" pattern at the top.
-                if (y == height && (x | z) && std::abs(x) == std::abs(z))
-                    continue;
-                replace_air_at(position + leaves_off, BlockID::leaves, chunk);
-            }
-        }
-    }
-    // Place tree logs
-    for (int y = 0; y < height; y++)
-    {
-        set_block_at(position, BlockID::wood, chunk);
-        ++position.y;
-    }
-}
-
-inline void generate_trees(vec3i pos, chunk_t *chunk, javaport::Random &rng)
-{
-    static uint32_t tree_positions[WORLDGEN_TREE_ATTEMPTS];
-    treerand(pos.x, pos.z, tree_positions, WORLDGEN_TREE_ATTEMPTS);
-    uint32_t max_trees = WORLDGEN_TREE_ATTEMPTS * std::clamp(improved_noise.GetNoise(pos.x / 128.0f, pos.z / 128.0f) * 0.625f + 0.5f, 0.0, 1.0);
-    for (uint32_t c = 0; c < max_trees; c++)
-    {
-        uint32_t tree_value = tree_positions[c];
-        vec3i tree_pos((tree_value & 15), 0, ((tree_value >> 24) & 15));
-
-        // Place the trees on above ground.
-        tree_pos.y = chunk->terrain_map[tree_pos.x | (tree_pos.z << 4)];
-        tree_pos += vec3i(pos.x, 1, pos.z);
-
-        // Trees should only grow on top of the sea level
-        if (tree_pos.y >= 64)
-        {
-            int tree_height = (tree_value >> 28) & 3;
-            plant_tree(tree_pos, 3 + tree_height, chunk);
-        }
-    }
-}
-
-void generate_flowers(vec3i pos, chunk_t *chunk, javaport::Random &rng)
-{
-    uint32_t flower_positions[16];
-    treerand(pos.x + 1, pos.z - 3, flower_positions, 16);
-    uint32_t max_trees = 16 * std::clamp(improved_noise.GetNoise((pos.x - 121.47f) / 128.0f, (pos.z + 121.47f) / 128.0f) * 0.625f + 0.5f, 0.0, 1.0);
-    for (uint32_t c = 0; c < max_trees; c++)
-    {
-        uint32_t flower_value = flower_positions[c];
-        vec3i flower_pos((flower_value & 15), 0, ((flower_value >> 24) & 15));
-
-        // Place the trees on above ground.
-        flower_pos.y = chunk->terrain_map[flower_pos.x | (flower_pos.z << 4)];
-        flower_pos += vec3i(pos.x, 1, pos.z);
-        // Trees should only grow on top of the sea level
-        if (flower_pos.y >= 64)
-        {
-            block_t *block = chunk->get_block(flower_pos - vec3i(0, 1, 0));
-            if (block->get_blockid() != BlockID::grass)
-                continue;
-            block = chunk->get_block(flower_pos);
-            if (block->get_blockid() != BlockID::air)
-                continue;
-            block->set_blockid((flower_value & 1) ? BlockID::dandelion : BlockID::rose);
-        }
-    }
-}
-
-void generate_vein(vec3i pos, BlockID id, chunk_t *chunk, javaport::Random &rng)
-{
-    for (int x = pos.x; x < pos.x + 2; x++)
-    {
-        for (int y = pos.y; y < pos.y + 2; y++)
-        {
-            for (int z = pos.z; z < pos.z + 2; z++)
-            {
-                if (rng.nextInt(2) == 0)
-                {
-                    vec3i pos(x, y, z);
-                    block_t *block = get_block_at(pos, chunk);
-                    if (block && block->get_blockid() == BlockID::stone)
-                    {
-                        block->set_blockid(id);
-                    }
-                }
-            }
-        }
-    }
-}
-
-void generate_ore_type(vec3i neighbor_pos, BlockID id, int count, int max_height, chunk_t *chunk, javaport::Random &rng)
-{
-    for (int i = 0; i < count; i++)
-    {
-        int x = rng.nextInt(16);
-        int y = rng.nextInt(80);
-        int z = rng.nextInt(16);
-        vec3i pos(x + neighbor_pos.x, y, z + neighbor_pos.z);
-        if (y > max_height)
-            continue;
-        generate_vein(pos, id, chunk, rng);
-        block_t *block = get_block_at(pos, chunk);
-        x = rng.nextInt(3) - 1;
-        y = rng.nextInt(3) - 1;
-        z = rng.nextInt(3) - 1;
-        if (block && block->get_blockid() == id && (x | y | z) != 0)
-        {
-            pos = vec3i(x + pos.x, y + pos.y, z + pos.z);
-            generate_vein(pos, id, chunk, rng);
-        }
-    }
-}
-
-void generate_ores(vec3i neighbor_pos, chunk_t *chunk, javaport::Random &rng)
-{
-    int coal_count = rng.nextInt(8) + 16;
-    int iron_count = rng.nextInt(4) + 8;
-    int gold_count = rng.nextInt(4) + 8;
-    int diamond_count = rng.nextInt(4) + 8;
-
-    generate_ore_type(neighbor_pos, BlockID::coal_ore, coal_count, 80, chunk, rng);
-    generate_ore_type(neighbor_pos, BlockID::iron_ore, iron_count, 56, chunk, rng);
-    generate_ore_type(neighbor_pos, BlockID::gold_ore, gold_count, 32, chunk, rng);
-    generate_ore_type(neighbor_pos, BlockID::diamond_ore, diamond_count, 12, chunk, rng);
-}
-
-void generate_features(chunk_t *chunk)
-{
-    javaport::Random rng(chunk->x * 0x4F9939F508L + chunk->z * 0x1F38D3E7L + current_world->seed);
-    vec3i block_pos(chunk->x * 16, 0, chunk->z * 16);
-    generate_ores(block_pos, chunk, rng);
-    generate_trees(block_pos, chunk, rng);
-    generate_flowers(block_pos, chunk, rng);
-    if (rng.nextInt(4) == 0)
-    {
-        javaport::WorldGenLakes lake_gen(BlockID::water);
-        vec3i pos(rng.nextInt(16) + block_pos.x, rng.nextInt(128), rng.nextInt(16) + block_pos.z);
-        lake_gen.generate(rng, pos);
-    }
-
-    if (rng.nextInt(8) == 0)
-    {
-        javaport::WorldGenLakes lava_lake_gen(BlockID::lava);
-        vec3i pos(rng.nextInt(16) + block_pos.x, rng.nextInt(128), rng.nextInt(16) + block_pos.z);
-        if (pos.y < 64 || rng.nextInt(10) == 0)
-            lava_lake_gen.generate(rng, pos);
-    }
-
-    javaport::WorldGenLiquids water_liquid_gen(BlockID::water);
-    for (int i = 0; i < 50; i++)
-    {
-        vec3i pos(rng.nextInt(16) + 8, rng.nextInt(120) + 8, rng.nextInt(16) + 8);
-        water_liquid_gen.generate(rng, pos + block_pos);
-    }
-
-    javaport::WorldGenLiquids lava_gen(BlockID::lava);
-    for (int i = 0; i < 20; i++)
-    {
-        vec3i pos(rng.nextInt(16) + 8, rng.nextInt(rng.nextInt(rng.nextInt(112) + 8) + 8), rng.nextInt(16) + 8);
-        lava_gen.generate(rng, pos + block_pos);
-    }
-}
-
-void generate_chunk()
-{
-    if (pending_chunks.size() == 0)
-        return;
-    chunk_t *chunk = pending_chunks.back();
-    if (!chunk)
-        return;
-    if (chunk->generation_stage != ChunkGenStage::empty)
-    {
-        if (chunk->generation_stage == ChunkGenStage::loading)
-            chunk->deserialize();
-        return;
-    }
-
-    static BlockID blocks[16 * 16 * WORLD_HEIGHT];
-
-    // Initialize the blocks to air
-    std::fill_n(blocks, 16 * 16 * WORLD_HEIGHT, BlockID::air);
-
-    {
-        // Generate the terrain
-        javaport::MapGenTerrain terrain_gen(improved_noise);
-        terrain_gen.generate(chunk, current_world->seed, blocks);
-    }
-
-    {
-        // Generate the caves
-        javaport::MapGenCaves cavegen;
-        cavegen.generate(chunk, current_world->seed, blocks);
-    }
-
-    for (int32_t i = 16 * 16 * WORLD_HEIGHT - 1; i >= 16 * 16 * 64; i--)
-    {
-        if (blocks[i] == BlockID::air && blocks[i - 256] == BlockID::stone)
-        {
-            blocks[i - 256] = BlockID::grass;
-            for (int j = 2; j < 4; j++)
-            {
-                if (blocks[i - (j << 8)] == BlockID::stone)
-                {
-                    blocks[i - (j << 8)] = BlockID::dirt;
-                }
-            }
-        }
-    }
-
-    static float sand_noise[16 * 16];
-    improved_noise.GetNoiseSet(vec3f(chunk->x * 16 - 193.514f, 0, chunk->z * 16 + 37.314f), vec3i(16, 1, 16), 131.134f, 2, sand_noise);
-
-    for (int32_t i = 0; i < 16 * 16; i++)
-    {
-        if (sand_noise[i & 0xFF] > 0.3f)
-            continue;
-        for (int32_t y = 60; y < WORLD_HEIGHT; y++)
-        {
-            int index = (y << 8) | i;
-            if (blocks[index] == BlockID::grass)
-            {
-                blocks[index] = BlockID::sand;
-                int j;
-                for (j = 1; j < 4; j++, index -= 256)
-                {
-                    if (blocks[index] == BlockID::dirt)
-                    {
-                        blocks[index] = BlockID::sand;
-                    }
-                }
-                for (; j < 6; j++, index -= 256)
-                {
-                    if (blocks[index] == BlockID::stone)
-                    {
-                        blocks[index] = BlockID::sandstone;
-                    }
-                }
-            }
-        }
-    }
-
-    int index;
-
-    // Generate the bedrock layer
-    for (index = 0; index < 256; index++)
-    {
-        blocks[index] = BlockID::bedrock;
-    }
-
-    // Randomize the additional bedrock layers (1-4)
-    for (; index < 1280; index++)
-    {
-        if (fastrand() & 1)
-            blocks[index] = BlockID::bedrock;
-    }
-
-    block_t *block = chunk->blockstates;
-    for (int32_t i = 0; i < 16 * 16 * WORLD_HEIGHT; i++, block++)
-    {
-        block->set_blockid(blocks[i]);
-    }
-
-    chunk->generation_stage = ChunkGenStage::features;
-
-    usleep(100);
-
-    index = 0;
-    for (int z = 0; z < 16; z++)
-        for (int x = 0; x < 16; x++, index++)
-            chunk->terrain_map[index] = skycast(vec3i(x, 0, z), chunk);
-
-    // If the chunk generator has already been de-initialized
-    // during generation, clean up the chunk and return
-    if (!chunk_generator_thread_active)
-    {
-        delete chunk;
-        return;
-    }
-
-    lock_t chunk_lock(chunk_mutex);
-    chunks.push_back(chunk);
-    pending_chunks.erase(std::find(pending_chunks.begin(), pending_chunks.end(), chunk));
-    chunk_lock.unlock();
-    for (int32_t x = chunk->x - 1; x <= chunk->x + 1; x++)
-    {
-        for (int32_t z = chunk->z - 1; z <= chunk->z + 1; z++)
-        {
-            // Skip corners
-            if ((x - chunk->x) && (z - chunk->z))
-                continue;
-            // Attempt to generate features for the neighboring chunks
-            chunk_t *neighbor = get_chunk(x, z);
-            if (neighbor)
-            {
-                generate_features(neighbor);
-                LWP_YieldThread();
-
-                // Update the VBOs of the neighboring chunks
-                for (int i = 0; i < VERTICAL_SECTION_COUNT; i++)
-                {
-                    neighbor->vbos[i].dirty = true;
-                }
-            }
-        }
-    }
-
-    chunk->generation_stage = ChunkGenStage::done;
-}
-
-void deinit_chunks()
-{
-    if (!chunk_generator_thread_active)
-        return;
-    chunk_generator_thread_active = false;
+    chunk_manager_thread_active = false;
     LWP_MutexDestroy(chunk_mutex);
-    LWP_JoinThread(chunk_generator_thread_handle, NULL);
+    LWP_JoinThread(chunk_manager_thread_handle, NULL);
 }
 
-void apply_noise_seed()
+void init_chunk_manager(chunkprovider *chunk_provider)
 {
-    improved_noise.Init(current_world->seed);
-}
-
-// create chunk
-void init_chunk_generator()
-{
-    if (chunk_generator_thread_active)
+    if (chunk_manager_thread_active)
         return;
-    chunk_generator_thread_active = true;
+    chunk_manager_thread_active = true;
     LWP_MutexInit(&chunk_mutex, false);
-    auto chunk_generator_thread = [](void *) -> void *
+    auto chunk_generator_thread = [](void *arg) -> void *
     {
-        while (chunk_generator_thread_active)
+        chunkprovider *provider = (chunkprovider *)arg;
+
+        // Chunk provider can be null if we are in a remote world
+        if (!provider)
+        {
+            chunk_manager_thread_active = true;
+            return NULL;
+        }
+        while (chunk_manager_thread_active)
         {
             while (pending_chunks.size() == 0)
             {
                 LWP_YieldThread();
-                if (!chunk_generator_thread_active)
+                if (!chunk_manager_thread_active)
                     break;
             }
-            generate_chunk();
+            if (!chunk_manager_thread_active)
+                break;
+            chunk_t *chunk = pending_chunks.back();
+
+            // Generate the base terrain for the chunk
+            provider->provide_chunk(chunk);
+
+            // Move the chunk to the active list
+            lock_t chunk_lock(chunk_mutex);
+            chunks.push_back(chunk);
+            pending_chunks.erase(std::find(pending_chunks.begin(), pending_chunks.end(), chunk));
+            chunk_lock.unlock();
+
+            // Finish the chunk with features
+            provider->populate_chunk(chunk);
+
+            usleep(100);
         }
-        pending_chunks.clear();
-        chunks.clear();
         return NULL;
     };
 
-    LWP_CreateThread(&chunk_generator_thread_handle,
+    LWP_CreateThread(&chunk_manager_thread_handle,
                      chunk_generator_thread,
-                     NULL,
+                     &chunk_provider,
                      NULL,
                      128 * 1024,
                      50);

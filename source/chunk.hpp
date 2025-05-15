@@ -11,22 +11,9 @@
 #include <math/vec2i.hpp>
 #include <math/vec3i.hpp>
 #include <math/vec3f.hpp>
-
+#include "util/constants.hpp"
 #include "block.hpp"
 #include "entity.hpp"
-#define SIMULATION_DISTANCE 2
-#define RENDER_DISTANCE 5
-#define CHUNK_COUNT ((RENDER_DISTANCE) * (RENDER_DISTANCE + 1) * 4)
-#define GENERATION_DISTANCE (RENDER_DISTANCE - 1)
-#define VERTICAL_SECTION_COUNT 8
-#define WORLD_HEIGHT (VERTICAL_SECTION_COUNT << 4)
-#define MAX_WORLD_Y (WORLD_HEIGHT - 1)
-
-#define WORLDGEN_TREE_ATTEMPTS 8
-
-#define VBO_SOLID 1
-#define VBO_TRANSPARENT 2
-#define VBO_ALL 0xFF
 
 enum class ChunkGenStage : uint8_t
 {
@@ -269,13 +256,13 @@ public:
 
 private:
 };
+class chunkprovider;
 
 extern const vec3i face_offsets[];
 extern mutex_t chunk_mutex;
 std::deque<chunk_t *> &get_chunks();
-void apply_noise_seed();
-void init_chunk_generator();
-void deinit_chunks();
+void init_chunk_manager(chunkprovider *chunk_provider);
+void deinit_chunk_manager();
 bool has_pending_chunks();
 void set_world_hell(bool hell);
 BlockID get_block_id_at(const vec3i &position, BlockID default_id = BlockID::air, chunk_t *near = nullptr);
@@ -286,7 +273,6 @@ chunk_t *get_chunk_from_pos(const vec3i &pos);
 chunk_t *get_chunk(int32_t x, int32_t z);
 chunk_t *get_chunk(const vec2i &pos);
 bool add_chunk(int32_t x, int32_t z);
-void generate_chunk();
 void get_neighbors(const vec3i &pos, block_t **neighbors, chunk_t *near = nullptr);
 void update_block_at(const vec3i &pos);
 void update_neighbors(const vec3i &pos);

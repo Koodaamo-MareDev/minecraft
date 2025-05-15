@@ -338,10 +338,8 @@ int main(int argc, char **argv)
     current_world->player.m_entity = new entity_player_local(vec3f(0.5, -999, 0.5));
     add_entity(current_world->player.m_entity);
 
-    init_chunk_generator();
     current_world->reset();
     current_world->seed = gettime();
-    apply_noise_seed();
     VIDEO_Flush();
     VIDEO_WaitVSync();
     GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
@@ -378,7 +376,7 @@ int main(int argc, char **argv)
     {
         if (!current_world->load())
         {
-            current_world->reset();
+            current_world->create();
         }
     }
 
@@ -546,7 +544,6 @@ int main(int argc, char **argv)
     current_world->reset();
     Crapper::deinitNetwork();
     delete current_world;
-    deinit_chunks();
     config.save();
     VIDEO_Flush();
     VIDEO_WaitVSync();
@@ -589,7 +586,7 @@ void UpdateLoadingStatus()
                 {
                     continue;
                 }
-                
+
                 chunk_count++;
 
                 // Check if the vbos near the player are up to date
@@ -994,10 +991,10 @@ void DrawHUD(gertex::GXView &viewport)
 
     // Use inverse blending for the crosshair
     gertex::set_blending(gertex::GXBlendMode::inverse);
-    
+
     // Only draw when fully opaque
     gertex::set_alpha_cutoff(255);
-    
+
     // Draw the crosshair
     draw_textured_quad(icons_texture, crosshair_x, crosshair_y, 32, 32, 0, 0, 16, 16);
 

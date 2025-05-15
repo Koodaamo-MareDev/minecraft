@@ -14,6 +14,7 @@ class chunk_t;
 class entity_physical;
 class aabb_t;
 class camera_t;
+class chunkprovider;
 
 class player_properties
 {
@@ -51,6 +52,7 @@ public:
     bool loaded = false;
     bool hell = false;
     int64_t seed = 0;
+    chunkprovider *chunk_provider = nullptr;
 
     std::string name = "world";
 
@@ -85,6 +87,7 @@ public:
 
     void save();
     bool load();
+    void create();
     void reset();
 
 private:
