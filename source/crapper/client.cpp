@@ -98,11 +98,11 @@ namespace Crapper
         net_ioctl(sockfd, FIONBIO, &nonblock);
         // Due to the way the Wii network library works, we have to send the data in chunks of 2048 bytes.
         size_t offset = 0;
-        while (offset < buffer.data.size())
+        while (offset < buffer.size())
         {
-            size_t length = std::min(buffer.data.size() - offset, 512U);
+            size_t length = std::min(buffer.size() - offset, 512U);
 
-            int sent = net_write(sockfd, &buffer.data.data()[offset], length);
+            int sent = net_write(sockfd, &buffer.ptr()[offset], length);
             if (sent < 0)
             {
                 dbgprintf("Error sending data: %d %s\n", sent, strerror(-sent));
@@ -127,7 +127,7 @@ namespace Crapper
         int received;
         do
         {
-            if (buffer.data.size() > 131072)
+            if (buffer.size() > 131072)
                 break; // Limit the buffer size to 128KB
 
             received = net_read(sockfd, tmp, sizeof(tmp));
@@ -146,7 +146,7 @@ namespace Crapper
             }
 
             // Append the received data to the buffer
-            buffer.data.insert(buffer.data.end(), tmp, tmp + received);
+            buffer.append(tmp, tmp + received);
         } while (received > 0);
     }
 
@@ -1832,12 +1832,12 @@ namespace Crapper
         }
         if (!buffer.underflow && status == ErrorStatus::OK)
         {
-            buffer.data.erase(buffer.data.begin(), buffer.data.begin() + buffer.offset);
+            buffer.erase(buffer.begin(), buffer.begin() + buffer.offset);
         }
         if (status != ErrorStatus::OK)
         {
             current_world->set_remote(false);
-            buffer.data.clear();
+            buffer.clear();
         }
         bool last_message = buffer.underflow || status != ErrorStatus::OK;
         buffer.underflow = false;

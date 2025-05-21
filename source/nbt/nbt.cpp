@@ -114,7 +114,7 @@ void NBTBase::writeTag(std::ostream &stream)
 {
     ByteBuffer buffer;
     writeTag(buffer);
-    stream.write(reinterpret_cast<const char *>(buffer.data.data()), buffer.data.size());
+    stream.write(reinterpret_cast<const char *>(buffer.ptr()), buffer.size());
 }
 
 NBTBase *NBTBase::readTag(ByteBuffer &buffer)
@@ -136,7 +136,7 @@ NBTBase *NBTBase::readTag(std::istream &stream)
 {
     // Read all bytes from stream
     ByteBuffer buffer;
-    buffer.data = std::vector<uint8_t>((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
+    buffer.reallocateWith(new std::vector<uint8_t>((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>()));
 
     return readTag(buffer);
 }
@@ -147,15 +147,15 @@ NBTTagCompound *NBTBase::readGZip(ByteBuffer &buffer)
     try
     {
         mz_ulong decompressed_size = 512 * 1024;
-        output_buffer.data.resize(decompressed_size); // 512 KB buffer - should be enough for most NBT data
+        output_buffer.resize(decompressed_size); // 512 KB buffer - should be enough for most NBT data
 
         // Skip the GZIP header and footer
-        size_t ret = tinfl_decompress_mem_to_mem(output_buffer.data.data(), decompressed_size, buffer.data.data() + GZIP_HEADER_SIZE, buffer.data.size() - GZIP_HEADER_SIZE - GZIP_FOOTER_SIZE, 0);
+        size_t ret = tinfl_decompress_mem_to_mem(output_buffer.ptr(), decompressed_size, buffer.ptr() + GZIP_HEADER_SIZE, buffer.size() - GZIP_HEADER_SIZE - GZIP_FOOTER_SIZE, 0);
 
         if (ret != TINFL_DECOMPRESS_MEM_TO_MEM_FAILED)
         {
             decompressed_size = ret;
-            output_buffer.data.resize(decompressed_size);
+            output_buffer.resize(decompressed_size);
             NBTBase *base = NBTBase::readTag(output_buffer);
             if (!base)
                 throw std::runtime_error("Failed to read tag");
@@ -182,8 +182,8 @@ NBTTagCompound *NBTBase::readGZip(std::istream &stream, uint32_t len)
 {
     // Read entire file into memory
     ByteBuffer buffer;
-    buffer.data.resize(len);
-    stream.read(reinterpret_cast<char *>(buffer.data.data()), len);
+    buffer.resize(len);
+    stream.read(reinterpret_cast<char *>(buffer.ptr()), len);
 
     // Decompress the GZIP file
     return readGZip(buffer);
@@ -195,9 +195,9 @@ void NBTBase::writeGZip(ByteBuffer &buffer, NBTTagCompound *compound)
     compound->writeTag(output_buffer);
     try
     {
-        uint8_t *compressed_data = new uint8_t[output_buffer.data.size()];
-        mz_ulong compressed_size = output_buffer.data.size();
-        size_t ret = tdefl_compress_mem_to_mem(compressed_data, compressed_size, output_buffer.data.data(), output_buffer.data.size(), TDEFL_DEFAULT_MAX_PROBES);
+        uint8_t *compressed_data = new uint8_t[output_buffer.size()];
+        mz_ulong compressed_size = output_buffer.size();
+        size_t ret = tdefl_compress_mem_to_mem(compressed_data, compressed_size, output_buffer.ptr(), output_buffer.size(), TDEFL_DEFAULT_MAX_PROBES);
 
         if (ret != TINFL_DECOMPRESS_MEM_TO_MEM_FAILED)
         {
@@ -210,16 +210,16 @@ void NBTBase::writeGZip(ByteBuffer &buffer, NBTTagCompound *compound)
             buffer.writeBytes(compressed_data, compressed_size);
 
             // Calculate the CRC32 checksum
-            uint32_t crc = mz_crc32(0, output_buffer.data.data(), output_buffer.data.size());
+            uint32_t crc = mz_crc32(0, output_buffer.ptr(), output_buffer.size());
 
             // Write the CRC32 checksum
             buffer.writeInt(byteswap(crc));
 
             // Write the uncompressed size
-            buffer.writeInt(byteswap(output_buffer.data.size()));
+            buffer.writeInt(byteswap(output_buffer.size()));
 
             // Free the temporary buffers
-            output_buffer.data.clear();
+            output_buffer.clear();
             delete[] compressed_data;
         }
         else
@@ -240,7 +240,7 @@ void NBTBase::writeGZip(std::ostream &stream, NBTTagCompound *compound)
     writeGZip(buffer, compound);
 
     // Write Gzip stream
-    stream.write(reinterpret_cast<const char *>(buffer.data.data()), buffer.data.size());
+    stream.write(reinterpret_cast<const char *>(buffer.ptr()), buffer.size());
 }
 
 NBTTagCompound *NBTBase::readZlib(ByteBuffer &buffer)
@@ -249,18 +249,18 @@ NBTTagCompound *NBTBase::readZlib(ByteBuffer &buffer)
     try
     {
         mz_ulong decompressed_size = 512 * 1024;
-        output_buffer.data.resize(decompressed_size); // 512 KB buffer - should be enough for most NBT data
-        int ret = mz_uncompress(output_buffer.data.data(), &decompressed_size, buffer.data.data(), buffer.data.size());
+        output_buffer.resize(decompressed_size); // 512 KB buffer - should be enough for most NBT data
+        int ret = mz_uncompress(output_buffer.ptr(), &decompressed_size, buffer.ptr(), buffer.size());
 
         if (ret == MZ_BUF_ERROR)
         {
             decompressed_size = 1024 * 1024;
-            output_buffer.data.resize(decompressed_size);
-            ret = mz_uncompress(output_buffer.data.data(), &decompressed_size, buffer.data.data(), buffer.data.size());
+            output_buffer.resize(decompressed_size);
+            ret = mz_uncompress(output_buffer.ptr(), &decompressed_size, buffer.ptr(), buffer.size());
         }
         if (ret == MZ_OK)
         {
-            output_buffer.data.resize(decompressed_size);
+            output_buffer.resize(decompressed_size);
             NBTBase *base = NBTBase::readTag(output_buffer);
             if (!base)
                 throw std::runtime_error("Failed to read tag");
@@ -286,8 +286,8 @@ NBTTagCompound *NBTBase::readZlib(ByteBuffer &buffer)
 NBTTagCompound *NBTBase::readZlib(std::istream &stream, uint32_t len)
 {
     ByteBuffer buffer;
-    buffer.data.resize(len);
-    stream.read(reinterpret_cast<char *>(buffer.data.data()), len);
+    buffer.resize(len);
+    stream.read(reinterpret_cast<char *>(buffer.ptr()), len);
     return readZlib(buffer);
 }
 
@@ -297,12 +297,12 @@ void NBTBase::writeZlib(ByteBuffer &buffer, NBTTagCompound *compound)
     compound->writeTag(output_buffer);
     try
     {
-        uint8_t *compressed_data = new uint8_t[output_buffer.data.size()];
-        mz_ulong compressed_size = output_buffer.data.size();
-        int ret = mz_compress2(compressed_data, &compressed_size, output_buffer.data.data(), output_buffer.data.size(), MZ_BEST_SPEED);
+        uint8_t *compressed_data = new uint8_t[output_buffer.size()];
+        mz_ulong compressed_size = output_buffer.size();
+        int ret = mz_compress2(compressed_data, &compressed_size, output_buffer.ptr(), output_buffer.size(), MZ_BEST_SPEED);
 
         // We can free the output buffer now - we don't need it anymore and the less memory we use at once, the better
-        output_buffer.data.clear();
+        output_buffer.clear();
 
         if (ret == MZ_OK)
         {
@@ -327,12 +327,12 @@ void NBTBase::writeZlib(std::ostream &stream, NBTTagCompound *compound)
     compound->writeTag(buffer);
     try
     {
-        uint8_t *compressed_data = new uint8_t[buffer.data.size()];
-        mz_ulong compressed_size = buffer.data.size();
-        int ret = mz_compress2(compressed_data, &compressed_size, buffer.data.data(), buffer.data.size(), MZ_BEST_SPEED);
+        uint8_t *compressed_data = new uint8_t[buffer.size()];
+        mz_ulong compressed_size = buffer.size();
+        int ret = mz_compress2(compressed_data, &compressed_size, buffer.ptr(), buffer.size(), MZ_BEST_SPEED);
 
         // We can free the output buffer now - we don't need it anymore and the less memory we use at once, the better
-        buffer.data.clear();
+        buffer.clear();
 
         if (ret == MZ_OK)
         {

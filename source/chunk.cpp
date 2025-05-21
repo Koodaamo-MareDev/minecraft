@@ -1750,17 +1750,17 @@ void chunk_t::serialize()
     root_compound.writeTag(uncompressed_buffer);
 
     // Compress the data
-    uint32_t uncompressed_size = uncompressed_buffer.data.size();
+    uint32_t uncompressed_size = uncompressed_buffer.size();
     mz_ulong compressed_size = uncompressed_size;
 
     ByteBuffer buffer;
-    buffer.data.resize(uncompressed_size);
+    buffer.resize(uncompressed_size);
 
-    int result = mz_compress2(buffer.data.data(), &compressed_size, uncompressed_buffer.data.data(), uncompressed_size, MZ_BEST_SPEED);
+    int result = mz_compress2(buffer.ptr(), &compressed_size, uncompressed_buffer.ptr(), uncompressed_size, MZ_BEST_SPEED);
 
-    uncompressed_buffer.data.clear();
+    uncompressed_buffer.clear();
 
-    buffer.data.resize(compressed_size);
+    buffer.resize(compressed_size);
     if (result != MZ_OK)
     {
         throw std::runtime_error("Failed to compress chunk data");
@@ -1770,7 +1770,7 @@ void chunk_t::serialize()
     uint16_t offset = (x & 0x1F) | ((z & 0x1F) << 5);
 
     // Allocate the buffer in file
-    uint32_t chunk_offset = region->allocate(buffer.data.size() + 5, offset);
+    uint32_t chunk_offset = region->allocate(buffer.size() + 5, offset);
     if (chunk_offset == 0)
     {
         throw std::runtime_error("Failed to allocate space for chunk");
@@ -1779,7 +1779,7 @@ void chunk_t::serialize()
     // Write the header
 
     // Calculate the location of the chunk in the file
-    uint32_t loc = (((buffer.data.size() + 5 + 4095) >> 12) & 0xFF) | (chunk_offset << 8);
+    uint32_t loc = (((buffer.size() + 5 + 4095) >> 12) & 0xFF) | (chunk_offset << 8);
 
     // Write the chunk location
     chunk_file.seekp(offset << 2);
@@ -1802,7 +1802,7 @@ void chunk_t::serialize()
     chunk_file.write(reinterpret_cast<char *>(&compression), sizeof(uint8_t));
 
     // Write the compressed data
-    chunk_file.write(reinterpret_cast<char *>(buffer.data.data()), buffer.data.size());
+    chunk_file.write(reinterpret_cast<char *>(buffer.ptr()), buffer.size());
     chunk_file.flush();
 
     uint32_t pos = chunk_file.seekg(0, std::ios::end).tellg();
@@ -1863,9 +1863,8 @@ void chunk_t::deserialize()
     }
 
     // Read the compressed data
-    ByteBuffer buffer;
-    buffer.data.resize(length - 1);
-    chunk_file.read(reinterpret_cast<char *>(buffer.data.data()), length - 1);
+    ByteBuffer buffer(length - 1);
+    chunk_file.read(reinterpret_cast<char *>(buffer.ptr()), length - 1);
 
     NBTTagCompound *compound = nullptr;
     try

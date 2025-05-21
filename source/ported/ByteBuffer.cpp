@@ -34,7 +34,7 @@ void ByteBuffer::writeShort(int16_t value)
 
 void ByteBuffer::writeByte(uint8_t value)
 {
-    data.push_back(value);
+    data->push_back(value);
 }
 
 void ByteBuffer::writeString(const std::string &value)
@@ -45,7 +45,7 @@ void ByteBuffer::writeString(const std::string &value)
 
 void ByteBuffer::writeBytes(const uint8_t *value, size_t length)
 {
-    data.insert(data.end(), value, value + length);
+    data->insert(data->end(), value, value + length);
 }
 
 void ByteBuffer::writeFloat(float value)
@@ -64,70 +64,70 @@ void ByteBuffer::writeDouble(double value)
 
 void ByteBuffer::writeBool(bool value)
 {
-    data.push_back(value ? 1 : 0);
+    data->push_back(value ? 1 : 0);
 }
 
 int64_t ByteBuffer::readLong()
 {
-    if (offset + 8 > data.size())
+    if (offset + 8 > data->size())
     {
         underflow = true;
         return 0;
     }
     int64_t value = 0;
-    value |= (int64_t(data[offset++]) & 0xFF) << 56;
-    value |= (int64_t(data[offset++]) & 0xFF) << 48;
-    value |= (int64_t(data[offset++]) & 0xFF) << 40;
-    value |= (int64_t(data[offset++]) & 0xFF) << 32;
-    value |= (int64_t(data[offset++]) & 0xFF) << 24;
-    value |= (int64_t(data[offset++]) & 0xFF) << 16;
-    value |= (int64_t(data[offset++]) & 0xFF) << 8;
-    value |= (int64_t(data[offset++]) & 0xFF);
+    value |= (int64_t((*data)[offset++]) & 0xFF) << 56;
+    value |= (int64_t((*data)[offset++]) & 0xFF) << 48;
+    value |= (int64_t((*data)[offset++]) & 0xFF) << 40;
+    value |= (int64_t((*data)[offset++]) & 0xFF) << 32;
+    value |= (int64_t((*data)[offset++]) & 0xFF) << 24;
+    value |= (int64_t((*data)[offset++]) & 0xFF) << 16;
+    value |= (int64_t((*data)[offset++]) & 0xFF) << 8;
+    value |= (int64_t((*data)[offset++]) & 0xFF);
     return value;
 }
 
 int32_t ByteBuffer::readInt()
 {
-    if (offset + 4 > data.size())
+    if (offset + 4 > data->size())
     {
         underflow = true;
         return 0;
     }
     int32_t value = 0;
-    value |= (int32_t(data[offset++]) & 0xFF) << 24;
-    value |= (int32_t(data[offset++]) & 0xFF) << 16;
-    value |= (int32_t(data[offset++]) & 0xFF) << 8;
-    value |= (int32_t(data[offset++]) & 0xFF);
+    value |= (int32_t((*data)[offset++]) & 0xFF) << 24;
+    value |= (int32_t((*data)[offset++]) & 0xFF) << 16;
+    value |= (int32_t((*data)[offset++]) & 0xFF) << 8;
+    value |= (int32_t((*data)[offset++]) & 0xFF);
     return value;
 }
 
 int16_t ByteBuffer::readShort()
 {
-    if (offset + 2 > data.size())
+    if (offset + 2 > data->size())
     {
         underflow = true;
         return 0;
     }
     int16_t value = 0;
-    value |= (int16_t(data[offset++]) & 0xFF) << 8;
-    value |= (int16_t(data[offset++]) & 0xFF);
+    value |= (int16_t((*data)[offset++]) & 0xFF) << 8;
+    value |= (int16_t((*data)[offset++]) & 0xFF);
     return value;
 }
 
 uint8_t ByteBuffer::readByte()
 {
-    if (offset + 1 > data.size())
+    if (offset + 1 > data->size())
     {
         underflow = true;
         return 0;
     }
-    return data[offset++];
+    return (*data)[offset++];
 }
 
 std::string ByteBuffer::readString()
 {
     size_t length = readShort();
-    if (offset + length > data.size())
+    if (offset + length > data->size())
     {
         underflow = true;
         return "";
@@ -135,19 +135,19 @@ std::string ByteBuffer::readString()
     std::string value;
     for (size_t i = 0; i < length; i++)
     {
-        value += data[offset++];
+        value += (*data)[offset++];
     }
     return value;
 }
 
 void ByteBuffer::readBytes(uint8_t *value, size_t length)
 {
-    if (offset + length > data.size())
+    if (offset + length > data->size())
     {
         underflow = true;
         return;
     }
-    memcpy(value, &data.data()[offset], length);
+    memcpy(value, &data->data()[offset], length);
     offset += length;
 }
 

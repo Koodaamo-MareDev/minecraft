@@ -21,19 +21,19 @@ pnguin::PNGFile::PNGFile(const std::string &filename)
     ByteBuffer file_data;
     try
     {
-        file_data.data.resize(file_size);
+        file_data.resize(file_size);
     }
     catch (std::bad_alloc &e)
     {
         throw std::runtime_error("Failed to allocate memory for file " + filename);
     }
 
-    file.read(reinterpret_cast<char *>(file_data.data.data()), file_size);
+    file.read(reinterpret_cast<char *>(file_data.ptr()), file_size);
     file.close();
 
     // Check the header
     std::vector<uint8_t> header = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
-    if (file_data.data.size() < header.size() || std::memcmp(file_data.data.data(), header.data(), header.size()) != 0)
+    if (file_data.size() < header.size() || std::memcmp(file_data.ptr(), header.data(), header.size()) != 0)
     {
         throw std::runtime_error("File " + filename + " is not a PNG file");
     }
@@ -41,15 +41,15 @@ pnguin::PNGFile::PNGFile(const std::string &filename)
     auto locate_next_chunk([&file_data](size_t start, const std::string &type) -> std::pair<size_t, size_t>
                            {
         size_t pos = start;
-        while (pos + 12 <= file_data.data.size())
+        while (pos + 12 <= file_data.size())
         {
             file_data.offset = pos;
             size_t chunk_size = file_data.readInt();
-            if (pos + 12 + chunk_size > file_data.data.size())
+            if (pos + 12 + chunk_size > file_data.size())
             {
                 break;
             }
-            if (std::memcmp(file_data.data.data() + pos + 4, type.data(), 4) == 0)
+            if (std::memcmp(file_data.ptr() + pos + 4, type.data(), 4) == 0)
             {
                 return std::make_pair(pos + 8, chunk_size);
             }
@@ -61,7 +61,7 @@ pnguin::PNGFile::PNGFile(const std::string &filename)
                           {
         file_data.offset = pos + chunk_size;
         uint32_t crc = file_data.readInt() ^ 0xFFFFFFFF;
-        uint32_t calc_crc = mz_crc32(MZ_CRC32_INIT, file_data.data.data() + pos - 4, chunk_size + 4) ^ 0xFFFFFFFF;
+        uint32_t calc_crc = mz_crc32(MZ_CRC32_INIT, file_data.ptr() + pos - 4, chunk_size + 4) ^ 0xFFFFFFFF;
         if (crc != calc_crc)
         {
             throw std::runtime_error("Invalid CRC for chunk");
@@ -111,7 +111,7 @@ pnguin::PNGFile::PNGFile(const std::string &filename)
     {
 
         // Check for out of bounds pointer
-        if (idat.first + idat.second > file_data.data.size())
+        if (idat.first + idat.second > file_data.size())
         {
             throw std::runtime_error("Out of bounds read while inflating data");
         }
@@ -119,7 +119,7 @@ pnguin::PNGFile::PNGFile(const std::string &filename)
         // Copy the compressed data
         try
         {
-            compressed_data.data.insert(compressed_data.data.end(), file_data.data.begin() + idat.first, file_data.data.begin() + idat.first + idat.second);
+            compressed_data.append(file_data.begin() + idat.first, file_data.begin() + idat.first + idat.second);
         }
         catch (std::bad_alloc &e)
         {
@@ -140,14 +140,14 @@ pnguin::PNGFile::PNGFile(const std::string &filename)
     mz_ulong inflated_size = width * height * 4 + height;
     try
     {
-        decompressed_data.data.resize(inflated_size);
+        decompressed_data.resize(inflated_size);
     }
     catch (std::bad_alloc &e)
     {
         throw std::runtime_error("Failed to allocate memory for image data");
     }
     int err;
-    if ((err = mz_uncompress(decompressed_data.data.data(), &inflated_size, compressed_data.data.data(), compressed_data.data.size())) != MZ_OK)
+    if ((err = mz_uncompress(decompressed_data.ptr(), &inflated_size, compressed_data.ptr(), compressed_data.size())) != MZ_OK)
     {
         throw std::runtime_error("Failed to inflate image data: " + std::string(mz_error(err)));
     }
@@ -158,13 +158,13 @@ pnguin::PNGFile::PNGFile(const std::string &filename)
         throw std::runtime_error("Failed to inflate all image data");
     }
     // Free the compressed data
-    file_data.data.clear();
+    file_data.clear();
 
     // Copy the scanlines
     decompressed_data.offset = 0;
     try
     {
-        pixels.data.resize(width * height * 4);
+        pixels.resize(width * height * 4);
     }
     catch (std::bad_alloc &e)
     {
@@ -172,6 +172,7 @@ pnguin::PNGFile::PNGFile(const std::string &filename)
     }
     uint8_t active_filter = 0;
     uint8_t r, g, b, a;
+    uint8_t *pixels_data = pixels.ptr();
     for (uint32_t i = 0; i < height; i++)
     {
         // Get the filter byte
@@ -181,7 +182,7 @@ pnguin::PNGFile::PNGFile(const std::string &filename)
         case 0:
         {
             // Copy the scanline
-            std::memcpy(pixels.data.data() + i * width * 4, decompressed_data.data.data() + decompressed_data.offset, width * 4);
+            std::memcpy(pixels.ptr() + i * width * 4, decompressed_data.ptr() + decompressed_data.offset, width * 4);
             decompressed_data.offset += width * 4;
             break;
         }
@@ -198,15 +199,15 @@ pnguin::PNGFile::PNGFile(const std::string &filename)
                 if (j >= 1)
                 {
                     uint32_t prev = (i * width + j - 1) << 2;
-                    r = (int(r) + pixels.data[prev]) & 0xFF;
-                    g = (int(g) + pixels.data[prev + 1]) & 0xFF;
-                    b = (int(b) + pixels.data[prev + 2]) & 0xFF;
-                    a = (int(a) + pixels.data[prev + 3]) & 0xFF;
+                    r = (int(r) + pixels_data[prev]) & 0xFF;
+                    g = (int(g) + pixels_data[prev + 1]) & 0xFF;
+                    b = (int(b) + pixels_data[prev + 2]) & 0xFF;
+                    a = (int(a) + pixels_data[prev + 3]) & 0xFF;
                 }
-                pixels.data[curr] = r;
-                pixels.data[curr + 1] = g;
-                pixels.data[curr + 2] = b;
-                pixels.data[curr + 3] = a;
+                pixels_data[curr] = r;
+                pixels_data[curr + 1] = g;
+                pixels_data[curr + 2] = b;
+                pixels_data[curr + 3] = a;
             }
             break;
         }
@@ -223,15 +224,15 @@ pnguin::PNGFile::PNGFile(const std::string &filename)
                 if (i >= 1)
                 {
                     uint32_t up = ((i - 1) * width + j) << 2;
-                    r = (int(r) + pixels.data[up]) & 0xFF;
-                    g = (int(g) + pixels.data[up + 1]) & 0xFF;
-                    b = (int(b) + pixels.data[up + 2]) & 0xFF;
-                    a = (int(a) + pixels.data[up + 3]) & 0xFF;
+                    r = (int(r) + pixels_data[up]) & 0xFF;
+                    g = (int(g) + pixels_data[up + 1]) & 0xFF;
+                    b = (int(b) + pixels_data[up + 2]) & 0xFF;
+                    a = (int(a) + pixels_data[up + 3]) & 0xFF;
                 }
-                pixels.data[curr] = r;
-                pixels.data[curr + 1] = g;
-                pixels.data[curr + 2] = b;
-                pixels.data[curr + 3] = a;
+                pixels_data[curr] = r;
+                pixels_data[curr + 1] = g;
+                pixels_data[curr + 2] = b;
+                pixels_data[curr + 3] = a;
             }
             break;
         }
@@ -245,10 +246,10 @@ pnguin::PNGFile::PNGFile(const std::string &filename)
                 uint32_t up = (i > 0) ? (((i - 1) * width + j) << 2) : 0;
                 for (uint32_t k = 0; k < 4; k++) // Iterate over RGBA channels
                 {
-                    int a = (j > 0) ? pixels.data[prev + k] : 0;
-                    int b = (i > 0) ? pixels.data[up + k] : 0;
+                    int a = (j > 0) ? pixels_data[prev + k] : 0;
+                    int b = (i > 0) ? pixels_data[up + k] : 0;
 
-                    pixels.data[curr + k] = (int(decompressed_data.readByte()) + ((a + b) / 2)) & 0xFF;
+                    pixels_data[curr + k] = (int(decompressed_data.readByte()) + ((a + b) / 2)) & 0xFF;
                 }
             }
             break;
@@ -265,9 +266,9 @@ pnguin::PNGFile::PNGFile(const std::string &filename)
 
                 for (uint32_t k = 0; k < 4; k++) // Iterate over RGBA channels
                 {
-                    int a = (j > 0) ? pixels.data[prev + k] : 0;
-                    int b = (i > 0) ? pixels.data[up + k] : 0;
-                    int c = (i > 0 && j > 0) ? pixels.data[up_prev + k] : 0;
+                    int a = (j > 0) ? pixels_data[prev + k] : 0;
+                    int b = (i > 0) ? pixels_data[up + k] : 0;
+                    int c = (i > 0 && j > 0) ? pixels_data[up_prev + k] : 0;
 
                     int p = a + b - c;
                     int pa = std::abs(p - a);
@@ -282,7 +283,7 @@ pnguin::PNGFile::PNGFile(const std::string &filename)
                     else
                         pr = c;
 
-                    pixels.data[curr + k] = (int(decompressed_data.readByte()) + pr) & 0xFF;
+                    pixels_data[curr + k] = (int(decompressed_data.readByte()) + pr) & 0xFF;
                 }
             }
             break;
@@ -310,7 +311,7 @@ void pnguin::PNGFile::to_tpl(GXTexObj &texture)
     const uint32_t tpl_size = width * height << 2;
     uint8_t *res = (uint8_t *)memalign(32, tpl_size);
     uint8_t *res_ptr = res;
-    uint8_t *tmp_ptr = (uint8_t *)pixels.data.data();
+    uint8_t *tmp_ptr = (uint8_t *)pixels.ptr();
 
     for (uint32_t y = 0; y < height; y++)
     {

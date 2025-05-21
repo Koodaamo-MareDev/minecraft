@@ -23,7 +23,7 @@ namespace pnguin
         PNGFile(const std::string &filename);
         uint32_t get_width() const { return width; }
         uint32_t get_height() const { return height; }
-        const uint8_t *get_data() const { return pixels.data.data(); }
+        const uint8_t *get_data() const { return pixels.ptr(); }
         void to_tpl(GXTexObj &texture);
     };
 }
