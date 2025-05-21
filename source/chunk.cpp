@@ -35,9 +35,9 @@ const vec3i face_offsets[] = {
     vec3i{+0, +0, -1},  // Negative Z
     vec3i{+0, +0, +1}}; // Positive Z
 
-mutex_t chunk_mutex;
-static lwp_t chunk_manager_thread_handle = (lwp_t)NULL;
-static bool chunk_manager_thread_active = false;
+mutex_t chunk_mutex = LWP_MUTEX_NULL;
+static lwp_t chunk_manager_thread_handle = LWP_THREAD_NULL;
+static bool run_chunk_manager = false;
 
 std::deque<chunk_t *> chunks;
 std::deque<chunk_t *> pending_chunks;
@@ -111,7 +111,7 @@ chunk_t *get_chunk(int32_t x, int32_t z)
 
 bool add_chunk(int32_t x, int32_t z)
 {
-    if (pending_chunks.size() + chunks.size() >= CHUNK_COUNT)
+    if (!run_chunk_manager || pending_chunks.size() + chunks.size() >= CHUNK_COUNT)
         return false;
     lock_t chunk_lock(chunk_mutex);
     for (chunk_t *&m_chunk : pending_chunks)
@@ -157,39 +157,52 @@ bool add_chunk(int32_t x, int32_t z)
 
 void deinit_chunk_manager()
 {
-    if (!chunk_manager_thread_active)
+    if (chunk_manager_thread_handle == LWP_THREAD_NULL)
         return;
-    chunk_manager_thread_active = false;
-    LWP_MutexDestroy(chunk_mutex);
+
+    // Tell the chunk manager thread to stop
+    run_chunk_manager = false;
+
     LWP_JoinThread(chunk_manager_thread_handle, NULL);
+    chunk_manager_thread_handle = LWP_THREAD_NULL;
+
+    // Cleanup the chunk mutex
+    if (chunk_mutex != LWP_MUTEX_NULL)
+        LWP_MutexDestroy(chunk_mutex);
+    chunk_mutex = LWP_MUTEX_NULL;
 }
 
 void init_chunk_manager(chunkprovider *chunk_provider)
 {
-    if (chunk_manager_thread_active)
+    if (chunk_manager_thread_handle != LWP_THREAD_NULL)
         return;
-    chunk_manager_thread_active = true;
-    LWP_MutexInit(&chunk_mutex, false);
-    auto chunk_generator_thread = [](void *arg) -> void *
+
+    // Initialize the chunk mutex if it hasn't been initialized yet
+    if (chunk_mutex == LWP_MUTEX_NULL)
+        LWP_MutexInit(&chunk_mutex, false);
+
+    // Chunk provider can be null if something else will be providing the chunks.
+    // This should only happen when in a remote world which means that chunks are
+    // provided via the network code. In such a case, don't start the thread.
+    if (!chunk_provider)
+    {
+        return;
+    }
+    auto chunk_manager_thread = [](void *arg) -> void *
     {
         chunkprovider *provider = (chunkprovider *)arg;
-
+        run_chunk_manager = true;
         // Chunk provider can be null if we are in a remote world
-        if (!provider)
+        while (run_chunk_manager)
         {
-            chunk_manager_thread_active = true;
-            return NULL;
-        }
-        while (chunk_manager_thread_active)
-        {
-            while (pending_chunks.size() == 0)
+            while (pending_chunks.empty())
             {
                 LWP_YieldThread();
-                if (!chunk_manager_thread_active)
-                    break;
+                if (!run_chunk_manager)
+                {
+                    return NULL;
+                }
             }
-            if (!chunk_manager_thread_active)
-                break;
             chunk_t *chunk = pending_chunks.back();
 
             // Generate the base terrain for the chunk
@@ -210,10 +223,10 @@ void init_chunk_manager(chunkprovider *chunk_provider)
     };
 
     LWP_CreateThread(&chunk_manager_thread_handle,
-                     chunk_generator_thread,
-                     &chunk_provider,
+                     chunk_manager_thread,
+                     chunk_provider,
                      NULL,
-                     128 * 1024,
+                     0,
                      50);
 }
 
