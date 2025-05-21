@@ -1,7 +1,9 @@
 #ifndef _BLOCK_ID_HPP_
 #define _BLOCK_ID_HPP_
 
-enum class BlockID
+#include <cstdint>
+
+enum BlockID : uint8_t
 {
     air = 0,
     stone,
