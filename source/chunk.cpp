@@ -1938,10 +1938,4 @@ void chunk_t::deserialize()
     {
         vbos[vbo_index].dirty = true;
     }
-
-    // Add the chunk to the world
-    lock_t chunk_lock(chunk_mutex);
-    chunks.push_back(this);
-    pending_chunks.erase(std::find(pending_chunks.begin(), pending_chunks.end(), this));
-    chunk_lock.unlock();
 }
