@@ -355,23 +355,32 @@ int main(int argc, char **argv)
     gui::init_matrices();
 
     gertex::GXFog fog = gertex::GXFog{true, gertex::GXFogType::linear, viewport.near, viewport.far, viewport.near, viewport.far, background};
-#ifdef MULTIPLAYER
-    if (Crapper::initNetwork())
+
+    std::string server_ip = config.get<std::string>("server", "");
+
+    if (!server_ip.empty() && Crapper::initNetwork())
     {
+        int32_t server_port = config.get<int32_t>("port", 25565);
+
+        // Generate a "unique" username based on the device ID
         uint32_t dev_id = 0;
         ES_GetDeviceID(&dev_id);
-        client.username = "Wii_" + std::to_string(dev_id);
 
-        client.joinServer("desktop-marcus.local", 25565);
-        if (client.status != Crapper::ErrorStatus::OK)
-            client.joinServer("mc.okayu.zip", 25566);
+        // Use the username from the config or generate a default one
+        client.username = std::string(config.get<std::string>("username", "Wii_" + std::to_string(dev_id)));
+        config["username"] = client.username;
+
+        // Attempt to connect to the server
+        client.joinServer(server_ip, server_port);
+
         if (client.status != Crapper::ErrorStatus::OK)
         {
             // Reset the world if the connection failed
             current_world->reset();
         }
     }
-#endif
+
+    // Fall back to local world if not connected to a server
     if (!current_world->is_remote())
     {
         if (!current_world->load())
