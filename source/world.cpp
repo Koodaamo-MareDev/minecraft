@@ -963,6 +963,7 @@ void world::reset()
     // Stop the chunk manager
     deinit_chunk_manager();
 
+    light_engine::reset();
     gui_dirtscreen *dirtscreen = new gui_dirtscreen(gertex::GXView());
     dirtscreen->set_text("Loading level");
     gui::set_gui(dirtscreen);
