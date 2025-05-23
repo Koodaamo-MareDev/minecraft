@@ -1,5 +1,6 @@
 #include "MapGenSurface.hpp"
 #include "NoiseSynthesizer.hpp"
+#include "../raycast.hpp"
 
 void javaport::MapGenSurface::populate(int32_t chunkX, int32_t chunkZ, int32_t x, int32_t z, BlockID *out_ids)
 {
@@ -20,32 +21,58 @@ void javaport::MapGenSurface::populate(int32_t chunkX, int32_t chunkZ, int32_t x
         }
     }
 
-    float sand_noise[16 * 16];
-    noiser.GetNoiseSet(vec3f(x * 16 - 193.514f, 0, z * 16 + 37.314f), vec3i(16, 1, 16), 131.134f, 2, sand_noise);
+    float temperature_noise[16 * 16];
+    noiser.GetNoiseSet(vec3f(x * 16 - 193.514f, 0, z * 16 + 37.314f), vec3i(16, 1, 16), 131.134f, 2, temperature_noise);
 
     for (int32_t i = 0; i < 16 * 16; i++)
     {
-        if (sand_noise[i] > 0.3f)
-            continue;
-        for (int32_t y = 60; y < WORLD_HEIGHT; y++)
+        float noise_sample = temperature_noise[i];
+
+        // Check for cold biome
+        if (noise_sample > 0.7f)
         {
-            int index = (y << 8) | i;
-            if (out_ids[index] == BlockID::grass)
+            // Cover grass with snow
+            for (int y = MAX_WORLD_Y - 1; y >= 63; y--)
             {
-                out_ids[index] = BlockID::sand;
-                int j;
-                for (j = 1; j < 4; j++, index -= 256)
+                int index = (y << 8) | i;
+                if (out_ids[index] == BlockID::grass && out_ids[index + 256] == BlockID::air)
                 {
-                    if (out_ids[index] == BlockID::dirt)
-                    {
-                        out_ids[index] = BlockID::sand;
-                    }
+                    out_ids[index + 256] = BlockID::snow_layer;
+                    break;
                 }
-                for (; j < 6; j++, index -= 256)
+            }
+
+            // Cover water with ice
+            if (out_ids[i | (63 << 8)] == BlockID::water)
+            {
+                out_ids[i | (63 << 8)] = BlockID::ice;
+            }
+        }
+        
+        // Check for warm biome
+        if (noise_sample < 0.37f)
+        {
+            // Coat with sand
+            for (int32_t y = 60; y < WORLD_HEIGHT; y++)
+            {
+                int index = (y << 8) | i;
+                if (out_ids[index] == BlockID::grass)
                 {
-                    if (out_ids[index] == BlockID::stone)
+                    out_ids[index] = BlockID::sand;
+                    int j;
+                    for (j = 1; j < 4; j++, index -= 256)
                     {
-                        out_ids[index] = BlockID::sandstone;
+                        if (out_ids[index] == BlockID::dirt)
+                        {
+                            out_ids[index] = BlockID::sand;
+                        }
+                    }
+                    for (; j < 6; j++, index -= 256)
+                    {
+                        if (out_ids[index] == BlockID::stone)
+                        {
+                            out_ids[index] = BlockID::sandstone;
+                        }
                     }
                 }
             }

@@ -789,9 +789,14 @@ int chunk_t::pre_render_block(block_t *block, const vec3i &pos, bool transparent
     }
     else
     {
-        if (block->get_blockid() == BlockID::chest)
+        switch (block->get_blockid())
         {
+        case BlockID::chest:
             return render_chest(block, pos);
+        case BlockID::snow_layer:
+            return render_snow_layer(block, pos);
+        default:
+            break;
         }
     }
     int vertexCount = 0;
@@ -825,9 +830,14 @@ int chunk_t::render_block(block_t *block, const vec3i &pos, bool transparent)
     }
     else
     {
-        if (block->get_blockid() == BlockID::chest)
+        switch (block->get_blockid())
         {
+        case BlockID::chest:
             return render_chest(block, pos);
+        case BlockID::snow_layer:
+            return render_snow_layer(block, pos);
+        default:
+            break;
         }
     }
     int vertexCount = 0;
@@ -955,6 +965,70 @@ int chunk_t::render_flat_ground(block_t *block, const vec3i &pos)
     GX_VertexLit({vertex_pos + vec3f{-.5, -.4375, 0.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PY);
     GX_VertexLit({vertex_pos + vec3f{-.5, -.4375, -.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PY);
     return 4;
+}
+
+int chunk_t::render_snow_layer(block_t *block, const vec3i &pos)
+{
+    uint8_t lighting = block->light;
+    vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
+    vec3f vertex_pos(local_pos.x, local_pos.y, local_pos.z);
+    uint32_t texture_index = get_default_texture_index(block->get_blockid());
+    int vertexCount = 4;
+
+    // Top
+    GX_VertexLit({vertex_pos + vec3f{0.5, -.375, -.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PY);
+    GX_VertexLit({vertex_pos + vec3f{0.5, -.375, 0.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PY);
+    GX_VertexLit({vertex_pos + vec3f{-.5, -.375, 0.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PY);
+    GX_VertexLit({vertex_pos + vec3f{-.5, -.375, -.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PY);
+
+    BlockID neighbor_ids[6];
+    {
+        block_t *neighbors[6];
+        get_neighbors(pos, neighbors, this);
+        for (int i = 0; i < 6; i++)
+        {
+            neighbor_ids[i] = neighbors[i] ? neighbors[i]->get_blockid() : BlockID::air;
+        }
+    }
+
+    if (block->get_opacity(FACE_NX) && neighbor_ids[FACE_NX] != BlockID::snow_layer)
+    {
+        // Negative X
+        GX_VertexLit({vertex_pos + vec3f{-.5, -.375, -.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NX);
+        GX_VertexLit({vertex_pos + vec3f{-.5, -.375, 0.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_NX);
+        GX_VertexLit({vertex_pos + vec3f{-.5, -.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_NX);
+        GX_VertexLit({vertex_pos + vec3f{-.5, -.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NX);
+        vertexCount += 4;
+    }
+    if (block->get_opacity(FACE_PX) && neighbor_ids[FACE_PX] != BlockID::snow_layer)
+    {
+        // Positive X
+        GX_VertexLit({vertex_pos + vec3f{0.5, -.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PX);
+        GX_VertexLit({vertex_pos + vec3f{0.5, -.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PX);
+        GX_VertexLit({vertex_pos + vec3f{0.5, -.375, 0.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PX);
+        GX_VertexLit({vertex_pos + vec3f{0.5, -.375, -.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PX);
+        vertexCount += 4;
+    }
+    if (block->get_opacity(FACE_NZ) && neighbor_ids[FACE_NZ] != BlockID::snow_layer)
+    {
+        // Negative Z
+        GX_VertexLit({vertex_pos + vec3f{-.5, -.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NZ);
+        GX_VertexLit({vertex_pos + vec3f{0.5, -.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_NZ);
+        GX_VertexLit({vertex_pos + vec3f{0.5, -.375, -.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_NZ);
+        GX_VertexLit({vertex_pos + vec3f{-.5, -.375, -.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NZ);
+        vertexCount += 4;
+    }
+    if (block->get_opacity(FACE_PZ) && neighbor_ids[FACE_PZ] != BlockID::snow_layer)
+    {
+        // Positive Z
+        GX_VertexLit({vertex_pos + vec3f{-.5, -.375, 0.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PZ);
+        GX_VertexLit({vertex_pos + vec3f{0.5, -.375, 0.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PZ);
+        GX_VertexLit({vertex_pos + vec3f{0.5, -.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PZ);
+        GX_VertexLit({vertex_pos + vec3f{-.5, -.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PZ);
+        vertexCount += 4;
+    }
+
+    return vertexCount;
 }
 
 int chunk_t::render_cross(block_t *block, const vec3i &pos)

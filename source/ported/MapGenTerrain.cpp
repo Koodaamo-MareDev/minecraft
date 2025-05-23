@@ -16,14 +16,24 @@ namespace javaport
         constexpr float y_scale = 0.125f;
         constexpr float z_scale = 0.25f;
 
+        float biome_noise_2d[64];
         float noise_2d[256];
         float noise_3d[x_max * y_max * z_max];
-        noiser.GetNoiseSet(vec3f(chunkX * 16, 0, chunkZ * 16), vec3i(16, 1, 16), 24.0f, 2, noise_2d);
+        noiser.GetNoiseSet(vec3f(chunkX * 16, 0, chunkZ * 16), vec3i(16, 1, 16), 24.0f, 3, noise_2d);
+        noiser.GetNoiseSet(vec3f(chunkX * 8 - 193.514f, 0, chunkZ * 8 + 93.314f), vec3i(8, 1, 8), 135.24f, 1, biome_noise_2d);
         noiser.GetNoiseSet(vec3f(chunkX * coarse_width, 0, chunkZ * coarse_width), vec3i(x_max, y_max, z_max), 4.0f, 1, noise_3d);
 
         for (int32_t i = x_max * y_max * z_max - 1; i >= 0; --i)
         {
             noise_3d[i] = noise_3d[i] * 2.0f - 1.0f;
+        }
+
+        for (int32_t z = 0, i = 0; z < 16; ++z)
+        {
+            for (int32_t x = 0; x < 16; ++x, ++i)
+            {
+                noise_2d[i] *= std::pow(biome_noise_2d[((z >> 1) << 3) | (x >> 1)] * 1.5f, 2.0f);
+            }
         }
 
         for (int32_t x_coarse = 0; x_coarse < coarse_width; ++x_coarse)
@@ -104,7 +114,8 @@ namespace javaport
         {
             for (int32_t x = 0; x < 16; ++x, ++i)
             {
-                for (int32_t y = 54 + std::min(int32_t(noise_2d[i] * 16), 127); y > 0; y--)
+                noise_2d[i] += std::pow(biome_noise_2d[((z >> 1) << 3) | (x >> 1)] - 0.35f, 2.0f);
+                for (int32_t y = 54 + std::min(int32_t(noise_2d[i] * 20), 127); y > 0; y--)
                 {
                     out_ids[i | (y << 8)] = BlockID::stone;
                 }

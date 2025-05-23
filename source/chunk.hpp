@@ -232,6 +232,7 @@ public:
     int get_chest_texture_index(block_t *block, const vec3i &pos, uint8_t face);
     int render_special(block_t *block, const vec3i &pos);
     int render_flat_ground(block_t *block, const vec3i &pos);
+    int render_snow_layer(block_t *block, const vec3i &pos);
     int render_chest(block_t *block, const vec3i &pos);
     int render_torch(block_t *block, const vec3i &pos);
     int render_torch_with_angle(block_t *block, const vec3f &vertex_pos, vfloat_t ax, vfloat_t az);

@@ -63,6 +63,15 @@ void chunkprovider_overworld::provide_chunk(chunk_t *chunk)
         block->set_blockid(blocks[i]);
     }
 
+    // Fix snowy grass
+    for (index = 16 * 16 * 63; index < 16 * 16 * MAX_WORLD_Y; index++)
+    {
+        if (blocks[index] == BlockID::grass && blocks[index + 256] == BlockID::snow_layer)
+        {
+            chunk->blockstates[index].meta = 1;
+        }
+    }
+
     // The chunk is now ready for features generation
     chunk->generation_stage = ChunkGenStage::features;
 }
