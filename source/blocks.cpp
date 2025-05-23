@@ -763,7 +763,7 @@ blockproperties_t block_properties[256] = {
     blockproperties_t().id(BlockID::redstone_torch).texture(99).solid(false).opacity(0).transparent(true).luminance(7).sound(SoundType::stone).aabb(torch_aabb).render_type(RenderType::special).collision(CollisionType::none),
     blockproperties_t().id(BlockID::stone_button).texture(0).solid(false).opacity(0).transparent(false).sound(SoundType::stone).aabb(flat_aabb).render_type(RenderType::special).collision(CollisionType::none),
     blockproperties_t().id(BlockID::snow_layer).texture(66).solid(false).opacity(0).transparent(false).sound(SoundType::cloth).aabb(snow_layer_aabb).render_type(RenderType::special).collision(CollisionType::none),
-    blockproperties_t().id(BlockID::ice).texture(67).solid(true).opacity(3).transparent(false).sound(SoundType::glass).slipperiness(0.98).drops(std::bind(no_drop, std::placeholders::_1)).destroy(std::bind(melt_destroy, std::placeholders::_1, std::placeholders::_2)),
+    blockproperties_t().id(BlockID::ice).texture(67).solid(true).opacity(3).transparent(true).sound(SoundType::glass).slipperiness(0.98).drops(std::bind(no_drop, std::placeholders::_1)).destroy(std::bind(melt_destroy, std::placeholders::_1, std::placeholders::_2)),
     blockproperties_t().id(BlockID::snow_block).texture(66).solid(false).opacity(0).transparent(true).sound(SoundType::cloth).render_type(RenderType::full).collision(CollisionType::none),
     blockproperties_t().id(BlockID::cactus).texture(69).solid(false).opacity(0).transparent(true).sound(SoundType::grass).render_type(RenderType::special),
     blockproperties_t().id(BlockID::clay).texture(72).sound(SoundType::dirt),
