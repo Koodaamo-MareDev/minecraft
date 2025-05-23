@@ -588,6 +588,8 @@ void world::draw_scene(bool opaque)
     // Enable indexed colors
     GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
 
+    std::deque<std::pair<chunkvbo_t *, vbo_buffer_t *>> vbos_to_draw;
+
     // Draw the solid pass
     if (opaque)
     {
@@ -598,17 +600,10 @@ void world::draw_scene(bool opaque)
                 for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
                 {
                     chunkvbo_t &vbo = chunk->vbos[j];
-                    if (!vbo.visible)
+                    if (!vbo.visible || !vbo.cached_solid.buffer || !vbo.cached_solid.length)
                         continue;
-
-                    guVector chunkPos = {(f32)chunk->x * 16, (f32)j * 16, (f32)chunk->z * 16};
-                    if (vbo.cached_solid.buffer && vbo.cached_solid.length)
-                    {
-                        transform_view(gertex::get_view_matrix(), chunkPos);
-                        GX_CallDispList(vbo.cached_solid.buffer, vbo.cached_solid.length);
-                    }
+                    vbos_to_draw.push_back(std::make_pair(&vbo, &vbo.cached_solid));
                 }
-                chunk->render_entities(partial_ticks, false);
             }
         }
     }
@@ -622,19 +617,30 @@ void world::draw_scene(bool opaque)
                 for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
                 {
                     chunkvbo_t &vbo = chunk->vbos[j];
-                    if (!vbo.visible)
+                    if (!vbo.visible || !vbo.cached_transparent.buffer || !vbo.cached_transparent.length)
                         continue;
-
-                    guVector chunkPos = {(f32)chunk->x * 16, (f32)j * 16, (f32)chunk->z * 16};
-                    if (vbo.cached_transparent.buffer && vbo.cached_transparent.length)
-                    {
-                        transform_view(gertex::get_view_matrix(), chunkPos);
-                        GX_CallDispList(vbo.cached_transparent.buffer, vbo.cached_transparent.length);
-                    }
+                    vbos_to_draw.push_back(std::make_pair(&vbo, &vbo.cached_transparent));
                 }
-                chunk->render_entities(partial_ticks, true);
             }
         }
+    }
+
+    // Sort the vbos to draw the furthest ones first
+    std::sort(vbos_to_draw.begin(), vbos_to_draw.end(), [](std::pair<chunkvbo_t *, vbo_buffer_t *> &a, std::pair<chunkvbo_t *, vbo_buffer_t *> &b)
+              { return b.first < a.first; });
+
+    // Draw the vbos
+    for (std::pair<chunkvbo_t *, vbo_buffer_t *> &pair : vbos_to_draw)
+    {
+        chunkvbo_t *&vbo = pair.first;
+        vbo_buffer_t *&buffer = pair.second;
+        transform_view(gertex::get_view_matrix(), vec3f(vbo->x, vbo->y, vbo->z));
+        GX_CallDispList(buffer->buffer, buffer->length);
+    }
+
+    for (chunk_t *&chunk : chunks)
+    {
+        chunk->render_entities(partial_ticks, !opaque);
     }
 
     // Enable direct colors
