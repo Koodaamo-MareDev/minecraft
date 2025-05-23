@@ -192,7 +192,6 @@ void init_chunk_manager(chunkprovider *chunk_provider)
     {
         chunkprovider *provider = (chunkprovider *)arg;
         run_chunk_manager = true;
-        // Chunk provider can be null if we are in a remote world
         while (run_chunk_manager)
         {
             while (pending_chunks.empty())
