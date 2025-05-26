@@ -314,6 +314,15 @@ void update_block_at(const vec3i &pos)
                 update_neighbors(pos);
             }
         }
+        if (block->get_blockid() == BlockID::snow_layer)
+        {
+            block_t *block_below = chunk->get_block(pos + vec3i(0, -1, 0));
+            if (block_below && block_below->get_blockid() == BlockID::grass)
+            {
+                block_below->meta = 1; // Set the snowy flag
+                update_block_at(pos + vec3i(0, -1, 0));
+            }
+        }
     }
     chunk->update_height_map(pos);
     light_engine::post(pos, chunk);
