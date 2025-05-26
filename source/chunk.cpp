@@ -426,88 +426,6 @@ void chunk_t::recalculate_section_visibility(int section)
 int chunk_t::build_vbo(int section, bool transparent)
 {
     chunkvbo_t &vbo = this->vbos[section];
-// #define OLD_VBOSYSTEM
-#ifdef OLD_VBOSYSTEM
-    int quadVertexCount = pre_render_block_mesh(section, transparent);
-    int triaVertexCount = pre_render_fluid_mesh(section, transparent);
-    if (!quadVertexCount && !triaVertexCount)
-    {
-        if (transparent)
-        {
-            vbo.transparent.detach();
-        }
-        else
-        {
-            vbo.solid.detach();
-        }
-        return (0);
-    }
-
-    // Calculate potential memory usage
-    int estimatedMemory = (triaVertexCount + quadVertexCount) * VERTEX_ATTR_LENGTH;
-    if (quadVertexCount)
-        estimatedMemory += 3;
-    if (triaVertexCount)
-        estimatedMemory += 3;
-    estimatedMemory += 32;
-    estimatedMemory = (estimatedMemory + 31) & ~31;
-
-    void *displist_vbo = memalign(32, estimatedMemory); // 32 bytes for alignment
-
-    if (displist_vbo == nullptr)
-    {
-        printf("Failed to allocate %d bytes for section %d VBO at (%d, %d)\n", estimatedMemory, section, this->x, this->z);
-        return (1);
-    }
-    DCInvalidateRange(displist_vbo, estimatedMemory);
-
-    GX_BeginDispList(displist_vbo, estimatedMemory);
-    if (quadVertexCount)
-    {
-        int newQuadVertexCount;
-        if ((newQuadVertexCount = render_block_mesh(section, transparent, quadVertexCount)) != quadVertexCount)
-        {
-            printf("Invalid vtx count while rendering blocks: expected %d, got %d", quadVertexCount, newQuadVertexCount);
-            isExiting = true;
-        }
-    }
-    if (triaVertexCount)
-    {
-        int newTriaVertexCount;
-        if ((newTriaVertexCount = render_fluid_mesh(section, transparent, triaVertexCount)) != triaVertexCount)
-        {
-            printf("Invalid vtx count while rendering fluid: expected %d, got %d", triaVertexCount, newTriaVertexCount);
-            isExiting = true;
-        }
-    }
-    // GX_EndDispList() returns the size of the display list, so store that value and use it with GX_CallDispList().
-    int preciseMemory = GX_EndDispList();
-    if (!preciseMemory)
-    {
-        printf("Failed to create display list for section %d at (%d, %d)\n", section, this->x, this->z);
-        printf("Size should be %d\n", estimatedMemory);
-        return (2);
-    }
-    if (preciseMemory != estimatedMemory)
-    {
-        if (abs(preciseMemory - estimatedMemory) > 64)
-        {
-            printf("Sizes differ too much: %d != %d, diff=%d\n", preciseMemory, estimatedMemory, preciseMemory - estimatedMemory);
-            return (2);
-        }
-    }
-
-    if (transparent)
-    {
-        vbo.transparent.buffer = displist_vbo;
-        vbo.transparent.length = preciseMemory;
-    }
-    else
-    {
-        vbo.solid.buffer = displist_vbo;
-        vbo.solid.length = preciseMemory;
-    }
-#else
     static uint8_t vbo_buffer[64000 * VERTEX_ATTR_LENGTH] __attribute__((aligned(32)));
     DCInvalidateRange(vbo_buffer, sizeof(vbo_buffer));
 
@@ -608,32 +526,9 @@ int chunk_t::build_vbo(int section, bool transparent)
         vbo.solid.length = displist_size;
     }
     DCFlushRange(displist_vbo, displist_size);
-#endif
     return (0);
 }
 
-int chunk_t::pre_render_fluid_mesh(int section, bool transparent)
-{
-    int vertexCount = 0;
-    vec3i chunk_offset = vec3i(this->x * 16, section * 16, this->z * 16);
-
-    GX_BeginGroup(GX_TRIANGLES, 0);
-    block_t *block = get_block(chunk_offset);
-    for (int _y = 0; _y < 16; _y++)
-    {
-        for (int _z = 0; _z < 16; _z++)
-        {
-            for (int _x = 0; _x < 16; _x++, block++)
-            {
-                vec3i blockpos = vec3i(_x, _y, _z) + chunk_offset;
-                if (properties(block->id).m_fluid && transparent == properties(block->id).m_transparent)
-                    vertexCount += render_fluid(block, blockpos);
-            }
-        }
-    }
-    GX_EndGroup();
-    return vertexCount;
-}
 int chunk_t::render_fluid_mesh(int section, bool transparent, int vertexCount)
 {
     vec3i chunk_offset = vec3i(this->x * 16, section * 16, this->z * 16);
@@ -650,28 +545,6 @@ int chunk_t::render_fluid_mesh(int section, bool transparent, int vertexCount)
                 vec3i blockpos = vec3i(_x, _y, _z) + chunk_offset;
                 if (properties(block->id).m_fluid && transparent == properties(block->id).m_transparent)
                     vertexCount += render_fluid(block, blockpos);
-            }
-        }
-    }
-    GX_EndGroup();
-    return vertexCount;
-}
-
-int chunk_t::pre_render_block_mesh(int section, bool transparent)
-{
-    int vertexCount = 0;
-    vec3i chunk_offset = vec3i(this->x * 16, section * 16, this->z * 16);
-    GX_BeginGroup(GX_QUADS, 0);
-    // Build the mesh from the blockstates
-    block_t *block = get_block(chunk_offset);
-    for (int _y = 0; _y < 16; _y++)
-    {
-        for (int _z = 0; _z < 16; _z++)
-        {
-            for (int _x = 0; _x < 16; _x++, block++)
-            {
-                vec3i blockpos = vec3i(_x, _y, _z) + chunk_offset;
-                vertexCount += pre_render_block(block, blockpos, transparent);
             }
         }
     }
@@ -765,47 +638,6 @@ void get_neighbors(const vec3i &pos, block_t **neighbors, chunk_t *near)
     else
         for (int x = 0; x < 6; x++)
             neighbors[x] = near->get_block(pos + face_offsets[x]);
-}
-
-int chunk_t::pre_render_block(block_t *block, const vec3i &pos, bool transparent)
-{
-    if (!block->get_visibility() || properties(block->id).m_fluid || transparent != properties(block->id).m_transparent)
-        return 0;
-    if (transparent)
-    {
-        switch (properties(block->id).m_render_type)
-        {
-        case RenderType::cross:
-            return render_cross(block, pos);
-        case RenderType::special:
-            return render_special(block, pos);
-        case RenderType::flat_ground:
-            return render_flat_ground(block, pos);
-        case RenderType::slab:
-            return render_slab(block, pos);
-        default:
-            break;
-        }
-    }
-    else
-    {
-        switch (block->get_blockid())
-        {
-        case BlockID::chest:
-            return render_chest(block, pos);
-        case BlockID::snow_layer:
-            return render_snow_layer(block, pos);
-        default:
-            break;
-        }
-    }
-    int vertexCount = 0;
-    for (uint8_t face = 0; face < 6; face++)
-    {
-        if (block->get_opacity(face))
-            vertexCount += 4;
-    }
-    return vertexCount;
 }
 
 int chunk_t::render_block(block_t *block, const vec3i &pos, bool transparent)

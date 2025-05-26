@@ -343,7 +343,7 @@ void render_single_block(block_t &selected_block, bool transparency)
         return;
 
     // Precalculate the vertex count. Set position to Y = -16 to render "outside the world"
-    int vertexCount = chunks[0]->pre_render_block(&selected_block, vec3i(0, -16, 0), transparency);
+    int vertexCount = chunks[0]->render_block(&selected_block, vec3i(0, -16, 0), transparency);
 
     // Start drawing the block
     GX_BeginGroup(GX_QUADS, vertexCount);
@@ -361,7 +361,7 @@ void render_single_block_at(block_t &selected_block, vec3i pos, bool transparenc
     if (!chunk)
         return;
     // Precalculate the vertex count. Set position to Y = -16 to render "outside the world"
-    int vertexCount = chunk->pre_render_block(&selected_block, pos, transparency);
+    int vertexCount = chunk->render_block(&selected_block, pos, transparency);
 
     // Start drawing the block
     GX_BeginGroup(GX_QUADS, vertexCount);
