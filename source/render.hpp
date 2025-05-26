@@ -64,7 +64,7 @@ void update_textures();
 
 void use_texture(GXTexObj &texture);
 
-int render_face(vec3i pos, uint8_t face, uint32_t texture_index, chunk_t *near = nullptr, block_t *block = nullptr);
+int render_face(vec3i pos, uint8_t face, uint32_t texture_index, chunk_t *near = nullptr, block_t *block = nullptr, uint8_t min_y = 0, uint8_t max_y = 16);
 
 void render_single_block(block_t &selected_block, bool transparency);
 
