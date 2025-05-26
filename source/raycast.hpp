@@ -8,6 +8,7 @@
 #include <math/math_utils.h>
 #include <ported/Random.hpp>
 
+#include "world.hpp"
 #include "chunk.hpp"
 #include "blocks.hpp"
 
@@ -615,10 +616,8 @@ inline void explode_raycast(vec3f origin, vec3f direction, float intensity, chun
                 {
                     add_entity(new entity_explosive_block(*block, block_pos, rand() % 20 + 10));
                 }
-                block->set_blockid(BlockID::air);
-                block->meta = 0;
-                update_block_at(block_pos);
-                update_neighbors(block_pos);
+                block_t old_block = *block;
+                current_world->destroy_block(block_pos, &old_block);
             }
             intensity -= 0.225;
             if (intensity <= 0)
