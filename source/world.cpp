@@ -512,9 +512,6 @@ void world::spawn_drop(const vec3i &pos, const block_t *old_block, inventory::it
 
 void world::create_explosion(vec3f pos, float power, chunk_t *near)
 {
-    if (!is_remote())
-        explode(pos, power * 0.75f, near);
-
     javaport::Random rng;
 
     sound sound = get_sound("old_explode");
@@ -546,6 +543,8 @@ void world::create_explosion(vec3f pos, float power, chunk_t *near)
 
         m_particle_system.add_particle(particle);
     }
+    if (!is_remote())
+        explode(pos, power * 0.75f, near);
 }
 
 void world::draw(camera_t &camera)
