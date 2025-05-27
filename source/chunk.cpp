@@ -810,17 +810,13 @@ int chunk_t::render_flat_ground(block_t *block, const vec3i &pos)
 
 int chunk_t::render_snow_layer(block_t *block, const vec3i &pos)
 {
-    uint8_t lighting = block->light;
     vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
     vec3f vertex_pos(local_pos.x, local_pos.y, local_pos.z);
     uint32_t texture_index = get_default_texture_index(block->get_blockid());
     int vertexCount = 4;
 
     // Top
-    GX_VertexLit({vertex_pos + vec3f{0.5, -.375, -.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PY);
-    GX_VertexLit({vertex_pos + vec3f{0.5, -.375, 0.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PY);
-    GX_VertexLit({vertex_pos + vec3f{-.5, -.375, 0.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PY);
-    GX_VertexLit({vertex_pos + vec3f{-.5, -.375, -.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PY);
+    render_face(pos, FACE_PY, texture_index, this, block, 0, 2);
 
     BlockID neighbor_ids[6];
     {
