@@ -363,43 +363,69 @@ int render_face(vec3i pos, uint8_t face, uint32_t texture_index, chunk_t *near, 
         block = get_block_at(pos, near);
     uint8_t light_val = get_face_light_index(pos, face, near, block);
     uint8_t ao[4] = {0, 0, 0, 0};
+    uint8_t ao_no_op[4] = {0, 0, 0, 0};
     uint8_t lighting[4] = {light_val, light_val, light_val, light_val};
     vertex_property16_t vertices[4];
     uint8_t index = 0;
+#define SMOOTH(ao_tgt) smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], ao_tgt[index])
     if ((face & ~1) != FACE_NY)
     {
         // Side faces
         uint8_t max_y_orig = max_y;
         min_y = (min_y & 0xF) ? min_y : 0;
         max_y = (max_y & 0xF) ? max_y : 0;
-        uint8_t no_op = 0;
-        smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], min_y ? no_op : ao[index]);
+        uint8_t *ao_min_target = min_y ? ao_no_op : ao;
+        uint8_t *ao_max_target = max_y ? ao_no_op : ao;
+        SMOOTH(ao_min_target);
         vertices[index] = {vertex_pos + (min_y ? vertical_add(cube_vertices[face][index], min_y) : cube_vertices16[face][index]), TEXTURE_NX(texture_index), TEXTURE_PY(texture_index) - min_y};
         index++;
-        smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], max_y ? no_op : ao[index]);
+        SMOOTH(ao_max_target);
         vertices[index] = {vertex_pos + (max_y ? vertical_add(cube_vertices[face][index], max_y) : cube_vertices16[face][index]), TEXTURE_NX(texture_index), TEXTURE_PY(texture_index) - max_y_orig};
         index++;
-        smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], max_y ? no_op : ao[index]);
+        SMOOTH(ao_max_target);
         vertices[index] = {vertex_pos + (max_y ? vertical_add(cube_vertices[face][index], max_y) : cube_vertices16[face][index]), TEXTURE_PX(texture_index), TEXTURE_PY(texture_index) - max_y_orig};
         index++;
-        smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], min_y ? no_op : ao[index]);
+        SMOOTH(ao_min_target);
         vertices[index] = {vertex_pos + (min_y ? vertical_add(cube_vertices[face][index], min_y) : cube_vertices16[face][index]), TEXTURE_PX(texture_index), TEXTURE_PY(texture_index) - min_y};
     }
     else
     {
         // Top and bottom faces
-        smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], ao[index]);
-        vertices[index] = {vertex_pos + cube_vertices16[face][index], TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)};
-        index++;
-        smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], ao[index]);
-        vertices[index] = {vertex_pos + cube_vertices16[face][index], TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)};
-        index++;
-        smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], ao[index]);
-        vertices[index] = {vertex_pos + cube_vertices16[face][index], TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)};
-        index++;
-        smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], ao[index]);
-        vertices[index] = {vertex_pos + cube_vertices16[face][index], TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)};
+        min_y = (min_y & 0xF) ? min_y : 0;
+        max_y = (max_y & 0xF) ? max_y : 0;
+        uint8_t *ao_target = ao;
+        if ((min_y && face == FACE_NY) || (max_y && face == FACE_PY))
+            ao_target = ao_no_op;
+        if (face == FACE_NY)
+        {
+            SMOOTH(ao_target);
+            vertices[index] = {vertex_pos + (min_y ? vertical_add(cube_vertices[face][index], min_y) : cube_vertices16[face][index]), TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)};
+            index++;
+            SMOOTH(ao_target);
+            vertices[index] = {vertex_pos + (min_y ? vertical_add(cube_vertices[face][index], min_y) : cube_vertices16[face][index]), TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)};
+            index++;
+            SMOOTH(ao_target);
+            vertices[index] = {vertex_pos + (min_y ? vertical_add(cube_vertices[face][index], min_y) : cube_vertices16[face][index]), TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)};
+            index++;
+            SMOOTH(ao_target);
+            vertices[index] = {vertex_pos + (min_y ? vertical_add(cube_vertices[face][index], min_y) : cube_vertices16[face][index]), TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)};
+        }
+        else
+        {
+            SMOOTH(ao_target);
+            vertices[index] = {vertex_pos + (max_y ? vertical_add(cube_vertices[face][index], max_y) : cube_vertices16[face][index]), TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)};
+            index++;
+            SMOOTH(ao_target);
+            vertices[index] = {vertex_pos + (max_y ? vertical_add(cube_vertices[face][index], max_y) : cube_vertices16[face][index]), TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)};
+            index++;
+            SMOOTH(ao_target);
+            vertices[index] = {vertex_pos + (max_y ? vertical_add(cube_vertices[face][index], max_y) : cube_vertices16[face][index]), TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)};
+            index++;
+            SMOOTH(ao_target);
+            vertices[index] = {vertex_pos + (max_y ? vertical_add(cube_vertices[face][index], max_y) : cube_vertices16[face][index]), TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)};
+        }
     }
+#undef SMOOTH
     index = (ao[0] + ao[3] > ao[1] + ao[2]);
     GX_VertexLit16(vertices[index], lighting[index], face + ao[index]);
     index = (index + 1) & 3;
