@@ -1005,15 +1005,110 @@ GXColor get_sky_color(bool cave_darkness)
     float brightness = elevation_brightness * sky_multiplier;
     return GXColor{uint8_t(sky_color.r * brightness), uint8_t(sky_color.g * brightness), uint8_t(sky_color.b * brightness), 0xFF};
 }
+
+float *get_sunrise_color()
+{
+    static float out_color[4] = {0.0F, 0.0F, 0.0F, 0.0F};
+
+    float blendRange = 0.4F;
+
+    // Map time of day to cosine curve over full day (0 to 1 -> 0 to 2π)
+    float skyAngle = std::cos(get_celestial_angle() * M_PI * 2.0F);
+
+    // Center the glow range at 0.0 (sunrise/sunset)
+    float glowCenter = 0.0F;
+
+    // Only compute glow when within blend range of the center
+    if (skyAngle >= glowCenter - blendRange && skyAngle <= glowCenter + blendRange)
+    {
+        // Normalize [-blendRange, blendRange] to [0, 1]
+        float fade = (skyAngle - glowCenter) / blendRange * 0.5F + 0.5F;
+
+        // Alpha is a sin curve for smooth appearance, squared for extra fade
+        float alpha = 1.0F - (1.0F - std::sin(fade * M_PI)) * 0.99F;
+        alpha *= alpha;
+
+        // RGB values are faded based on 'fade'
+        float red = fade * 0.3F + 0.7F;          // Starts at 0.7, becomes more red as fade → 1
+        float green = fade * fade * 0.7F + 0.2F; // Strong green component near mid-fade
+        float blue = 0.2F;                       // Blue stays constant
+
+        // Store and return as RGBA
+        out_color[0] = red;
+        out_color[1] = green;
+        out_color[2] = blue;
+        out_color[3] = alpha;
+        return out_color;
+    }
+    else
+    {
+        // Not within sunrise/sunset range — no color
+        return nullptr;
+    }
+}
+
 GXColor get_lightmap_color(uint8_t light)
 {
     return *(GXColor *)&light_map[uint32_t(light) << 2];
 }
+
+void draw_sunrise()
+{
+    float *sunrise_color = get_sunrise_color();
+    if (!sunrise_color)
+        return;
+    
+    // Convert the color to 8-bit values
+    uint8_t r = uint8_t(sunrise_color[0] * 255);
+    uint8_t g = uint8_t(sunrise_color[1] * 255);
+    uint8_t b = uint8_t(sunrise_color[2] * 255);
+    uint8_t a = uint8_t(sunrise_color[3] * 255);
+
+    // Store the current state
+    gertex::GXState state = gertex::get_state();
+
+    gertex::set_blending(gertex::GXBlendMode::normal);
+
+    // Use floats for vertex positions
+    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_F32, 0);
+
+    use_texture(white_texture);
+    
+    gertex::GXMatrix mtx_tmp;
+    gertex::GXMatrix mtx;
+    guVector axis{1, 0, 0};
+    guMtxRotAxisDeg(mtx.mtx, &axis, 90.0f);
+    float celestial_angle = get_celestial_angle();
+    axis = {0, 0, 1};
+    guMtxRotAxisDeg(mtx_tmp.mtx, &axis, celestial_angle > 0.5F ? 180.0F : 0.0F);
+    guMtxConcat(mtx.mtx, mtx_tmp.mtx, mtx.mtx);
+    transform_view(mtx, player_pos);
+
+    uint8_t quality = 16;
+    float centerX = 0.0F;
+    float centerY = 100.0F;
+    float centerZ = 0.0F;
+
+    GX_BeginGroup(GX_TRIANGLEFAN, quality + 2);
+
+    // Draw the center vertex
+    GX_VertexF(vertex_property_t(vec3f(centerX, centerY, centerZ), 0, 0, r, g, b, a));
+
+    // Draw the outer vertices
+    for (int i = 0; i <= quality; ++i)
+    {
+        float v = (float)i * (float)M_PI * 2.0F / (float)quality;
+        float x = std::sin(v);
+        float z = std::cos(v);
+        GX_VertexF(vertex_property_t(vec3f(x * -120.0F, z * -120.0F, z * -40.0F), 0, 0, r, g, b, 0));
+    }
+    GX_EndGroup();
+
+    gertex::set_state(state);
+}
+
 void draw_sky(GXColor background)
 {
-    // Enable z-buffering
-    GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
-
     // Disable fog
     gertex::use_fog(false);
 
@@ -1022,8 +1117,16 @@ void draw_sky(GXColor background)
     GX_SetAlphaUpdate(GX_FALSE);
     GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_FALSE);
 
+    // Use solid color texture
     use_texture(white_texture);
 
+    // Draw sunrise
+    draw_sunrise();
+
+    // Use short vertex positions with fractional bits
+    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, BASE3D_POS_FRAC_BITS);
+
+    // Prepare rendering the celestial bodies
     gertex::GXMatrix celestial_rotated_view;
     GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
 
