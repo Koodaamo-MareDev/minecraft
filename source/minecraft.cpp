@@ -985,6 +985,8 @@ void UpdateCamera(camera_t &camera)
     camera.rot.y = yrot;
     player->rotation.x = xrot;
     player->rotation.y = yrot;
+
+    current_world->update_frustum(camera);
 }
 
 void UpdateNetwork()

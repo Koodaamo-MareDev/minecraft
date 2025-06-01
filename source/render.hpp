@@ -80,6 +80,8 @@ vec3f vector_to_angles(const vec3f &vec);
 
 float distance_to_plane(const vec3f &point, const frustum_t &frustum, int planeIndex);
 
+float distance_to_vector(const vec3f &point, const frustum_t &frustum, int planeIndex);
+
 float distance_to_frustum(const vec3f &point, const frustum_t &frustum);
 
 frustum_t calculate_frustum(camera_t &camera);

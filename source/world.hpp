@@ -15,6 +15,7 @@ class entity_physical;
 class aabb_t;
 class camera_t;
 class chunkprovider;
+class frustum_t;
 
 class player_properties
 {
@@ -53,6 +54,7 @@ public:
     bool hell = false;
     int64_t seed = 0;
     chunkprovider *chunk_provider = nullptr;
+    frustum_t* frustum = nullptr;
 
     std::string name = "world";
 
@@ -64,6 +66,7 @@ public:
 
     void tick();
     void update();
+    void update_frustum(camera_t &camera);
     void update_chunks();
     void update_vbos();
     void update_fluids(chunk_t *chunk, int section);

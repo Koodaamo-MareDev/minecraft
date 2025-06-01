@@ -549,6 +549,12 @@ float distance_to_plane(const vec3f &point, const frustum_t &frustum, int planeI
     return plane.direction.x * point.x + plane.direction.y * point.y + plane.direction.z * point.z - plane.distance;
 }
 
+float distance_to_vector(const vec3f &point, const frustum_t &frustum, int planeIndex)
+{
+    plane_t plane = frustum.planes[planeIndex];
+    return -(plane.direction.x * point.x + plane.direction.y * point.y + plane.direction.z * point.z);
+}
+
 // Function to calculate the distance from a point to a frustum
 float distance_to_frustum(const vec3f &point, const frustum_t &frustum)
 {
@@ -596,6 +602,9 @@ frustum_t calculate_frustum(camera_t &camera)
     guVecNormalize(&up_vec);
     guVecNormalize(&down_vec);
 
+    guVecScale(&left_vec, &left_vec, camera.aspect);
+    guVecScale(&right_vec, &right_vec, camera.aspect);
+
     // Calculate the frustum plane equations in the form Ax + By + Cz + D = 0
     frustum.planes[0].direction = left_vec;
     frustum.planes[0].distance = guVecDotProduct(&left_vec, &near_center);
@@ -619,7 +628,7 @@ frustum_t calculate_frustum(camera_t &camera)
     for (int i = 0; i < 6; ++i)
     {
         plane_t &plane = frustum.planes[i];
-        vfloat_t length = 1.f / std::sqrt(plane.direction.x * plane.direction.x +
+        vfloat_t length = Q_rsqrt(plane.direction.x * plane.direction.x +
                                           plane.direction.y * plane.direction.y +
                                           plane.direction.z * plane.direction.z);
         plane.direction.x *= length;

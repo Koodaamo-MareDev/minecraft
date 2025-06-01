@@ -40,6 +40,8 @@ world::~world()
     delete player.m_entity;
     if (chunk_provider)
         delete chunk_provider;
+    if (frustum)
+        delete frustum;
 }
 
 bool world::is_remote()
@@ -83,6 +85,13 @@ void world::update()
     m_sound_system.update(angles_to_vector(0, yrot + 90), player.m_entity->get_position(std::fmod(partial_ticks, 1)));
 }
 
+void world::update_frustum(camera_t &camera)
+{
+    if (!frustum)
+        frustum = new frustum_t;
+    *frustum = calculate_frustum(camera);
+}
+
 void world::update_chunks()
 {
     int light_up_calls = 0;
@@ -100,7 +109,7 @@ void world::update_chunks()
             if (chunk->generation_stage != ChunkGenStage::done)
                 continue;
 
-            int min_height = player_pos.y - 16;
+            int min_height = MAX_WORLD_Y;
             for (int i = 0; i < 256; i++)
             {
                 if (int(chunk->height_map[i]) < min_height)
@@ -110,6 +119,7 @@ void world::update_chunks()
             float horizontal_multiplier = std::abs(xrot) < 70 ? 16 : 12;
             float vertical_multiplier = std::abs(xrot) > 20 ? 12 : 8;
             bool visible = (hdistance <= std::max(RENDER_DISTANCE * horizontal_multiplier, 16.0f));
+            bool above_ground = player_pos.y >= min_height;
 
             // Tick chunks
             for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
@@ -122,11 +132,20 @@ void world::update_chunks()
 
                 vec3f vbo_offset = vec3f(vbo.x + 8, vbo.y + 8, vbo.z + 8) - player_pos;
                 vec3f forward = angles_to_vector(xrot, yrot);
-                bool behind = vbo_offset.x * forward.x + vbo_offset.y * forward.y + vbo_offset.z * forward.z < -16;
-
-                bool above_ground = player_pos.y >= min_height;
+                bool behind = vbo_offset.x * forward.x + vbo_offset.y * forward.y + vbo_offset.z * forward.z < -23.0f;
 
                 vbo.visible = visible && !behind && (above_ground || (vdistance <= std::max(RENDER_DISTANCE * vertical_multiplier, 16.0f))) && (vbo.y + 16 >= min_height);
+                if (vbo.visible && frustum)
+                {
+                    for (int p = 0; p < 4; p++)
+                    {
+                        if (distance_to_vector(vbo_offset, *frustum, p) < -23.0f)
+                        {
+                            vbo.visible = false;
+                            break;
+                        }
+                    }
+                }
                 if (!is_remote() && chunk->has_fluid_updates[j] && vdistance <= SIMULATION_DISTANCE * 16 && ticks - last_fluid_tick >= 5)
                     update_fluids(chunk, j);
             }
@@ -624,9 +643,9 @@ void world::draw_scene(bool opaque)
         }
     }
 
-    // Sort the vbos to draw the furthest ones first
-    std::sort(vbos_to_draw.begin(), vbos_to_draw.end(), [](std::pair<chunkvbo_t *, vbo_buffer_t *> &a, std::pair<chunkvbo_t *, vbo_buffer_t *> &b)
-              { return b.first < a.first; });
+    // Sort the vbos to draw the nearest ones first in the solid pass, and the furthest ones first in the transparent pass
+    std::sort(vbos_to_draw.begin(), vbos_to_draw.end(), [opaque](std::pair<chunkvbo_t *, vbo_buffer_t *> &a, std::pair<chunkvbo_t *, vbo_buffer_t *> &b)
+              { return (b.first < a.first) ^ opaque; });
 
     // Draw the vbos
     for (std::pair<chunkvbo_t *, vbo_buffer_t *> &pair : vbos_to_draw)
