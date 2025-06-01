@@ -492,12 +492,13 @@ int main(int argc, char **argv)
         // Draw the scene
         if (current_world && current_world->loaded)
         {
-            current_world->draw(camera);
             // Draw sky
             if (current_world->player.in_fluid == BlockID::air && !current_world->hell)
                 draw_sky(background);
 
             GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, BASE3D_POS_FRAC_BITS);
+            current_world->draw(camera);
+
             use_texture(terrain_texture);
             current_world->draw_selected_block();
         }
