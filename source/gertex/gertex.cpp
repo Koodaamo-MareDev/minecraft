@@ -106,7 +106,7 @@ namespace gertex
     {
         // Prepare the perspective matrix
         Mtx44 prespective_mtx;
-        guPerspective(prespective_mtx, view.fov, view.aspect, view.near, view.far);
+        guPerspective(prespective_mtx, view.fov, view.aspect / view.aspect_correction, view.near, view.far);
         guMtx44Copy(prespective_mtx, state.proj_mtx.mtx);
 
         // Update the state
@@ -134,6 +134,7 @@ namespace gertex
         // Construct a flat (2D) matrix
         Mtx flat_matrix;
         guMtxIdentity(flat_matrix);
+        guMtxScaleApply(flat_matrix, flat_matrix, 1.0F, 1.0F / view.aspect_correction, 1.0F);
         guMtxTransApply(flat_matrix, flat_matrix, 0.0F, 0.0F, -0.5F);
         GX_LoadPosMtxImm(flat_matrix, GX_PNMTX0);
         guMtxCopy(flat_matrix, state.mtx.mtx);

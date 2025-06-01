@@ -141,6 +141,7 @@ void HandleGUI(gertex::GXView &viewport);
 void UpdateGUI(gertex::GXView &viewport);
 void DrawGUI(gertex::GXView &viewport);
 void DrawHUD(gertex::GXView &viewport);
+void DrawDebugInfo(gertex::GXView &viewport);
 void UpdateCamera(camera_t &camera);
 void PrepareTEV();
 void GetInput();
@@ -320,7 +321,7 @@ int main(int argc, char **argv)
 
     // Set the inventory cursor to the center of the screen
     cursor_x = viewport.width / 2;
-    cursor_y = viewport.height / 2;
+    cursor_y = viewport.height * viewport.aspect_correction / 2;
 
     f32 FOV = config.get<float>("fov", 90.0f);
 
@@ -352,7 +353,7 @@ int main(int argc, char **argv)
     PrepareTEV();
 
     inventory::init_items();
-    gui::init_matrices();
+    gui::init_matrices(viewport.aspect_correction);
 
     gertex::GXFog fog = gertex::GXFog{true, gertex::GXFogType::linear, viewport.near, viewport.far, viewport.near, viewport.far, background};
 
@@ -866,21 +867,79 @@ void HandleGUI(gertex::GXView &viewport)
         // Draw the underwater overlay
         static vec3f pan_underwater_texture(0, 0, 0);
         pan_underwater_texture = pan_underwater_texture + vec3f(wiimote_rx * 0.25, wiimote_ry * 0.25, 0.0);
+        float corrected_height = viewport.height * viewport.aspect_correction;
         pan_underwater_texture.x = std::fmod(pan_underwater_texture.x, viewport.width);
-        pan_underwater_texture.y = std::fmod(pan_underwater_texture.y, viewport.height);
+        pan_underwater_texture.y = std::fmod(pan_underwater_texture.y, corrected_height);
         if (current_world->player.in_fluid == BlockID::water)
         {
-            draw_textured_quad(underwater_texture, pan_underwater_texture.x - viewport.width, pan_underwater_texture.y - viewport.height, viewport.width * 3, viewport.height * 3, 0, 0, 48, 48);
+            draw_textured_quad(underwater_texture, pan_underwater_texture.x, pan_underwater_texture.y - viewport.height, viewport.width * 3, corrected_height * 3, 0, 0, 48, 48);
             draw_textured_quad(vignette_texture, 0, 0, viewport.width, viewport.height, 0, 0, 256, 256);
         }
-        draw_textured_quad(vignette_texture, 0, 0, viewport.width, viewport.height, 0, 0, 256, 256);
+        draw_textured_quad(vignette_texture, 0, 0, viewport.width, corrected_height, 0, 0, 256, 256);
 
         DrawHUD(viewport);
     }
     UpdateGUI(viewport);
     DrawGUI(viewport);
 
-    gui::draw_text_with_shadow(0, 0, "Memory: " + std::to_string(current_world->memory_usage) + " B");
+    DrawDebugInfo(viewport);
+}
+
+GXColor fps_color(int fps)
+{
+    GXColor result = {0xFF, 0xFF, 0xFF, 0xFF};
+    switch (fps / 10)
+    {
+    case 0:                                // 0-9 FPS
+    case 1:                                // 10-19 FPS
+        result = {0xFF, 0x55, 0x55, 0xFF}; // Red
+        break;
+    case 2:                                // 20-29 FPS
+    case 3:                                // 30-39 FPS
+        result = {0xFF, 0xAA, 0x00, 0xFF}; // Gold
+        break;
+    case 4:                                // 40-49 FPS
+        result = {0xFF, 0xFF, 0x55, 0xFF}; // Yellow
+        break;
+    default:                               // 50+ FPS
+        result = {0xFF, 0xFF, 0xFF, 0xFF}; // White
+        break;
+    }
+    return result;
+}
+
+void DrawDebugInfo(gertex::GXView &viewport)
+{
+    uint64_t current_frame_time = time_get();
+    static uint64_t last_frame_time = current_frame_time;
+    static uint64_t last_sample_time = current_frame_time;
+    static double fps = 0;
+
+    // Update FPS every 1/4th second (get first sample ASAP i.e. on the second frame)
+    if (time_diff_s(last_sample_time, current_frame_time) >= 0.25 || frameCounter == 1)
+    {
+        // Calculate the time difference in seconds
+        fps = time_diff_s(last_frame_time, current_frame_time);
+
+        // Avoid division by zero
+        if (fps > 0)
+        {
+            // Calculate FPS
+            fps = 1 / fps;
+        }
+
+        // Reset the last sample time
+        last_sample_time = current_frame_time;
+    }
+    // Update the last frame time
+    last_frame_time = current_frame_time;
+
+    // Display debug information
+    gui::draw_text_with_shadow(0, viewport.ystart, "Memory: " + std::to_string(current_world->memory_usage) + " B");
+    gui::draw_text_with_shadow(0, viewport.ystart + 16, std::to_string(int(fps)) + " fps", fps_color(int(fps)));
+    std::string resolution_str = std::to_string(int(viewport.width)) + "x" + std::to_string(int(viewport.height));
+    std::string widescreen_str = viewport.widescreen ? " Widescreen" : "";
+    gui::draw_text_with_shadow(0, viewport.ystart + 32, resolution_str + widescreen_str);
 }
 
 void Render(guVector chunkPos, void *buffer, u32 length)
@@ -978,7 +1037,7 @@ void UpdateGUI(gertex::GXView &viewport)
     if (!wiimote_ir_visible)
     {
         // Since you can technically go out of bounds using a joystick, we need to clamp the cursor position; it'd be really annoying losing the cursor
-        cursor_x = std::clamp(cursor_x, 0, int(viewport.width));
+        cursor_x = std::clamp(cursor_x, 0, int(viewport.width / viewport.aspect_correction));
         cursor_y = std::clamp(cursor_y, 0, int(viewport.height));
     }
     gui::get_gui()->update();
@@ -992,9 +1051,11 @@ void DrawHUD(gertex::GXView &viewport)
     // Reset the orthogonal position matrix and push it onto the stack
     gertex::ortho(viewport);
 
+    float corrected_height = viewport.height * viewport.aspect_correction;
+
     // Draw crosshair
     int crosshair_x = int(viewport.width - 32) >> 1;
-    int crosshair_y = int(viewport.height - 32) >> 1;
+    int crosshair_y = int(corrected_height - 32) >> 1;
 
     // Save the current state
     gertex::GXState state = gertex::get_state();
@@ -1014,17 +1075,17 @@ void DrawHUD(gertex::GXView &viewport)
     // Draw IR cursor if visible
     if (wiimote_ir_visible)
     {
-        draw_textured_quad(icons_texture, wiimote_ir_x * viewport.width - 7, wiimote_ir_y * viewport.height - 3, 48, 48, 32, 32, 56, 56);
+        draw_textured_quad(icons_texture, wiimote_ir_x * viewport.width - 7, wiimote_ir_y * corrected_height - 3, 48, 48, 32, 32, 56, 56);
     }
 
     // Enable direct colors
     GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
 
     // Draw the hotbar background
-    draw_textured_quad(icons_texture, (viewport.width - 364) / 2, viewport.height - 44, 364, 44, 56, 9, 238, 31);
+    draw_textured_quad(icons_texture, (viewport.width - 364) / 2, corrected_height - 44, 364, 44, 56, 9, 238, 31);
 
     // Draw the hotbar selection
-    draw_textured_quad(icons_texture, (viewport.width - 364) / 2 + current_world->player.selected_hotbar_slot * 40 - 2, viewport.height - 46, 48, 48, 56, 31, 80, 55);
+    draw_textured_quad(icons_texture, (viewport.width - 364) / 2 + current_world->player.selected_hotbar_slot * 40 - 2, corrected_height - 46, 48, 48, 56, 31, 80, 55);
 
     if (current_world)
     {
@@ -1034,7 +1095,7 @@ void DrawHUD(gertex::GXView &viewport)
         // Draw the hotbar items
         for (size_t i = 0; i < 9; i++)
         {
-            gui::draw_item((viewport.width - 364) / 2 + i * 40 + 6, viewport.height - 38, current_world->player.m_inventory[i]);
+            gui::draw_item((viewport.width - 364) / 2 + i * 40 + 6, corrected_height - 38, current_world->player.m_inventory[i]);
         }
 
         // Restore the orthogonal position matrix
@@ -1051,19 +1112,19 @@ void DrawHUD(gertex::GXView &viewport)
     // Empty hearts
     for (int i = 0; i < 10; i++)
     {
-        draw_textured_quad(icons_texture, (viewport.width - 364) / 2 + i * 16, viewport.height - 64, 18, 18, 16, 0, 25, 9);
+        draw_textured_quad(icons_texture, (viewport.width - 364) / 2 + i * 16, corrected_height - 64, 18, 18, 16, 0, 25, 9);
     }
 
     // Full hearts
     for (int i = 0; i < (health & ~1); i += 2)
     {
-        draw_textured_quad(icons_texture, (viewport.width - 364) / 2 + i * 8, viewport.height - 64, 18, 18, 52, 0, 61, 9);
+        draw_textured_quad(icons_texture, (viewport.width - 364) / 2 + i * 8, corrected_height - 64, 18, 18, 52, 0, 61, 9);
     }
 
     // Half heart (if the player has an odd amount of health)
     if ((health & 1) == 1)
     {
-        draw_textured_quad(icons_texture, (viewport.width - 364) / 2 + (health & ~1) * 8, viewport.height - 64, 18, 18, 61, 0, 70, 9);
+        draw_textured_quad(icons_texture, (viewport.width - 364) / 2 + (health & ~1) * 8, corrected_height - 64, 18, 18, 61, 0, 70, 9);
     }
 }
 

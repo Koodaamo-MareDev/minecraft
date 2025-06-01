@@ -34,7 +34,9 @@ public:
     gertex::GXView viewport;
     gui() = delete;
     inventory::item_stack item_in_hand;
-    gui(const gertex::GXView &viewport) : viewport(viewport) {}
+    gui(const gertex::GXView &viewport) : viewport(viewport)
+    {
+    }
     virtual ~gui() = default;
     virtual void draw() = 0;
     virtual void update() = 0;
@@ -43,7 +45,7 @@ public:
     virtual void refresh() {}
     virtual bool use_cursor() { return true; }
 
-    static void init_matrices();
+    static void init_matrices(float aspect_correction);
     static int text_width(std::string str);
     static void draw_text(int x, int y, std::string str, GXColor color = {255, 255, 255, 255});
     static void draw_text_with_shadow(int x, int y, std::string str, GXColor color = {255, 255, 255, 255});

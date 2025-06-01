@@ -7,7 +7,7 @@ gertex::GXMatrix gui_item_matrix;
 
 gui *gui::current_gui = nullptr;
 
-void gui::init_matrices()
+void gui::init_matrices(float aspect_correction)
 {
     // Prepare matrices for rendering GUI elements
     Mtx tmp_matrix;
@@ -21,9 +21,10 @@ void gui::init_matrices()
     guMtxRotDeg(tmp_matrix, 'y', 45.0F);
     guMtxConcat(gui_block_matrix.mtx, tmp_matrix, gui_block_matrix.mtx);
 
-    guMtxScaleApply(gui_block_matrix.mtx, gui_block_matrix.mtx, 0.65, 0.65, 0.65f);
+    guMtxScaleApply(gui_block_matrix.mtx, gui_block_matrix.mtx, 0.65f, 0.65f / aspect_correction, 0.65f);
     guMtxTransApply(gui_block_matrix.mtx, gui_block_matrix.mtx, 0.0f, 0.0f, -10.0f);
 
+    guMtxScaleApply(gui_item_matrix.mtx, gui_item_matrix.mtx, 1.0f, 1.0f / aspect_correction, 1.0f);
     guMtxTransApply(gui_item_matrix.mtx, gui_item_matrix.mtx, 0.0f, 0.0f, -10.0f);
 }
 

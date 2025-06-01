@@ -13,12 +13,12 @@ void gui_dirtscreen::draw()
 
     for (size_t i = 0; i < text_lines.size(); i++)
     {
-        gui::draw_text_with_shadow((viewport.width - gui::text_width(text_lines[i])) / 2, 200 + i * 16, text_lines[i]);
+        gui::draw_text_with_shadow((viewport.width - gui::text_width(text_lines[i])) / 2, viewport.aspect_correction * 200 + i * 16, text_lines[i]);
     }
     if (max_progress > 0)
     {
-        draw_colored_quad((viewport.width - 200) / 2, 272, 200, 4, 0x80, 0x80, 0x80, 0xFF);
-        draw_colored_quad((viewport.width - 200) / 2, 272, int(progress) * 200 / int(max_progress), 4, 0x80, 0xFF, 0x80, 0xFF);
+        draw_colored_quad((viewport.width - 200) / 2, viewport.aspect_correction * 200 + 72, 200, 4, 0x80, 0x80, 0x80, 0xFF);
+        draw_colored_quad((viewport.width - 200) / 2, viewport.aspect_correction * 200 + 72, int(progress) * 200 / int(max_progress), 4, 0x80, 0xFF, 0x80, 0xFF);
     }
 }
 

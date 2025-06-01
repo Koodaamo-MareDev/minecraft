@@ -4,10 +4,8 @@
 
 gui_survival::gui_survival(const gertex::GXView &viewport, inventory::container &container) : gui(viewport), linked_container(container)
 {
-    init_matrices();
-
     int start_x = (viewport.width - width) / 2;
-    int start_y = (viewport.height - height) / 2;
+    int start_y = (viewport.aspect_correction * viewport.height - height) / 2;
 
     // Initialize the hotbar
     for (size_t i = 0; i < hotbar_slots.size(); i++)
@@ -34,7 +32,7 @@ void gui_survival::draw()
     draw_colored_quad(0, 0, viewport.width, viewport.height, 0, 0, 0, 128);
 
     int start_x = (viewport.width - width) / 2;
-    int start_y = (viewport.height - height) / 2;
+    int start_y = (viewport.aspect_correction * viewport.height - height) / 2;
 
     // Enable direct colors
     GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);

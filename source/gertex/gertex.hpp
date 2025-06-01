@@ -34,7 +34,9 @@ namespace gertex
         float near = CAMERA_NEAR;
         float far = CAMERA_FAR;
         float aspect = CAMERA_WIDTH / CAMERA_HEIGHT;
+        float aspect_correction = 1.0f; // Aspect correction factor for widescreen
         float yscale = 1.2f;
+        float ystart = 0.0f; // Optional padding for the top of the screen - useful for preventing HUD overscan issues when in widescreen mode
         bool widescreen = false;
         static GXView *default_view;
 
@@ -50,6 +52,9 @@ namespace gertex
             this->near = near;
             this->far = far;
             this->widescreen = widescreen;
+            if (widescreen)
+                aspect_correction = 0.75f;
+            ystart = 16;
             if (!default_view)
                 default_view = this;
         }
