@@ -1069,6 +1069,8 @@ void draw_sunrise()
 
     gertex::set_blending(gertex::GXBlendMode::normal);
 
+    GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_FALSE);
+
     // Use floats for vertex positions
     GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_F32, 0);
 
@@ -1080,14 +1082,14 @@ void draw_sunrise()
     guMtxRotAxisDeg(mtx.mtx, &axis, 90.0f);
     float celestial_angle = get_celestial_angle();
     axis = {0, 0, 1};
-    guMtxRotAxisDeg(mtx_tmp.mtx, &axis, celestial_angle > 0.5F ? 180.0F : 0.0F);
+    guMtxRotAxisDeg(mtx_tmp.mtx, &axis, celestial_angle > 0.5f ? 180.0f : 0.0f);
     guMtxConcat(mtx.mtx, mtx_tmp.mtx, mtx.mtx);
     transform_view(mtx, player_pos);
 
     uint8_t quality = 16;
-    float centerX = 0.0F;
-    float centerY = 100.0F;
-    float centerZ = 0.0F;
+    float centerX = 0.0f;
+    float centerY = 100.0f;
+    float centerZ = 0.0f;
 
     GX_BeginGroup(GX_TRIANGLEFAN, quality + 2);
 
@@ -1097,10 +1099,10 @@ void draw_sunrise()
     // Draw the outer vertices
     for (int i = 0; i <= quality; ++i)
     {
-        float v = (float)i * (float)M_PI * 2.0F / (float)quality;
+        float v = (float)i * (float)M_PI * -2.0f / (float)quality;
         float x = std::sin(v);
         float z = std::cos(v);
-        GX_VertexF(vertex_property_t(vec3f(x * -120.0F, z * -120.0F, z * -40.0F), 0, 0, r, g, b, 0));
+        GX_VertexF(vertex_property_t(vec3f(x * 120.0f, z * 120.0f, -z * 40.0f * sunrise_color[3]), 0, 0, r, g, b, 0));
     }
     GX_EndGroup();
 
