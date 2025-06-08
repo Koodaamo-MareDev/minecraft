@@ -307,15 +307,16 @@ void world::edit_blocks()
         return;
     }
     block_t selected_block = block_t{uint8_t(player.selected_item->id & 0xFF), 0x7F, uint8_t(player.selected_item->meta & 0xFF)};
+    bool finish_destroying = should_destroy_block && player.block_mine_progress >= 1.0f;
 
     player.draw_block_outline = raycast_precise(vec3f(player_pos.x + .5, player_pos.y + .5, player_pos.z + .5), vec3f(forward.x, forward.y, forward.z), 4, &player.raycast_pos, &player.raycast_face, player.block_bounds);
     if (player.draw_block_outline)
     {
-        BlockID new_blockid = should_destroy_block ? BlockID::air : selected_block.get_blockid();
-        if (should_destroy_block || should_place_block)
+        BlockID new_blockid = finish_destroying ? BlockID::air : selected_block.get_blockid();
+        if (finish_destroying || should_place_block)
         {
             block_t *targeted_block = get_block_at(player.raycast_pos);
-            vec3i editable_pos = should_destroy_block ? (player.raycast_pos) : (player.raycast_pos + player.raycast_face);
+            vec3i editable_pos = finish_destroying ? (player.raycast_pos) : (player.raycast_pos + player.raycast_face);
             block_t *editable_block = get_block_at(editable_pos);
             if (editable_block)
             {
@@ -356,20 +357,20 @@ void world::edit_blocks()
                     else
                     {
                         should_place_block &= old_blockid == BlockID::air || properties(old_blockid).m_fluid;
-                        if (!should_destroy_block && should_place_block)
+                        if (!finish_destroying && should_place_block)
                         {
                             editable_block->meta = new_blockid == BlockID::air ? 0 : selected_block.meta;
                             editable_block->set_blockid(new_blockid);
                         }
                     }
-                    if (should_destroy_block)
+                    if (finish_destroying)
                     {
                         editable_block->meta = new_blockid == BlockID::air ? 0 : selected_block.meta;
                         editable_block->set_blockid(new_blockid);
                     }
                 }
 
-                if (should_destroy_block)
+                if (finish_destroying)
                 {
                     if (!is_remote())
                         destroy_block(editable_pos, &old_block);
@@ -394,9 +395,13 @@ void world::edit_blocks()
         }
     }
 
+    if (finish_destroying)
+    {
+        player.block_mine_progress = 0.0f;
+    }
+
     // Clear the place/destroy block flags to prevent placing blocks immediately.
     should_place_block = false;
-    should_destroy_block = false;
 }
 
 int world::prepare_chunks(int count)
@@ -661,11 +666,50 @@ void world::draw_scene(bool opaque)
         chunk->render_entities(partial_ticks, !opaque);
     }
 
+    if (player.draw_block_outline && should_destroy_block)
+    {
+        chunk_t *targeted_chunk = get_chunk_from_pos(player.raycast_pos);
+        block_t *targeted_block = targeted_chunk ? targeted_chunk->get_block(player.raycast_pos) : nullptr;
+        if (targeted_block && targeted_block->get_blockid() != BlockID::air)
+        {
+            // Create a copy of the targeted block for rendering
+            block_t targeted_block_copy = *targeted_block;
+
+            // Set light to maximum for rendering
+            targeted_block_copy.light = 0xFF;
+
+            // Save the current state
+            gertex::GXState state = gertex::get_state();
+
+            // Use blending mode for block breaking animation
+            gertex::set_blending(gertex::GXBlendMode::multiply2);
+
+            // Apply the transformation for the block breaking animation
+            vec3f adjusted_offset = vec3f(player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z);
+            vec3f towards_camera = vec3f(player_pos) - adjusted_offset;
+            towards_camera.normalize();
+            towards_camera = towards_camera * 0.002;
+
+            transform_view(gertex::get_view_matrix(), adjusted_offset + towards_camera);
+
+            // Override texture index for the block breaking animation
+            override_texture_index(240 + (int)(player.block_mine_progress * 10.0f));
+
+            render_single_block(targeted_block_copy, !opaque);
+
+            // Reset texture index override
+            override_texture_index(-1);
+
+            // Restore the previous state
+            gertex::set_state(state);
+        }
+    }
+
     // Enable direct colors
     GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
 
     // Draw block outlines
-    if (opaque && player.draw_block_outline)
+    if (!opaque && player.draw_block_outline)
     {
         GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
         vec3f outline_pos = player.raycast_pos - vec3f(0.5, 0.5, 0.5);
@@ -815,6 +859,12 @@ void world::draw_selected_block()
 
 void world::draw_bounds(aabb_t *bounds)
 {
+    // Save the current state
+    gertex::GXState state = gertex::get_state();
+
+    // Use blending mode for block breaking animation
+    gertex::set_blending(gertex::GXBlendMode::multiply2);
+
     GX_BeginGroup(GX_LINES, 24);
 
     aabb_t aabb = *bounds;
@@ -827,7 +877,7 @@ void world::draw_bounds(aabb_t *bounds)
         {
             for (int k = 0; k < 2; k++)
             {
-                GX_Vertex(vertex_property_t(min + vec3f(size.x * k, size.y * i, size.z * j), 0, 0, 0, 0, 0, 191));
+                GX_Vertex(vertex_property_t(min + vec3f(size.x * k, size.y * i, size.z * j), 0, 0, 127, 127, 127));
             }
         }
     }
@@ -837,7 +887,7 @@ void world::draw_bounds(aabb_t *bounds)
         {
             for (int k = 0; k < 2; k++)
             {
-                GX_Vertex(vertex_property_t(min + vec3f(size.x * i, size.y * k, size.z * j), 0, 0, 0, 0, 0, 191));
+                GX_Vertex(vertex_property_t(min + vec3f(size.x * i, size.y * k, size.z * j), 0, 0, 127, 127, 127));
             }
         }
     }
@@ -847,11 +897,14 @@ void world::draw_bounds(aabb_t *bounds)
         {
             for (int k = 0; k < 2; k++)
             {
-                GX_Vertex(vertex_property_t(min + vec3f(size.x * i, size.y * j, size.z * k), 0, 0, 0, 0, 0, 191));
+                GX_Vertex(vertex_property_t(min + vec3f(size.x * i, size.y * j, size.z * k), 0, 0, 127, 127, 127));
             }
         }
     }
     GX_EndGroup();
+
+    // Restore the previous state
+    gertex::set_state(state);
 }
 
 void world::save()
@@ -1118,6 +1171,19 @@ void world::update_player()
     else
     {
         player.in_fluid = BlockID::air;
+    }
+
+    if (should_destroy_block && player.block_mine_progress < 1.0f)
+    {
+        block_t *targeted_block = get_block_at(player.raycast_pos);
+        if (targeted_block && targeted_block->get_blockid() != BlockID::air)
+        {
+            player.block_mine_progress += properties(targeted_block->get_blockid()).get_break_multiplier(*player.selected_item, player.m_entity->on_ground, basefluid(player.in_fluid) == BlockID::water);
+        }
+    }
+    else
+    {
+        player.block_mine_progress = 0.0f;
     }
 }
 

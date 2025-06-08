@@ -18,6 +18,7 @@ int8_t get_block_opacity(BlockID blockid);
 
 uint8_t get_block_luminance(BlockID block_id);
 
+void override_texture_index(int32_t texture_index);
 uint32_t get_default_texture_index(BlockID blockid);
 uint32_t get_face_texture_index(block_t *block, int face);
 

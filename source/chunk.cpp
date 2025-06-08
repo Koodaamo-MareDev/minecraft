@@ -695,7 +695,7 @@ int chunk_t::render_block(block_t *block, const vec3i &pos, bool transparent)
         for (uint8_t face = 0; face < 6; face++)
         {
             if (block->get_opacity(face))
-                vertexCount += render_face(pos, face, properties(block->id).m_texture_index, this, block);
+                vertexCount += render_face(pos, face, get_default_texture_index(block->get_blockid()), this, block);
         }
     }
     return vertexCount;
@@ -703,6 +703,11 @@ int chunk_t::render_block(block_t *block, const vec3i &pos, bool transparent)
 
 int chunk_t::get_chest_texture_index(block_t *block, const vec3i &pos, uint8_t face)
 {
+    // Check for texture overrides
+    uint32_t texture_index = get_default_texture_index(block->get_blockid());
+    if (texture_index != properties(block->id).m_texture_index)
+        return texture_index;
+
     // Bottom and top faces are always the same
     if (face == FACE_NY || face == FACE_PY)
         return 25;
@@ -898,7 +903,10 @@ int chunk_t::render_slab(block_t *block, const vec3i &pos)
     uint8_t lighting = block->light;
     vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
     vec3f vertex_pos(local_pos.x, local_pos.y, local_pos.z);
-    uint32_t top_index = get_default_texture_index(block->get_blockid());
+
+    // Check for texture overrides
+    uint32_t texture_index = get_default_texture_index(block->get_blockid());
+    uint32_t top_index = texture_index;
     uint32_t side_index = top_index - 1;
     uint32_t bottom_index = top_index;
     bool render_top = true;
@@ -927,6 +935,10 @@ int chunk_t::render_slab(block_t *block, const vec3i &pos)
     default:
         break;
     }
+
+    if (texture_index != properties(block->id).m_texture_index)
+        bottom_index = side_index = top_index = texture_index;
+
     int vertexCount = 0;
     if (top_half)
     {
@@ -1067,12 +1079,13 @@ int chunk_t::render_door(block_t *block, const vec3i pos)
     vec3f vertex_pos = vec3f(local_pos.x, local_pos.y, local_pos.z) - vec3f(0.5);
 
     uint32_t texture_index = get_default_texture_index(block->get_blockid());
+    bool replace_texture = texture_index != properties(block->id).m_texture_index;
     bool top_half = block->meta & 8;
     bool open = block->meta & 4;
     uint8_t direction = block->meta & 3;
     if (!open)
         direction = (direction + 3) & 3;
-    if (!top_half)
+    if (!top_half && replace_texture)
         texture_index += 16;
 
     constexpr vfloat_t door_thickness = 0.1875;

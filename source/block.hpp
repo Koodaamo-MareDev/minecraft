@@ -72,6 +72,9 @@ struct blockproperties_t
     CollisionType m_collision = CollisionType::solid;
     float_t m_slipperiness = 0.6f;
     float_t m_blast_resistance = 0.5f;
+    inventory::tool_type m_tool_type = inventory::tool_type::none;
+    inventory::tool_tier m_tool_tier = inventory::tool_tier::no_tier;
+    float_t m_hardness = 2.0f;
 
     union
     {
@@ -262,6 +265,47 @@ struct blockproperties_t
     {
         this->m_drops = drops_func;
         return *this;
+    }
+
+    blockproperties_t &tool(inventory::tool_type tool, inventory::tool_tier tier)
+    {
+        this->m_tool_type = tool;
+        this->m_tool_tier = tier;
+        return *this;
+    }
+
+    blockproperties_t &hardness(float value)
+    {
+        this->m_hardness = value;
+        return *this;
+    }
+
+    bool can_be_broken_with(const inventory::item_stack &item) const
+    {
+        if (this->m_tool_type == inventory::tool_type::none)
+            return true; // Can break with hands or any item
+
+        if (this->m_tool_tier == inventory::tool_tier::no_tier)
+            return true; // Can break with any item or hands, but still slow
+
+        if (item.as_item().tool == this->m_tool_type && item.as_item().tier >= this->m_tool_tier)
+            return true; // Can break with the correct tool and tier
+
+        return false; // Cannot break with this item
+    }
+
+    float get_break_multiplier(const inventory::item_stack &item, bool on_ground, bool in_water) const
+    {
+        if (m_hardness < 0.0f)
+            return 0.0f; // Block cannot be broken
+
+        if (!this->can_be_broken_with(item))
+            return 0.01f / this->m_hardness; // Cannot break with this item, use default speed
+
+        if (item.as_item().tool == inventory::tool_type::none || (item.as_item().tool == this->m_tool_type && item.as_item().tier >= this->m_tool_tier))
+            return item.as_item().get_efficiency(m_id, this->m_tool_type, this->m_tool_tier) * (on_ground ? 1.0f : 0.2f) * (in_water ? 0.2f : 1.0f) / this->m_hardness / 30.0f;
+
+        return 1.0f; // Instant break with hands or any item
     }
 };
 

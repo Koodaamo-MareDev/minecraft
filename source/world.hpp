@@ -30,6 +30,7 @@ public:
     vec3i raycast_face = vec3i(0, 0, 0);
     std::vector<aabb_t> block_bounds;
     bool draw_block_outline = false;
+    float block_mine_progress = 0.0f;
 
     inventory::container m_inventory = inventory::container(40, 36); // 4 rows of 9 slots, the rest 4 are the armor slots
     inventory::item_stack *selected_item = nullptr;

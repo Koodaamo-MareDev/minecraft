@@ -6,6 +6,7 @@
 #include <array>
 #include <stdexcept>
 #include <math/vec3i.hpp>
+#include <vector>
 
 #include "block_id.hpp"
 
@@ -27,6 +28,7 @@ namespace inventory
 
     enum tool_tier : uint8_t
     {
+        no_tier,
         wood,
         gold,
         stone,
@@ -47,6 +49,8 @@ namespace inventory
         uint8_t texture_index = 0;
         tool_type tool = none;
         tool_tier tier = wood;
+        float efficiency = 1.0f;
+        int32_t damage = 0;
         std::function<void(item &, vec3i, vec3i, entity_physical *)> on_use = default_on_use;
 
         item(uint16_t id = 0, uint8_t max_stack = 64, std::function<void(item &, vec3i, vec3i, entity_physical *)> on_use = default_on_use) : id(id), max_stack(max_stack), on_use(on_use) {}
@@ -55,6 +59,8 @@ namespace inventory
         {
             return id < 0x100;
         }
+
+        float get_efficiency(BlockID block_id, tool_type type, tool_tier tier) const;
     };
 
     extern item item_list[512];

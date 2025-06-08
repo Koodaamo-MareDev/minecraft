@@ -814,7 +814,7 @@ void GetInput()
         // repeats buttons every 10 frames
         if ((raw_wiimote_held & WPAD_CLASSIC_BUTTON_FULL_L) && ((raw_wiimote_down & WPAD_CLASSIC_BUTTON_FULL_L) || shoulder_btn_frame_counter % 10 == 0))
             should_place_block = true;
-        if ((raw_wiimote_held & WPAD_CLASSIC_BUTTON_FULL_R) && ((raw_wiimote_down & WPAD_CLASSIC_BUTTON_FULL_R) || shoulder_btn_frame_counter % 10 == 0))
+        if ((raw_wiimote_held & WPAD_CLASSIC_BUTTON_FULL_R))
             should_place_block = !(should_destroy_block = true);
     }
     if (raw_wiimote_down & WPAD_CLASSIC_BUTTON_ZL)

@@ -426,6 +426,15 @@ int render_face(vec3i pos, uint8_t face, uint32_t texture_index, chunk_t *near, 
         }
     }
 #undef SMOOTH
+    if (texture_index >= 240 && texture_index < 250)
+    {
+        // Force full brightness for breaking block override
+        lighting[0] = lighting[1] = lighting[2] = lighting[3] = 255;
+        // Reset ambient occlusion
+        ao[0] = ao[1] = ao[2] = ao[3] = 0;
+        // Set the face to the top face
+        face = FACE_PY;
+    }
     index = (ao[0] + ao[3] > ao[1] + ao[2]);
     GX_VertexLit16(vertices[index], lighting[index], face + ao[index]);
     index = (index + 1) & 3;
@@ -629,8 +638,8 @@ frustum_t calculate_frustum(camera_t &camera)
     {
         plane_t &plane = frustum.planes[i];
         vfloat_t length = Q_rsqrt(plane.direction.x * plane.direction.x +
-                                          plane.direction.y * plane.direction.y +
-                                          plane.direction.z * plane.direction.z);
+                                  plane.direction.y * plane.direction.y +
+                                  plane.direction.z * plane.direction.z);
         plane.direction.x *= length;
         plane.direction.y *= length;
         plane.direction.z *= length;
@@ -1066,7 +1075,7 @@ void draw_sunrise()
     float *sunrise_color = get_sunrise_color();
     if (!sunrise_color)
         return;
-    
+
     // Convert the color to 8-bit values
     uint8_t r = uint8_t(sunrise_color[0] * 255);
     uint8_t g = uint8_t(sunrise_color[1] * 255);
@@ -1084,7 +1093,7 @@ void draw_sunrise()
     GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_F32, 0);
 
     use_texture(white_texture);
-    
+
     gertex::GXMatrix mtx_tmp;
     gertex::GXMatrix mtx;
     guVector axis{1, 0, 0};

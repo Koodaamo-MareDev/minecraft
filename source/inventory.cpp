@@ -135,4 +135,37 @@ namespace inventory
         // Don't place the stack if the index is out of bounds
         return stack;
     }
+
+    float item::get_efficiency(BlockID block_id, tool_type block_tool_type, tool_tier block_tool_tier) const
+    {
+        // Swords have a fixed efficiency
+        if (tool == tool_type::sword)
+            return 1.5f;
+
+        // Skip if the item is not a tool
+        if (block_tool_tier == tool_tier::no_tier || block_tool_type == tool_type::none)
+            return 1.0f;
+
+        // Apply the efficiency based on tier if the tool matches
+        if (this->tool == block_tool_type && this->tier >= block_tool_tier)
+        {
+            switch (this->tier)
+            {
+            case tool_tier::wood:
+                return 2.0f;
+            case tool_tier::gold:
+                return 12.0f;
+            case tool_tier::stone:
+                return 4.0f;
+            case tool_tier::iron:
+                return 6.0f;
+            case tool_tier::diamond:
+                return 8.0f;
+            default:
+                break;
+            }
+        }
+
+        return 1.0f;
+    }
 } // namespace inventory
