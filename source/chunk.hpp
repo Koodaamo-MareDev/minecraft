@@ -222,21 +222,6 @@ public:
     void recalculate_visibility(block_t *block, vec3i pos);
     void recalculate_section_visibility(int section);
     int build_vbo(int section, bool transparent);
-    int render_fluid(block_t *block, const vec3i &pos);
-    int render_fluid_mesh(int section, bool transparent, int vertexCount);
-    int render_block_mesh(int section, bool transparent, int vertexCount);
-    int render_block(block_t *block, const vec3i &pos, bool transparent);
-    int get_chest_texture_index(block_t *block, const vec3i &pos, uint8_t face);
-    int render_special(block_t *block, const vec3i &pos);
-    int render_flat_ground(block_t *block, const vec3i &pos);
-    int render_snow_layer(block_t *block, const vec3i &pos);
-    int render_chest(block_t *block, const vec3i &pos);
-    int render_torch(block_t *block, const vec3i &pos);
-    int render_torch_with_angle(block_t *block, const vec3f &vertex_pos, vfloat_t ax, vfloat_t az);
-    int render_door(block_t *block, const vec3i pos);
-    int render_cross(block_t *block, const vec3i &pos);
-    int render_slab(block_t *block, const vec3i &pos);
-
     void update_entities();
 
     void render_entities(float partial_ticks, bool transparency);

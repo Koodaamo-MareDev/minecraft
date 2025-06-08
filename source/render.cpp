@@ -1,4 +1,5 @@
 #include "render.hpp"
+#include "render_blocks.hpp"
 
 #include <ported/Random.hpp>
 
@@ -453,13 +454,13 @@ void render_single_block(block_t &selected_block, bool transparency)
         return;
 
     // Precalculate the vertex count. Set position to Y = -16 to render "outside the world"
-    int vertexCount = chunks[0]->render_block(&selected_block, vec3i(0, -16, 0), transparency);
+    int vertexCount = render_block(*chunks[0], &selected_block, vec3i(0, -16, 0), transparency);
 
     // Start drawing the block
     GX_BeginGroup(GX_QUADS, vertexCount);
 
     // Render the block. Set position to Y = -16 to render "outside the world"
-    chunks[0]->render_block(&selected_block, vec3i(0, -16, 0), transparency);
+    render_block(*chunks[0], &selected_block, vec3i(0, -16, 0), transparency);
 
     // End the group
     GX_EndGroup();
@@ -471,13 +472,13 @@ void render_single_block_at(block_t &selected_block, vec3i pos, bool transparenc
     if (!chunk)
         return;
     // Precalculate the vertex count. Set position to Y = -16 to render "outside the world"
-    int vertexCount = chunk->render_block(&selected_block, pos, transparency);
+    int vertexCount = render_block(*chunk, &selected_block, pos, transparency);
 
     // Start drawing the block
     GX_BeginGroup(GX_QUADS, vertexCount);
 
     // Render the block. Set position to Y = -16 to render "outside the world"
-    chunk->render_block(&selected_block, pos, transparency);
+    render_block(*chunk, &selected_block, pos, transparency);
 
     // End the group
     GX_EndGroup();
