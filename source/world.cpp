@@ -372,8 +372,22 @@ void world::edit_blocks()
 
                 if (finish_destroying)
                 {
-                    if (!is_remote())
-                        destroy_block(editable_pos, &old_block);
+                    destroy_block(editable_pos, &old_block);
+                    if (is_remote())
+                    {
+                        // Restore the old block - server will handle the destruction
+                        set_block_at(editable_pos, old_blockid);
+                        
+                        // Send block destruction packet to the server
+                        for (uint8_t face_num = 0; face_num < 6; face_num++)
+                        {
+                            if (player.raycast_face == face_offsets[face_num])
+                            {
+                                client.sendBlockDig(2, editable_pos.x, editable_pos.y, editable_pos.z, (face_num + 4) % 6);
+                                break;
+                            }
+                        }
+                    }
                 }
                 else if (should_place_block)
                 {
@@ -1187,8 +1201,24 @@ void world::update_player()
 
         if (targeted_block && targeted_block->get_blockid() != BlockID::air)
         {
+            if (is_remote() && player.mining_tick == 0)
+            {
+                // Send block dig packet to the server
+                for (uint8_t face_num = 0; face_num < 6; face_num++)
+                {
+                    if (player.raycast_face == face_offsets[face_num])
+                    {
+                        client.sendBlockDig(0, player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z, (face_num + 4) % 6);
+                        break;
+                    }
+                }
+            }
             if (++player.mining_tick % 4 == 0)
             {
+                if (is_remote())
+                {
+                    client.sendAnimation(1);
+                }
                 // Play the mining sound every 4 ticks
                 sound sound = get_mine_sound(targeted_block->get_blockid());
                 sound.pitch *= 0.5f;

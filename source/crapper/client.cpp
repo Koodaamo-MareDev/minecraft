@@ -734,6 +734,16 @@ namespace Crapper
         send(buffer);
     }
 
+    void MinecraftClient::sendAnimation(uint8_t animation_id)
+    {
+        // Send player animation packet
+        ByteBuffer buffer;
+        buffer.writeByte(0x12);                                     // Packet ID
+        buffer.writeInt(current_world->player.m_entity->entity_id); // Entity ID
+        buffer.writeByte(animation_id);
+        send(buffer);
+    }
+
     void MinecraftClient::sendBlockItemSwitch(uint16_t item_id)
     {
         // Send player switch item packet

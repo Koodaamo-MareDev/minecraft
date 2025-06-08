@@ -129,6 +129,7 @@ namespace Crapper
         void sendPlayerLook();
         void sendBlockDig(uint8_t status, int32_t x, uint8_t y, int32_t z, uint8_t face);
         void sendPlaceBlock(int32_t x, int32_t y, int32_t z, uint8_t face, uint16_t item_id, uint8_t item_count, uint8_t item_meta);
+        void sendAnimation(uint8_t animation_id);
         void sendBlockItemSwitch(uint16_t item_id);
         void sendKeepAlive();
 
