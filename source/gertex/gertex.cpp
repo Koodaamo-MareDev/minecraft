@@ -154,6 +154,9 @@ namespace gertex
         case GXBlendMode::inverse:
             GX_SetBlendMode(GX_BM_LOGIC, 0x00, 0x00, GX_LO_INV);
             break;
+        case GXBlendMode::multiply2:
+            GX_SetBlendMode(GX_BM_BLEND, GX_BL_DSTCLR, GX_BL_SRCCLR, GX_LO_NOOP);
+            break;
         default:
             break;
         }

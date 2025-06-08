@@ -97,7 +97,8 @@ namespace gertex
         none,
         normal,
         additive,
-        inverse
+        inverse,
+        multiply2
     };
 
     struct GXMatrix
