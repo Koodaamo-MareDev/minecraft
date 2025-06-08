@@ -1175,15 +1175,34 @@ void world::update_player()
 
     if (should_destroy_block && player.block_mine_progress < 1.0f)
     {
+        static block_t *last_targeted_block = nullptr;
         block_t *targeted_block = get_block_at(player.raycast_pos);
+        if (last_targeted_block != targeted_block)
+        {
+            // Reset the progress if the targeted block has changed
+            player.block_mine_progress = 0.0f;
+            player.mining_tick = 0;
+            last_targeted_block = targeted_block;
+        }
+
         if (targeted_block && targeted_block->get_blockid() != BlockID::air)
         {
+            if (++player.mining_tick % 4 == 0)
+            {
+                // Play the mining sound every 4 ticks
+                sound sound = get_mine_sound(targeted_block->get_blockid());
+                sound.pitch *= 0.5f;
+                sound.volume = 0.15f;
+                sound.position = vec3f(player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z);
+                play_sound(sound);
+            }
             player.block_mine_progress += properties(targeted_block->get_blockid()).get_break_multiplier(*player.selected_item, player.m_entity->on_ground, basefluid(player.in_fluid) == BlockID::water);
         }
     }
     else
     {
         player.block_mine_progress = 0.0f;
+        player.mining_tick = 0;
     }
 }
 
