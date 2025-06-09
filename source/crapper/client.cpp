@@ -728,7 +728,20 @@ namespace Crapper
         else
         {
             buffer.writeShort(item_id);
+#ifdef ITEM_DESYNC_FIX
+            /*
+             * This is a workaround for the item desync issue.
+             * The server expects the stack to be in sync with
+             * the client. Sending an invalid stack will cause
+             * the server to refresh the item item stack. For
+             * this to work, we need to send an item with a
+             * count of 0, which is not send by normal clients.
+             * This only works for the vanilla server
+             */
+            buffer.writeByte(0);
+#else
             buffer.writeByte(item_count);
+#endif
             buffer.writeShort(item_meta);
         }
         send(buffer);

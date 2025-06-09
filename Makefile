@@ -22,7 +22,7 @@ SOURCES		:=	source source/crapper source/gertex source/math source/nbt source/pn
 TEXTURES	:=	textures
 INCLUDES	:=	source source/thirdparty
 DEFINES		:=	-DMINIZ_NO_ARCHIVE_APIS -DMINIZ_NO_ZLIB_COMPATIBLE_NAMES
-BUILD_FEAT	:=	
+BUILD_FEAT	:=	-DITEM_DESYNC_FIX
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
