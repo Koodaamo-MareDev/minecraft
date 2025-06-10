@@ -17,7 +17,7 @@
 lwp_t light_engine::thread_handle = 0;
 bool light_engine::thread_active = false;
 bool light_engine::use_skylight = true;
-std::deque<std::pair<vec3i, chunk_t *>> light_engine::pending_updates;
+std::deque<coord> light_engine::pending_updates;
 
 void light_engine::init()
 {
@@ -62,9 +62,9 @@ void light_engine::loop()
     uint64_t start = time_get();
     while (pending_updates.size() > 0 && thread_active)
     {
-        std::pair<vec3i, chunk_t *> current = pending_updates.front();
+        coord &current = pending_updates.front();
         pending_updates.pop_front();
-        chunk_t *chunk = current.second;
+        chunk_t *chunk = current.chunk;
         if (chunk)
         {
             update(current);
@@ -91,12 +91,10 @@ void light_engine::deinit()
     }
 }
 
-void light_engine::post(vec3i pos, chunk_t *chunk)
+void light_engine::post(const coord &location)
 {
-    if (!chunk || pos.y > MAX_WORLD_Y || pos.y < 0)
-        return;
-    ++chunk->light_update_count;
-    pending_updates.push_back(std::make_pair(pos, chunk));
+    ++location.chunk->light_update_count;
+    pending_updates.push_back(location);
 }
 
 /*
@@ -116,42 +114,35 @@ static inline int8_t MAX_I8(int8_t a, int8_t b)
  *  faster than any other implementation that I could find online.
  */
 
-void light_engine::update(const std::pair<vec3i, chunk_t *> &update)
+void light_engine::update(const coord &update)
 {
-    std::deque<std::pair<vec3i, chunk_t *>> light_updates;
+    std::deque<coord> light_updates;
     std::deque<chunk_t *> &chunks = get_chunks();
-    vec3i coords = update.first;
-    light_updates.push_back(update);
+    coord origin = update;
+    light_updates.push_back(origin);
     while (light_updates.size() > 0)
     {
         if (!thread_active)
             return;
-        std::pair item = light_updates.back();
-        vec3i pos = item.first;
-        chunk_t *chunk = item.second;
+        coord current = light_updates.back();
+        chunk_t *chunk = current.chunk;
         if (std::find(chunks.begin(), chunks.end(), chunk) == chunks.end()) // FIXME: This is a hacky way
             return;                                                         // to check if the chunk is valid
         light_updates.pop_back();
 
-        if (pos.y > MAX_WORLD_Y || pos.y < 0)
+        if (!chunk || current.coords.y < 0)
             continue;
-        if (!chunk)
-        {
-            continue;
-        }
-        vec2i chunk_pos = block_to_chunk_pos(pos);
-        int map_index = ((pos.x & 15) << 4) | (pos.z & 15);
 
-        block_t *block = chunk->get_block(pos);
+        block_t *block = &chunk->blockstates[uint16_t(current)];
 
         uint8_t new_skylight = 0;
         uint8_t new_blocklight = properties(block->id).m_luminance;
 
-        if (use_skylight && pos.y >= chunk->height_map[map_index])
+        if (use_skylight && current.coords.y >= chunk->height_map[current.coords.h_index])
             new_skylight = 0xF;
 
         block_t *neighbors[6];
-        get_neighbors(pos, neighbors, chunk);
+        get_neighbors(vec3i(current), neighbors, chunk);
         int8_t opacity = get_block_opacity(block->get_blockid());
         if (opacity != 15)
         {
@@ -167,22 +158,25 @@ void light_engine::update(const std::pair<vec3i, chunk_t *> &update)
 
         uint8_t new_light = (new_skylight << 4) | new_blocklight;
 
-        if (block->light != new_light || coords == pos)
+        if (block->light != new_light || origin.index == current.index)
         {
             block->light = new_light;
             for (int i = 0; i < 6; i++)
             {
                 if (neighbors[i])
                 {
-                    std::pair<vec3i, chunk_t *> update = std::make_pair(pos + face_offsets[i], chunk);
-                    if (block_to_chunk_pos(update.first) != chunk_pos)
+                    vec3i new_pos = vec3i(current) + face_offsets[i];
+                    chunk_t *coord_chunk = chunk;
+
+                    // If the new position is outside the chunk, get the correct chunk from the position
+                    if (chunk->x != (new_pos.x >> 4) || chunk->z != (new_pos.z >> 4))
                     {
-                        update.second = get_chunk_from_pos(update.first);
+                        coord_chunk = get_chunk_from_pos(new_pos);
                     }
-                    light_updates.push_back(update);
+                    light_updates.push_back(coord(new_pos, coord_chunk));
                 }
             }
         }
-        chunk->vbos[(pos.y >> 4) & 15].dirty = true;
+        chunk->vbos[(current.coords.y >> 4) & 15].dirty = true;
     }
 }

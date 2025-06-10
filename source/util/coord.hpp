@@ -15,12 +15,26 @@ struct coord
         {
 #if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
             int8_t y;
-            uint8_t z : 4;
-            uint8_t x : 4;
+            union
+            {
+                struct
+                {
+                    uint8_t z : 4;
+                    uint8_t x : 4;
+                };
+                uint8_t h_index;
+            };
 #else
-            uint8_t x : 4;
-            uint8_t z : 4;
-            uint8_t y;
+            union
+            {
+                struct
+                {
+                    uint8_t x : 4;
+                    uint8_t z : 4;
+                };
+                uint8_t h_index;
+            };
+            int8_t y;
 #endif
         } coords;
         uint16_t index;

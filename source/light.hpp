@@ -3,24 +3,25 @@
 
 #include <math/vec3i.hpp>
 #include "chunk.hpp"
+#include "util/coord.hpp"
 #include <cstdint>
 #include <ogc/gu.h>
 class light_engine
 {
 private:
-    static void update(const std::pair<vec3i, chunk_t *> &update);
+    static void update(const coord &update);
 
     static lwp_t thread_handle;
     static bool thread_active;
     static bool use_skylight;
-    static std::deque<std::pair<vec3i, chunk_t *>> pending_updates;
+    static std::deque<coord> pending_updates;
 
 public:
     static void init();
     static void deinit();
     static void loop();
     static void reset();
-    static void post(vec3i pos, chunk_t *chunk);
+    static void post(const coord &location);
     static void enable_skylight(bool enabled);
     static bool busy();
 };
