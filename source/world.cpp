@@ -929,7 +929,7 @@ void world::save()
         try
         {
             for (chunk_t *c : get_chunks())
-                c->serialize();
+                c->write();
         }
         catch (std::exception &e)
         {

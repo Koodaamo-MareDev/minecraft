@@ -21,7 +21,7 @@ void chunkprovider_overworld::provide_chunk(chunk_t *chunk)
     // Prioritize loading the chunk from disk if it exists
     if (chunk->generation_stage == ChunkGenStage::loading)
     {
-        chunk->deserialize();
+        chunk->read();
         return;
     }
 

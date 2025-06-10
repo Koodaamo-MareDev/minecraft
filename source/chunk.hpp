@@ -227,15 +227,21 @@ public:
     void render_entities(float partial_ticks, bool transparency);
 
     uint32_t size();
-    chunk_t()
+    chunk_t(int32_t x, int32_t z) : x(x), z(z)
     {
+        for (int i = 0; i < VERTICAL_SECTION_COUNT; i++)
+        {
+            this->vbos[i].x = x;
+            this->vbos[i].y = i * 16;
+            this->vbos[i].z = z;
+        }
     }
     ~chunk_t();
 
     void save(NBTTagCompound &stream);
     void load(NBTTagCompound &stream);
-    void serialize();
-    void deserialize();
+    void write();
+    void read();
 
 private:
 };
@@ -246,7 +252,6 @@ extern mutex_t chunk_mutex;
 std::deque<chunk_t *> &get_chunks();
 void init_chunk_manager(chunkprovider *chunk_provider);
 void deinit_chunk_manager();
-bool has_pending_chunks();
 void set_world_hell(bool hell);
 BlockID get_block_id_at(const vec3i &position, BlockID default_id = BlockID::air, chunk_t *near = nullptr);
 block_t *get_block_at(const vec3i &vec, chunk_t *near = nullptr);

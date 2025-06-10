@@ -1248,16 +1248,24 @@ namespace Crapper
         {
             try
             {
-                chunk = new chunk_t;
-                chunk->x = chunk_pos.x;
-                chunk->z = chunk_pos.y;
+                chunk = new chunk_t(chunk_pos.x, chunk_pos.y);
             }
             catch (std::bad_alloc &e)
             {
+                // This is usually caused by a vanilla server attempting to send all chunks
+                // within the default view distance of 10 chunks. The custom server has a
+                // smaller view distance which is why this is not an issue on such servers.
+                // This can cause the client to run out of memory, especially on the Wii.
+
+                // We will log the error and rethrow an exception to indicate failure.
                 dbgprintf("Failed to allocate memory for chunk\n");
                 dbgprintf("Chunk count: %d\n", get_chunks().size());
+                
+                // We need to free the decompressed data before throwing an exception
                 delete[] decompressed_data;
-                return;
+
+                // Rethrow the exception
+                throw std::runtime_error("Failed to allocate memory for chunk");
             }
         }
 

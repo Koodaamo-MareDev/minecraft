@@ -66,21 +66,6 @@ void set_world_hell(bool hell)
     current_world->hell = hell;
 }
 
-bool has_pending_chunks()
-{
-    return pending_chunks.size() > 0;
-}
-
-bool chunk_sorter(chunk_t *&a, chunk_t *&b)
-{
-    return (*a < *b);
-}
-
-bool chunk_sorter_reverse(chunk_t *&a, chunk_t *&b)
-{
-    return (*b < *a);
-}
-
 std::deque<chunk_t *> &get_chunks()
 {
     return chunks;
@@ -116,45 +101,31 @@ bool add_chunk(int32_t x, int32_t z)
     if (!run_chunk_manager || pending_chunks.size() + chunks.size() >= CHUNK_COUNT)
         return false;
     lock_t chunk_lock(chunk_mutex);
-    for (chunk_t *&m_chunk : pending_chunks)
-    {
-        if (m_chunk && m_chunk->x == x && m_chunk->z == z)
-        {
-            return false;
-        }
-    }
-    for (chunk_t *&m_chunk : chunks)
-    {
-        if (m_chunk && m_chunk->x == x && m_chunk->z == z)
-        {
-            return false;
-        }
-    }
 
-    try
+    // Function to find a chunk with the given coordinates
+    auto find_chunk = [x, z](chunk_t *chunk)
     {
-        chunk_t *chunk = new chunk_t;
-        chunk->x = x;
-        chunk->z = z;
-        mcr::region *region = mcr::get_region(x >> 5, z >> 5);
-        if (region->locations[(x & 31) | ((z & 31) << 5)] == 0)
-        {
-            chunk->generation_stage = ChunkGenStage::empty;
-        }
-        else
-        {
-            chunk->generation_stage = ChunkGenStage::loading;
-        }
+        return chunk && chunk->x == x && chunk->z == z;
+    };
 
-        pending_chunks.push_back(chunk);
-        std::sort(pending_chunks.begin(), pending_chunks.end(), chunk_sorter);
-        return true;
-    }
-    catch (std::bad_alloc &e)
-    {
-        printf("Failed to allocate memory for chunk\n");
-    }
-    return false;
+    // Check if the chunk already exists
+    if (std::find_if(pending_chunks.begin(), pending_chunks.end(), find_chunk) != pending_chunks.end())
+        return false;
+    if (std::find_if(chunks.begin(), chunks.end(), find_chunk) != chunks.end())
+        return false;
+
+    chunk_t *chunk = new chunk_t(x, z);
+
+    // Check if the chunk exists in the region file
+    mcr::region *region = mcr::get_region(x >> 5, z >> 5);
+    if (region->locations[(x & 31) | ((z & 31) << 5)] != 0)
+        chunk->generation_stage = ChunkGenStage::loading;
+
+    // Add the chunk to the pending chunks
+    pending_chunks.push_back(chunk);
+    std::sort(pending_chunks.begin(), pending_chunks.end());
+
+    return true;
 }
 
 void deinit_chunk_manager()
@@ -833,7 +804,7 @@ void chunk_t::load(NBTTagCompound &stream)
     }
 }
 
-void chunk_t::serialize()
+void chunk_t::write()
 {
     // Write the chunk using mcregion format
 
@@ -926,7 +897,7 @@ void chunk_t::serialize()
     chunk_file.flush();
 }
 
-void chunk_t::deserialize()
+void chunk_t::read()
 {
     mcr::region *region = mcr::get_region(x >> 5, z >> 5);
 
