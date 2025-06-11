@@ -800,7 +800,7 @@ void chunk_t::load(NBTTagCompound &stream)
 
     for (int i = 0; i < 256; i++)
     {
-        height_map[i] = heightmap[(i >> 4) | (i & 0xF) << 4];
+        height_map[i] = heightmap[i];
     }
 }
 
