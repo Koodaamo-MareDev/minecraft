@@ -318,10 +318,10 @@ void chunk_t::light_up()
         for (int i = 0; i < 256; i++)
         {
             pos.coords.h_index = i;
-            int end_y = this->height_map[i] = skycast(vec3i(pos), this) + 1;
+            int end_y = skycast(vec3i(pos), this);
             if (end_y >= MAX_WORLD_Y || end_y <= 0)
                 return;
-
+            this->height_map[i] = end_y + 1;
             for (pos.coords.y = MAX_WORLD_Y; pos.coords.y > end_y; pos.coords.y--)
             {
                 this->blockstates[uint16_t(pos)].sky_light = 15;
