@@ -27,7 +27,9 @@ public:
     vec3f operator/(vfloat_t const &a) const;
     vec3f operator-() const;
     vec3f operator%(vfloat_t const &b);
+    vec3f fast_normalize() const; // Fast normalization using fast inverse square root
     vec3f normalize() const;
+    vfloat_t fast_magnitude() const; // Fast magnitude using fast inverse square root
     vfloat_t magnitude() const;
     vfloat_t sqr_magnitude() const;
     static vec3f lerp(vec3f a, vec3f b, vfloat_t t)

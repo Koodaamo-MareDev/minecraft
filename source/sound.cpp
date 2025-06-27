@@ -65,7 +65,7 @@ void sound::update(vec3f head_right, vec3f head_position)
     vec3f relative_position = position - head_position;
 
     guVector head_direction = head_right;
-    guVector sound_direction = (position - head_position).normalize();
+    guVector sound_direction = (position - head_position).fast_normalize();
 
     // Calculate which side of the plane the sound is on
     float distance = guVecDotProduct(&head_direction, &sound_direction);

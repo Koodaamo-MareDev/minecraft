@@ -57,7 +57,7 @@ void entity_physical::resolve_collision(entity_physical *b)
     vec3f push = aabb.push_out_horizontal(b->aabb);
 
     // Add velocity to separate the entities
-    this->velocity = this->velocity + push.normalize() * 0.025;
+    this->velocity = this->velocity + push.fast_normalize() * 0.025;
 }
 
 void entity_physical::teleport(vec3f pos)
@@ -203,7 +203,7 @@ void entity_physical::tick()
         if (jumping)
             velocity.y += 0.04;
 
-        velocity = velocity + (fluid_velocity.normalize() * 0.004);
+        velocity = velocity + (fluid_velocity.fast_normalize() * 0.004);
 
         if (cobweb_movement)
             velocity = velocity * 0.25;
@@ -626,7 +626,7 @@ void entity_creeper::tick()
         vfloat_t sqrdistance = direction.sqr_magnitude();
         if (sqrdistance < 512 && sqrdistance > 0.5)
         {
-            rotation = vector_to_angles(direction.normalize());
+            rotation = vector_to_angles(direction.fast_normalize());
             if (ticks_existed % 4 == 0)
             {
                 vec3f target = vec3f(std::floor(follow_entity->position.x), std::floor(follow_entity->aabb.min.y), std::floor(follow_entity->position.z));
@@ -638,7 +638,7 @@ void entity_creeper::tick()
                     target.y = below;
                 }
                 vec3f move = simple_pathfind(target);
-                movement = vec3f(move.x, 0, move.z).normalize() * 0.5 + vec3f(0, move.y > 0.25, 0);
+                movement = vec3f(move.x, 0, move.z).fast_normalize() * 0.5 + vec3f(0, move.y > 0.25, 0);
             }
             if (ticks_existed % 1200 == 300)
             {

@@ -484,7 +484,7 @@ int main(int argc, char **argv)
         gertex::perspective(viewport);
 
         // Set fog near and far distances
-        fog.start = fog_multiplier * fog_depth_multiplier * GENERATION_DISTANCE * 8.0f;
+        fog.start = fog_multiplier * fog_depth_multiplier * FOG_DISTANCE * 0.5f;
         fog.end = fog.start * 2.0f;
 
         // Enable fog
@@ -698,7 +698,7 @@ void GetInput()
             else
             {
                 // Magnitude of 0.25 or less means that the stick is near the center. 1 means it's at the edge and means it will move at full speed.
-                right_stick = right_stick.normalize() * ((right_stick.magnitude() - 0.125) / 0.875);
+                right_stick = right_stick.fast_normalize() * ((right_stick.magnitude() - 0.125) / 0.875);
 
                 // Multiply the result by 2 since the edges of the screen are difficult to reach as tracking is lost.
                 right_stick = right_stick * 2;
@@ -710,7 +710,7 @@ void GetInput()
         }
 
         if (right_stick.magnitude() > 1.0)
-            right_stick = right_stick.normalize();
+            right_stick = right_stick.fast_normalize();
 
         // Map the Wiimote and Nunchuck buttons to the Classic Controller buttons
         if ((nunchuk_held & NUNCHUK_BUTTON_C))

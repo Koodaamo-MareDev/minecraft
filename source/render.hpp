@@ -56,8 +56,6 @@ inline uint8_t get_face_light_index(vec3i pos, uint8_t face, chunk_t *near, bloc
     return other_block->light;
 }
 
-void init_texture(GXTexObj &texture, void *data_src, uint32_t data_len);
-
 void init_textures();
 
 void update_textures();
@@ -79,8 +77,6 @@ vec3f angles_to_vector(float x, float y);
 vec3f vector_to_angles(const vec3f &vec);
 
 float distance_to_plane(const vec3f &point, const frustum_t &frustum, int planeIndex);
-
-float distance_to_vector(const vec3f &point, const frustum_t &frustum, int planeIndex);
 
 float distance_to_frustum(const vec3f &point, const frustum_t &frustum);
 

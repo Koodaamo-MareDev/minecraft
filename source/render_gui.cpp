@@ -93,8 +93,8 @@ vfloat_t __attribute__((noinline)) text_width_3d(std::string str)
 void __attribute__((noinline)) draw_text_3d(vec3f pos, std::string str, GXColor color)
 {
     vec3f char_size = vec3f(0.25);
-    vec3f right_vec = -angles_to_vector(0, yrot + 90);
-    vec3f up_vec = -angles_to_vector(xrot + 90, yrot);
+    vec3f right_vec = angles_to_vector(0, yrot + 90);
+    vec3f up_vec = angles_to_vector(xrot + 90, yrot);
 
     // Enable direct colors
     GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);

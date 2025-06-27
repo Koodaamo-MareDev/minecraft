@@ -57,19 +57,29 @@ void world::set_remote(bool value)
 void world::tick()
 {
     update_entities();
+    calculate_visibility();
+    if (frames_since_chunk_addition < 100)
+        frames_since_chunk_addition++;
 }
 
 void world::update()
 {
-    bool should_update_vbos = true;
-    if (!is_remote() && !light_engine::busy())
+    if (!is_remote())
     {
-        should_update_vbos = prepare_chunks(1);
+        if (!prepare_chunks(1))
+        {
+            frames_since_chunk_addition = 0;
+        }
+    }
+    else
+    {
+        frames_since_chunk_addition = 100;
     }
     cleanup_chunks();
     edit_blocks();
     update_chunks();
-    if (should_update_vbos)
+
+    if (frames_since_chunk_addition > 20)
         update_vbos();
 
     // Update the particle system
@@ -100,7 +110,7 @@ void world::update_chunks()
         if (chunk)
         {
             float hdistance = chunk->player_taxicab_distance();
-            if (hdistance > RENDER_DISTANCE * 24 + 24 && !is_remote())
+            if (hdistance > CHUNK_DISTANCE * 24 + 24 && !is_remote())
             {
                 remove_chunk(chunk);
                 continue;
@@ -109,43 +119,10 @@ void world::update_chunks()
             if (chunk->generation_stage != ChunkGenStage::done)
                 continue;
 
-            int min_height = MAX_WORLD_Y;
-            for (int i = 0; i < 256; i++)
-            {
-                if (int(chunk->height_map[i]) < min_height)
-                    min_height = chunk->height_map[i];
-            }
-
-            float horizontal_multiplier = std::abs(xrot) < 70 ? 16 : 12;
-            float vertical_multiplier = std::abs(xrot) > 20 ? 12 : 8;
-            bool visible = (hdistance <= std::max(RENDER_DISTANCE * horizontal_multiplier, 16.0f));
-            bool above_ground = player_pos.y >= min_height;
-
             // Tick chunks
             for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
             {
-                chunkvbo_t &vbo = chunk->vbos[j];
-                vbo.x = chunk->x * 16;
-                vbo.y = j * 16;
-                vbo.z = chunk->z * 16;
-                float vdistance = std::abs(vbo.y - player_pos.y);
-
-                vec3f vbo_offset = vec3f(vbo.x + 8, vbo.y + 8, vbo.z + 8) - player_pos;
-                vec3f forward = angles_to_vector(xrot, yrot);
-                bool behind = vbo_offset.x * forward.x + vbo_offset.y * forward.y + vbo_offset.z * forward.z < -23.0f;
-
-                vbo.visible = visible && !behind && (above_ground || (vdistance <= std::max(RENDER_DISTANCE * vertical_multiplier, 16.0f))) && (vbo.y + 16 >= min_height);
-                if (vbo.visible && frustum)
-                {
-                    for (int p = 0; p < 4; p++)
-                    {
-                        if (distance_to_vector(vbo_offset, *frustum, p) < -23.0f)
-                        {
-                            vbo.visible = false;
-                            break;
-                        }
-                    }
-                }
+                float vdistance = std::abs(j * 16 - player_pos.y);
                 if (!is_remote() && chunk->has_fluid_updates[j] && vdistance <= SIMULATION_DISTANCE * 16 && ticks - last_fluid_tick >= 5)
                     update_fluids(chunk, j);
             }
@@ -256,12 +233,26 @@ void world::update_vbos()
             int vbo_i = vbo.y >> 4;
             chunk_t *chunk = get_chunk_from_pos(vec3i(vbo.x, 0, vbo.z));
             vbo.dirty = false;
+            vbo.refresh_visibility = true;
             chunk->recalculate_section_visibility(vbo_i);
             chunk->build_vbo(vbo_i, false);
             chunk->build_vbo(vbo_i, true);
             vbos_to_update.push_back(vbo_ptr);
             if (!--max_vbo_updates)
                 break;
+        }
+        // if (max_vbo_updates)
+        {
+            // Try to update the first dirty VBO
+            for (chunkvbo_t *vbo_ptr : vbos_to_update)
+            {
+                if (!vbo_ptr->refresh_visibility)
+                    continue;
+                chunk_t *chunk = get_chunk_from_pos(vec3i(vbo_ptr->x, 0, vbo_ptr->z));
+                chunk->refresh_vbo_visibility(vbo_ptr->y >> 4);
+                vbo_ptr->refresh_visibility = false;
+                break;
+            }
         }
     }
     // Update cached buffers when no vbos need to be rebuilt.
@@ -290,6 +281,144 @@ void world::update_vbos()
             vbo.has_updated = true;
         }
         vbos_to_update.clear();
+    }
+}
+
+/**
+ * This implementation of cave culling is based on the documentation
+ * and the implementation of the original Minecraft culling algorithm.
+ * You can find the original 2D implementation here:
+ * https://tomcc.github.io/index.html
+ */
+
+struct vbo_node
+{
+    chunkvbo_t *vbo;
+    int8_t from;     // The face we entered the VBO from
+    uint8_t dirs[6]; // For preventing revisits of the same face
+};
+
+void world::calculate_visibility()
+{
+    // Reset visibility status for all VBOs
+    for (chunk_t *&chunk : get_chunks())
+    {
+        if (chunk)
+        {
+            for (uint8_t i = 0; i < VERTICAL_SECTION_COUNT; i++)
+            {
+                chunk->vbos[i].visible = false;
+            }
+        }
+    }
+
+    // Gets the VBO at the given position
+    auto vbo_at = [](const vec3i &pos) -> chunkvbo_t *
+    {
+        // Out of bounds check for Y coordinate
+        if (pos.y < 0 || pos.y >= WORLD_HEIGHT)
+            return nullptr;
+
+        // Get the chunk from the position
+        chunk_t *chunk = get_chunk_from_pos(pos);
+
+        // If the chunk doesn't exist, neither does the VBO
+        if (!chunk)
+            return nullptr;
+
+        return &chunk->vbos[pos.y >> 4];
+    };
+
+    // Converts a face pair to a bitmask for visibility flags.
+    // Assumes a != b
+    auto faces_to_index = [](uint8_t a, uint8_t b)
+    {
+        return 1 << (a * 5 + (b < a ? b : b - 1));
+    };
+
+    std::deque<vbo_node> vbo_queue;
+    std::deque<chunkvbo_t *> visited;
+    vbo_node entry;
+    entry.vbo = vbo_at(vec3i(int(player.m_entity->position.x), int(player.m_entity->position.y), int(player.m_entity->position.z)));
+
+    // Check if there is a VBO at the player's position
+    if (!entry.vbo)
+        return;
+
+    // Initialize the rest of the entry node
+    entry.from = -1;
+    for (uint8_t i = 0; i < 6; i++)
+        entry.dirs[i] = 0;
+    vbo_queue.push_back(entry);
+    visited.push_front(entry.vbo);
+
+    while (!vbo_queue.empty())
+    {
+        vbo_node node = vbo_queue.front();
+        vbo_queue.pop_front();
+
+        // Mark the VBO as visible
+        node.vbo->visible = true;
+
+        auto visit = [&](vec3i pos, int8_t through)
+        {
+            // Don't revisit directions we have already visited
+            if (node.dirs[through ^ 1])
+                return;
+
+            // Skip if the position is out of bounds
+            chunkvbo_t *next_vbo = vbo_at(pos);
+            if (!next_vbo)
+                return;
+
+            // Don't revisit VBOs we have already visited
+            if (std::find(visited.begin(), visited.end(), next_vbo) != visited.end())
+                return;
+
+            if (node.from != -1)
+            {
+                // Check if the node is visible from the face we entered
+                if (!(node.vbo->visibility_flags & (faces_to_index(node.from, through) | faces_to_index(through, node.from))))
+                    return;
+            }
+
+            vec3f vbo_offset = vec3f(pos.x + 8, pos.y + 8, pos.z + 8) - player.m_entity->position;
+
+            // Check if the VBO is within the render distance
+            if (std::abs(vbo_offset.x) + std::abs(vbo_offset.z) > RENDER_DISTANCE)
+                return;
+            // Apply frustum culling
+            for (uint8_t i = 0; i < 6; i++)
+            {
+                if (distance_to_plane(vbo_offset, *frustum, i) < -22.7f)
+                {
+                    // If the VBO is outside the frustum, skip it
+                    return;
+                }
+            }
+
+            // Mark the VBO as visited
+            visited.push_front(next_vbo);
+
+            // Prepare next node
+            vbo_node new_node;
+            new_node.vbo = next_vbo;
+            new_node.from = through ^ 1;
+
+            // Copy the directions from the current node
+            std::memcpy(new_node.dirs, node.dirs, sizeof(new_node.dirs));
+
+            // Mark the direction we came from as visited
+            new_node.dirs[through] = 1;
+
+            // Add the new node to the queue
+            vbo_queue.push_back(new_node);
+        };
+        vec3i origin = vec3i(node.vbo->x, node.vbo->y, node.vbo->z);
+        for (uint8_t i = 0; i < 6; i++)
+        {
+            visit(origin + (face_offsets[i] * 16), i ^ 1);
+        }
     }
 }
 
@@ -377,7 +506,7 @@ void world::edit_blocks()
                     {
                         // Restore the old block - server will handle the destruction
                         set_block_at(editable_pos, old_blockid);
-                        
+
                         // Send block destruction packet to the server
                         for (uint8_t face_num = 0; face_num < 6; face_num++)
                         {
@@ -412,6 +541,7 @@ void world::edit_blocks()
     if (finish_destroying)
     {
         player.block_mine_progress = 0.0f;
+        player.mining_tick = -6;
     }
 
     // Clear the place/destroy block flags to prevent placing blocks immediately.
@@ -422,14 +552,14 @@ int world::prepare_chunks(int count)
 {
     const int center_x = (int(std::floor(player.m_entity->position.x)) >> 4);
     const int center_z = (int(std::floor(player.m_entity->position.z)) >> 4);
-    const int start_x = center_x - GENERATION_DISTANCE;
-    const int start_z = center_z - GENERATION_DISTANCE;
+    const int start_x = center_x - CHUNK_DISTANCE;
+    const int start_z = center_z - CHUNK_DISTANCE;
 
-    for (int x = start_x, rx = -GENERATION_DISTANCE; count && rx <= GENERATION_DISTANCE; x++, rx++)
+    for (int x = start_x, rx = -CHUNK_DISTANCE; count && rx <= CHUNK_DISTANCE; x++, rx++)
     {
-        for (int z = start_z, rz = -GENERATION_DISTANCE; count && rz <= GENERATION_DISTANCE; z++, rz++)
+        for (int z = start_z, rz = -CHUNK_DISTANCE; count && rz <= CHUNK_DISTANCE; z++, rz++)
         {
-            if (std::abs(rx) + std::abs(rz) > ((RENDER_DISTANCE * 3) >> 1))
+            if (std::abs(rx) + std::abs(rz) > ((CHUNK_DISTANCE * 3) >> 1))
                 continue;
             if (add_chunk(x, z))
                 count--;
@@ -680,7 +810,7 @@ void world::draw_scene(bool opaque)
         chunk->render_entities(partial_ticks, !opaque);
     }
 
-    if (player.draw_block_outline && should_destroy_block)
+    if (player.draw_block_outline && should_destroy_block && player.mining_tick > 0)
     {
         chunk_t *targeted_chunk = get_chunk_from_pos(player.raycast_pos);
         block_t *targeted_block = targeted_chunk ? targeted_chunk->get_block(player.raycast_pos) : nullptr;
@@ -701,7 +831,7 @@ void world::draw_scene(bool opaque)
             // Apply the transformation for the block breaking animation
             vec3f adjusted_offset = vec3f(player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z);
             vec3f towards_camera = vec3f(player_pos) - adjusted_offset;
-            towards_camera.normalize();
+            towards_camera.fast_normalize();
             towards_camera = towards_camera * 0.002;
 
             transform_view(gertex::get_view_matrix(), adjusted_offset + towards_camera);
@@ -729,7 +859,7 @@ void world::draw_scene(bool opaque)
         vec3f outline_pos = player.raycast_pos - vec3f(0.5, 0.5, 0.5);
 
         vec3f towards_camera = vec3f(player_pos) - outline_pos;
-        towards_camera.normalize();
+        towards_camera.fast_normalize();
         towards_camera = towards_camera * 0.002;
 
         vec3f b_min = vec3f(player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z) + vec3f(1.0, 1.0, 1.0);
@@ -1195,7 +1325,6 @@ void world::update_player()
         {
             // Reset the progress if the targeted block has changed
             player.block_mine_progress = 0.0f;
-            player.mining_tick = 0;
             last_targeted_block = targeted_block;
         }
 
@@ -1213,26 +1342,94 @@ void world::update_player()
                     }
                 }
             }
-            if (++player.mining_tick % 4 == 0)
+            player.mining_tick++;
+
+            // A cooldown applies when the player finishes mining a block. Negative values indicate the cooldown is still active.
+            if (player.mining_tick >= 0)
             {
-                if (is_remote())
+                // The player hits the block 5 times per second
+                if (player.mining_tick % 4 == 0)
                 {
-                    client.sendAnimation(1);
+                    // Swing the player's arm - TODO: Add a proper client-side animation
+                    if (is_remote())
+                    {
+                        client.sendAnimation(1);
+                    }
+
+                    // Play the mining sound
+                    sound sound = get_mine_sound(targeted_block->get_blockid());
+                    sound.pitch *= 0.5f;
+                    sound.volume = 0.15f;
+                    sound.position = vec3f(player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z);
+                    play_sound(sound);
+
+                    // Add block breaking particles
+                    particle particle;
+                    particle.max_life_time = 60;
+                    particle.physics = PPHYSIC_FLAG_ALL;
+                    particle.type = PTYPE_BLOCK_BREAK;
+                    particle.size = 8;
+                    particle.brightness = 0xFF;
+                    int texture_index = get_default_texture_index(targeted_block->get_blockid());
+                    int u = TEXTURE_X(texture_index);
+                    int v = TEXTURE_Y(texture_index);
+                    javaport::Random rng;
+
+                    for (int i = 0; i < 32; i++)
+                    {
+                        // Randomize the particle position and velocity
+                        vec3f pos_local = vec3f(rng.nextFloat(), rng.nextFloat(), rng.nextFloat());
+                        vec3f pos_local_diff = pos_local - vec3f(.5f, .5f, .5f);
+
+                        // Randomize the particle velocity
+                        particle.velocity = vec3f(rng.nextFloat() - .5f, rng.nextFloat() - .25f, rng.nextFloat() - .5f) * 3.0f;
+
+                        // Force the particle out of the block
+                        if (std::abs(pos_local_diff.x) < std::abs(pos_local_diff.y) && std::abs(pos_local_diff.x) < std::abs(pos_local_diff.z))
+                        {
+                            pos_local.x += pos_local_diff.z * 1.1f;
+                            particle.velocity.x *= 0.5f;
+                        }
+                        else if (std::abs(pos_local_diff.y) < std::abs(pos_local_diff.x) && std::abs(pos_local_diff.y) < std::abs(pos_local_diff.z))
+                        {
+                            pos_local.y += pos_local_diff.y * 1.f;
+                            particle.velocity.y *= 0.5f;
+                        }
+                        else if (std::abs(pos_local_diff.z) < std::abs(pos_local_diff.x) && std::abs(pos_local_diff.z) < std::abs(pos_local_diff.y))
+                        {
+                            pos_local.z += pos_local_diff.z * 1.1f;
+                            particle.velocity.z *= 0.5f;
+                        }
+
+                        particle.position = vec3f(player.raycast_pos.x - .5f, player.raycast_pos.y - .5f, player.raycast_pos.z - .5f) + pos_local;
+
+                        // Randomize the particle texture coordinates
+                        particle.u = u + (rng.next(2) << 2);
+                        particle.v = v + (rng.next(2) << 2);
+
+                        // Randomize the particle life time by up to 10 ticks
+                        particle.life_time = particle.max_life_time - (rand() % 10);
+
+                        add_particle(particle);
+                    }
                 }
-                // Play the mining sound every 4 ticks
-                sound sound = get_mine_sound(targeted_block->get_blockid());
-                sound.pitch *= 0.5f;
-                sound.volume = 0.15f;
-                sound.position = vec3f(player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z);
-                play_sound(sound);
+
+                // Increase the mining progress
+                player.block_mine_progress += properties(targeted_block->get_blockid()).get_break_multiplier(*player.selected_item, player.m_entity->on_ground, basefluid(player.in_fluid) == BlockID::water);
             }
-            player.block_mine_progress += properties(targeted_block->get_blockid()).get_break_multiplier(*player.selected_item, player.m_entity->on_ground, basefluid(player.in_fluid) == BlockID::water);
+            else
+            {
+                player.block_mine_progress = 0.0f;
+            }
         }
     }
     else
     {
         player.block_mine_progress = 0.0f;
-        player.mining_tick = 0;
+        if (player.mining_tick < 0)
+            player.mining_tick++;
+        else
+            player.mining_tick = 0;
     }
 }
 

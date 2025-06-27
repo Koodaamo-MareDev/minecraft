@@ -555,14 +555,8 @@ vec3f vector_to_angles(const vec3f &vec)
 // Function to calculate the signed distance from a point to a frustum plane
 float distance_to_plane(const vec3f &point, const frustum_t &frustum, int planeIndex)
 {
-    plane_t plane = frustum.planes[planeIndex];
-    return plane.direction.x * point.x + plane.direction.y * point.y + plane.direction.z * point.z - plane.distance;
-}
-
-float distance_to_vector(const vec3f &point, const frustum_t &frustum, int planeIndex)
-{
-    plane_t plane = frustum.planes[planeIndex];
-    return -(plane.direction.x * point.x + plane.direction.y * point.y + plane.direction.z * point.z);
+    const plane_t &plane = frustum.planes[planeIndex];
+    return (plane.direction.x * point.x + plane.direction.y + plane.direction.z * point.z + plane.distance) / plane.direction.fast_magnitude();
 }
 
 // Function to calculate the distance from a point to a frustum
@@ -587,6 +581,8 @@ frustum_t calculate_frustum(camera_t &camera)
 {
     frustum_t frustum;
 
+    constexpr float fov_margin = 15.0f; // Used to prevent overculling of blocks at the edges of the screen
+
     // Calculate half-width and half-height at near plane
     float half_fov = camera.fov * 0.5f;
 
@@ -595,22 +591,13 @@ frustum_t calculate_frustum(camera_t &camera)
     guVector backward = vec3f() - forward;
 
     // Calculate the 4 perspective frustum planes (not near and far)
-    guVector right_vec = angles_to_vector(camera.rot.x, camera.rot.y + 90 + half_fov);
-    guVector left_vec = angles_to_vector(camera.rot.x, camera.rot.y - 90 - half_fov);
-    guVector up_vec = angles_to_vector(camera.rot.x + 90 + half_fov, camera.rot.y);
-    guVector down_vec = angles_to_vector(camera.rot.x - 90 - half_fov, camera.rot.y);
+    guVector right_vec = -angles_to_vector(camera.rot.x, camera.rot.y + 90 + half_fov + fov_margin);
+    guVector left_vec = -angles_to_vector(camera.rot.x, camera.rot.y - 90 - half_fov);
+    guVector up_vec = -angles_to_vector(camera.rot.x + 90 + half_fov, camera.rot.y);
+    guVector down_vec = -angles_to_vector(camera.rot.x - 90 - half_fov, camera.rot.y);
 
     // Calculate points on the near and far planes
-    guVector near_center = camera.position + (vec3f(forward) * (camera.near));
-    guVector far_center = camera.position + (vec3f(forward) * (camera.far));
-
-    // Normalize the directions
-    guVecNormalize(&forward);
-    guVecNormalize(&backward);
-    guVecNormalize(&right_vec);
-    guVecNormalize(&left_vec);
-    guVecNormalize(&up_vec);
-    guVecNormalize(&down_vec);
+    guVector near_center = (vec3f(forward) * (camera.near));
 
     guVecScale(&left_vec, &left_vec, camera.aspect);
     guVecScale(&right_vec, &right_vec, camera.aspect);
@@ -629,10 +616,10 @@ frustum_t calculate_frustum(camera_t &camera)
     frustum.planes[3].distance = guVecDotProduct(&up_vec, &near_center);
 
     frustum.planes[4].direction = forward;
-    frustum.planes[4].distance = guVecDotProduct(&forward, &near_center);
+    frustum.planes[4].distance = camera.near;
 
     frustum.planes[5].direction = backward;
-    frustum.planes[5].distance = guVecDotProduct(&backward, &far_center);
+    frustum.planes[5].distance = camera.far;
 
     // Normalize the plane equations
     for (int i = 0; i < 6; ++i)

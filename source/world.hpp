@@ -48,6 +48,7 @@ public:
     int last_entity_tick = 0;
     int last_fluid_tick = 0;
     int fluid_update_count = 0;
+    int frames_since_chunk_addition = 0;
     double delta_time = 0.0;
     double partial_ticks = 0.0;
     size_t memory_usage = 0;
@@ -71,6 +72,7 @@ public:
     void update_frustum(camera_t &camera);
     void update_chunks();
     void update_vbos();
+    void calculate_visibility();
     void update_fluids(chunk_t *chunk, int section);
     void edit_blocks();
 

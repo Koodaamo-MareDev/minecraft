@@ -87,6 +87,7 @@ class chunkvbo_t
 public:
     bool visible = false;
     bool dirty = false;
+    bool refresh_visibility = false;
     int32_t x = 0;
     uint8_t y = 0;
     int32_t z = 0;
@@ -94,6 +95,7 @@ public:
     vbo_buffer_t cached_solid = vbo_buffer_t();
     vbo_buffer_t transparent = vbo_buffer_t();
     vbo_buffer_t cached_transparent = vbo_buffer_t();
+    uint32_t visibility_flags = 0;
 
     bool has_solid_fluid = false;
     bool has_transparent_fluid = false;
@@ -221,6 +223,9 @@ public:
     void recalculate_height_map();
     void recalculate_visibility(block_t *block, vec3i pos);
     void recalculate_section_visibility(int section);
+    static void init_floodfill_startpoints();
+    void vbo_visibility_flood_fill(vec3i pos);
+    void refresh_vbo_visibility(int section);
     int build_vbo(int section, bool transparent);
     void update_entities();
 
@@ -229,11 +234,11 @@ public:
     uint32_t size();
     chunk_t(int32_t x, int32_t z) : x(x), z(z)
     {
-        for (int i = 0; i < VERTICAL_SECTION_COUNT; i++)
+        for (int y = 0; y < VERTICAL_SECTION_COUNT; y++)
         {
-            this->vbos[i].x = x;
-            this->vbos[i].y = i * 16;
-            this->vbos[i].z = z;
+            this->vbos[y].x = x << 4;
+            this->vbos[y].y = y << 4;
+            this->vbos[y].z = z << 4;
         }
     }
     ~chunk_t();

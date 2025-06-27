@@ -143,5 +143,5 @@ vec3f pathfinding_t::simple_pathfind(vec3f start, vec3f goal, std::deque<vec3i> 
         dir = (path[1] + vec3f(0.5, 0, 0.5) - start);
     if(path.size() > 2 && path[1].y != start_i.y)
         dir = dir + (path[2] + vec3f(0.5, 0, 0.5) - start);
-    return dir.normalize();
+    return dir.fast_normalize();
 }

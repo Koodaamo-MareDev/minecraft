@@ -406,6 +406,192 @@ void chunk_t::recalculate_section_visibility(int section)
     }
 }
 
+// These variables are used for the flood fill algorithm
+static std::vector<vec3i> floodfill_start_points;
+static uint32_t floodfill_counter = 0;
+static uint32_t floodfill_to_replace = 1;
+static uint32_t floodfill_flood_id = 0;
+static uint16_t floodfill_grid[4096] = {0}; // 16 * 16 * 16
+static uint8_t floodfill_faces_touched[6] = {0};
+
+// Initialize the flood fill start points for visibility calculations
+// This function generates the start points for the flood fill algorithm
+void chunk_t::init_floodfill_startpoints()
+{
+    floodfill_start_points.clear();
+    constexpr int size = 16;
+    constexpr int max = size - 1;
+    // Generate faces at x = 0 and x = max
+    for (int y = 0; y < size; ++y)
+        for (int z = 0; z < size; ++z)
+        {
+            floodfill_start_points.push_back(vec3i(0, y, z));   // x = 0
+            floodfill_start_points.push_back(vec3i(max, y, z)); // x = max
+        }
+
+    // Generate faces at y = 0 and y = max, skipping already added edges
+    for (int x = 1; x < max; ++x)
+        for (int z = 0; z < size; ++z)
+        {
+            floodfill_start_points.push_back(vec3i(x, 0, z));   // y = 0
+            floodfill_start_points.push_back(vec3i(x, max, z)); // y = max
+        }
+
+    // Generate faces at z = 0 and z = max, skipping already added edges
+    for (int x = 1; x < max; ++x)
+        for (int y = 1; y < max; ++y)
+        {
+            floodfill_start_points.push_back(vec3i(x, y, 0));   // z = 0
+            floodfill_start_points.push_back(vec3i(x, y, max)); // z = max
+        }
+}
+
+void chunk_t::vbo_visibility_flood_fill(vec3i start_pos)
+{
+    std::deque<vec3i> queue;
+    queue.push_back(start_pos);
+
+    while (!queue.empty())
+    {
+        vec3i pos = queue.front();
+        queue.pop_front();
+
+        // Bounds check: If out of bounds, mark touched face and continue
+        if (pos.x < 0)
+        {
+            floodfill_counter++;
+            floodfill_faces_touched[0] = 1;
+            continue;
+        }
+        if (pos.x > 15)
+        {
+            floodfill_counter++;
+            floodfill_faces_touched[1] = 1;
+            continue;
+        }
+        if (pos.y < 0)
+        {
+            floodfill_counter++;
+            floodfill_faces_touched[2] = 1;
+            continue;
+        }
+        if (pos.y > 15)
+        {
+            floodfill_counter++;
+            floodfill_faces_touched[3] = 1;
+            continue;
+        }
+        if (pos.z < 0)
+        {
+            floodfill_counter++;
+            floodfill_faces_touched[4] = 1;
+            continue;
+        }
+        if (pos.z > 15)
+        {
+            floodfill_counter++;
+            floodfill_faces_touched[5] = 1;
+            continue;
+        }
+
+        int index = pos.x | (pos.y << 8) | (pos.z << 4);
+        if (floodfill_grid[index] != floodfill_to_replace)
+            continue;
+
+        // Mark the block as visited
+        floodfill_grid[index] = floodfill_flood_id;
+
+        // Add neighboring positions to the queue
+        for (int i = 0; i < 6; i++)
+        {
+            queue.push_back(pos + face_offsets[i]);
+        }
+    }
+}
+
+void chunk_t::refresh_vbo_visibility(int section)
+{
+    // Converts a face pair to a bitmask for visibility flags.
+    // Assumes a != b
+    auto faces_to_index = [](int a, int b)
+    {
+        return 1 << (a * 5 + (b < a ? b : b - 1));
+    };
+    chunkvbo_t &vbo = this->vbos[section];
+
+    // Initialize the flood fill start points if not already initialized
+    if (floodfill_start_points.empty())
+        init_floodfill_startpoints();
+
+    // Rebuild the flood fill grid
+    block_t *block = this->get_block(vec3i(0, section << 4, 0));
+    bool empty = true;
+    for (uint32_t i = 0; i < 4096; i++, block++)
+    {
+        // Default to non-solid block
+        floodfill_grid[i] = 1;
+
+        // Skip air blocks
+        if (!block->id)
+            continue;
+
+        blockproperties_t prop = properties(block->id);
+
+        if (prop.m_fluid || prop.m_transparent)
+            continue;
+
+        if (prop.m_render_type != RenderType::full && prop.m_render_type != RenderType::full_special)
+            continue;
+
+        // Mark the block as a solid block in the flood fill grid
+        floodfill_grid[i] = 0;
+        empty = false;
+    }
+    if (empty)
+    {
+        // No blocks to process, skip the flood fill
+        vbo.visibility_flags = 0x3FFFFFFF;
+        vbo.refresh_visibility = false;
+        return;
+    }
+    vbo.visibility_flags = 0;
+    std::memset(floodfill_faces_touched, 0, sizeof(floodfill_faces_touched));
+    floodfill_flood_id = 2;
+    for (uint32_t i = 0; i < floodfill_start_points.size(); i++)
+    {
+        vec3i pos = floodfill_start_points[i];
+
+        // Reset the flood fill state
+        floodfill_counter = 0;
+        floodfill_to_replace = 1; // Reset the flood fill to replace value
+        std::memset(floodfill_faces_touched, 0, sizeof(floodfill_faces_touched));
+
+        // Start the flood fill from the current position
+        vbo_visibility_flood_fill(pos);
+
+        if (floodfill_counter > 1)
+        {
+            floodfill_flood_id++;
+
+            // Connect the faces that were touched during the flood fill
+            for (int j = 0; j < 6; j++)
+                if (floodfill_faces_touched[j])
+                    for (int k = 0; k < 6; k++)
+                        if (j != k && floodfill_faces_touched[k])
+                            vbo.visibility_flags |= faces_to_index(j, k) | faces_to_index(k, j);
+        }
+        else
+        {
+            // Cancel the flood fill as it failed.
+            floodfill_to_replace = floodfill_flood_id;
+            floodfill_flood_id = 1;
+            vbo_visibility_flood_fill(pos);
+            floodfill_flood_id = floodfill_to_replace;
+        }
+    }
+    vbo.refresh_visibility = false;
+}
+
 int chunk_t::build_vbo(int section, bool transparent)
 {
     chunkvbo_t &vbo = this->vbos[section];
@@ -556,7 +742,7 @@ vec3f get_fluid_direction(block_t *block, vec3i pos, chunk_t *chunk)
     }
     if (!direction_set)
         direction.y = -1.0;
-    return direction.normalize();
+    return direction.fast_normalize();
 }
 
 void add_entity(entity_physical *entity)
