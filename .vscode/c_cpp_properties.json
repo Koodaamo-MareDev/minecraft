@@ -12,7 +12,8 @@
                 "${workspaceFolder}\\build"
             ],
             "defines": [
-                "HW_RVL"
+                "HW_RVL",
+                "__wii__"
             ],
             "windowsSdkVersion": "10.0.19041.0",
             "compilerPath": "C:/devkitPro/devkitPPC/bin/powerpc-eabi-g++.exe",
