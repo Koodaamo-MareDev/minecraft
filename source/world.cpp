@@ -58,8 +58,8 @@ void world::tick()
 {
     update_entities();
     calculate_visibility();
-    if (frames_since_chunk_addition < 100)
-        frames_since_chunk_addition++;
+    if (ticks_since_chunk_addition < 100)
+        ticks_since_chunk_addition++;
 }
 
 void world::update()
@@ -68,18 +68,18 @@ void world::update()
     {
         if (!prepare_chunks(1))
         {
-            frames_since_chunk_addition = 0;
+            ticks_since_chunk_addition = 0;
         }
     }
     else
     {
-        frames_since_chunk_addition = 100;
+        ticks_since_chunk_addition = 100;
     }
     cleanup_chunks();
     edit_blocks();
     update_chunks();
 
-    if (frames_since_chunk_addition > 20)
+    if (ticks_since_chunk_addition > 20)
         update_vbos();
 
     // Update the particle system
