@@ -894,44 +894,43 @@ void draw_stars()
     {
         javaport::Random rng(10842);
         int index = 0;
-        for (int var3 = 0; var3 < 1500; ++var3)
+        for (int index = 0; index < 1500; ++index)
         {
-            double var4 = (double)(rng.nextFloat() * 2.0F - 1.0F);
-            double var6 = (double)(rng.nextFloat() * 2.0F - 1.0F);
-            double var8 = (double)(rng.nextFloat() * 2.0F - 1.0F);
-            double var10 = (double)(0.25F + rng.nextFloat() * 0.25F);
-            double var12 = var4 * var4 + var6 * var6 + var8 * var8;
-            if (var12 < 1.0 && var12 > 0.01)
+            double dirX = (double)(rng.nextFloat() * 2.0F - 1.0F);
+            double dirY = (double)(rng.nextFloat() * 2.0F - 1.0F);
+            double dirZ = (double)(rng.nextFloat() * 2.0F - 1.0F);
+            double size = (double)(0.25F + rng.nextFloat() * 0.25F);
+            double sqrMagnitude = dirX * dirX + dirY * dirY + dirZ * dirZ;
+            if (sqrMagnitude < 1.0 && sqrMagnitude > 0.01)
             {
-                var12 = 1.0 / std::sqrt(var12);
-                var4 *= var12;
-                var6 *= var12;
-                var8 *= var12;
-                double var14 = var4 * 100.0;
-                double var16 = var6 * 100.0;
-                double var18 = var8 * 100.0;
-                double var20 = std::atan2(var4, var8);
-                double var22 = std::sin(var20);
-                double var24 = std::cos(var20);
-                double var26 = std::atan2(std::sqrt(var4 * var4 + var8 * var8), var6);
-                double var28 = std::sin(var26);
-                double var30 = std::cos(var26);
-                double var32 = rng.nextDouble() * M_TWOPI;
-                double var34 = std::sin(var32);
-                double var36 = std::cos(var32);
+                sqrMagnitude = 1.0 / std::sqrt(sqrMagnitude);
+                dirX *= sqrMagnitude;
+                dirY *= sqrMagnitude;
+                dirZ *= sqrMagnitude;
+                double xDist = dirX * 100.0;
+                double yDist = dirY * 100.0;
+                double zDist = dirZ * 100.0;
+                double pitch = std::atan2(dirX, dirZ);
+                double sinPitch = std::sin(pitch);
+                double cosPitch = std::cos(pitch);
+                double yaw = std::atan2(std::sqrt(dirX * dirX + dirZ * dirZ), dirY);
+                double sinYaw = std::sin(yaw);
+                double cosYaw = std::cos(yaw);
+                double roll = rng.nextDouble() * M_TWOPI;
+                double sinRoll = std::sin(roll);
+                double cosRoll = std::cos(roll);
 
-                for (int var38 = 0; var38 < 4; ++var38)
+                for (int vertIndex = 0; vertIndex < 4; ++vertIndex)
                 {
-                    double var39 = 0.0;
-                    double var41 = (double)((var38 & 2) - 1) * var10;
-                    double var43 = (double)(((var38 + 1) & 2) - 1) * var10;
-                    double var47 = var41 * var36 - var43 * var34;
-                    double var49 = var43 * var36 + var41 * var34;
-                    double var53 = var47 * var28 + var39 * var30;
-                    double var55 = var39 * var28 - var47 * var30;
-                    double var57 = var55 * var22 - var49 * var24;
-                    double var61 = var49 * var22 + var55 * var24;
-                    vertices[index++] = vec3f(var14 + var57, var16 + var53, var18 + var61);
+                    double x = (double)((vertIndex & 2) - 1) * size;
+                    double z = (double)(((vertIndex + 1) & 2) - 1) * size;
+                    double rotatedX = x * cosRoll - z * sinRoll;
+                    double rotatedZ = z * cosRoll + x * sinRoll;
+                    double vertY = rotatedX * sinYaw;
+                    double rotatedY = -rotatedX * cosYaw;
+                    double vertX = rotatedY * sinPitch - rotatedZ * cosPitch;
+                    double vertZ = rotatedZ * sinPitch + rotatedY * cosPitch;
+                    vertices[index++] = vec3f(xDist + vertX, yDist + vertY, zDist + vertZ);
                 }
             }
         }
@@ -961,41 +960,39 @@ float get_celestial_angle()
         --normalized_daytime;
     }
 
-    float var4 = normalized_daytime;
+    float tmp_daytime = normalized_daytime;
     normalized_daytime = 1.0F - (float)((std::cos((double)normalized_daytime * M_PI) + 1.0) / 2.0);
-    normalized_daytime = var4 + (normalized_daytime - var4) / 3.0F;
+    normalized_daytime = tmp_daytime + (normalized_daytime - tmp_daytime) / 3.0F;
     return normalized_daytime;
 }
 float get_star_brightness()
 {
-    float var2 = get_celestial_angle();
-    float var3 = 1.0F - (std::cos(var2 * M_TWOPI) * 2.0F + 0.75F);
-    if (var3 < 0.0F)
+    float brightness = 1.0F - (std::cos(get_celestial_angle() * M_TWOPI) * 2.0F + 0.75F);
+    if (brightness < 0.0F)
     {
-        var3 = 0.0F;
+        brightness = 0.0F;
     }
 
-    if (var3 > 1.0F)
+    if (brightness > 1.0F)
     {
-        var3 = 1.0F;
+        brightness = 1.0F;
     }
 
-    return var3 * var3 * 0.5F;
+    return brightness * brightness * 0.5F;
 }
 float get_sky_multiplier()
 {
-    float var2 = get_celestial_angle();
-    float var3 = std::cos(var2 * M_TWOPI) * 2.0F + 0.5F;
-    if (var3 < 0.0F)
+    float multiplier = std::cos(get_celestial_angle() * M_TWOPI) * 2.0F + 0.5F;
+    if (multiplier < 0.0F)
     {
-        var3 = 0.0F;
+        multiplier = 0.0F;
     }
 
-    if (var3 > 1.0F)
+    if (multiplier > 1.0F)
     {
-        var3 = 1.0F;
+        multiplier = 1.0F;
     }
-    return var3;
+    return multiplier;
 }
 GXColor get_sky_color(bool cave_darkness)
 {
