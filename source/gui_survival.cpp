@@ -49,19 +49,19 @@ void gui_survival::draw()
     // Draw the hotbar
     for (gui_slot &slot : hotbar_slots)
     {
-        draw_item(slot.x, slot.y, slot.item);
+        draw_item(slot.x, slot.y, slot.item, viewport);
     }
 
     // Draw the inventory
     for (gui_slot &slot : inventory_slots)
     {
-        draw_item(slot.x, slot.y, slot.item);
+        draw_item(slot.x, slot.y, slot.item, viewport);
     }
 
     // Draw the armor
     for (gui_slot &slot : armor_slots)
     {
-        draw_item(slot.x, slot.y, slot.item);
+        draw_item(slot.x, slot.y, slot.item, viewport);
     }
 
     // Disable backface culling for the rest of the GUI
@@ -121,7 +121,7 @@ void gui_survival::draw()
         GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
 
         // Draw the item in hand
-        draw_item(cursor_x - 16, cursor_y - 16, item_in_hand);
+        draw_item(cursor_x - 16, cursor_y - 16, item_in_hand, viewport);
     }
 }
 

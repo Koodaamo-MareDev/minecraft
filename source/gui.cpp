@@ -96,7 +96,7 @@ void gui::draw_text_with_shadow(int x, int y, std::string str, GXColor color)
     draw_text(x, y, str, color);
 }
 
-void gui::draw_item(int x, int y, inventory::item_stack stack)
+void gui::draw_item(int x, int y, inventory::item_stack stack, gertex::GXView &viewport)
 {
     if (stack.empty())
         return;
@@ -122,7 +122,7 @@ void gui::draw_item(int x, int y, inventory::item_stack stack)
         {
             // Translate the block to the correct position
             guMtxCopy(gui_block_matrix.mtx, tmp_matrix);
-            guMtxTransApply(tmp_matrix, tmp_matrix, x + 16, y + 16, 0.0f);
+            guMtxTransApply(tmp_matrix, tmp_matrix, x + 16, (y + 16) / viewport.aspect_correction, 0.0f);
             GX_LoadPosMtxImm(tmp_matrix, GX_PNMTX0);
 
             // Draw the block
@@ -132,7 +132,7 @@ void gui::draw_item(int x, int y, inventory::item_stack stack)
         else
         {
             guMtxCopy(gui_item_matrix.mtx, tmp_matrix);
-            guMtxTransApply(tmp_matrix, tmp_matrix, x + 16, y + 16, 0.0f);
+            guMtxTransApply(tmp_matrix, tmp_matrix, x + 16, (y + 16) / viewport.aspect_correction, 0.0f);
             GX_LoadPosMtxImm(tmp_matrix, GX_PNMTX0);
 
             int texture_index = get_default_texture_index(BlockID(block.id));
@@ -144,7 +144,7 @@ void gui::draw_item(int x, int y, inventory::item_stack stack)
     {
         use_texture(items_texture);
         guMtxCopy(gui_item_matrix.mtx, tmp_matrix);
-        guMtxTransApply(tmp_matrix, tmp_matrix, x + 16, y + 16, 0.0f);
+        guMtxTransApply(tmp_matrix, tmp_matrix, x + 16, (y + 16) / viewport.aspect_correction, 0.0f);
         GX_LoadPosMtxImm(tmp_matrix, GX_PNMTX0);
 
         int texture_index = item.texture_index;
@@ -161,11 +161,11 @@ void gui::draw_item(int x, int y, inventory::item_stack stack)
     }
 }
 
-void gui::draw_container(int x, int y, inventory::container &container)
+void gui::draw_container(int x, int y, inventory::container &container, gertex::GXView &viewport)
 {
     for (size_t i = 0; i < container.size(); i++)
     {
-        draw_item(x + (i % 9) * 36, y + (i / 9) * 36, container[i]);
+        draw_item(x + (i % 9) * 36, y + (i / 9) * 36, container[i], viewport);
     }
 }
 

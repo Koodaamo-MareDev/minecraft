@@ -1088,21 +1088,17 @@ void DrawHUD(gertex::GXView &viewport)
 
     // Draw the hotbar selection
     draw_textured_quad(icons_texture, (viewport.width - 364) / 2 + current_world->player.selected_hotbar_slot * 40 - 2, corrected_height - 46, 48, 48, 56, 31, 80, 55);
+    // Push the orthogonal position matrix onto the stack
+    gertex::push_matrix();
 
-    if (current_world)
+    // Draw the hotbar items
+    for (size_t i = 0; i < 9; i++)
     {
-        // Push the orthogonal position matrix onto the stack
-        gertex::push_matrix();
-
-        // Draw the hotbar items
-        for (size_t i = 0; i < 9; i++)
-        {
-            gui::draw_item((viewport.width - 364) / 2 + i * 40 + 6, corrected_height - 38, current_world->player.m_inventory[i]);
-        }
-
-        // Restore the orthogonal position matrix
-        gertex::pop_matrix();
+        gui::draw_item((viewport.width - 364) / 2 + i * 40 + 6, corrected_height - 38, current_world->player.m_inventory[i], viewport);
     }
+
+    // Restore the orthogonal position matrix
+    gertex::pop_matrix();
     gertex::load_pos_matrix();
 
     // Enable direct colors as the previous call to draw_item may have changed the color mode

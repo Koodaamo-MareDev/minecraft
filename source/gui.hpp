@@ -49,7 +49,7 @@ public:
     static int text_width(std::string str);
     static void draw_text(int x, int y, std::string str, GXColor color = {255, 255, 255, 255});
     static void draw_text_with_shadow(int x, int y, std::string str, GXColor color = {255, 255, 255, 255});
-    static void draw_item(int x, int y, inventory::item_stack item);
+    static void draw_item(int x, int y, inventory::item_stack item, gertex::GXView &viewport);
 
     /**
      * This function draws the items in the container.
@@ -57,7 +57,7 @@ public:
      * The container is drawn row by row, starting from the top left corner.
      * NOTE: It is up to the user to draw the background.
      **/
-    static void draw_container(int x, int y, inventory::container &container);
+    static void draw_container(int x, int y, inventory::container &container, gertex::GXView &viewport);
 
     static gui *get_gui()
     {
