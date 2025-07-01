@@ -466,8 +466,7 @@ int main(int argc, char **argv)
                 }
             }
 
-            if (current_world)
-                current_world->tick();
+            current_world->tick();
 
             wiimote_down = 0;
             wiimote_held = 0;
@@ -476,8 +475,7 @@ int main(int argc, char **argv)
 
         UpdateCamera(camera);
 
-        if (current_world)
-            current_world->update();
+        current_world->update();
 
         UpdateLoadingStatus();
 
@@ -491,7 +489,7 @@ int main(int argc, char **argv)
         gertex::set_fog(fog);
 
         // Draw the scene
-        if (current_world && current_world->loaded)
+        if (current_world->loaded)
         {
             // Draw sky
             if (current_world->player.in_fluid == BlockID::air && !current_world->hell)
@@ -851,7 +849,7 @@ void HandleGUI(gertex::GXView &viewport)
 {
     if ((raw_wiimote_down & WPAD_CLASSIC_BUTTON_X) != 0)
     {
-        if (current_world && current_world->loaded)
+        if (current_world->loaded)
         {
             if (gui::get_gui())
             {
@@ -975,12 +973,9 @@ void UpdateCamera(camera_t &camera)
         target_view_bob_offset = vec3f(0, 0, 0);
         target_view_bob_screen_offset = vec3f(0, 0, 0);
     }
-    if (current_world)
-    {
-        current_world->player.view_bob_offset = vec3f::lerp(current_world->player.view_bob_offset, target_view_bob_offset, 0.035);
-        current_world->player.view_bob_screen_offset = vec3f::lerp(current_world->player.view_bob_screen_offset, target_view_bob_screen_offset, 0.035);
-        player_pos = current_world->player.view_bob_offset + player_pos;
-    }
+    current_world->player.view_bob_offset = vec3f::lerp(current_world->player.view_bob_offset, target_view_bob_offset, 0.035);
+    current_world->player.view_bob_screen_offset = vec3f::lerp(current_world->player.view_bob_screen_offset, target_view_bob_screen_offset, 0.035);
+    player_pos = current_world->player.view_bob_offset + player_pos;
     camera.position = player_pos;
     camera.rot.x = xrot;
     camera.rot.y = yrot;
