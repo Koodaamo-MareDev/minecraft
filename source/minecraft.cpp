@@ -794,40 +794,41 @@ void GetInput()
 
         wiimote_rx = right_stick.x;
         wiimote_ry = right_stick.y;
+
+        if (!((raw_wiimote_held & WPAD_CLASSIC_BUTTON_FULL_L) || (raw_wiimote_held & WPAD_CLASSIC_BUTTON_FULL_R)))
+            shoulder_btn_frame_counter = -1;
+        else
+            shoulder_btn_frame_counter++;
+
+        should_place_block = false;
+        should_destroy_block = false;
+        if (shoulder_btn_frame_counter >= 0)
+        {
+            // repeats buttons every 10 frames
+            if ((raw_wiimote_held & WPAD_CLASSIC_BUTTON_FULL_L) && ((raw_wiimote_down & WPAD_CLASSIC_BUTTON_FULL_L) || shoulder_btn_frame_counter % 10 == 0))
+                should_place_block = true;
+            if ((raw_wiimote_held & WPAD_CLASSIC_BUTTON_FULL_R))
+                should_place_block = !(should_destroy_block = true);
+        }
+        if (raw_wiimote_down & WPAD_CLASSIC_BUTTON_ZL)
+        {
+            current_world->player.selected_hotbar_slot = (current_world->player.selected_hotbar_slot + 8) % 9;
+            if (current_world->is_remote())
+                client.sendBlockItemSwitch(current_world->player.selected_hotbar_slot);
+        }
+        if (raw_wiimote_down & WPAD_CLASSIC_BUTTON_ZR)
+        {
+            current_world->player.selected_hotbar_slot = (current_world->player.selected_hotbar_slot + 1) % 9;
+            if (current_world->is_remote())
+                client.sendBlockItemSwitch(current_world->player.selected_hotbar_slot);
+        }
     } // If the inventory is visible, don't allow the player to move
     else
     {
         wiimote_x = 0;
         wiimote_z = 0;
-        return;
-    }
-
-    if (!((raw_wiimote_held & WPAD_CLASSIC_BUTTON_FULL_L) || (raw_wiimote_held & WPAD_CLASSIC_BUTTON_FULL_R)))
-        shoulder_btn_frame_counter = -1;
-    else
-        shoulder_btn_frame_counter++;
-
-    should_place_block = false;
-    should_destroy_block = false;
-    if (shoulder_btn_frame_counter >= 0)
-    {
-        // repeats buttons every 10 frames
-        if ((raw_wiimote_held & WPAD_CLASSIC_BUTTON_FULL_L) && ((raw_wiimote_down & WPAD_CLASSIC_BUTTON_FULL_L) || shoulder_btn_frame_counter % 10 == 0))
-            should_place_block = true;
-        if ((raw_wiimote_held & WPAD_CLASSIC_BUTTON_FULL_R))
-            should_place_block = !(should_destroy_block = true);
-    }
-    if (raw_wiimote_down & WPAD_CLASSIC_BUTTON_ZL)
-    {
-        current_world->player.selected_hotbar_slot = (current_world->player.selected_hotbar_slot + 8) % 9;
-        if (current_world->is_remote())
-            client.sendBlockItemSwitch(current_world->player.selected_hotbar_slot);
-    }
-    if (raw_wiimote_down & WPAD_CLASSIC_BUTTON_ZR)
-    {
-        current_world->player.selected_hotbar_slot = (current_world->player.selected_hotbar_slot + 1) % 9;
-        if (current_world->is_remote())
-            client.sendBlockItemSwitch(current_world->player.selected_hotbar_slot);
+        should_place_block = false;
+        should_destroy_block = false;
     }
 }
 
