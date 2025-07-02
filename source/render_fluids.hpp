@@ -7,5 +7,5 @@
 class chunk_t;
 class block_t;
 int render_fluid(chunk_t &chunk, block_t *block, const vec3i &pos);
-int render_fluids(chunk_t &chunk, int section, bool transparent, int vertexCount);
+int render_section_fluids(chunk_t &chunk, int index, bool transparent, int vertexCount);
 #endif

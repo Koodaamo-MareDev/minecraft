@@ -1333,7 +1333,7 @@ namespace Crapper
         // Mark chunk as dirty
         for (int vbo_index = 0; vbo_index < VERTICAL_SECTION_COUNT; vbo_index++)
         {
-            chunk->vbos[vbo_index].dirty = true;
+            chunk->sections[vbo_index].dirty = true;
         }
 
         lock_t chunk_lock(chunk_mutex);

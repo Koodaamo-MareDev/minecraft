@@ -40,6 +40,35 @@ public:
     player_properties();
 };
 
+enum class section_update_phase : uint8_t
+{
+    BLOCK_VISIBILITY = 0,   // Update visibility of blocks in a section
+    SECTION_VISIBILITY = 1, // Update visibility of sections in world
+    SOLID = 2,              // Update solid VBOs
+    TRANSPARENT = 3,        // Update transparent VBOs
+    FLUSH = 4,              // Flush all VBOs
+    COUNT = 5               // Total number of phases
+};
+
+inline section_update_phase operator++(section_update_phase &phase, int)
+{
+    section_update_phase old_phase = phase;
+    if (uint8_t(old_phase) + 1 >= uint8_t(section_update_phase::COUNT))
+        phase = section_update_phase::BLOCK_VISIBILITY;
+    else
+        phase = section_update_phase(uint8_t(old_phase) + 1);
+    return old_phase;
+};
+
+inline section_update_phase &operator++(section_update_phase &phase)
+{
+    if (uint8_t(phase) + 1 >= uint8_t(section_update_phase::COUNT))
+        phase = section_update_phase::BLOCK_VISIBILITY;
+    else
+        phase = section_update_phase(uint8_t(phase) + 1);
+    return phase;
+}
+
 class world
 {
 public:
@@ -48,7 +77,6 @@ public:
     int last_entity_tick = 0;
     int last_fluid_tick = 0;
     int fluid_update_count = 0;
-    int ticks_since_chunk_addition = 0;
     double delta_time = 0.0;
     double partial_ticks = 0.0;
     size_t memory_usage = 0;
@@ -57,7 +85,7 @@ public:
     bool hell = false;
     int64_t seed = 0;
     chunkprovider *chunk_provider = nullptr;
-    frustum_t* frustum = nullptr;
+    frustum_t *frustum = nullptr;
 
     std::string name = "world";
 
@@ -71,9 +99,9 @@ public:
     void update();
     void update_frustum(camera_t &camera);
     void update_chunks();
-    void update_vbos();
+    section_update_phase update_sections(section_update_phase phase);
     void calculate_visibility();
-    void update_fluids(chunk_t *chunk, int section);
+    void update_fluid_section(chunk_t *chunk, int index);
     void edit_blocks();
 
     int prepare_chunks(int count);

@@ -100,7 +100,7 @@ void chunkprovider_overworld::populate_chunk(chunk_t *chunk)
                 // Update the VBOs of the neighboring chunks
                 for (int i = 0; i < VERTICAL_SECTION_COUNT; i++)
                 {
-                    neighbor->vbos[i].dirty = true;
+                    neighbor->sections[i].dirty = true;
                 }
             }
         }

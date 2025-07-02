@@ -889,12 +889,13 @@ void draw_particles(camera_t &camera, particle *particles, int count)
 void draw_stars()
 {
     static bool generated = false;
-    static vec3f vertices[780 << 2];
+    static std::vector<vec3f> vertices;
     if (!generated)
     {
+        vertices.resize(6000); // 1500 quads
         javaport::Random rng(10842);
-        int index = 0;
-        for (int index = 0; index < 1500; ++index)
+        size_t index = 0;
+        for (size_t i = 0; i < 1500; i++)
         {
             double dirX = (double)(rng.nextFloat() * 2.0F - 1.0F);
             double dirY = (double)(rng.nextFloat() * 2.0F - 1.0F);
@@ -903,7 +904,7 @@ void draw_stars()
             double sqrMagnitude = dirX * dirX + dirY * dirY + dirZ * dirZ;
             if (sqrMagnitude < 1.0 && sqrMagnitude > 0.01)
             {
-                sqrMagnitude = 1.0 / std::sqrt(sqrMagnitude);
+                sqrMagnitude = Q_rsqrt_d(sqrMagnitude);
                 dirX *= sqrMagnitude;
                 dirY *= sqrMagnitude;
                 dirZ *= sqrMagnitude;
@@ -913,7 +914,7 @@ void draw_stars()
                 double pitch = std::atan2(dirX, dirZ);
                 double sinPitch = std::sin(pitch);
                 double cosPitch = std::cos(pitch);
-                double yaw = std::atan2(std::sqrt(dirX * dirX + dirZ * dirZ), dirY);
+                double yaw = std::atan2(Q_sqrt_d(dirX * dirX + dirZ * dirZ), dirY);
                 double sinYaw = std::sin(yaw);
                 double cosYaw = std::cos(yaw);
                 double roll = rng.nextDouble() * M_TWOPI;
@@ -934,13 +935,15 @@ void draw_stars()
                 }
             }
         }
+        // Resize the vector to the actual number of vertices generated
+        vertices.resize(index);
         generated = true;
     }
     int brightness_level = (get_star_brightness() * 255);
     if (brightness_level > 0)
     {
-        GX_BeginGroup(GX_QUADS, 780 << 2);
-        for (int i = 0; i < (780 << 2); i++)
+        GX_BeginGroup(GX_QUADS, vertices.size());
+        for (size_t i = 0; i < vertices.size(); i++)
             GX_Vertex(vertex_property_t(vertices[i ^ 3], 0, 0, brightness_level, brightness_level, brightness_level, brightness_level));
         GX_EndGroup();
     }

@@ -471,7 +471,6 @@ int main(int argc, char **argv)
             wiimote_down = 0;
             wiimote_held = 0;
         }
-        current_world->last_entity_tick = current_world->ticks;
 
         UpdateCamera(camera);
 
@@ -601,10 +600,10 @@ void UpdateLoadingStatus()
                 // Check if the vbos near the player are up to date
                 for (int i = min_y; i <= max_y; i++)
                 {
-                    if (chunk->vbos[i].visible)
+                    if (chunk->sections[i].visible)
                     {
                         required++;
-                        if (chunk->vbos[i].has_updated)
+                        if (chunk->sections[i].has_updated)
                         {
                             loading_progress++;
                         }
@@ -613,7 +612,12 @@ void UpdateLoadingStatus()
             }
         }
 
-        is_loading = loading_progress < required || chunk_count < 9;
+        is_loading = loading_progress < required;
+        if (chunk_count < 9)
+        {
+            is_loading = true;
+            loading_progress = 0;
+        }
 
         gui_dirtscreen *dirtscreen = dynamic_cast<gui_dirtscreen *>(gui::get_gui());
         if (dirtscreen)

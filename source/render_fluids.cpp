@@ -225,9 +225,9 @@ int render_fluid(chunk_t &chunk, block_t *block, const vec3i &pos)
     return faceCount * 3;
 }
 
-int render_fluids(chunk_t &chunk, int section, bool transparent, int vertexCount)
+int render_section_fluids(chunk_t &chunk, int index, bool transparent, int vertexCount)
 {
-    vec3i chunk_offset = vec3i(chunk.x * 16, section * 16, chunk.z * 16);
+    vec3i chunk_offset = vec3i(chunk.x * 16, index * 16, chunk.z * 16);
 
     GX_BeginGroup(GX_TRIANGLES, vertexCount);
     vertexCount = 0;

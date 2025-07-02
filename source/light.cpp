@@ -177,6 +177,6 @@ void light_engine::update(const coord &update)
                 }
             }
         }
-        chunk->vbos[(current.coords.y >> 4) & 15].dirty = true;
+        chunk->sections[(current.coords.y >> 4) & 15].dirty = true;
     }
 }

@@ -3,6 +3,7 @@
 #include <ported/Random.hpp>
 #include <crapper/client.hpp>
 
+#include "timers.hpp"
 #include "world.hpp"
 #include "chunk.hpp"
 #include "block.hpp"
@@ -58,32 +59,8 @@ void world::tick()
 {
     update_entities();
     calculate_visibility();
-    if (ticks_since_chunk_addition < 100)
-        ticks_since_chunk_addition++;
-}
-
-void world::update()
-{
-    if (!is_remote())
-    {
-        if (!prepare_chunks(1))
-        {
-            ticks_since_chunk_addition = 0;
-        }
-    }
-    else
-    {
-        ticks_since_chunk_addition = 100;
-    }
     cleanup_chunks();
-    edit_blocks();
     update_chunks();
-
-    if (ticks_since_chunk_addition > 20)
-        update_vbos();
-
-    // Update the particle system
-    m_particle_system.update(0.025);
 
     // Calculate chunk memory usage
     memory_usage = 0;
@@ -93,6 +70,28 @@ void world::update()
     }
 
     m_sound_system.update(angles_to_vector(0, yrot + 90), player.m_entity->get_position(std::fmod(partial_ticks, 1)));
+
+    current_world->last_entity_tick = current_world->ticks;
+}
+
+void world::update()
+{
+    static section_update_phase current_update_phase = section_update_phase::BLOCK_VISIBILITY;
+    // If there are no chunks loaded, we can skip the update
+    uint64_t start_time = time_get();
+    uint64_t elapsed_time = 0;
+
+    // Limit to 3ms per update
+    while (elapsed_time < 3000)
+    {
+        // Cycle through the phases
+        current_update_phase = update_sections(current_update_phase);
+        elapsed_time = time_diff_us(start_time, time_get());
+    }
+    if (elapsed_time >= 100)
+        printf("Got to phase %d in %llu us\n", int(current_update_phase), elapsed_time);
+    edit_blocks();
+    m_particle_system.update(delta_time);
 }
 
 void world::update_frustum(camera_t &camera)
@@ -124,7 +123,7 @@ void world::update_chunks()
             {
                 float vdistance = std::abs(j * 16 - player_pos.y);
                 if (!is_remote() && chunk->has_fluid_updates[j] && vdistance <= SIMULATION_DISTANCE * 16 && ticks - last_fluid_tick >= 5)
-                    update_fluids(chunk, j);
+                    update_fluid_section(chunk, j);
             }
             if (!chunk->lit_state && light_up_calls < 5)
             {
@@ -139,9 +138,13 @@ void world::update_chunks()
         fluid_update_count++;
         fluid_update_count %= 30;
     }
+    if (!is_remote())
+    {
+        prepare_chunks(1);
+    }
 }
 
-void world::update_fluids(chunk_t *chunk, int section)
+void world::update_fluid_section(chunk_t *chunk, int index)
 {
     auto int_to_blockpos = [](ptrdiff_t x) -> vec3i
     {
@@ -164,7 +167,7 @@ void world::update_fluids(chunk_t *chunk, int section)
 
     for (size_t i = 0; i < 4096; i++)
     {
-        block_t *block = &chunk->blockstates[i | (section << 12)];
+        block_t *block = &chunk->blockstates[i | (index << 12)];
         if ((block->meta & FLUID_UPDATE_REQUIRED_FLAG))
             fluid_levels[get_fluid_meta_level(block) & 7][i] = block;
     }
@@ -183,14 +186,27 @@ void world::update_fluids(chunk_t *chunk, int section)
             block = nullptr;
         }
     }
-    chunk->has_fluid_updates[section] = (curr_fluid_count != 0);
+    chunk->has_fluid_updates[index] = (curr_fluid_count != 0);
 }
 
-void world::update_vbos()
+constexpr size_t default_vbo_update_threshold = 5;
+section_update_phase world::update_sections(section_update_phase phase)
 {
-    static std::vector<chunkvbo_t *> vbos_to_update;
-    std::vector<chunkvbo_t *> vbos_to_rebuild;
-    if (!light_engine::busy())
+    // This controls how many VBOs are updated in one tick
+    // It also decreases over time, giving a chance for all
+    // VBOs to be updated in a reasonable time frame.
+    static size_t min_vbos_to_flush = default_vbo_update_threshold;
+
+    // Buffer to hold VBOs that need to be flushed
+    static std::vector<section *> vbos_to_flush;
+
+    // Pointer to the current VBO being processed
+    static section *curr_section = nullptr;
+
+    // Process the current VBO based on the phase
+    switch (phase)
+    {
+    case section_update_phase::BLOCK_VISIBILITY:
     {
         for (chunk_t *&chunk : get_chunks())
         {
@@ -216,72 +232,94 @@ void world::update_vbos()
                     continue;
                 for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
                 {
-                    chunkvbo_t &vbo = chunk->vbos[j];
-                    if (vbo.visible && vbo.dirty)
+                    section &other_section = chunk->sections[j];
+                    if (other_section.visible && other_section.dirty && (!curr_section || other_section < *curr_section))
                     {
-                        vbos_to_rebuild.push_back(&vbo);
+                        // If the current section is not set or the other section is closer to the player, set it as the current section
+                        curr_section = &other_section;
                     }
                 }
             }
         }
-        std::sort(vbos_to_rebuild.begin(), vbos_to_rebuild.end(), [](chunkvbo_t *a, chunkvbo_t *b)
-                  { return *a < *b; });
-        uint32_t max_vbo_updates = 1;
-        for (chunkvbo_t *vbo_ptr : vbos_to_rebuild)
+
+        if (!curr_section)
         {
-            chunkvbo_t &vbo = *vbo_ptr;
-            int vbo_i = vbo.y >> 4;
-            chunk_t *chunk = get_chunk_from_pos(vec3i(vbo.x, 0, vbo.z));
-            vbo.dirty = false;
-            vbo.refresh_visibility = true;
-            chunk->recalculate_section_visibility(vbo_i);
-            chunk->build_vbo(vbo_i, false);
-            chunk->build_vbo(vbo_i, true);
-            vbos_to_update.push_back(vbo_ptr);
-            if (!--max_vbo_updates)
-                break;
+            // If no section was set, skip to the next phase
+            break;
         }
-        // if (max_vbo_updates)
-        {
-            // Try to update the first dirty VBO
-            for (chunkvbo_t *vbo_ptr : vbos_to_update)
-            {
-                if (!vbo_ptr->refresh_visibility)
-                    continue;
-                chunk_t *chunk = get_chunk_from_pos(vec3i(vbo_ptr->x, 0, vbo_ptr->z));
-                chunk->refresh_vbo_visibility(vbo_ptr->y >> 4);
-                vbo_ptr->refresh_visibility = false;
-                break;
-            }
-        }
+
+        // Recalculate the visibility of the section
+        curr_section->chunk->refresh_section_block_visibility(curr_section->y >> 4);
+
+        break;
     }
-    // Update cached buffers when no vbos need to be rebuilt.
-    // This ensures that the buffers are updated synchronously.
-    if (vbos_to_rebuild.size() == 0)
+    case section_update_phase::SECTION_VISIBILITY:
+        curr_section->chunk->refresh_section_visibility(curr_section->y >> 4);
+        break;
+    case section_update_phase::SOLID:
+        curr_section->chunk->build_vbo(curr_section->y >> 4, false);
+        break;
+    case section_update_phase::TRANSPARENT:
+        if (!curr_section)
+            break;
+        curr_section->chunk->build_vbo(curr_section->y >> 4, true);
+
+        // Clear the section's dirty flag
+        curr_section->dirty = false;
+
+        // Add the section to the flush buffer
+        vbos_to_flush.push_back(curr_section);
+
+        // Reset the section pointer
+        curr_section = nullptr;
+        break;
+    case section_update_phase::FLUSH:
     {
-        for (chunkvbo_t *vbo_ptr : vbos_to_update)
+        // Flush cached buffers
+        if (vbos_to_flush.size() >= min_vbos_to_flush)
         {
-            chunkvbo_t &vbo = *vbo_ptr;
-            if (vbo.solid != vbo.cached_solid)
+            for (section *current : vbos_to_flush)
             {
-                // Clear the cached buffer
-                vbo.cached_solid.clear();
+                if (current->solid != current->cached_solid)
+                {
+                    // Clear the cached buffer
+                    current->cached_solid.clear();
 
-                // Set the cached buffer to the new buffer
-                vbo.cached_solid = vbo.solid;
-            }
-            if (vbo.transparent != vbo.cached_transparent)
-            {
-                // Clear the cached buffer
-                vbo.cached_transparent.clear();
+                    // Set the cached buffer to the new buffer
+                    current->cached_solid = current->solid;
+                }
+                if (current->transparent != current->cached_transparent)
+                {
+                    // Clear the cached buffer
+                    current->cached_transparent.clear();
 
-                // Set the cached buffer to the new buffer
-                vbo.cached_transparent = vbo.transparent;
+                    // Set the cached buffer to the new buffer
+                    current->cached_transparent = current->transparent;
+                }
+                current->has_updated = true;
             }
-            vbo.has_updated = true;
+            vbos_to_flush.clear();
+
+            // Reset the threshold for the next tick
+            min_vbos_to_flush = default_vbo_update_threshold;
         }
-        vbos_to_update.clear();
+        else
+        {
+            // Decrease the threshold for the next tick
+            if (min_vbos_to_flush > 1)
+                min_vbos_to_flush--;
+        }
     }
+    default:
+        break;
+    }
+    if (phase++ != section_update_phase::FLUSH && !curr_section)
+    {
+        // Skip to flush phase if no section is set
+        phase = section_update_phase::FLUSH;
+    }
+
+    return phase;
 }
 
 /**
@@ -291,9 +329,9 @@ void world::update_vbos()
  * https://tomcc.github.io/index.html
  */
 
-struct vbo_node
+struct section_node
 {
-    chunkvbo_t *vbo;
+    section *sect;
     int8_t from;     // The face we entered the VBO from
     uint8_t dirs[6]; // For preventing revisits of the same face
 };
@@ -307,13 +345,13 @@ void world::calculate_visibility()
         {
             for (uint8_t i = 0; i < VERTICAL_SECTION_COUNT; i++)
             {
-                chunk->vbos[i].visible = false;
+                chunk->sections[i].visible = false;
             }
         }
     }
 
     // Gets the VBO at the given position
-    auto vbo_at = [](const vec3i &pos) -> chunkvbo_t *
+    auto section_at = [](const vec3i &pos) -> section *
     {
         // Out of bounds check for Y coordinate
         if (pos.y < 0 || pos.y >= WORLD_HEIGHT)
@@ -326,7 +364,7 @@ void world::calculate_visibility()
         if (!chunk)
             return nullptr;
 
-        return &chunk->vbos[pos.y >> 4];
+        return &chunk->sections[pos.y >> 4];
     };
 
     // Converts a face pair to a bitmask for visibility flags.
@@ -336,29 +374,29 @@ void world::calculate_visibility()
         return 1 << (a * 5 + (b < a ? b : b - 1));
     };
 
-    std::deque<vbo_node> vbo_queue;
-    std::deque<chunkvbo_t *> visited;
-    vbo_node entry;
-    entry.vbo = vbo_at(vec3i(int(player.m_entity->position.x), int(player.m_entity->position.y), int(player.m_entity->position.z)));
+    std::deque<section_node> section_queue;
+    std::deque<section *> visited;
+    section_node entry;
+    entry.sect = section_at(vec3i(int(player.m_entity->position.x), int(player.m_entity->position.y), int(player.m_entity->position.z)));
 
     // Check if there is a VBO at the player's position
-    if (!entry.vbo)
+    if (!entry.sect)
         return;
 
     // Initialize the rest of the entry node
     entry.from = -1;
     for (uint8_t i = 0; i < 6; i++)
         entry.dirs[i] = 0;
-    vbo_queue.push_back(entry);
-    visited.push_front(entry.vbo);
+    section_queue.push_back(entry);
+    visited.push_front(entry.sect);
 
-    while (!vbo_queue.empty())
+    while (!section_queue.empty())
     {
-        vbo_node node = vbo_queue.front();
-        vbo_queue.pop_front();
+        section_node node = section_queue.front();
+        section_queue.pop_front();
 
         // Mark the VBO as visible
-        node.vbo->visible = true;
+        node.sect->visible = true;
 
         auto visit = [&](vec3i pos, int8_t through)
         {
@@ -367,42 +405,42 @@ void world::calculate_visibility()
                 return;
 
             // Skip if the position is out of bounds
-            chunkvbo_t *next_vbo = vbo_at(pos);
-            if (!next_vbo)
+            section *next_section = section_at(pos);
+            if (!next_section)
                 return;
 
-            // Don't revisit VBOs we have already visited
-            if (std::find(visited.begin(), visited.end(), next_vbo) != visited.end())
+            // Don't revisit sections we have already visited
+            if (std::find(visited.begin(), visited.end(), next_section) != visited.end())
                 return;
 
             if (node.from != -1)
             {
                 // Check if the node is visible from the face we entered
-                if (!(node.vbo->visibility_flags & (faces_to_index(node.from, through) | faces_to_index(through, node.from))))
+                if (!(node.sect->visibility_flags & (faces_to_index(node.from, through) | faces_to_index(through, node.from))))
                     return;
             }
 
-            vec3f vbo_offset = vec3f(pos.x + 8, pos.y + 8, pos.z + 8) - player.m_entity->position;
+            vec3f section_offset = vec3f(pos.x + 8, pos.y + 8, pos.z + 8) - player.m_entity->position;
 
-            // Check if the VBO is within the render distance
-            if (std::abs(vbo_offset.x) + std::abs(vbo_offset.z) > RENDER_DISTANCE)
+            // Check if the section is within the render distance
+            if (std::abs(section_offset.x) + std::abs(section_offset.z) > RENDER_DISTANCE)
                 return;
             // Apply frustum culling
             for (uint8_t i = 0; i < 6; i++)
             {
-                if (distance_to_plane(vbo_offset, *frustum, i) < -22.7f)
+                if (distance_to_plane(section_offset, *frustum, i) < -22.7f)
                 {
-                    // If the VBO is outside the frustum, skip it
+                    // If the section is outside the frustum, skip it
                     return;
                 }
             }
 
-            // Mark the VBO as visited
-            visited.push_front(next_vbo);
+            // Mark the section as visited
+            visited.push_front(next_section);
 
             // Prepare next node
-            vbo_node new_node;
-            new_node.vbo = next_vbo;
+            section_node new_node;
+            new_node.sect = next_section;
             new_node.from = through ^ 1;
 
             // Copy the directions from the current node
@@ -412,9 +450,9 @@ void world::calculate_visibility()
             new_node.dirs[through] = 1;
 
             // Add the new node to the queue
-            vbo_queue.push_back(new_node);
+            section_queue.push_back(new_node);
         };
-        vec3i origin = vec3i(node.vbo->x, node.vbo->y, node.vbo->z);
+        vec3i origin = vec3i(node.sect->x, node.sect->y, node.sect->z);
         for (uint8_t i = 0; i < 6; i++)
         {
             visit(origin + (face_offsets[i] * 16), i ^ 1);
@@ -572,20 +610,20 @@ void world::remove_chunk(chunk_t *chunk)
 {
     for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
     {
-        chunkvbo_t &vbo = chunk->vbos[j];
-        vbo.visible = false;
+        section &current = chunk->sections[j];
+        current.visible = false;
 
-        if (vbo.solid && vbo.solid != vbo.cached_solid)
+        if (current.solid && current.solid != current.cached_solid)
         {
-            vbo.solid.clear();
+            current.solid.clear();
         }
-        if (vbo.transparent && vbo.transparent != vbo.cached_transparent)
+        if (current.transparent && current.transparent != current.cached_transparent)
         {
-            vbo.transparent.clear();
+            current.transparent.clear();
         }
 
-        vbo.cached_solid.clear();
-        vbo.cached_transparent.clear();
+        current.cached_solid.clear();
+        current.cached_transparent.clear();
     }
     chunk->generation_stage = ChunkGenStage::invalid;
 }
@@ -755,7 +793,7 @@ void world::draw_scene(bool opaque)
     // Enable indexed colors
     GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
 
-    std::deque<std::pair<chunkvbo_t *, vbo_buffer_t *>> vbos_to_draw;
+    std::deque<std::pair<section *, vbo_buffer_t *>> sections_to_draw;
 
     // Draw the solid pass
     if (opaque)
@@ -766,10 +804,10 @@ void world::draw_scene(bool opaque)
             {
                 for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
                 {
-                    chunkvbo_t &vbo = chunk->vbos[j];
-                    if (!vbo.visible || !vbo.cached_solid.buffer || !vbo.cached_solid.length)
+                    section &current = chunk->sections[j];
+                    if (!current.visible || !current.cached_solid.buffer || !current.cached_solid.length)
                         continue;
-                    vbos_to_draw.push_back(std::make_pair(&vbo, &vbo.cached_solid));
+                    sections_to_draw.push_back(std::make_pair(&current, &current.cached_solid));
                 }
             }
         }
@@ -783,25 +821,25 @@ void world::draw_scene(bool opaque)
             {
                 for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
                 {
-                    chunkvbo_t &vbo = chunk->vbos[j];
-                    if (!vbo.visible || !vbo.cached_transparent.buffer || !vbo.cached_transparent.length)
+                    section &current = chunk->sections[j];
+                    if (!current.visible || !current.cached_transparent.buffer || !current.cached_transparent.length)
                         continue;
-                    vbos_to_draw.push_back(std::make_pair(&vbo, &vbo.cached_transparent));
+                    sections_to_draw.push_back(std::make_pair(&current, &current.cached_transparent));
                 }
             }
         }
     }
 
     // Sort the vbos to draw the nearest ones first in the solid pass, and the furthest ones first in the transparent pass
-    std::sort(vbos_to_draw.begin(), vbos_to_draw.end(), [opaque](std::pair<chunkvbo_t *, vbo_buffer_t *> &a, std::pair<chunkvbo_t *, vbo_buffer_t *> &b)
+    std::sort(sections_to_draw.begin(), sections_to_draw.end(), [opaque](std::pair<section *, vbo_buffer_t *> &a, std::pair<section *, vbo_buffer_t *> &b)
               { return (b.first < a.first) ^ opaque; });
 
     // Draw the vbos
-    for (std::pair<chunkvbo_t *, vbo_buffer_t *> &pair : vbos_to_draw)
+    for (std::pair<section *, vbo_buffer_t *> &pair : sections_to_draw)
     {
-        chunkvbo_t *&vbo = pair.first;
+        section *&sect = pair.first;
         vbo_buffer_t *&buffer = pair.second;
-        transform_view(gertex::get_view_matrix(), vec3f(vbo->x, vbo->y, vbo->z));
+        transform_view(gertex::get_view_matrix(), vec3f(sect->x, sect->y, sect->z));
         GX_CallDispList(buffer->buffer, buffer->length);
     }
 
@@ -1348,7 +1386,7 @@ void world::update_player()
             if (player.mining_tick >= 0)
             {
                 // The player hits the block 5 times per second
-                if (player.mining_tick % 4 == 0)
+                if (player.mining_tick % 4 == 1)
                 {
                     // Swing the player's arm - TODO: Add a proper client-side animation
                     if (is_remote())
@@ -1373,35 +1411,56 @@ void world::update_player()
                     int texture_index = get_default_texture_index(targeted_block->get_blockid());
                     int u = TEXTURE_X(texture_index);
                     int v = TEXTURE_Y(texture_index);
+
+                    // Calculate the bounds of the block to spawn particles around
+                    vec3f b_min = vec3f(player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z) + vec3f(1.0, 1.0, 1.0);
+                    vec3f b_max = vec3f(player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z);
+                    bool hitbox = false;
+                    for (aabb_t &bounds : player.block_bounds)
+                    {
+                        hitbox = true;
+                        b_min.x = std::min(bounds.min.x, b_min.x);
+                        b_min.y = std::min(bounds.min.y, b_min.y);
+                        b_min.z = std::min(bounds.min.z, b_min.z);
+
+                        b_max.x = std::max(bounds.max.x, b_max.x);
+                        b_max.y = std::max(bounds.max.y, b_max.y);
+                        b_max.z = std::max(bounds.max.z, b_max.z);
+                    }
+                    aabb_t block_outer_bounds = aabb_t(b_min, b_max);
                     javaport::Random rng;
 
-                    for (int i = 0; i < 32; i++)
+                    for (int i = 0; hitbox && i < 8; i++)
                     {
                         // Randomize the particle position and velocity
-                        vec3f pos_local = vec3f(rng.nextFloat(), rng.nextFloat(), rng.nextFloat());
-                        vec3f pos_local_diff = pos_local - vec3f(.5f, .5f, .5f);
+                        vec3f local_pos = vec3f(rng.nextFloat(), rng.nextFloat(), rng.nextFloat());
+
+                        vec3f pos = (block_outer_bounds.min + block_outer_bounds.max) * 0.5 + local_pos;
+
+                        // Put the particle at the edge of the block by rounding the position to the nearest block edge on a random axis
+                        // This will ensure that the particles are spawned at the edges of the block
+                        int axis_to_round = rng.nextInt(3);
+                        if (axis_to_round == 0)
+                        {
+                            pos.x = std::round(pos.x);
+                        }
+                        else if (axis_to_round == 1)
+                        {
+                            pos.y = std::round(pos.y);
+                        }
+                        else
+                        {
+                            pos.z = std::round(pos.z);
+                        }
+                        // Force the particle within the bounds of the block
+                        pos.x = std::clamp(pos.x - 0.5, block_outer_bounds.min.x, block_outer_bounds.max.x) - 0.5;
+                        pos.y = std::clamp(pos.y - 0.5, block_outer_bounds.min.y, block_outer_bounds.max.y);
+                        pos.z = std::clamp(pos.z - 0.5, block_outer_bounds.min.z, block_outer_bounds.max.z) - 0.5;
+
+                        particle.position = pos;
 
                         // Randomize the particle velocity
                         particle.velocity = vec3f(rng.nextFloat() - .5f, rng.nextFloat() - .25f, rng.nextFloat() - .5f) * 3.0f;
-
-                        // Force the particle out of the block
-                        if (std::abs(pos_local_diff.x) < std::abs(pos_local_diff.y) && std::abs(pos_local_diff.x) < std::abs(pos_local_diff.z))
-                        {
-                            pos_local.x += pos_local_diff.z * 1.1f;
-                            particle.velocity.x *= 0.5f;
-                        }
-                        else if (std::abs(pos_local_diff.y) < std::abs(pos_local_diff.x) && std::abs(pos_local_diff.y) < std::abs(pos_local_diff.z))
-                        {
-                            pos_local.y += pos_local_diff.y * 1.f;
-                            particle.velocity.y *= 0.5f;
-                        }
-                        else if (std::abs(pos_local_diff.z) < std::abs(pos_local_diff.x) && std::abs(pos_local_diff.z) < std::abs(pos_local_diff.y))
-                        {
-                            pos_local.z += pos_local_diff.z * 1.1f;
-                            particle.velocity.z *= 0.5f;
-                        }
-
-                        particle.position = vec3f(player.raycast_pos.x - .5f, player.raycast_pos.y - .5f, player.raycast_pos.z - .5f) + pos_local;
 
                         // Randomize the particle texture coordinates
                         particle.u = u + (rng.next(2) << 2);

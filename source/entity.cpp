@@ -46,7 +46,7 @@ bool entity_physical::can_remove()
         return true;
     if (int_pos.y < 0 || int_pos.y >= 256)
         return false;
-    chunkvbo_t &vbo = curr_chunk->vbos[int_pos.y >> 4];
+    section &vbo = curr_chunk->sections[int_pos.y >> 4];
     if (vbo.dirty || curr_chunk->light_update_count || vbo.cached_solid != vbo.solid || vbo.cached_transparent != vbo.transparent)
         return false;
     return dead;

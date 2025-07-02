@@ -386,9 +386,9 @@ void chunk_t::recalculate_visibility(block_t *block, vec3i pos)
 }
 
 // recalculates the blockstates of a section
-void chunk_t::recalculate_section_visibility(int section)
+void chunk_t::refresh_section_block_visibility(int index)
 {
-    vec3i chunk_pos(this->x * 16, section * 16, this->z * 16);
+    vec3i chunk_pos(this->x * 16, index * 16, this->z * 16);
 
     block_t *block = this->get_block(chunk_pos); // Gets the first block of the section
     for (int y = 0; y < 16; y++)
@@ -509,7 +509,7 @@ void chunk_t::vbo_visibility_flood_fill(vec3i start_pos)
     }
 }
 
-void chunk_t::refresh_vbo_visibility(int section)
+void chunk_t::refresh_section_visibility(int index)
 {
     // Converts a face pair to a bitmask for visibility flags.
     // Assumes a != b
@@ -517,14 +517,14 @@ void chunk_t::refresh_vbo_visibility(int section)
     {
         return 1 << (a * 5 + (b < a ? b : b - 1));
     };
-    chunkvbo_t &vbo = this->vbos[section];
+    section &vbo = this->sections[index];
 
     // Initialize the flood fill start points if not already initialized
     if (floodfill_start_points.empty())
         init_floodfill_startpoints();
 
     // Rebuild the flood fill grid
-    block_t *block = this->get_block(vec3i(0, section << 4, 0));
+    block_t *block = this->get_block(vec3i(0, index << 4, 0));
     bool empty = true;
     for (uint32_t i = 0; i < 4096; i++, block++)
     {
@@ -551,7 +551,6 @@ void chunk_t::refresh_vbo_visibility(int section)
     {
         // No blocks to process, skip the flood fill
         vbo.visibility_flags = 0x3FFFFFFF;
-        vbo.refresh_visibility = false;
         return;
     }
     vbo.visibility_flags = 0;
@@ -589,12 +588,11 @@ void chunk_t::refresh_vbo_visibility(int section)
             floodfill_flood_id = floodfill_to_replace;
         }
     }
-    vbo.refresh_visibility = false;
 }
 
-int chunk_t::build_vbo(int section, bool transparent)
+int chunk_t::build_vbo(int index, bool transparent)
 {
-    chunkvbo_t &vbo = this->vbos[section];
+    section &vbo = this->sections[index];
     static uint8_t vbo_buffer[64000 * VERTEX_ATTR_LENGTH] __attribute__((aligned(32)));
     DCInvalidateRange(vbo_buffer, sizeof(vbo_buffer));
 
@@ -604,7 +602,7 @@ int chunk_t::build_vbo(int section, bool transparent)
     uint16_t *quadVtxCountPtr = (uint16_t *)(&vbo_buffer[1]);
 
     // Render the block mesh
-    int quadVtxCount = render_blocks(*this, section, transparent, 64000U);
+    int quadVtxCount = render_section_blocks(*this, index, transparent, 64000U);
 
     // 3 bytes for the GX_Begin command, with 1 byte offset to access the vertex count (uint16_t)
     int offset = (quadVtxCount * VERTEX_ATTR_LENGTH) + 1 + 3;
@@ -612,14 +610,14 @@ int chunk_t::build_vbo(int section, bool transparent)
     // The vertex count for the fluid mesh is stored as a uint16_t after the block mesh vertex data
     uint16_t *triVtxCountPtr = (uint16_t *)(&vbo_buffer[offset]);
 
-    int triVtxCount = render_fluids(*this, section, transparent, 64000U);
+    int triVtxCount = render_section_fluids(*this, index, transparent, 64000U);
 
     // End the display list - we don't need to store the size, as we can calculate it from the vertex counts
     uint32_t success = GX_EndDispList();
 
     if (!success)
     {
-        printf("Failed to create display list for section %d at (%d, %d)\n", section, this->x, this->z);
+        printf("Failed to create display list for section %d at (%d, %d)\n", index, this->x, this->z);
         return (2);
     }
     if (transparent)
@@ -659,30 +657,30 @@ int chunk_t::build_vbo(int section, bool transparent)
     void *displist_vbo = memalign(32, displist_size);
     if (displist_vbo == nullptr)
     {
-        printf("Failed to allocate %d bytes for section %d VBO at (%d, %d)\n", displist_size, section, this->x, this->z);
+        printf("Failed to allocate %d bytes for section %d VBO at (%d, %d)\n", displist_size, index, this->x, this->z);
         printf("Chunk count: %d\n", chunks.size());
         return (1);
     }
 
-    uint32_t index = 0;
+    uint32_t pos = 0;
     // Copy the quad data
     if (quadVtxCount)
     {
         uint32_t quadSize = quadVtxCount * VERTEX_ATTR_LENGTH + 3;
         memcpy(displist_vbo, vbo_buffer, quadSize);
-        index += quadSize;
+        pos += quadSize;
     }
 
     // Copy the triangle data
     if (triVtxCount)
     {
         uint32_t triSize = triVtxCount * VERTEX_ATTR_LENGTH + 3;
-        memcpy((void *)((u32)displist_vbo + index), (void *)((u32)vbo_buffer + (quadVtxCount * VERTEX_ATTR_LENGTH + 3)), triSize);
-        index += triSize;
+        memcpy((void *)((u32)displist_vbo + pos), (void *)((u32)vbo_buffer + (quadVtxCount * VERTEX_ATTR_LENGTH + 3)), triSize);
+        pos += triSize;
     }
 
     // Set the rest of the buffer to 0
-    memset((void *)((u32)displist_vbo + index), 0, displist_size - index);
+    memset((void *)((u32)displist_vbo + pos), 0, displist_size - pos);
 
     if (transparent)
     {
@@ -884,7 +882,7 @@ uint32_t chunk_t::size()
 {
     uint32_t base_size = sizeof(chunk_t);
     for (int i = 0; i < VERTICAL_SECTION_COUNT; i++)
-        base_size += this->vbos[i].cached_solid.length + this->vbos[i].cached_transparent.length + sizeof(chunkvbo_t);
+        base_size += this->sections[i].cached_solid.length + this->sections[i].cached_transparent.length + sizeof(section);
     for (entity_physical *&entity : entities)
         base_size += entity->size();
     return base_size;
@@ -1190,6 +1188,6 @@ void chunk_t::read()
     // Mark chunk as dirty
     for (int vbo_index = 0; vbo_index < VERTICAL_SECTION_COUNT; vbo_index++)
     {
-        vbos[vbo_index].dirty = true;
+        sections[vbo_index].dirty = true;
     }
 }

@@ -7,7 +7,7 @@
 class chunk_t;
 class block_t;
 
-int render_blocks(chunk_t &chunk, int section, bool transparent, int vertexCount);
+int render_section_blocks(chunk_t &chunk, int index, bool transparent, int vertexCount);
 int render_block(chunk_t &chunk, block_t *block, const vec3i &pos, bool transparent);
 int render_cube(chunk_t &chunk, block_t *block, const vec3i &pos, bool transparent);
 int render_cube_special(chunk_t &chunk, block_t *block, const vec3i &pos, bool transparent);

@@ -3,9 +3,9 @@
 #include "blocks.hpp"
 #include "render.hpp"
 
-int render_blocks(chunk_t &chunk, int section, bool transparent, int vertexCount)
+int render_section_blocks(chunk_t &chunk, int index, bool transparent, int vertexCount)
 {
-    vec3i chunk_offset = vec3i(chunk.x * 16, section * 16, chunk.z * 16);
+    vec3i chunk_offset = vec3i(chunk.x * 16, index * 16, chunk.z * 16);
     GX_BeginGroup(GX_QUADS, vertexCount);
     vertexCount = 0;
     // Build the mesh from the blockstates

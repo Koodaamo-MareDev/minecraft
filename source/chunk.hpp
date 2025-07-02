@@ -82,15 +82,15 @@ public:
     }
 };
 
-class chunkvbo_t
+class section
 {
 public:
     bool visible = false;
     bool dirty = false;
-    bool refresh_visibility = false;
     int32_t x = 0;
     uint8_t y = 0;
     int32_t z = 0;
+    chunk_t *chunk = nullptr;
     vbo_buffer_t solid = vbo_buffer_t();
     vbo_buffer_t cached_solid = vbo_buffer_t();
     vbo_buffer_t transparent = vbo_buffer_t();
@@ -107,7 +107,7 @@ public:
         return std::abs((this->x & ~15) - (int(std::floor(player_pos.x)) & ~15)) + std::abs((this->y & ~15) - (int(std::floor(player_pos.y)) & ~15)) + std::abs((this->z & ~15) - (int(std::floor(player_pos.z)) & ~15));
     }
 
-    bool operator<(chunkvbo_t &other)
+    bool operator<(section &other)
     {
         return this->player_taxicab_distance() < other.player_taxicab_distance();
     }
@@ -125,7 +125,7 @@ public:
     block_t blockstates[16 * 16 * WORLD_HEIGHT] = {0};
     uint8_t height_map[16 * 16] = {0};
     uint8_t terrain_map[16 * 16] = {0};
-    chunkvbo_t vbos[VERTICAL_SECTION_COUNT] = {0};
+    section sections[VERTICAL_SECTION_COUNT] = {0};
     uint8_t has_fluid_updates[VERTICAL_SECTION_COUNT] = {1};
     uint32_t light_update_count = 0;
     std::vector<entity_physical *> entities;
@@ -222,11 +222,11 @@ public:
     void light_up();
     void recalculate_height_map();
     void recalculate_visibility(block_t *block, vec3i pos);
-    void recalculate_section_visibility(int section);
+    void refresh_section_block_visibility(int index);
     static void init_floodfill_startpoints();
     void vbo_visibility_flood_fill(vec3i pos);
-    void refresh_vbo_visibility(int section);
-    int build_vbo(int section, bool transparent);
+    void refresh_section_visibility(int index);
+    int build_vbo(int index, bool transparent);
     void update_entities();
 
     void render_entities(float partial_ticks, bool transparency);
@@ -236,9 +236,10 @@ public:
     {
         for (int y = 0; y < VERTICAL_SECTION_COUNT; y++)
         {
-            this->vbos[y].x = x << 4;
-            this->vbos[y].y = y << 4;
-            this->vbos[y].z = z << 4;
+            this->sections[y].x = x << 4;
+            this->sections[y].y = y << 4;
+            this->sections[y].z = z << 4;
+            this->sections[y].chunk = this;
         }
     }
     ~chunk_t();
