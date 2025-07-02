@@ -88,8 +88,6 @@ void world::update()
         current_update_phase = update_sections(current_update_phase);
         elapsed_time = time_diff_us(start_time, time_get());
     }
-    if (elapsed_time >= 100)
-        printf("Got to phase %d in %llu us\n", int(current_update_phase), elapsed_time);
     edit_blocks();
     m_particle_system.update(delta_time);
 }
