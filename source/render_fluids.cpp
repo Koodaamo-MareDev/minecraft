@@ -125,10 +125,10 @@ int render_fluid(chunk_t &chunk, block_t *block, const vec3i &pos)
 
     uint8_t texture_offset = block_properties[uint8_t(flowfluid(block_id))].m_texture_index;
 
-    uint32_t texture_start_x = TEXTURE_X(texture_offset);
-    uint32_t texture_start_y = TEXTURE_Y(texture_offset);
-    uint32_t texture_end_x = texture_start_x + UV_SCALE;
-    uint32_t texture_end_y = texture_start_y + UV_SCALE;
+    vfloat_t texture_start_x = TEXTURE_X(texture_offset);
+    vfloat_t texture_start_y = TEXTURE_Y(texture_offset);
+    vfloat_t texture_end_x = texture_start_x + UV_SCALE;
+    vfloat_t texture_end_y = texture_start_y + UV_SCALE;
 
     vertex_property_t bottomPlaneCoords[4] = {
         {(local_pos + vec3f{-.5f, -.5f, -.5f}), texture_start_x, texture_end_y},
@@ -161,10 +161,10 @@ int render_fluid(chunk_t &chunk, block_t *block, const vec3i &pos)
     }
 
     vertex_property_t topPlaneCoords[4] = {
-        {(local_pos + vec3f{+.5f, -.5f + corner_tops[3], -.5f}), uint32_t(tex_off_x - cos_angle - sin_angle), uint32_t(tex_off_y - cos_angle + sin_angle)},
-        {(local_pos + vec3f{+.5f, -.5f + corner_tops[2], +.5f}), uint32_t(tex_off_x - cos_angle + sin_angle), uint32_t(tex_off_y + cos_angle + sin_angle)},
-        {(local_pos + vec3f{-.5f, -.5f + corner_tops[1], +.5f}), uint32_t(tex_off_x + cos_angle + sin_angle), uint32_t(tex_off_y + cos_angle - sin_angle)},
-        {(local_pos + vec3f{-.5f, -.5f + corner_tops[0], -.5f}), uint32_t(tex_off_x + cos_angle - sin_angle), uint32_t(tex_off_y - cos_angle - sin_angle)},
+        {(local_pos + vec3f{+.5f, -.5f + corner_tops[3], -.5f}), (tex_off_x - cos_angle - sin_angle), (tex_off_y - cos_angle + sin_angle)},
+        {(local_pos + vec3f{+.5f, -.5f + corner_tops[2], +.5f}), (tex_off_x - cos_angle + sin_angle), (tex_off_y + cos_angle + sin_angle)},
+        {(local_pos + vec3f{-.5f, -.5f + corner_tops[1], +.5f}), (tex_off_x + cos_angle + sin_angle), (tex_off_y + cos_angle - sin_angle)},
+        {(local_pos + vec3f{-.5f, -.5f + corner_tops[0], -.5f}), (tex_off_x + cos_angle - sin_angle), (tex_off_y - cos_angle - sin_angle)},
     };
     if (!is_same_fluid(block_id, neighbor_ids[FACE_PY]))
         faceCount += DrawHorizontalQuad(topPlaneCoords[0], topPlaneCoords[1], topPlaneCoords[2], topPlaneCoords[3], is_solid(neighbor_ids[FACE_PY]) ? light : neighbors[FACE_PY]->light);
