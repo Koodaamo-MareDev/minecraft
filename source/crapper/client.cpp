@@ -225,6 +225,8 @@ namespace Crapper
             z = buffer.readInt();
             break;
         }
+        if (buffer.underflow)
+            return false;
         return true;
     }
 
@@ -1788,9 +1790,7 @@ namespace Crapper
         case 0x28:
         {
             // Handle packet 0x28 (entity metadata)
-            buffer.readInt(); // Entity ID
-            DataWatcher metadata;
-            metadata.read(buffer);
+            handleMetadata(buffer);
             break;
         }
         case 0x32:
