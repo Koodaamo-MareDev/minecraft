@@ -378,16 +378,16 @@ int render_face(vec3i pos, uint8_t face, uint32_t texture_index, chunk_t *near, 
         uint8_t *ao_min_target = min_y ? ao_no_op : ao;
         uint8_t *ao_max_target = max_y ? ao_no_op : ao;
         SMOOTH(ao_min_target);
-        vertices[index] = {vertex_pos + (min_y ? vertical_add(cube_vertices[face][index], min_y) : cube_vertices16[face][index]), TEXTURE_NX(texture_index), TEXTURE_PY(texture_index) - min_y};
+        vertices[index] = {vertex_pos + (min_y ? vertical_add(cube_vertices[face][index], min_y) : cube_vertices16[face][index]), TEXTURE_NX(texture_index), TEXTURE_PY(texture_index) - min_y * BASE3D_PIXEL_UV_SCALE};
         index++;
         SMOOTH(ao_max_target);
-        vertices[index] = {vertex_pos + (max_y ? vertical_add(cube_vertices[face][index], max_y) : cube_vertices16[face][index]), TEXTURE_NX(texture_index), TEXTURE_PY(texture_index) - max_y_orig};
+        vertices[index] = {vertex_pos + (max_y ? vertical_add(cube_vertices[face][index], max_y) : cube_vertices16[face][index]), TEXTURE_NX(texture_index), TEXTURE_PY(texture_index) - max_y_orig * BASE3D_PIXEL_UV_SCALE};
         index++;
         SMOOTH(ao_max_target);
-        vertices[index] = {vertex_pos + (max_y ? vertical_add(cube_vertices[face][index], max_y) : cube_vertices16[face][index]), TEXTURE_PX(texture_index), TEXTURE_PY(texture_index) - max_y_orig};
+        vertices[index] = {vertex_pos + (max_y ? vertical_add(cube_vertices[face][index], max_y) : cube_vertices16[face][index]), TEXTURE_PX(texture_index), TEXTURE_PY(texture_index) - max_y_orig * BASE3D_PIXEL_UV_SCALE};
         index++;
         SMOOTH(ao_min_target);
-        vertices[index] = {vertex_pos + (min_y ? vertical_add(cube_vertices[face][index], min_y) : cube_vertices16[face][index]), TEXTURE_PX(texture_index), TEXTURE_PY(texture_index) - min_y};
+        vertices[index] = {vertex_pos + (min_y ? vertical_add(cube_vertices[face][index], min_y) : cube_vertices16[face][index]), TEXTURE_PX(texture_index), TEXTURE_PY(texture_index) - min_y * BASE3D_PIXEL_UV_SCALE};
     }
     else
     {
@@ -501,26 +501,26 @@ void render_item_pixel(uint32_t texture_index, uint8_t x, uint8_t y, bool x_next
 {
     GX_BeginGroup(GX_QUADS, (1 + x_next + y_next) << 2);
     // Render the selected pixel.
-    GX_VertexLit({vec3f(+.5 - x * 0.0625 - 0.0625, -.5 + y * 0.0625, -.5), TEXTURE_X(texture_index) + x + 1, TEXTURE_Y(texture_index) + y}, light, FACE_PX);
-    GX_VertexLit({vec3f(+.5 - x * 0.0625 - 0.0625, -.5 + y * 0.0625 + 0.0625, -.5), TEXTURE_X(texture_index) + x + 1, TEXTURE_Y(texture_index) + y + 1}, light, FACE_PX);
-    GX_VertexLit({vec3f(+.5 - x * 0.0625, -.5 + y * 0.0625 + 0.0625, -.5), TEXTURE_X(texture_index) + x, TEXTURE_Y(texture_index) + y + 1}, light, FACE_PX);
-    GX_VertexLit({vec3f(+.5 - x * 0.0625, -.5 + y * 0.0625, -.5), TEXTURE_X(texture_index) + x, TEXTURE_Y(texture_index) + y}, light, FACE_PX);
+    GX_VertexLit({vec3f(+.5 - x * 0.0625 - 0.0625, -.5 + y * 0.0625, -.5), TEXTURE_X(texture_index) + (x + 1) * BASE3D_PIXEL_UV_SCALE, TEXTURE_Y(texture_index) + y * BASE3D_PIXEL_UV_SCALE}, light, FACE_PX);
+    GX_VertexLit({vec3f(+.5 - x * 0.0625 - 0.0625, -.5 + y * 0.0625 + 0.0625, -.5), TEXTURE_X(texture_index) + (x + 1) * BASE3D_PIXEL_UV_SCALE, TEXTURE_Y(texture_index) + (y + 1) * BASE3D_PIXEL_UV_SCALE}, light, FACE_PX);
+    GX_VertexLit({vec3f(+.5 - x * 0.0625, -.5 + y * 0.0625 + 0.0625, -.5), TEXTURE_X(texture_index) + x * BASE3D_PIXEL_UV_SCALE, TEXTURE_Y(texture_index) + (y + 1) * BASE3D_PIXEL_UV_SCALE}, light, FACE_PX);
+    GX_VertexLit({vec3f(+.5 - x * 0.0625, -.5 + y * 0.0625, -.5), TEXTURE_X(texture_index) + x * BASE3D_PIXEL_UV_SCALE, TEXTURE_Y(texture_index) + y * BASE3D_PIXEL_UV_SCALE}, light, FACE_PX);
 
     if (x_next)
     {
         // Render the selected pixel.
-        GX_VertexLit({vec3f(+.5 - x * 0.0625 - 0.0625, -.5 + y * 0.0625, -.625), TEXTURE_X(texture_index) + x + 1, TEXTURE_Y(texture_index) + y}, light, FACE_PZ);
-        GX_VertexLit({vec3f(+.5 - x * 0.0625 - 0.0625, -.5 + y * 0.0625 + 0.0625, -.625), TEXTURE_X(texture_index) + x + 1, TEXTURE_Y(texture_index) + y + 1}, light, FACE_PZ);
-        GX_VertexLit({vec3f(+.5 - x * 0.0625 - 0.0625, -.5 + y * 0.0625 + 0.0625, -.5), TEXTURE_X(texture_index) + x, TEXTURE_Y(texture_index) + y + 1}, light, FACE_PZ);
-        GX_VertexLit({vec3f(+.5 - x * 0.0625 - 0.0625, -.5 + y * 0.0625, -.5), TEXTURE_X(texture_index) + x, TEXTURE_Y(texture_index) + y}, light, FACE_PZ);
+        GX_VertexLit({vec3f(+.5 - x * 0.0625 - 0.0625, -.5 + y * 0.0625, -.625), TEXTURE_X(texture_index) + (x + 1) * BASE3D_PIXEL_UV_SCALE, TEXTURE_Y(texture_index) + y * BASE3D_PIXEL_UV_SCALE}, light, FACE_PZ);
+        GX_VertexLit({vec3f(+.5 - x * 0.0625 - 0.0625, -.5 + y * 0.0625 + 0.0625, -.625), TEXTURE_X(texture_index) + (x + 1) * BASE3D_PIXEL_UV_SCALE, TEXTURE_Y(texture_index) + (y + 1) * BASE3D_PIXEL_UV_SCALE}, light, FACE_PZ);
+        GX_VertexLit({vec3f(+.5 - x * 0.0625 - 0.0625, -.5 + y * 0.0625 + 0.0625, -.5), TEXTURE_X(texture_index) + x * BASE3D_PIXEL_UV_SCALE, TEXTURE_Y(texture_index) + (y + 1) * BASE3D_PIXEL_UV_SCALE}, light, FACE_PZ);
+        GX_VertexLit({vec3f(+.5 - x * 0.0625 - 0.0625, -.5 + y * 0.0625, -.5), TEXTURE_X(texture_index) + x * BASE3D_PIXEL_UV_SCALE, TEXTURE_Y(texture_index) + y * BASE3D_PIXEL_UV_SCALE}, light, FACE_PZ);
     }
     if (y_next)
     {
         // Render the selected pixel.
-        GX_VertexLit({vec3f(+.5 - x * 0.0625 - 0.0625, -.5 + y * 0.0625, -.625), TEXTURE_X(texture_index) + x + 1, TEXTURE_Y(texture_index) + y}, light, FACE_PY);
-        GX_VertexLit({vec3f(+.5 - x * 0.0625 - 0.0625, -.5 + y * 0.0625, -.5), TEXTURE_X(texture_index) + x + 1, TEXTURE_Y(texture_index) + y + 1}, light, FACE_PY);
-        GX_VertexLit({vec3f(+.5 - x * 0.0625, -.5 + y * 0.0625, -.5), TEXTURE_X(texture_index) + x, TEXTURE_Y(texture_index) + y + 1}, light, FACE_PY);
-        GX_VertexLit({vec3f(+.5 - x * 0.0625, -.5 + y * 0.0625, -.625), TEXTURE_X(texture_index) + x, TEXTURE_Y(texture_index) + y}, light, FACE_PY);
+        GX_VertexLit({vec3f(+.5 - x * 0.0625 - 0.0625, -.5 + y * 0.0625, -.625), TEXTURE_X(texture_index) + (x + 1) * BASE3D_PIXEL_UV_SCALE, TEXTURE_Y(texture_index) + y * BASE3D_PIXEL_UV_SCALE}, light, FACE_PY);
+        GX_VertexLit({vec3f(+.5 - x * 0.0625 - 0.0625, -.5 + y * 0.0625, -.5), TEXTURE_X(texture_index) + (x + 1) * BASE3D_PIXEL_UV_SCALE, TEXTURE_Y(texture_index) + (y + 1) * BASE3D_PIXEL_UV_SCALE}, light, FACE_PY);
+        GX_VertexLit({vec3f(+.5 - x * 0.0625, -.5 + y * 0.0625, -.5), TEXTURE_X(texture_index) + x * BASE3D_PIXEL_UV_SCALE, TEXTURE_Y(texture_index) + (y + 1) * BASE3D_PIXEL_UV_SCALE}, light, FACE_PY);
+        GX_VertexLit({vec3f(+.5 - x * 0.0625, -.5 + y * 0.0625, -.625), TEXTURE_X(texture_index) + x * BASE3D_PIXEL_UV_SCALE, TEXTURE_Y(texture_index) + y * BASE3D_PIXEL_UV_SCALE}, light, FACE_PY);
     }
     // End the group
     GX_EndGroup();
@@ -800,7 +800,7 @@ void draw_particles(camera_t &camera, particle *particles, int count)
         guMtxRotDeg(rot_mtx, 'y', camera.rot.y);
         guVecMultiply(rot_mtx, &vertex, &vertex);
 
-        vertices[i] = vertex_property_t(vertex, x << 2, y << 2);
+        vertices[i] = vertex_property_t(vertex, (x << 2) * BASE3D_PIXEL_UV_SCALE, (y << 2) * BASE3D_PIXEL_UV_SCALE);
     }
 
     // Draw particles on a per-type basis
@@ -850,8 +850,8 @@ void draw_particles(camera_t &camera, particle *particles, int count)
 
                     if (t == PTYPE_BLOCK_BREAK)
                     {
-                        vertex.x_uv += particle.u;
-                        vertex.y_uv += particle.v;
+                        vertex.x_uv += particle.u * BASE3D_PIXEL_UV_SCALE;
+                        vertex.y_uv += particle.v * BASE3D_PIXEL_UV_SCALE;
                         GX_VertexLitF(vertex, particle.brightness);
                     }
                     else if (t == PTYPE_TINY_SMOKE)
@@ -859,8 +859,8 @@ void draw_particles(camera_t &camera, particle *particles, int count)
                         int x = (j == 0 || j == 3);
                         int y = (j > 1);
                         float brightness_value = ((particle.brightness & 0xF) | (particle.brightness >> 4)) * 0.0625f + 0.0625f;
-                        vertex.x_uv = (x << 4) + (int(particle.life_time * 16.0f / float(particle.max_life_time)) << 4);
-                        vertex.y_uv = (y << 4);
+                        vertex.x_uv = ((x << 4) + (int(particle.life_time * 16.0f / float(particle.max_life_time)) << 4)) * BASE3D_PIXEL_UV_SCALE;
+                        vertex.y_uv = (y << 4) * BASE3D_PIXEL_UV_SCALE;
                         vertex.color_r = particle.r * brightness_value;
                         vertex.color_g = particle.g * brightness_value;
                         vertex.color_b = particle.b * brightness_value;
@@ -871,8 +871,8 @@ void draw_particles(camera_t &camera, particle *particles, int count)
                     {
                         int x = (j == 0 || j == 3);
                         int y = (j > 1);
-                        vertex.x_uv = (x << 4) + particle.u;
-                        vertex.y_uv = (y << 4) + particle.v;
+                        vertex.x_uv = ((x << 4) + particle.u) * BASE3D_PIXEL_UV_SCALE;
+                        vertex.y_uv = ((y << 4) + particle.v) * BASE3D_PIXEL_UV_SCALE;
                         GX_VertexLitF(vertex, particle.brightness);
                     }
                 }
@@ -1150,9 +1150,9 @@ void draw_sky(GXColor background)
     // Draw sun
     use_texture(sun_texture);
     GX_BeginGroup(GX_QUADS, 4);
-    GX_Vertex(vertex_property_t(vec3f(-size, +dist, +size), 0, BASE3D_UV_FRAC));
-    GX_Vertex(vertex_property_t(vec3f(+size, +dist, +size), BASE3D_UV_FRAC, BASE3D_UV_FRAC));
-    GX_Vertex(vertex_property_t(vec3f(+size, +dist, -size), BASE3D_UV_FRAC, 0));
+    GX_Vertex(vertex_property_t(vec3f(-size, +dist, +size), 0, 1));
+    GX_Vertex(vertex_property_t(vec3f(+size, +dist, +size), 1, 1));
+    GX_Vertex(vertex_property_t(vec3f(+size, +dist, -size), 1, 0));
     GX_Vertex(vertex_property_t(vec3f(-size, +dist, -size), 0, 0));
     GX_EndGroup();
 
@@ -1160,9 +1160,9 @@ void draw_sky(GXColor background)
     use_texture(moon_texture);
     GX_BeginGroup(GX_QUADS, 4);
     GX_Vertex(vertex_property_t(vec3f(-size, -dist, -size), 0, 0));
-    GX_Vertex(vertex_property_t(vec3f(+size, -dist, -size), BASE3D_UV_FRAC, 0));
-    GX_Vertex(vertex_property_t(vec3f(+size, -dist, +size), BASE3D_UV_FRAC, BASE3D_UV_FRAC));
-    GX_Vertex(vertex_property_t(vec3f(-size, -dist, +size), 0, BASE3D_UV_FRAC));
+    GX_Vertex(vertex_property_t(vec3f(+size, -dist, -size), 1, 0));
+    GX_Vertex(vertex_property_t(vec3f(+size, -dist, +size), 1, 1));
+    GX_Vertex(vertex_property_t(vec3f(-size, -dist, +size), 0, 1));
     GX_EndGroup();
 
     // Enable fog
@@ -1183,8 +1183,11 @@ void draw_sky(GXColor background)
     // The clouds are placed at y=108
     dist = 108.0f * scale;
 
-    // Reset transform and move the clouds
-    transform_view(gertex::get_view_matrix(), guVector{0, 0, float(((current_world->ticks % 40960) + current_world->partial_ticks) * 0.05)});
+    // Reset transform
+    transform_view(gertex::get_view_matrix(), guVector{0, 0, 0});
+
+    // Clouds are moving at a speed of 0.05 blocks per tick.
+    float uv_offset = (current_world->ticks % 40960 + current_world->partial_ticks) * 0.05f / 2048.0f;
 
     // Clouds are a bit yellowish white. They are also affected by the time
     float sky_multiplier = get_sky_multiplier();
@@ -1195,9 +1198,9 @@ void draw_sky(GXColor background)
     // Draw clouds
     use_texture(clouds_texture);
     GX_BeginGroup(GX_QUADS, 4);
-    GX_Vertex(vertex_property_t(vec3f(-size, dist, +size), 0, BASE3D_UV_FRAC << 1, sky_r, sky_g, sky_b));
-    GX_Vertex(vertex_property_t(vec3f(+size, dist, +size), BASE3D_UV_FRAC << 1, BASE3D_UV_FRAC << 1, sky_r, sky_g, sky_b));
-    GX_Vertex(vertex_property_t(vec3f(+size, dist, -size), BASE3D_UV_FRAC << 1, 0, sky_r, sky_g, sky_b));
-    GX_Vertex(vertex_property_t(vec3f(-size, dist, -size), 0, 0, sky_r, sky_g, sky_b));
+    GX_Vertex(vertex_property_t(vec3f(-size, dist, +size), 0, 2 + uv_offset, sky_r, sky_g, sky_b));
+    GX_Vertex(vertex_property_t(vec3f(+size, dist, +size), 2, 2 + uv_offset, sky_r, sky_g, sky_b));
+    GX_Vertex(vertex_property_t(vec3f(+size, dist, -size), 2, 0 + uv_offset, sky_r, sky_g, sky_b));
+    GX_Vertex(vertex_property_t(vec3f(-size, dist, -size), 0, 0 + uv_offset, sky_r, sky_g, sky_b));
     GX_EndGroup();
 }

@@ -226,10 +226,10 @@ int render_torch_with_angle(chunk_t &chunk, block_t *block, const vec3f &vertex_
     GX_VertexLit({vertex_pos + vec3f{0.5f, 0.5f, 0.0625f}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PZ);
     GX_VertexLit({vertex_pos + vec3f{0.5f + ax, -.5f, 0.0625f + az}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PZ);
     // Top side
-    GX_VertexLit({vertex_pos + vec3f{0.0625f + ax * 0.375f, 0.125f, -.0625f + az * 0.375f}, TEXTURE_X(texture_index) + 9. * BASE3D_UV_FRAC_LO, TEXTURE_Y(texture_index) + 8. * BASE3D_UV_FRAC_LO}, lighting, FACE_PY);
-    GX_VertexLit({vertex_pos + vec3f{0.0625f + ax * 0.375f, 0.125f, 0.0625f + az * 0.375f}, TEXTURE_X(texture_index) + 9. * BASE3D_UV_FRAC_LO, TEXTURE_Y(texture_index) + 6. * BASE3D_UV_FRAC_LO}, lighting, FACE_PY);
-    GX_VertexLit({vertex_pos + vec3f{-.0625f + ax * 0.375f, 0.125f, 0.0625f + az * 0.375f}, TEXTURE_X(texture_index) + 7. * BASE3D_UV_FRAC_LO, TEXTURE_Y(texture_index) + 6. * BASE3D_UV_FRAC_LO}, lighting, FACE_PY);
-    GX_VertexLit({vertex_pos + vec3f{-.0625f + ax * 0.375f, 0.125f, -.0625f + az * 0.375f}, TEXTURE_X(texture_index) + 7. * BASE3D_UV_FRAC_LO, TEXTURE_Y(texture_index) + 8. * BASE3D_UV_FRAC_LO}, lighting, FACE_PY);
+    GX_VertexLit({vertex_pos + vec3f{0.0625f + ax * 0.375f, 0.125f, -.0625f + az * 0.375f}, TEXTURE_X(texture_index) + 9. * BASE3D_BLOCK_UV_SCALE, TEXTURE_Y(texture_index) + 8. * BASE3D_BLOCK_UV_SCALE}, lighting, FACE_PY);
+    GX_VertexLit({vertex_pos + vec3f{0.0625f + ax * 0.375f, 0.125f, 0.0625f + az * 0.375f}, TEXTURE_X(texture_index) + 9. * BASE3D_BLOCK_UV_SCALE, TEXTURE_Y(texture_index) + 6. * BASE3D_BLOCK_UV_SCALE}, lighting, FACE_PY);
+    GX_VertexLit({vertex_pos + vec3f{-.0625f + ax * 0.375f, 0.125f, 0.0625f + az * 0.375f}, TEXTURE_X(texture_index) + 7. * BASE3D_BLOCK_UV_SCALE, TEXTURE_Y(texture_index) + 6. * BASE3D_BLOCK_UV_SCALE}, lighting, FACE_PY);
+    GX_VertexLit({vertex_pos + vec3f{-.0625f + ax * 0.375f, 0.125f, -.0625f + az * 0.375f}, TEXTURE_X(texture_index) + 7. * BASE3D_BLOCK_UV_SCALE, TEXTURE_Y(texture_index) + 8. * BASE3D_BLOCK_UV_SCALE}, lighting, FACE_PY);
 
     return 20;
 }

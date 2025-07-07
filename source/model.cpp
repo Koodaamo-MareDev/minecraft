@@ -70,8 +70,8 @@ void modelbox_t::prepare()
     GX_BeginGroup(GX_QUADS, 24);
     for (int i = 0; i < 24; i++)
     {
-        faces[i].x_uv = (faces[i].x_uv + uv_off_x) * uv_scale_x * BASE3D_UV_FRAC;
-        faces[i].y_uv = (faces[i].y_uv + uv_off_y) * uv_scale_y * BASE3D_UV_FRAC;
+        faces[i].x_uv = (faces[i].x_uv + uv_off_x) * uv_scale_x;
+        faces[i].y_uv = (faces[i].y_uv + uv_off_y) * uv_scale_y;
         faces[i].pos = faces[i].pos * (1 / 16.f);
         GX_VertexLitF(faces[i], 255); // Default to full brightness
     }

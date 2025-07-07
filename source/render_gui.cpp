@@ -1,11 +1,11 @@
 #include "render_gui.hpp"
 #include <math/vec2i.hpp>
 #include "font_tile_widths.hpp"
-int draw_textured_quad(GXTexObj &texture, int32_t x, int32_t y, int32_t w, int32_t h, uint32_t u1, uint32_t v1, uint32_t u2, uint32_t v2, float scale)
+int draw_textured_quad(GXTexObj &texture, int32_t x, int32_t y, int32_t w, int32_t h, vfloat_t u1, vfloat_t v1, vfloat_t u2, vfloat_t v2, float scale)
 {
     use_texture(texture);
-    float scale_u = float(BASE3D_UV_FRAC) / GX_GetTexObjWidth(&texture);
-    float scale_v = float(BASE3D_UV_FRAC) / GX_GetTexObjHeight(&texture);
+    float scale_u = 1. / GX_GetTexObjWidth(&texture);
+    float scale_v = 1. / GX_GetTexObjHeight(&texture);
     u1 *= scale_u;
     u2 *= scale_u;
     v1 *= scale_v;
@@ -20,14 +20,14 @@ int draw_textured_quad(GXTexObj &texture, int32_t x, int32_t y, int32_t w, int32
 }
 
 // NOTE: This function doesn't load the texture automatically because it's used by font rendering. Make sure to call use_texture before calling this function.
-int draw_colored_sprite(GXTexObj &texture, vec2i pos, vec2i size, uint32_t u1, uint32_t v1, uint32_t u2, uint32_t v2, GXColor color, float scale)
+int draw_colored_sprite(GXTexObj &texture, vec2i pos, vec2i size, vfloat_t u1, vfloat_t v1, vfloat_t u2, vfloat_t v2, GXColor color, float scale)
 {
     uint8_t r = color.r;
     uint8_t g = color.g;
     uint8_t b = color.b;
     uint8_t a = color.a;
-    float scale_u = float(BASE3D_UV_FRAC) / GX_GetTexObjWidth(&texture);
-    float scale_v = float(BASE3D_UV_FRAC) / GX_GetTexObjHeight(&texture);
+    float scale_u = 1. / GX_GetTexObjWidth(&texture);
+    float scale_v = 1. / GX_GetTexObjHeight(&texture);
     u1 *= scale_u;
     u2 *= scale_u;
     v1 *= scale_v;
@@ -42,14 +42,14 @@ int draw_colored_sprite(GXTexObj &texture, vec2i pos, vec2i size, uint32_t u1, u
 }
 
 // NOTE: This function doesn't load the texture automatically because it's used by font rendering. Make sure to call use_texture before calling this function.
-int __attribute__((noinline)) draw_colored_sprite_3d(GXTexObj &texture, vec3f center, vec3f size, vec3f offset, vec3f right, vec3f up, uint32_t u1, uint32_t v1, uint32_t u2, uint32_t v2, GXColor color)
+int __attribute__((noinline)) draw_colored_sprite_3d(GXTexObj &texture, vec3f center, vec3f size, vec3f offset, vec3f right, vec3f up, vfloat_t u1, vfloat_t v1, vfloat_t u2, vfloat_t v2, GXColor color)
 {
     uint8_t r = color.r;
     uint8_t g = color.g;
     uint8_t b = color.b;
     uint8_t a = color.a;
-    float scale_u = float(BASE3D_UV_FRAC) / GX_GetTexObjWidth(&texture);
-    float scale_v = float(BASE3D_UV_FRAC) / GX_GetTexObjHeight(&texture);
+    float scale_u = 1. / GX_GetTexObjWidth(&texture);
+    float scale_v = 1. / GX_GetTexObjHeight(&texture);
     u1 *= scale_u;
     u2 *= scale_u;
     v1 *= scale_v;
@@ -93,8 +93,8 @@ vfloat_t __attribute__((noinline)) text_width_3d(std::string str)
 void __attribute__((noinline)) draw_text_3d(vec3f pos, std::string str, GXColor color)
 {
     vec3f char_size = vec3f(0.25);
-    vec3f right_vec = angles_to_vector(0, yrot + 90);
-    vec3f up_vec = angles_to_vector(xrot + 90, yrot);
+    vec3f right_vec = -angles_to_vector(0, yrot + 90);
+    vec3f up_vec = -angles_to_vector(xrot + 90, yrot);
 
     // Enable direct colors
     GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
@@ -145,19 +145,19 @@ int draw_colored_quad(int32_t x, int32_t y, int32_t w, int32_t h, uint8_t r, uin
 {
     use_texture(icons_texture);
     GX_BeginGroup(GX_QUADS, 4);
-    GX_Vertex(vertex_property_t(scale * vec3f(x, y, 0), 0, 16, r, g, b, a));
-    GX_Vertex(vertex_property_t(scale * vec3f(x + w, y, 0), 8, 16, r, g, b, a));
-    GX_Vertex(vertex_property_t(scale * vec3f(x + w, y + h, 0), 8, 24, r, g, b, a));
-    GX_Vertex(vertex_property_t(scale * vec3f(x, y + h, 0), 0, 24, r, g, b, a));
+    GX_Vertex(vertex_property_t(scale * vec3f(x, y, 0), 0 * BASE3D_PIXEL_UV_SCALE, 16 * BASE3D_PIXEL_UV_SCALE, r, g, b, a));
+    GX_Vertex(vertex_property_t(scale * vec3f(x + w, y, 0), 8 * BASE3D_PIXEL_UV_SCALE, 16 * BASE3D_PIXEL_UV_SCALE, r, g, b, a));
+    GX_Vertex(vertex_property_t(scale * vec3f(x + w, y + h, 0), 8 * BASE3D_PIXEL_UV_SCALE, 24 * BASE3D_PIXEL_UV_SCALE, r, g, b, a));
+    GX_Vertex(vertex_property_t(scale * vec3f(x, y + h, 0), 0 * BASE3D_PIXEL_UV_SCALE, 24 * BASE3D_PIXEL_UV_SCALE, r, g, b, a));
     GX_EndGroup();
     return 4;
 }
 
-int fill_screen_texture(GXTexObj &texture, gertex::GXView &view, int32_t u1, int32_t v1, int32_t u2, int32_t v2, float scale)
+int fill_screen_texture(GXTexObj &texture, gertex::GXView &view, vfloat_t u1, vfloat_t v1, vfloat_t u2, vfloat_t v2, float scale)
 {
     use_texture(texture);
-    float scale_u = float(BASE3D_UV_FRAC) / GX_GetTexObjWidth(&texture);
-    float scale_v = float(BASE3D_UV_FRAC) / GX_GetTexObjHeight(&texture);
+    float scale_u = 1.;// / GX_GetTexObjWidth(&texture);
+    float scale_v = 1.;// / GX_GetTexObjHeight(&texture);
     u1 *= scale_u;
     u2 *= scale_u;
     v1 *= scale_v;

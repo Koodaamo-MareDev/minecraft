@@ -653,8 +653,8 @@ void world::destroy_block(const vec3i pos, block_t *old_block)
     particle.type = PTYPE_BLOCK_BREAK;
     particle.size = 8;
     particle.brightness = 0xFF;
-    int u = TEXTURE_X(texture_index);
-    int v = TEXTURE_Y(texture_index);
+    int u = PARTICLE_X(texture_index);
+    int v = PARTICLE_Y(texture_index);
     for (int i = 0; i < 64; i++)
     {
         // Randomize the particle position and velocity
@@ -1001,8 +1001,8 @@ void world::draw_selected_block()
     // Transform the selected block position
     transform_view_screen(gertex::get_view_matrix(), selectedBlockPos, guVector{.75f, .75f, .75f}, guVector{10, 45, 180});
 
-    uint32_t tex_x = TEXTURE_X(texture_index);
-    uint32_t tex_y = TEXTURE_Y(texture_index);
+    uint16_t tex_x = PARTICLE_X(texture_index);
+    uint16_t tex_y = PARTICLE_Y(texture_index);
 
     // Opaque pass - items are always drawn in the opaque pass
     GX_SetZMode(GX_TRUE, GX_ALWAYS, GX_TRUE);
@@ -1407,8 +1407,8 @@ void world::update_player()
                     particle.size = 8;
                     particle.brightness = 0xFF;
                     int texture_index = get_default_texture_index(targeted_block->get_blockid());
-                    int u = TEXTURE_X(texture_index);
-                    int v = TEXTURE_Y(texture_index);
+                    int u = PARTICLE_X(texture_index);
+                    int v = PARTICLE_Y(texture_index);
 
                     // Calculate the bounds of the block to spawn particles around
                     vec3f b_min = vec3f(player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z) + vec3f(1.0, 1.0, 1.0);
