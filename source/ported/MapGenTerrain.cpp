@@ -87,7 +87,12 @@ namespace javaport
                                 float noise_value = noise_2d[index & 0xFF];
                                 float noise_threshold = lerpf(0.0f, 48.0f, std::clamp((noise_value * 4.0f) * noise_value * noise_value, 0.0f, 1.0f));
                                 float noise_height = 56 + noise_value * noise_threshold;
-                                if (y < noise_height && (y < sea_level || z1 > 0))
+                                float stone_chance = noise_value - 0.5f;
+                                if (stone_chance > 0.0f)
+                                    stone_chance *= 1.5f;
+                                else if (stone_chance < -0.25f)
+                                    stone_chance *= 0.35f;
+                                if (y < noise_height && (y < sea_level || z1 < stone_chance))
                                 {
                                     block_id = BlockID::stone;
                                 }
