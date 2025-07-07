@@ -513,9 +513,12 @@ void chunk_t::refresh_section_visibility(int index)
 {
     // Converts a face pair to a bitmask for visibility flags.
     // Assumes a != b
-    auto faces_to_index = [](int a, int b)
+    auto faces_to_index = [](uint8_t a, uint8_t b)
     {
-        return 1 << (a * 5 + (b < a ? b : b - 1));
+        int mask = 1 << (a * 5 + (b < a ? b : b - 1));
+        std::swap(a, b);
+        mask |= 1 << (a * 5 + (b < a ? b : b - 1));
+        return mask;
     };
     section &vbo = this->sections[index];
 
@@ -554,7 +557,6 @@ void chunk_t::refresh_section_visibility(int index)
         return;
     }
     vbo.visibility_flags = 0;
-    std::memset(floodfill_faces_touched, 0, sizeof(floodfill_faces_touched));
     floodfill_flood_id = 2;
     for (uint32_t i = 0; i < floodfill_start_points.size(); i++)
     {
@@ -577,7 +579,7 @@ void chunk_t::refresh_section_visibility(int index)
                 if (floodfill_faces_touched[j])
                     for (int k = 0; k < 6; k++)
                         if (j != k && floodfill_faces_touched[k])
-                            vbo.visibility_flags |= faces_to_index(j, k) | faces_to_index(k, j);
+                            vbo.visibility_flags |= faces_to_index(j, k);
         }
         else
         {

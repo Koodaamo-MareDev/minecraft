@@ -369,24 +369,33 @@ void world::calculate_visibility()
     // Assumes a != b
     auto faces_to_index = [](uint8_t a, uint8_t b)
     {
-        return 1 << (a * 5 + (b < a ? b : b - 1));
+        int mask = 1 << (a * 5 + (b < a ? b : b - 1));
+        std::swap(a, b);
+        mask |= 1 << (a * 5 + (b < a ? b : b - 1));
+        return mask;
     };
 
     std::deque<section_node> section_queue;
     std::deque<section *> visited;
-    section_node entry;
-    entry.sect = section_at(vec3i(int(player.m_entity->position.x), int(player.m_entity->position.y), int(player.m_entity->position.z)));
+    vec3f fpos = player.m_entity->get_position(std::fmod(partial_ticks, 1)) + vec3f(0, player.m_entity->y_offset, 0);
+    for (int x = -1; x <= 1; x++)
+        for (int y = -1; y <= 1; y++)
+            for (int z = -1; z <= 1; z++)
+            {
+                section_node entry;
+                entry.sect = section_at(vec3i(int(fpos.x) + x * 8, int(fpos.y) + y * 8, int(fpos.z) + z * 8));
 
-    // Check if there is a VBO at the player's position
-    if (!entry.sect)
-        return;
+                // Check if there is a VBO at the player's position
+                if (!entry.sect)
+                    return;
 
-    // Initialize the rest of the entry node
-    entry.from = -1;
-    for (uint8_t i = 0; i < 6; i++)
-        entry.dirs[i] = 0;
-    section_queue.push_back(entry);
-    visited.push_front(entry.sect);
+                // Initialize the rest of the entry node
+                entry.from = -1;
+                for (uint8_t i = 0; i < 6; i++)
+                    entry.dirs[i] = 0;
+                section_queue.push_back(entry);
+                visited.push_front(entry.sect);
+            }
 
     while (!section_queue.empty())
     {
@@ -414,11 +423,11 @@ void world::calculate_visibility()
             if (node.from != -1)
             {
                 // Check if the node is visible from the face we entered
-                if (!(node.sect->visibility_flags & (faces_to_index(node.from, through) | faces_to_index(through, node.from))))
+                if (!(node.sect->visibility_flags & (faces_to_index(node.from, through))))
                     return;
             }
 
-            vec3f section_offset = vec3f(pos.x + 8, pos.y + 8, pos.z + 8) - player.m_entity->position;
+            vec3f section_offset = vec3f(pos.x + 8, pos.y + 8, pos.z + 8) - fpos;
 
             // Check if the section is within the render distance
             if (std::abs(section_offset.x) + std::abs(section_offset.z) > RENDER_DISTANCE)
