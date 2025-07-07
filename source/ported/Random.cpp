@@ -60,7 +60,7 @@ namespace javaport
 
     int64_t Random::nextLong()
     {
-        return ((int64_t)next(32) << 32) | next(32);
+        return ((int64_t)next(32) << 32) + next(32);
     }
 
     int StringHashCode(const std::string &value)
