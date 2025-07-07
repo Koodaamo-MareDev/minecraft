@@ -592,9 +592,9 @@ frustum_t calculate_frustum(camera_t &camera)
 
     // Calculate the 4 perspective frustum planes (not near and far)
     guVector right_vec = -angles_to_vector(camera.rot.x, camera.rot.y + 90 + half_fov + fov_margin);
-    guVector left_vec = -angles_to_vector(camera.rot.x, camera.rot.y - 90 - half_fov + fov_margin);
+    guVector left_vec = -angles_to_vector(camera.rot.x, camera.rot.y - 90 - half_fov - fov_margin);
     guVector up_vec = -angles_to_vector(camera.rot.x + 90 + half_fov + fov_margin, camera.rot.y);
-    guVector down_vec = -angles_to_vector(camera.rot.x - 90 - half_fov + fov_margin, camera.rot.y);
+    guVector down_vec = -angles_to_vector(camera.rot.x - 90 - half_fov - fov_margin, camera.rot.y);
 
     // Calculate points on the near and far planes
     guVector near_center = (vec3f(forward) * (camera.near));
