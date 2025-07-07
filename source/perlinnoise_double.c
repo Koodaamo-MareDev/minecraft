@@ -19,7 +19,7 @@ static int p[B + B + 2];
 static double g3[B + B + 2][3];
 static double g2[B + B + 2][2];
 static double g1[B + B + 2];
-static int start = 1;
+static int start = 0;
 
 static void init(void);
 
