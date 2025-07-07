@@ -1,5 +1,6 @@
 #include "sounds.hpp"
 #include <cstring>
+#include "ported/Random.hpp"
 
 std::vector<std::string> music_files(
     {"calm1.ogg",
@@ -17,15 +18,16 @@ std::vector<std::string> music_files(
 
 std::string get_random_music()
 {
+    static javaport::Random random;
     if (music_files.empty())
     {
         return "";
     }
 
-    return music_files[rand() % music_files.size()];
+    return music_files[random.nextInt(music_files.size())];
 }
 
-std::map<std::string, aiff_container*> sound_map;
+std::map<std::string, aiff_container *> sound_map;
 
 aiff_container *get_sound(std::string name)
 {
@@ -46,7 +48,7 @@ aiff_container *get_sound(std::string name)
     size_t size = ftell(file);
     fseek(file, 0, SEEK_SET);
 
-    uint8_t* data = new(std::align_val_t(32)) uint8_t[size];
+    uint8_t *data = new (std::align_val_t(32)) uint8_t[size];
     if (!data)
     {
         fclose(file);
@@ -58,19 +60,19 @@ aiff_container *get_sound(std::string name)
     fclose(file);
 
     aiff_container *sound = new aiff_container(data);
-    if(!sound->data)
+    if (!sound->data)
     {
         // Aiff validation failed
         delete sound;
         delete[] data;
         return nullptr;
     }
-    
+
     sound_map[name] = sound;
     return sound;
 }
 
-aiff_container* randomize_sound(std::string name, int count)
+aiff_container *randomize_sound(std::string name, int count)
 {
     name += std::to_string((rand() % count) + 1);
     return get_sound(name);
