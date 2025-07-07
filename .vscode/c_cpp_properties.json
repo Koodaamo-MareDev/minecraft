@@ -13,7 +13,10 @@
             ],
             "defines": [
                 "HW_RVL",
-                "__wii__"
+                "__wii__",
+                "MINIZ_NO_ZLIB_COMPATIBLE_NAMES",
+                "ITEM_DESYNC_FIX",
+                "MINIZ_NO_ARCHIVE_APIS"
             ],
             "windowsSdkVersion": "10.0.19041.0",
             "compilerPath": "C:/devkitPro/devkitPPC/bin/powerpc-eabi-g++.exe",
