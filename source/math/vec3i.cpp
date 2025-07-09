@@ -71,3 +71,8 @@ uint32_t vec3i::sqr_magnitude() const
 {
     return uint32_t(x * x) + uint32_t(y * y) + uint32_t(z * z);
 }
+
+vec3i::operator vec3f() const
+{
+    return vec3f(static_cast<vfloat_t>(x), static_cast<vfloat_t>(y), static_cast<vfloat_t>(z));
+}

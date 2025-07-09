@@ -55,6 +55,9 @@ public:
         return result;
     }
 
+    // Conversion operator to vec3i
+    operator vec3i() const;
+
 #if HW_RVL
     vec3f(guVector a) : x(a.x), y(a.y), z(a.z) {}
     operator guVector() const;

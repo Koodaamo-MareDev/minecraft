@@ -80,6 +80,11 @@ vfloat_t vec3f::sqr_magnitude() const
     return x * x + y * y + z * z;
 }
 
+vec3f::operator vec3i() const
+{
+    return vec3i(static_cast<int32_t>(x), static_cast<int32_t>(y), static_cast<int32_t>(z));
+}
+
 #if HW_RVL
 vec3f::operator guVector() const
 {

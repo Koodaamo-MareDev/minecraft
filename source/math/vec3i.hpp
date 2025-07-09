@@ -33,6 +33,7 @@ public:
     {
         return hash() < a.hash();
     }
+    operator vec3f() const;
 };
 
 inline vec3i operator*(int32_t const &a, vec3i const &b)
