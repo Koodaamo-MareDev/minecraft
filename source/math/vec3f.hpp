@@ -45,6 +45,11 @@ public:
         return vec3f{std::abs(x), std::abs(y), std::abs(z)};
     }
 
+    vec3i round() const
+    {
+        return vec3i(static_cast<int32_t>(std::round(x)), static_cast<int32_t>(std::round(y)), static_cast<int32_t>(std::round(z)));
+    }
+
     // Returns the vector split into three axis-aligned vectors
     std::array<vec3f, 3> split() const
     {
