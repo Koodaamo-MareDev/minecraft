@@ -483,7 +483,7 @@ void world::edit_blocks()
     block_t selected_block = block_t{uint8_t(player.selected_item->id & 0xFF), 0x7F, uint8_t(player.selected_item->meta & 0xFF)};
     bool finish_destroying = should_destroy_block && player.block_mine_progress >= 1.0f;
 
-    player.draw_block_outline = raycast_precise(vec3f(player_pos.x + .5, player_pos.y + .5, player_pos.z + .5), vec3f(forward.x, forward.y, forward.z), 4, &player.raycast_pos, &player.raycast_face, player.block_bounds);
+    player.draw_block_outline = raycast_precise(vec3f(player_pos.x, player_pos.y, player_pos.z), vec3f(forward.x, forward.y, forward.z), 4, &player.raycast_pos, &player.raycast_face, player.block_bounds);
     if (player.draw_block_outline)
     {
         BlockID new_blockid = finish_destroying ? BlockID::air : selected_block.get_blockid();
@@ -766,7 +766,7 @@ void world::draw(camera_t &camera)
     GX_SetCullMode(GX_CULL_BACK);
 
     // Prepare the transformation matrix
-    transform_view(gertex::get_view_matrix(), guVector{0, 0, 0});
+    transform_view(gertex::get_view_matrix(), vec3f(0.5));
 
     // Prepare opaque rendering parameters
     GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
@@ -846,7 +846,7 @@ void world::draw_scene(bool opaque)
     {
         section *&sect = pair.first;
         vbo_buffer_t *&buffer = pair.second;
-        transform_view(gertex::get_view_matrix(), vec3f(sect->x, sect->y, sect->z));
+        transform_view(gertex::get_view_matrix(), vec3f(sect->x, sect->y, sect->z) + vec3f(0.5));
         GX_CallDispList(buffer->buffer, buffer->length);
     }
 
@@ -874,7 +874,7 @@ void world::draw_scene(bool opaque)
             gertex::set_blending(gertex::GXBlendMode::multiply2);
 
             // Apply the transformation for the block breaking animation
-            vec3f adjusted_offset = vec3f(player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z);
+            vec3f adjusted_offset = vec3f(player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z) + vec3f(0.5);
             vec3f towards_camera = vec3f(player_pos) - adjusted_offset;
             towards_camera.fast_normalize();
             towards_camera = towards_camera * 0.002;
@@ -901,13 +901,13 @@ void world::draw_scene(bool opaque)
     if (!opaque && player.draw_block_outline)
     {
         GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
-        vec3f outline_pos = player.raycast_pos - vec3f(0.5, 0.5, 0.5);
+        vec3f outline_pos = player.raycast_pos;
 
         vec3f towards_camera = vec3f(player_pos) - outline_pos;
         towards_camera.fast_normalize();
         towards_camera = towards_camera * 0.002;
 
-        vec3f b_min = vec3f(player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z) + vec3f(1.0, 1.0, 1.0);
+        vec3f b_min = vec3f(player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z) + vec3f(1.0);
         vec3f b_max = vec3f(player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z);
         for (aabb_t &bounds : player.block_bounds)
         {
@@ -925,7 +925,7 @@ void world::draw_scene(bool opaque)
         block_outer_bounds.min = b_min - floor_b_min;
         block_outer_bounds.max = b_max - floor_b_min;
 
-        transform_view(gertex::get_view_matrix(), floor_b_min + towards_camera - vec3f(0.5, 0.5, 0.5));
+        transform_view(gertex::get_view_matrix(), floor_b_min + towards_camera);
 
         // Draw the block outline
         draw_bounds(&block_outer_bounds);
@@ -940,7 +940,7 @@ void world::draw_selected_block()
 
     uint8_t light_value = 0;
     // Get the block at the player's position
-    block_t *view_block = get_block_at(vec3i(std::round(player_pos.x), std::round(player_pos.y), std::round(player_pos.z)));
+    block_t *view_block = get_block_at(current_world->player.m_entity->get_foot_blockpos());
     if (view_block)
     {
         // Set the light level of the selected block

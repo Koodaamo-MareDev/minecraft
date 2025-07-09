@@ -40,7 +40,7 @@ bool entity_physical::can_remove()
         return true;
     if (entity_pos.y > 255)
         return false;
-    vec3i int_pos = vec3i(std::floor(entity_pos.x), std::floor(entity_pos.y), std::floor(entity_pos.z));
+    vec3i int_pos = entity_pos.round();
     chunk_t *curr_chunk = get_chunk_from_pos(int_pos);
     if (!curr_chunk)
         return true;
@@ -156,7 +156,7 @@ void entity_physical::tick()
             for (int i = 0; i < 1 + width * 20; i++)
             {
                 // Randomize the particle position and velocity
-                particle.position = position + vec3f(rng.nextFloat() * 2 - 1, 0, rng.nextFloat() * 2 - 1) * width - vec3f(0.5, 0.5, 0.5);
+                particle.position = position + vec3f(rng.nextFloat() * 2 - 1, 0, rng.nextFloat() * 2 - 1) * width;
                 particle.position.y = std::floor(aabb.min.y + 1);
                 particle.velocity = velocity;
                 particle.velocity.y -= 0.2 * rng.nextFloat();
@@ -173,7 +173,7 @@ void entity_physical::tick()
             {
                 particle.u = rng.nextInt(4) + 3;
                 // Randomize the particle position and velocity
-                particle.position = position + vec3f(rng.nextFloat() * 2 - 1, 0, rng.nextFloat() * 2 - 1) * width - vec3f(0.5, 0.5, 0.5);
+                particle.position = position + vec3f(rng.nextFloat() * 2 - 1, 0, rng.nextFloat() * 2 - 1) * width;
                 particle.position.y = std::floor(aabb.min.y + 1);
                 particle.velocity = velocity;
 
@@ -276,7 +276,7 @@ void entity_physical::render(float partial_ticks, bool transparency)
     {
         vec3f entity_position = get_position(partial_ticks);
         entity_position.y = (aabb.max.y + aabb.min.y) * 0.5;
-        vec3i block_pos = vec3i(std::floor(entity_position.x), std::floor(entity_position.y + 0.5), std::floor(entity_position.z));
+        vec3i block_pos = (entity_position + vec3f(0, 0.5, 0)).round();
         block_t *block = get_block_at(block_pos, chunk);
         if (block && !properties(block->id).m_solid)
         {
@@ -284,7 +284,7 @@ void entity_physical::render(float partial_ticks, bool transparency)
         }
         // Render a mob spawner at the entity's position
         block_t block_state = {uint8_t(BlockID::bricks), 0x7F, 0, light_level};
-        transform_view(gertex::get_view_matrix(), entity_position - vec3f(0.5, 0.5, 0.5), (aabb.max - aabb.min));
+        transform_view(gertex::get_view_matrix(), entity_position, (aabb.max - aabb.min));
 
         // Restore default texture
         use_texture(terrain_texture);
@@ -560,7 +560,7 @@ void entity_explosive_block::render(float partial_ticks, bool transparency)
     block_state.visibility_flags = 0x7F;
 
     // Draw the selected block
-    transform_view(gertex::get_view_matrix(), get_position(partial_ticks) - vec3f(0.5, 0, 0.5));
+    transform_view(gertex::get_view_matrix(), get_position(partial_ticks));
 
     if ((fuse / 5) % 2 == 1)
         use_texture(white_texture);
@@ -703,7 +703,7 @@ void entity_creeper::render(float partial_ticks, bool transparency)
     vec3f entity_position = get_position(partial_ticks);
     vec3f entity_rotation = get_rotation(partial_ticks);
 
-    vec3i block_pos = vec3i(std::floor(entity_position.x), std::floor(entity_position.y), std::floor(entity_position.z));
+    vec3i block_pos = entity_position.round();
     block_t *block = get_block_at(block_pos, chunk);
     if (block && !properties(block->id).m_solid)
     {
@@ -738,7 +738,7 @@ void entity_creeper::render(float partial_ticks, bool transparency)
 
     creeper_model.speed = h_velocity.magnitude() * 30;
 
-    creeper_model.pos = entity_position - vec3f(0.5, 0.5, 0.5);
+    creeper_model.pos = entity_position;
     creeper_model.pos.y += y_offset;
     creeper_model.rot.y = body_rotation_y;
     creeper_model.head_rot = vec3f(entity_rotation.x, entity_rotation.y, 0);
@@ -824,7 +824,7 @@ void entity_item::render(float partial_ticks, bool transparency)
         entity_position = vec3f::lerp(entity_position, target, factor);
     }
 
-    vec3i block_pos = vec3i(std::floor(entity_position.x), std::floor(entity_position.y), std::floor(entity_position.z));
+    vec3i block_pos = entity_position.round();
     block_t *light_block = get_block_at(block_pos, chunk);
     if (light_block && !properties(light_block->id).m_solid)
     {
@@ -852,7 +852,7 @@ void entity_item::render(float partial_ticks, bool transparency)
     block_t block = {uint8_t(item.id & 0xFF), 0x7F, uint8_t(item_stack.meta & 0xFF), 0xF, 0xF};
     block.light = light_level;
 
-    vec3f anim_offset = vec3f(-0.5, std::sin((ticks_existed + partial_ticks) * M_1_PI * 0.25) * 0.125 - 0.375, -0.5);
+    vec3f anim_offset = vec3f(0, std::sin((ticks_existed + partial_ticks) * M_1_PI * 0.25) * 0.125 + 0.125, 0);
     vec3f dupe_offset = vec3f(0.0625);
     // Draw the item (twice if there are multiple items)
     for (int i = 0; i <= multi; i++)
@@ -1016,7 +1016,7 @@ void entity_living::render(float partial_ticks, bool transparency)
     }
     vec3f entity_position = get_position(partial_ticks);
     vec3f entity_rotation = get_rotation(partial_ticks);
-    vec3i block_pos = vec3i(std::floor(entity_position.x), std::floor(entity_position.y), std::floor(entity_position.z));
+    vec3i block_pos = entity_position.round();
     block_t *block = get_block_at(block_pos, nullptr);
     if (block && !properties(block->id).m_solid)
     {
@@ -1229,15 +1229,15 @@ void entity_player_mp::render(float partial_ticks, bool transparency)
         bg_size.y += 0.03125;
         vec3f right_vec = -angles_to_vector(0, yrot + 90);
         vec3f up_vec = -angles_to_vector(xrot + 90, yrot);
-        draw_colored_sprite_3d(white_texture, vec3f(-0.5, 1.875, -0.5), bg_size, vec3f(0, -0.03125 * 0.5, 0), right_vec, up_vec, 0, 0, 1, 1, GXColor{0, 0, 0, 0x3F});
+        draw_colored_sprite_3d(white_texture, vec3f(0, 2.375, 0), bg_size, vec3f(0, -0.03125 * 0.5, 0), right_vec, up_vec, 0, 0, 1, 1, GXColor{0, 0, 0, 0x3F});
 
         // Render partially transparent name tag (as seen behind walls)
-        draw_text_3d(vec3f(-0.5, 1.875, -0.5), player_name, GXColor{0xFF, 0xFF, 0xFF, 0x3F});
+        draw_text_3d(vec3f(0, 2.375, 0), player_name, GXColor{0xFF, 0xFF, 0xFF, 0x3F});
 
         // Render the name tag normally
         gertex::use_fog(true);
         GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
-        draw_text_3d(vec3f(-0.5, 1.875, -0.5), player_name, GXColor{0xFF, 0xFF, 0xFF, 0xFF});
+        draw_text_3d(vec3f(0, 2.375, 0), player_name, GXColor{0xFF, 0xFF, 0xFF, 0xFF});
 
         // The player should not render in the transparent pass
         return;
@@ -1256,7 +1256,7 @@ void entity_player_mp::render(float partial_ticks, bool transparency)
         player_model.speed = lerpd(player_model.speed, 0, 0.15);
     }
 
-    player_model.pos = entity_position - vec3f(0.5);
+    player_model.pos = entity_position;
     player_model.pos.y += y_offset;
     player_model.rot = vec3f(0, body_rotation_y, 0);
     player_model.head_rot = vec3f(entity_rotation.x, entity_rotation.y, 0);

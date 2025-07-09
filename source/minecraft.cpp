@@ -961,7 +961,7 @@ void Render(guVector chunkPos, void *buffer, u32 length)
 void UpdateCamera(camera_t &camera)
 {
     entity_player_local *player = current_world->player.m_entity;
-    player_pos = player->get_position(std::fmod(current_world->partial_ticks, 1)) - vec3f(0.5, 0.5, 0.5);
+    player_pos = player->get_position(std::fmod(current_world->partial_ticks, 1));
 
     // View bobbing
     static float view_bob_angle = 0;
@@ -978,8 +978,8 @@ void UpdateCamera(camera_t &camera)
     }
     else
     {
-        target_view_bob_offset = vec3f(0, 0, 0);
-        target_view_bob_screen_offset = vec3f(0, 0, 0);
+        target_view_bob_offset = vec3f(0);
+        target_view_bob_screen_offset = vec3f(0);
     }
     current_world->player.view_bob_offset = vec3f::lerp(current_world->player.view_bob_offset, target_view_bob_offset, 0.035);
     current_world->player.view_bob_screen_offset = vec3f::lerp(current_world->player.view_bob_screen_offset, target_view_bob_screen_offset, 0.035);
