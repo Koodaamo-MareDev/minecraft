@@ -94,20 +94,14 @@ void modelbox_t::render()
     {
         gertex::GXMatrix pos_mtx = gertex::get_matrix();
         gertex::push_matrix();
-        if (pos.sqr_magnitude() > 0)
-        {
-            guMtxApplyTrans(pos_mtx.mtx, pos_mtx.mtx, pos.x / 16, pos.y / 16, pos.z / 16);
-        }
-        if (rot.sqr_magnitude() > 0)
-        {
-            Mtx rot_mtx;
-            guMtxRotDeg(rot_mtx, 'z', rot.z);
-            guMtxConcat(pos_mtx.mtx, rot_mtx, pos_mtx.mtx);
-            guMtxRotDeg(rot_mtx, 'y', rot.y);
-            guMtxConcat(pos_mtx.mtx, rot_mtx, pos_mtx.mtx);
-            guMtxRotDeg(rot_mtx, 'x', rot.x);
-            guMtxConcat(pos_mtx.mtx, rot_mtx, pos_mtx.mtx);
-        }
+        guMtxApplyTrans(pos_mtx.mtx, pos_mtx.mtx, pos.x / 16, pos.y / 16, pos.z / 16);
+        Mtx rot_mtx;
+        guMtxRotDeg(rot_mtx, 'z', rot.z);
+        guMtxConcat(pos_mtx.mtx, rot_mtx, pos_mtx.mtx);
+        guMtxRotDeg(rot_mtx, 'y', rot.y);
+        guMtxConcat(pos_mtx.mtx, rot_mtx, pos_mtx.mtx);
+        guMtxRotDeg(rot_mtx, 'x', rot.x);
+        guMtxConcat(pos_mtx.mtx, rot_mtx, pos_mtx.mtx);
         guMtxScaleApply(pos_mtx.mtx, pos_mtx.mtx, -1, -1, -1);
         gertex::use_matrix(pos_mtx.mtx, true);
 
