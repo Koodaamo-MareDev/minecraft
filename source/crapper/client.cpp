@@ -524,10 +524,42 @@ namespace Crapper
     void MinecraftClient::handlePlayerEquipment(ByteBuffer &buffer)
     {
         // Read entity equipment
-        buffer.readInt();   // Entity ID
-        buffer.readShort(); // Slot
-        buffer.readShort(); // Item ID
-        buffer.readShort(); // Item metadata
+        int32_t entity_id = buffer.readInt(); // Entity ID
+        int16_t slot = buffer.readShort();    // Slot
+        int16_t item = buffer.readShort();    // Item ID
+        int16_t meta = buffer.readShort();    // Item metadata
+
+        if (buffer.underflow)
+            return;
+
+        entity_physical *entity = get_entity_by_id(entity_id);
+        if (!entity)
+        {
+            dbgprintf("Received player equipment for unknown entity %d\n", entity_id);
+            return;
+        }
+        entity_player *player = dynamic_cast<entity_player *>(entity);
+        if (!player)
+        {
+            dbgprintf("Received player equipment for non-player entity %d\n", entity_id);
+            return;
+        }
+        // Update the player's equipment
+        if (slot < 0 || slot >= 5)
+        {
+            dbgprintf("Invalid equipment slot %d for entity %d\n", slot, entity_id);
+            return;
+        }
+        if (item == -1)
+        {
+            // Remove the item from the slot
+            player->equipment[slot] = inventory::item_stack(); // Clear the slot
+        }
+        else
+        {
+            // Add the item to the slot
+            player->equipment[slot] = inventory::item_stack(item, 1, meta);
+        }
     }
 
     void MinecraftClient::handlePlayerHealth(ByteBuffer &buffer)

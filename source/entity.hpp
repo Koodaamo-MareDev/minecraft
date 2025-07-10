@@ -259,6 +259,7 @@ public:
     int selected_hotbar_slot = 0;
     bool in_bed = false;
     vec3i bed_pos = vec3i(0, 0, 0);
+    inventory::item_stack equipment[5] = {};
 
     entity_player(const vec3f &position);
 
