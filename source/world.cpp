@@ -967,7 +967,7 @@ void world::draw_selected_block()
         selected_block.light = light_value;
         RenderType render_type = properties(selected_block.id).m_render_type;
 
-        if (!properties(selected_block.id).m_fluid && (render_type == RenderType::full || render_type == RenderType::full_special || render_type == RenderType::slab))
+        if (!properties(selected_block.id).m_fluid && (properties(selected_block.id).m_nonflat || render_type == RenderType::full || render_type == RenderType::full_special || render_type == RenderType::slab))
         {
             // Render as a block
 

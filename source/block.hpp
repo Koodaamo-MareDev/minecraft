@@ -86,6 +86,7 @@ struct blockproperties_t
             uint8_t m_fluid : 1;
             uint8_t m_valid_item : 1;
             uint8_t m_needs_support : 1;
+            uint8_t m_nonflat : 1;
         };
         uint8_t m_flags;
     };
@@ -228,6 +229,12 @@ struct blockproperties_t
     blockproperties_t &needs_support(bool value)
     {
         this->m_needs_support = value;
+        return *this;
+    }
+
+    blockproperties_t &nonflat(bool value)
+    {
+        this->m_nonflat = value;
         return *this;
     }
 
