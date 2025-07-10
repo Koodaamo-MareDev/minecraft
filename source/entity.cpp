@@ -1246,9 +1246,10 @@ void entity_player_mp::render(float partial_ticks, bool transparency)
 
     vfloat_t h_speed = velocity.magnitude();
 
-    if (h_speed > 0.05)
+    if (h_speed > 0.025)
     {
-        accumulated_walk_distance += h_speed * 1.8;
+        h_speed /= 3;
+        accumulated_walk_distance += h_speed;
         player_model.speed = lerpd(player_model.speed, 32, 0.15);
     }
     else
