@@ -7,6 +7,8 @@
 #include <ogc/gx.h>
 #include <math/vec3f.hpp>
 #include <math/math_utils.h>
+#include "inventory.hpp"
+#include "gertex/gertex.hpp"
 
 class modelbox_t
 {
@@ -65,7 +67,8 @@ public:
 
     void prepare();
 
-    virtual void render(vfloat_t distance, float partial_ticks);
+    virtual void render(vfloat_t distance, float partial_ticks, bool transparency);
+    void render_handitem(modelbox_t *box, inventory::item_stack &item, vec3f pos, vec3f rot, vec3f scale, bool transparency);
 
     modelbox_t *add_box(vec3f pos, vec3f size, uint16_t uv_off_x, uint16_t uv_off_y, vfloat_t inflate)
     {
@@ -110,7 +113,7 @@ public:
         leg4->set_pos(vec3f(2, 16, -4));
     }
 
-    void render(vfloat_t distance, float partial_ticks) override
+    void render(vfloat_t distance, float partial_ticks, bool transparency) override
     {
         head->set_rot(head_rot - rot);
         float leg_rot = std::cos(distance * 0.6662f) * 28 * speed;
@@ -119,7 +122,7 @@ public:
         leg2->set_rot(vec3f(leg_rot2, 0, 0));
         leg3->set_rot(vec3f(leg_rot2, 0, 0));
         leg4->set_rot(vec3f(leg_rot, 0, 0));
-        model_t::render(distance, partial_ticks);
+        model_t::render(distance, partial_ticks, transparency);
     }
 };
 
@@ -132,6 +135,7 @@ public:
     modelbox_t *right_arm = nullptr;
     modelbox_t *left_leg = nullptr;
     modelbox_t *right_leg = nullptr;
+    inventory::item_stack equipment[5] = {}; // 0: hand, 1: helmet, 2: chestplate, 3: leggings, 4: boots
     float speed = 0.0f;
     vec3f head_rot = vec3f(0, 0, 0);
     player_model_t()
@@ -150,7 +154,7 @@ public:
         right_leg->set_pos(vec3f(2, 12, 0));
     }
 
-    void render(vfloat_t distance, float partial_ticks) override
+    void render(vfloat_t distance, float partial_ticks, bool transparency) override
     {
         float arm_rot = std::cos(distance) * speed;
         float arm_rot2 = std::cos(distance + 3.1415927f) * speed;
@@ -159,7 +163,15 @@ public:
         right_arm->set_rot(vec3f(arm_rot2, 0, 0));
         left_leg->set_rot(vec3f(arm_rot * 1.4, 0, 0));
         right_leg->set_rot(vec3f(arm_rot2 * 1.4, 0, 0));
-        model_t::render(distance, partial_ticks);
+        gertex::GXState state = gertex::get_state();
+        render_handitem(right_arm, equipment[0], vec3f(0, -4, 14), vec3f(-90, 0, 180), vec3f(1.0), transparency);
+        gertex::set_state(state);
+
+        // The player should not render in the transparent pass
+        if (transparency)
+            return;
+
+        model_t::render(distance, partial_ticks, transparency);
     }
 };
 

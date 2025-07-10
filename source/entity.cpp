@@ -751,7 +751,7 @@ void entity_creeper::render(float partial_ticks, bool transparency)
         gertex::set_color_add(std::sin(fuse + partial_ticks * 0.1) > 0 ? GXColor{0, 0, 0, 0xFF} : GXColor{0xFF, 0xFF, 0xFF, 0xFF});
     }
 
-    creeper_model.render(accumulated_walk_distance, partial_ticks);
+    creeper_model.render(accumulated_walk_distance, partial_ticks, transparency);
 #ifdef DEBUG
     if (follow_entity)
     {
@@ -861,7 +861,7 @@ void entity_item::render(float partial_ticks, bool transparency)
         {
             use_texture(terrain_texture);
 
-            if (!properties(item.id).m_fluid && (render_type == RenderType::full || render_type == RenderType::full_special || render_type == RenderType::slab))
+            if (!properties(item.id).m_fluid && (properties(item.id).m_nonflat || render_type == RenderType::full || render_type == RenderType::full_special || render_type == RenderType::slab))
             {
                 // Draw the block
                 item_rot.y = (ticks_existed + partial_ticks) * 4;
@@ -1238,9 +1238,6 @@ void entity_player_mp::render(float partial_ticks, bool transparency)
         gertex::use_fog(true);
         GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
         draw_text_3d(vec3f(0, 2.375, 0), player_name, GXColor{0xFF, 0xFF, 0xFF, 0xFF});
-
-        // The player should not render in the transparent pass
-        return;
     }
     entity_living::render(partial_ticks, transparency);
 
@@ -1263,5 +1260,9 @@ void entity_player_mp::render(float partial_ticks, bool transparency)
     player_model.head_rot = vec3f(entity_rotation.x, entity_rotation.y, 0);
 
     gertex::set_color_mul(get_lightmap_color(light_level));
-    player_model.render(accumulated_walk_distance, partial_ticks);
+    for (size_t i = 0; i < 5; i++)
+    {
+        player_model.equipment[i] = equipment[i];
+    }
+    player_model.render(accumulated_walk_distance, partial_ticks, transparency);
 }
