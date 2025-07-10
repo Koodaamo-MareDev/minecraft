@@ -17,6 +17,7 @@ int render_snow_layer(chunk_t &chunk, block_t *block, const vec3i &pos);
 int render_chest(chunk_t &chunk, block_t *block, const vec3i &pos);
 int render_torch(chunk_t &chunk, block_t *block, const vec3i &pos);
 int render_torch_with_angle(chunk_t &chunk, block_t *block, const vec3f &vertex_pos, float ax, float az);
+int render_cactus(chunk_t &chunk, block_t *block, const vec3i &pos);
 int render_door(chunk_t &chunk, block_t *block, const vec3i &pos);
 int render_cross(chunk_t &chunk, block_t *block, const vec3i &pos);
 int render_slab(chunk_t &chunk, block_t *block, const vec3i &pos);

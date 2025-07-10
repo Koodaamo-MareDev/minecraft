@@ -100,6 +100,8 @@ int render_special(chunk_t &chunk, block_t *block, const vec3i &pos)
     case BlockID::wooden_door:
     case BlockID::iron_door:
         return render_door(chunk, block, pos);
+    case BlockID::cactus:
+        return render_cactus(chunk, block, pos);
     default:
         return 0;
     }
@@ -359,6 +361,60 @@ int render_door(chunk_t &chunk, block_t *block, const vec3i &pos)
     return 20;
 }
 
+int render_cactus(chunk_t &chunk, block_t *block, const vec3i &pos)
+{
+    uint8_t lighting = block->light;
+    vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
+    vec3f vertex_pos(local_pos.x, local_pos.y, local_pos.z);
+    uint32_t texture_index = get_default_texture_index(block->get_blockid());
+    uint32_t top_texture_index = texture_index - 1;
+    uint32_t bottom_texture_index = texture_index + 1;
+    int vertexCount = 16;
+
+    // Positive X side
+    GX_VertexLit({vertex_pos + vec3f{0.4375, -.5, 0.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PX);
+    GX_VertexLit({vertex_pos + vec3f{0.4375, 0.5, 0.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PX);
+    GX_VertexLit({vertex_pos + vec3f{0.4375, 0.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PX);
+    GX_VertexLit({vertex_pos + vec3f{0.4375, -.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PX);
+
+    // Negative X side
+    GX_VertexLit({vertex_pos + vec3f{-.4375, -.5, -.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NX);
+    GX_VertexLit({vertex_pos + vec3f{-.4375, 0.5, -.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_NX);
+    GX_VertexLit({vertex_pos + vec3f{-.4375, 0.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_NX);
+    GX_VertexLit({vertex_pos + vec3f{-.4375, -.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NX);
+
+    // Bottom face
+    if (block->get_opacity(FACE_NY))
+    {
+        GX_VertexLit({vertex_pos + vec3f{-.5, -.5, -.5}, TEXTURE_NX(bottom_texture_index), TEXTURE_PY(bottom_texture_index)}, lighting, FACE_NY);
+        GX_VertexLit({vertex_pos + vec3f{-.5, -.5, 0.5}, TEXTURE_NX(bottom_texture_index), TEXTURE_NY(bottom_texture_index)}, lighting, FACE_NY);
+        GX_VertexLit({vertex_pos + vec3f{0.5, -.5, 0.5}, TEXTURE_PX(bottom_texture_index), TEXTURE_NY(bottom_texture_index)}, lighting, FACE_NY);
+        GX_VertexLit({vertex_pos + vec3f{0.5, -.5, -.5}, TEXTURE_PX(bottom_texture_index), TEXTURE_PY(bottom_texture_index)}, lighting, FACE_NY);
+        vertexCount += 4;
+    }
+    if (block->get_opacity(FACE_PY))
+    {
+        // Top face
+        GX_VertexLit({vertex_pos + vec3f{0.5, .5, -.5}, TEXTURE_NX(top_texture_index), TEXTURE_PY(top_texture_index)}, lighting, FACE_PY);
+        GX_VertexLit({vertex_pos + vec3f{0.5, .5, 0.5}, TEXTURE_NX(top_texture_index), TEXTURE_NY(top_texture_index)}, lighting, FACE_PY);
+        GX_VertexLit({vertex_pos + vec3f{-.5, .5, 0.5}, TEXTURE_PX(top_texture_index), TEXTURE_NY(top_texture_index)}, lighting, FACE_PY);
+        GX_VertexLit({vertex_pos + vec3f{-.5, .5, -.5}, TEXTURE_PX(top_texture_index), TEXTURE_PY(top_texture_index)}, lighting, FACE_PY);
+        vertexCount += 4;
+    }
+    // Positive Z side
+    GX_VertexLit({vertex_pos + vec3f{-.5, -.5, 0.4375}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PZ);
+    GX_VertexLit({vertex_pos + vec3f{-.5, 0.5, 0.4375}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PZ);
+    GX_VertexLit({vertex_pos + vec3f{0.5, 0.5, 0.4375}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PZ);
+    GX_VertexLit({vertex_pos + vec3f{0.5, -.5, 0.4375}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PZ);
+
+    // Negative Z side
+    GX_VertexLit({vertex_pos + vec3f{0.5, -.5, -.4375}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NZ);
+    GX_VertexLit({vertex_pos + vec3f{0.5, 0.5, -.4375}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_NZ);
+    GX_VertexLit({vertex_pos + vec3f{-.5, 0.5, -.4375}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_NZ);
+    GX_VertexLit({vertex_pos + vec3f{-.5, -.5, -.4375}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NZ);
+
+    return vertexCount;
+}
 int render_cross(chunk_t &chunk, block_t *block, const vec3i &pos)
 {
     uint8_t lighting = block->light;

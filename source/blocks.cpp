@@ -723,6 +723,18 @@ void door_aabb(const vec3i &pos, block_t *block, const aabb_t &other, std::vecto
         aabb_list.push_back(aabb);
 }
 
+void cactus_aabb(const vec3i &pos, block_t *block, const aabb_t &other, std::vector<aabb_t> &aabb_list)
+{
+    aabb_t aabb;
+    constexpr vfloat_t width = 0.875;
+    constexpr vfloat_t height = 1.0;
+    aabb.min = vec3f(pos.x + 0.0625, pos.y, pos.z + 0.0625);
+    aabb.max = aabb.min + vec3f(width, height, width);
+
+    if (aabb.intersects(other))
+        aabb_list.push_back(aabb);
+}
+
 blockproperties_t block_properties[256] = {
     blockproperties_t().id(BlockID::air).opacity(0).solid(false).transparent(true).collision(CollisionType::none).valid_item(false),
     blockproperties_t().id(BlockID::stone).tool(inventory::tool_type::pickaxe, inventory::tool_tier::wood).hardness(1.5f).texture(0).sound(SoundType::stone).drops(std::bind(fixed_drop, std::placeholders::_1, inventory::item_stack(BlockID::cobblestone, 1))),
@@ -805,7 +817,7 @@ blockproperties_t block_properties[256] = {
     blockproperties_t().id(BlockID::snow_layer).tool(inventory::tool_type::shovel, inventory::tool_tier::wood).hardness(0.1f).texture(66).solid(false).opacity(0).transparent(false).sound(SoundType::cloth).aabb(snow_layer_aabb).render_type(RenderType::special).collision(CollisionType::none).drops(std::bind(no_drop, std::placeholders::_1)).destroy(snow_layer_destroy).needs_support(true),
     blockproperties_t().id(BlockID::ice).tool(inventory::tool_type::pickaxe, inventory::tool_tier::no_tier).hardness(0.5f).texture(67).solid(true).opacity(3).transparent(true).sound(SoundType::glass).slipperiness(0.98).drops(std::bind(no_drop, std::placeholders::_1)).destroy(std::bind(melt_destroy, std::placeholders::_1, std::placeholders::_2)),
     blockproperties_t().id(BlockID::snow_block).tool(inventory::tool_type::shovel, inventory::tool_tier::wood).hardness(0.2f).texture(66).solid(false).opacity(0).transparent(true).sound(SoundType::cloth).render_type(RenderType::full).collision(CollisionType::none),
-    blockproperties_t().id(BlockID::cactus).hardness(0.4f).texture(69).solid(false).opacity(0).transparent(true).sound(SoundType::grass).render_type(RenderType::special),
+    blockproperties_t().id(BlockID::cactus).hardness(0.4f).texture(70).solid(false).opacity(0).transparent(true).sound(SoundType::cloth).aabb(cactus_aabb).render_type(RenderType::special).nonflat(true),
     blockproperties_t().id(BlockID::clay).tool(inventory::tool_type::shovel, inventory::tool_tier::no_tier).tool(inventory::tool_type::axe, inventory::tool_tier::no_tier).hardness(0.6f).texture(72).sound(SoundType::dirt),
     blockproperties_t().id(BlockID::reeds).hardness(0.0f).texture(73).solid(false).opacity(0).transparent(true).sound(SoundType::grass).render_type(RenderType::cross).collision(CollisionType::none).needs_support(true),
     blockproperties_t().id(BlockID::jukebox).tool(inventory::tool_type::pickaxe, inventory::tool_tier::no_tier).hardness(2.0f).texture(74).sound(SoundType::wood).render_type(RenderType::full_special),
