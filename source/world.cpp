@@ -1362,7 +1362,7 @@ void world::update_player()
         player.in_fluid = BlockID::air;
     }
 
-    if (should_destroy_block && player.block_mine_progress < 1.0f)
+    if (should_destroy_block && player.block_mine_progress < 1.0f && player.draw_block_outline)
     {
         static block_t *last_targeted_block = nullptr;
         block_t *targeted_block = get_block_at(player.raycast_pos);
