@@ -1,6 +1,7 @@
 #include "render_gui.hpp"
 #include <math/vec2i.hpp>
 #include "font_tile_widths.hpp"
+#include "util/crashfix.hpp"
 int draw_textured_quad(GXTexObj &texture, int32_t x, int32_t y, int32_t w, int32_t h, vfloat_t u1, vfloat_t v1, vfloat_t u2, vfloat_t v2, float scale)
 {
     use_texture(texture);
@@ -42,8 +43,9 @@ int draw_colored_sprite(GXTexObj &texture, vec2i pos, vec2i size, vfloat_t u1, v
 }
 
 // NOTE: This function doesn't load the texture automatically because it's used by font rendering. Make sure to call use_texture before calling this function.
-int __attribute__((noinline)) draw_colored_sprite_3d(GXTexObj &texture, vec3f center, vec3f size, vec3f offset, vec3f right, vec3f up, vfloat_t u1, vfloat_t v1, vfloat_t u2, vfloat_t v2, GXColor color)
+int draw_colored_sprite_3d(GXTexObj &texture, vec3f center, vec3f size, vec3f offset, vec3f right, vec3f up, vfloat_t u1, vfloat_t v1, vfloat_t u2, vfloat_t v2, GXColor color)
 {
+    WHY_DOES_NOP_FIX_EVERYTHING;
     uint8_t r = color.r;
     uint8_t g = color.g;
     uint8_t b = color.b;
@@ -67,8 +69,9 @@ int __attribute__((noinline)) draw_colored_sprite_3d(GXTexObj &texture, vec3f ce
     return 4;
 }
 
-vfloat_t __attribute__((noinline)) text_width_3d(std::string str)
+vfloat_t text_width_3d(std::string str)
 {
+    WHY_DOES_NOP_FIX_EVERYTHING;
     vfloat_t width = 0;
     vfloat_t max_width = 0;
     for (size_t i = 0; i < str.size(); i++)
@@ -90,8 +93,9 @@ vfloat_t __attribute__((noinline)) text_width_3d(std::string str)
     return std::max(max_width, width);
 }
 
-void __attribute__((noinline)) draw_text_3d(vec3f pos, std::string str, GXColor color)
+void draw_text_3d(vec3f pos, std::string str, GXColor color)
 {
+    WHY_DOES_NOP_FIX_EVERYTHING;
     vec3f char_size = vec3f(0.25);
     vec3f right_vec = -angles_to_vector(0, yrot + 90);
     vec3f up_vec = -angles_to_vector(xrot + 90, yrot);
