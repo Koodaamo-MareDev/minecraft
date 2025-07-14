@@ -187,7 +187,7 @@ int render_fluid(chunk_t &chunk, block_t *block, const vec3i &pos)
     sideCoords[2].y_uv = texture_start_y + corner_max[0] * BASE3D_PIXEL_UV_SCALE;
     sideCoords[1].y_uv = texture_start_y + corner_max[3] * BASE3D_PIXEL_UV_SCALE;
     sideCoords[0].y_uv = texture_start_y + corner_min[3] * BASE3D_PIXEL_UV_SCALE;
-    if (!is_same_fluid(block_id, neighbor_ids[FACE_NZ]) && (!is_solid(neighbor_ids[FACE_NZ]) || properties(neighbor_ids[FACE_NZ]).m_transparent))
+    if (neighbors[FACE_NZ] && !is_same_fluid(block_id, neighbor_ids[FACE_NZ]) && (!is_solid(neighbor_ids[FACE_NZ]) || properties(neighbor_ids[FACE_NZ]).m_transparent))
         faceCount += DrawVerticalQuad(sideCoords[0], sideCoords[1], sideCoords[2], sideCoords[3], neighbors[FACE_NZ]->light);
 
     sideCoords[3].pos = local_pos + vec3f{+.5f, -.5f + corner_bottoms[2], +.5f};
@@ -198,7 +198,7 @@ int render_fluid(chunk_t &chunk, block_t *block, const vec3i &pos)
     sideCoords[2].y_uv = texture_start_y + corner_max[2] * BASE3D_PIXEL_UV_SCALE;
     sideCoords[1].y_uv = texture_start_y + corner_max[1] * BASE3D_PIXEL_UV_SCALE;
     sideCoords[0].y_uv = texture_start_y + corner_min[1] * BASE3D_PIXEL_UV_SCALE;
-    if (!is_same_fluid(block_id, neighbor_ids[FACE_PZ]) && (!is_solid(neighbor_ids[FACE_PZ]) || properties(neighbor_ids[FACE_PZ]).m_transparent))
+    if (neighbors[FACE_PZ] && !is_same_fluid(block_id, neighbor_ids[FACE_PZ]) && (!is_solid(neighbor_ids[FACE_PZ]) || properties(neighbor_ids[FACE_PZ]).m_transparent))
         faceCount += DrawVerticalQuad(sideCoords[0], sideCoords[1], sideCoords[2], sideCoords[3], neighbors[FACE_PZ]->light);
 
     sideCoords[3].pos = local_pos + vec3f{-.5f, -.5f + corner_bottoms[1], +.5f};
@@ -209,7 +209,7 @@ int render_fluid(chunk_t &chunk, block_t *block, const vec3i &pos)
     sideCoords[2].y_uv = texture_start_y + corner_max[1] * BASE3D_PIXEL_UV_SCALE;
     sideCoords[1].y_uv = texture_start_y + corner_max[0] * BASE3D_PIXEL_UV_SCALE;
     sideCoords[0].y_uv = texture_start_y + corner_min[0] * BASE3D_PIXEL_UV_SCALE;
-    if (!is_same_fluid(block_id, neighbor_ids[FACE_NX]) && (!is_solid(neighbor_ids[FACE_NX]) || properties(neighbor_ids[FACE_NX]).m_transparent))
+    if (neighbors[FACE_NX] && !is_same_fluid(block_id, neighbor_ids[FACE_NX]) && (!is_solid(neighbor_ids[FACE_NX]) || properties(neighbor_ids[FACE_NX]).m_transparent))
         faceCount += DrawVerticalQuad(sideCoords[0], sideCoords[1], sideCoords[2], sideCoords[3], neighbors[FACE_NX]->light);
 
     sideCoords[3].pos = local_pos + vec3f{+.5f, -.5f + corner_bottoms[3], -.5f};
@@ -220,7 +220,7 @@ int render_fluid(chunk_t &chunk, block_t *block, const vec3i &pos)
     sideCoords[2].y_uv = texture_start_y + corner_max[3] * BASE3D_PIXEL_UV_SCALE;
     sideCoords[1].y_uv = texture_start_y + corner_max[2] * BASE3D_PIXEL_UV_SCALE;
     sideCoords[0].y_uv = texture_start_y + corner_min[2] * BASE3D_PIXEL_UV_SCALE;
-    if (!is_same_fluid(block_id, neighbor_ids[FACE_PX]) && (!is_solid(neighbor_ids[FACE_PX]) || properties(neighbor_ids[FACE_PX]).m_transparent))
+    if (neighbors[FACE_PX] && !is_same_fluid(block_id, neighbor_ids[FACE_PX]) && (!is_solid(neighbor_ids[FACE_PX]) || properties(neighbor_ids[FACE_PX]).m_transparent))
         faceCount += DrawVerticalQuad(sideCoords[0], sideCoords[1], sideCoords[2], sideCoords[3], neighbors[FACE_PX]->light);
     return faceCount * 3;
 }
