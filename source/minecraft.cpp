@@ -879,7 +879,7 @@ void HandleGUI(gertex::GXView &viewport)
         uint8_t vignette_alpha = 0xFF * vignette_strength;
         if (current_world->player.in_fluid == BlockID::water)
         {
-            draw_textured_quad(underwater_texture, pan_underwater_texture.x, pan_underwater_texture.y - viewport.height, viewport.width * 3, corrected_height * 3, 0, 0, 48, 48);
+            draw_textured_quad(underwater_texture, pan_underwater_texture.x - viewport.width, pan_underwater_texture.y - viewport.height, viewport.width * 3, corrected_height * 3, 0, 0, 48, 48);
         }
         use_texture(vignette_texture);
         draw_colored_sprite(vignette_texture, vec2i(0, 0), vec2i(viewport.width, corrected_height), 0, 0, 256, 256, GXColor{0xFF, 0xFF, 0xFF, vignette_alpha});
