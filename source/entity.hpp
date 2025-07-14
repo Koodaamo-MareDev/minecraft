@@ -204,6 +204,8 @@ public:
 
     virtual void render(float partial_ticks, bool transparency);
 
+    virtual bool can_remove();
+
     virtual bool use_fluid_physics()
     {
         return false;

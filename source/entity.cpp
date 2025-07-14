@@ -473,12 +473,14 @@ void entity_falling_block::tick()
 {
     fall_time++;
     entity_physical::tick();
-    if (on_ground && !current_world->is_remote())
+    if (current_world->is_remote())
+        return;
+
+    if (on_ground)
     {
-        dead = true; // Mark for removal
         vec3i int_pos = get_foot_blockpos();
         block_t *block = get_block_at(int_pos, chunk);
-        if (block)
+        if (block && block->get_blockid() == BlockID::air)
         {
             // Update the block
             *block = this->block_state;
@@ -487,6 +489,46 @@ void entity_falling_block::tick()
             update_neighbors(int_pos);
         }
     }
+
+    // Remove the entity after 30 seconds
+    if (fall_time > 600)
+    {
+        dead = true;
+
+        // Drop the block as an item
+        if (current_world && !current_world->is_remote())
+        {
+            inventory::item_stack item = properties(block_state.id).m_drops(block_state);
+            current_world->spawn_drop(get_foot_blockpos(), &block_state, item);
+        }
+    }
+}
+
+bool entity_falling_block::can_remove()
+{
+    if (current_world->is_remote())
+        return false;
+    // This flag is prioritized
+    if (dead)
+        return true;
+
+    int sect_num = get_foot_blockpos().y >> 4;
+
+    // Check if the section number is valid
+    if (sect_num >> 4 >= VERTICAL_SECTION_COUNT || sect_num < 0)
+        return true;
+
+    // Can't remove if it's not on the ground
+    if (!on_ground)
+        return false;
+
+    section &sect = chunk->sections[sect_num];
+
+    // Mesh should not be currently updating as that would cause visual glitches
+    bool is_section_updated = sect.cached_solid == sect.solid && sect.cached_transparent == sect.transparent;
+
+    // Ensure that the chunk doesn't have any light updates
+    return chunk->light_update_count == 0 && is_section_updated && !sect.dirty;
 }
 
 void entity_falling_block::render(float partial_ticks, bool transparency)
@@ -507,17 +549,15 @@ void entity_falling_block::render(float partial_ticks, bool transparency)
     if (on_ground || fall_time <= 1)
     {
         // Prepare the transformation matrix
-        vec3f chunk_pos = vec3f(int_pos.x & ~0xF, int_pos.y & ~0xF, int_pos.z & ~0xF);
+        vec3f chunk_pos = vec3f(int_pos.x & ~0xF, int_pos.y & ~0xF, int_pos.z & ~0xF) + vec3f(0.5);
         transform_view(gertex::get_view_matrix(), chunk_pos);
-        render_single_block_at(block_state, int_pos, false);
-        render_single_block_at(block_state, int_pos, true);
+        render_single_block_at(block_state, int_pos, transparency);
     }
     else
     {
         // Prepare the transformation matrix
-        transform_view(gertex::get_view_matrix(), get_position(partial_ticks) - vec3f(0.5, 0, 0.5));
-        render_single_block(block_state, false);
-        render_single_block(block_state, true);
+        transform_view(gertex::get_view_matrix(), get_position(partial_ticks) + vec3f(0, 0.5, 0));
+        render_single_block(block_state, transparency);
     }
 }
 
