@@ -44,7 +44,7 @@ void init_png_texture(GXTexObj &texture, const std::string &filename)
 {
     try
     {
-        pnguin::PNGFile png_file("/apps/minecraft/resources/textures/" + filename);
+        pnguin::PNGFile png_file(RESOURCES_DIR "textures/" + filename);
         png_file.to_tpl(texture);
     }
     catch (std::exception &e)
@@ -59,20 +59,20 @@ void init_textures()
 
     // Basic textures
     init_missing_texture(white_texture);
-    init_png_texture(clouds_texture, "clouds.png");
-    init_png_texture(sun_texture, "sun.png");
-    init_png_texture(moon_texture, "moon.png");
+    init_png_texture(clouds_texture, "environment/clouds.png");
+    init_png_texture(sun_texture, "terrain/sun.png");
+    init_png_texture(moon_texture, "terrain/moon.png");
     init_png_texture(particles_texture, "particles.png");
     init_png_texture(terrain_texture, "terrain.png");
-    init_png_texture(icons_texture, "icons.png");
-    init_png_texture(container_texture, "container.png");
-    init_png_texture(underwater_texture, "underwater.png");
-    init_png_texture(vignette_texture, "vignette.png");
-    init_png_texture(creeper_texture, "creeper.png");
-    init_png_texture(player_texture, "char.png");
-    init_png_texture(font_texture, "font.png");
-    init_png_texture(items_texture, "items.png");
-    init_png_texture(inventory_texture, "inventory.png");
+    init_png_texture(icons_texture, "gui/icons.png");
+    init_png_texture(container_texture, "gui/container.png");
+    init_png_texture(underwater_texture, "misc/water.png");
+    init_png_texture(vignette_texture, "misc/vignette.png");
+    init_png_texture(creeper_texture, "mob/creeper.png");
+    init_png_texture(player_texture, "mob/char.png");
+    init_png_texture(font_texture, "font/default.png");
+    init_png_texture(items_texture, "gui/items.png");
+    init_png_texture(inventory_texture, "gui/inventory.png");
 
     GX_InitTexObjWrapMode(&clouds_texture, GX_REPEAT, GX_REPEAT);
     GX_InitTexObjWrapMode(&underwater_texture, GX_REPEAT, GX_REPEAT);

@@ -15,4 +15,7 @@
 #define VBO_TRANSPARENT 2
 #define VBO_ALL 0xFF
 
+#define RESOURCES_DIR "/apps/minecraft/resources/"
+#define TEXTURE_DIR (RESOURCES_DIR "textures/")
+#define SOUND_DIR (RESOURCES_DIR "newsound/")
 #endif

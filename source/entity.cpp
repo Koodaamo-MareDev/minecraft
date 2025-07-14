@@ -136,7 +136,7 @@ void entity_physical::tick()
             if (impact > 1.0)
                 impact = 1.0;
             javaport::Random rng;
-            sound sound = get_sound("splash");
+            sound sound = get_sound("random/splash");
             sound.position = position;
             sound.pitch = 0.6 + rng.nextFloat() * 0.8;
             sound.volume = impact;
@@ -572,7 +572,7 @@ entity_explosive_block::entity_explosive_block(block_t block_state, const vec3i 
     // Play the fuse sound if there is a long enough fuse
     if (fuse > 45)
     {
-        sound sound = get_sound("fuse");
+        sound sound = get_sound("random/fuse");
         sound.position = get_position(0);
         sound.volume = 0.5;
         sound.pitch = 1.0;
@@ -690,7 +690,7 @@ void entity_creeper::tick()
             // Play the fuse sound
             if (fuse == creeper_fuse)
             {
-                sound sound = get_sound("fuse");
+                sound sound = get_sound("random/fuse");
                 sound.position = position;
                 sound.volume = 0.5;
                 sound.pitch = 1.0;
@@ -944,7 +944,7 @@ void entity_item::resolve_collision(entity_physical *b)
         {
             // Play the pop sound if the player picks up at least one item
             javaport::Random rng;
-            sound sound = get_sound("pop");
+            sound sound = get_sound("random/pop");
             sound.position = position;
             sound.volume = 0.5;
             sound.pitch = rng.nextFloat() * 0.8 + 0.6;
@@ -973,7 +973,7 @@ void entity_item::pickup(vec3f pos)
 {
     // Play the pop sound if the player picks up the stack
     javaport::Random rng;
-    sound sound = get_sound("pop");
+    sound sound = get_sound("random/pop");
     sound.position = position;
     sound.volume = 0.5;
     sound.pitch = rng.nextFloat() * 0.8 + 0.6;
@@ -1152,7 +1152,7 @@ void entity_player::hurt(uint16_t damage)
 {
     entity_living::hurt(damage);
     javaport::Random rng;
-    sound sound = get_sound("hurt");
+    sound sound = get_sound("random/hurt");
     sound.position = current_world->player.m_entity->position;
     sound.volume = 0.5;
     sound.pitch = rng.nextFloat() * 0.4 + 0.8;

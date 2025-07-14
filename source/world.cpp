@@ -756,7 +756,7 @@ void world::create_explosion(vec3f pos, float power, chunk_t *near)
 {
     javaport::Random rng;
 
-    sound sound = get_sound("old_explode");
+    sound sound = get_sound("random/old_explode");
     sound.position = pos;
     sound.volume = 0.5;
     sound.pitch = 0.8;

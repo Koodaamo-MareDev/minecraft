@@ -54,6 +54,6 @@ def calculate_tile_widths(image_path, output_file):
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        print("Usage: python calc_fontwidth.py <image>")
+        print("Usage: python gen_font_tile_widths.py <image>")
         exit(1)
     calculate_tile_widths(sys.argv[1], "font_tile_widths.hpp")

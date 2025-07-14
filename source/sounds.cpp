@@ -1,20 +1,21 @@
 #include "sounds.hpp"
 #include <cstring>
 #include "ported/Random.hpp"
+#include "util/constants.hpp"
 
 std::vector<std::string> music_files(
-    {"calm1.ogg",
-     "calm2.ogg",
-     "calm3.ogg",
-     "hal1.ogg",
-     "hal2.ogg",
-     "hal3.ogg",
-     "hal4.ogg",
-     "nuance1.ogg",
-     "nuance2.ogg",
-     "piano1.ogg",
-     "piano2.ogg",
-     "piano3.ogg"});
+    {"music/calm1.ogg",
+     "music/calm2.ogg",
+     "music/calm3.ogg",
+     "newmusic/hal1.ogg",
+     "newmusic/hal2.ogg",
+     "newmusic/hal3.ogg",
+     "newmusic/hal4.ogg",
+     "newmusic/nuance1.ogg",
+     "newmusic/nuance2.ogg",
+     "newmusic/piano1.ogg",
+     "newmusic/piano2.ogg",
+     "newmusic/piano3.ogg"});
 
 std::string get_random_music()
 {
@@ -36,7 +37,7 @@ aiff_container *get_sound(std::string name)
     {
         return it->second;
     }
-    std::string path = "/apps/minecraft/resources/sound/" + name + ".aiff";
+    std::string path = SOUND_DIR + name + ".aiff";
 
     FILE *file = fopen(path.c_str(), "rb");
     if (!file)

@@ -1,6 +1,7 @@
 #include "sound.hpp"
 #include "timers.hpp"
 #include "sounds.hpp"
+#include "util/constants.hpp"
 sound::sound(aiff_container &aiff_data)
 {
     set_aiff_data(aiff_data);
@@ -138,7 +139,7 @@ void sound_system::update(vec3f head_right, vec3f head_position)
 
     if (frames_to_next_music <= 0)
     {
-        play_music("/apps/minecraft/resources/" + get_random_music());
+        play_music(RESOURCES_DIR + get_random_music());
     }
 }
 
