@@ -18,6 +18,8 @@
 #include "light.hpp"
 #include "gui_dirtscreen.hpp"
 #include "chunkprovider.hpp"
+#include "util/face_pair.hpp"
+#include "util/crashfix.hpp"
 
 extern Crapper::MinecraftClient client;
 extern bool should_destroy_block;
@@ -373,6 +375,7 @@ struct section_node
 
 void world::calculate_visibility()
 {
+    init_face_pairs();
     // Reset visibility status for all VBOs
     for (chunk_t *&chunk : get_chunks())
     {
@@ -402,37 +405,25 @@ void world::calculate_visibility()
         return &chunk->sections[pos.y >> 4];
     };
 
-    // Converts a face pair to a bitmask for visibility flags.
-    // Assumes a != b
-    auto faces_to_index = [](uint8_t a, uint8_t b)
-    {
-        int mask = 1 << (a * 5 + (b < a ? b : b - 1));
-        std::swap(a, b);
-        mask |= 1 << (a * 5 + (b < a ? b : b - 1));
-        return mask;
-    };
-
     std::deque<section_node> section_queue;
     std::deque<section *> visited;
-    vec3f fpos = player.m_entity->get_position(std::fmod(partial_ticks, 1)) + vec3f(0, player.m_entity->y_offset, 0);
-    for (int x = -1; x <= 1; x++)
-        for (int y = -1; y <= 1; y++)
-            for (int z = -1; z <= 1; z++)
-            {
-                section_node entry;
-                entry.sect = section_at(vec3i(int(fpos.x) + x * 8, int(fpos.y) + y * 8, int(fpos.z) + z * 8));
+    vec3f fpos = player_pos;
+    for (int y = -1; y <= 1; y++)
+    {
+        section_node entry;
+        entry.sect = section_at(vec3i(int(fpos.x), int(fpos.y) + y * 8, int(fpos.z)));
 
-                // Check if there is a VBO at the player's position
-                if (!entry.sect)
-                    return;
+        // Check if there is a VBO at the player's position
+        if (!entry.sect)
+            return;
 
-                // Initialize the rest of the entry node
-                entry.from = -1;
-                for (uint8_t i = 0; i < 6; i++)
-                    entry.dirs[i] = 0;
-                section_queue.push_back(entry);
-                visited.push_front(entry.sect);
-            }
+        // Initialize the rest of the entry node
+        entry.from = -1;
+        for (uint8_t i = 0; i < 6; i++)
+            entry.dirs[i] = 0;
+        section_queue.push_back(entry);
+        visited.push_front(entry.sect);
+    }
 
     while (!section_queue.empty())
     {
@@ -444,6 +435,7 @@ void world::calculate_visibility()
 
         auto visit = [&](vec3i pos, int8_t through)
         {
+            WHY_DOES_NOP_FIX_EVERYTHING;
             // Don't revisit directions we have already visited
             if (node.dirs[through ^ 1])
                 return;
@@ -460,7 +452,7 @@ void world::calculate_visibility()
             if (node.from != -1)
             {
                 // Check if the node is visible from the face we entered
-                if (!(node.sect->visibility_flags & (faces_to_index(node.from, through))))
+                if (!(node.sect->visibility_flags & (face_pair_to_flag(node.from, through))))
                     return;
             }
 

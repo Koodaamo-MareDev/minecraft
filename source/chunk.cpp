@@ -29,6 +29,7 @@
 #include "nbt/nbt.hpp"
 #include "mcregion.hpp"
 #include "world.hpp"
+#include "util/face_pair.hpp"
 const vec3i face_offsets[] = {
     vec3i{-1, +0, +0},  // Negative X
     vec3i{+1, +0, +0},  // Positive X
@@ -511,15 +512,7 @@ void chunk_t::vbo_visibility_flood_fill(vec3i start_pos)
 
 void chunk_t::refresh_section_visibility(int index)
 {
-    // Converts a face pair to a bitmask for visibility flags.
-    // Assumes a != b
-    auto faces_to_index = [](uint8_t a, uint8_t b)
-    {
-        int mask = 1 << (a * 5 + (b < a ? b : b - 1));
-        std::swap(a, b);
-        mask |= 1 << (a * 5 + (b < a ? b : b - 1));
-        return mask;
-    };
+    init_face_pairs();
     section &vbo = this->sections[index];
 
     // Initialize the flood fill start points if not already initialized
@@ -579,7 +572,7 @@ void chunk_t::refresh_section_visibility(int index)
                 if (floodfill_faces_touched[j])
                     for (int k = 0; k < 6; k++)
                         if (j != k && floodfill_faces_touched[k])
-                            vbo.visibility_flags |= faces_to_index(j, k);
+                            vbo.visibility_flags |= face_pair_to_flag(j, k);
         }
         else
         {
