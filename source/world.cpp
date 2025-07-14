@@ -187,19 +187,30 @@ void world::update_fluid_section(chunk_t *chunk, int index)
     chunk->has_fluid_updates[index] = (curr_fluid_count != 0);
 }
 
-constexpr size_t default_vbo_update_threshold = 5;
 section_update_phase world::update_sections(section_update_phase phase)
 {
-    // This controls how many VBOs are updated in one tick
-    // It also decreases over time, giving a chance for all
-    // VBOs to be updated in a reasonable time frame.
-    static size_t min_vbos_to_flush = default_vbo_update_threshold;
-
     // Buffer to hold VBOs that need to be flushed
     static std::vector<section *> vbos_to_flush;
 
     // Pointer to the current VBO being processed
     static section *curr_section = nullptr;
+
+    // Gets the VBO at the given position
+    auto section_at = [](const vec3i &pos) -> section *
+    {
+        // Out of bounds check for Y coordinate
+        if (pos.y < 0 || pos.y >= WORLD_HEIGHT)
+            return nullptr;
+
+        // Get the chunk from the position
+        chunk_t *chunk = get_chunk_from_pos(pos);
+
+        // If the chunk doesn't exist, neither does the VBO
+        if (!chunk)
+            return nullptr;
+
+        return &chunk->sections[pos.y >> 4];
+    };
 
     // Process the current VBO based on the phase
     switch (phase)
@@ -252,9 +263,13 @@ section_update_phase world::update_sections(section_update_phase phase)
         break;
     }
     case section_update_phase::SECTION_VISIBILITY:
+        if (!curr_section)
+            break;
         curr_section->chunk->refresh_section_visibility(curr_section->y >> 4);
         break;
     case section_update_phase::SOLID:
+        if (!curr_section)
+            break;
         curr_section->chunk->build_vbo(curr_section->y >> 4, false);
         break;
     case section_update_phase::TRANSPARENT:
@@ -274,39 +289,61 @@ section_update_phase world::update_sections(section_update_phase phase)
     case section_update_phase::FLUSH:
     {
         // Flush cached buffers
-        if (vbos_to_flush.size() >= min_vbos_to_flush)
+        std::vector<section *> skipped_sections;
+        for (section *current : vbos_to_flush)
         {
-            for (section *current : vbos_to_flush)
+            if (current->dirty)
+                continue;
+            bool updated_neighbors = true;
+            for (int i = 0; i < 6; i++)
             {
-                if (current->solid != current->cached_solid)
-                {
-                    // Clear the cached buffer
-                    current->cached_solid.clear();
+                vec3i neighbor_pos = vec3i(current->x, current->y, current->z) + face_offsets[i] * 16;
+                section *neighbor = section_at(neighbor_pos);
+                if (!neighbor || !neighbor->visible)
+                    continue;
 
-                    // Set the cached buffer to the new buffer
-                    current->cached_solid = current->solid;
-                }
-                if (current->transparent != current->cached_transparent)
+                if (neighbor->dirty || neighbor->chunk->light_update_count)
                 {
-                    // Clear the cached buffer
-                    current->cached_transparent.clear();
-
-                    // Set the cached buffer to the new buffer
-                    current->cached_transparent = current->transparent;
+                    // Redo this section
+                    curr_section = neighbor;
+                    updated_neighbors = false;
+                    break;
                 }
-                current->has_updated = true;
             }
-            vbos_to_flush.clear();
 
-            // Reset the threshold for the next tick
-            min_vbos_to_flush = default_vbo_update_threshold;
+            if (!updated_neighbors)
+            {
+                // If the neighbors are not up-to-date, skip this section
+                skipped_sections.push_back(current);
+                continue;
+            }
+
+            if (current->solid != current->cached_solid)
+            {
+                // Clear the cached buffer
+                current->cached_solid.clear();
+
+                // Set the cached buffer to the new buffer
+                current->cached_solid = current->solid;
+            }
+            if (current->transparent != current->cached_transparent)
+            {
+                // Clear the cached buffer
+                current->cached_transparent.clear();
+
+                // Set the cached buffer to the new buffer
+                current->cached_transparent = current->transparent;
+            }
+            current->has_updated = true;
         }
-        else
+        vbos_to_flush.clear();
+
+        // Add back the sections that had to be skipped
+        for (section *skipped : skipped_sections)
         {
-            // Decrease the threshold for the next tick
-            if (min_vbos_to_flush > 1)
-                min_vbos_to_flush--;
+            vbos_to_flush.push_back(skipped);
         }
+        break;
     }
     default:
         break;
