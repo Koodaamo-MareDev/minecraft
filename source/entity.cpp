@@ -680,14 +680,6 @@ void entity_creeper::tick()
                 vec3f move = simple_pathfind(target);
                 movement = vec3f(move.x, 0, move.z).fast_normalize() * 0.5 + vec3f(0, move.y > 0.25, 0);
             }
-            if (ticks_existed % 1200 == 300)
-            {
-                sound sound = randomize_sound("cave", 13);
-                sound.position = position;
-                sound.volume = 1.0;
-                sound.pitch = 1.0;
-                current_world->play_sound(sound);
-            }
         }
         // Explode if the player is too close
         if (sqrdistance < 6.25)
