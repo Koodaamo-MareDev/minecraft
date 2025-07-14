@@ -81,8 +81,8 @@ void world::update()
     uint64_t start_time = time_get();
     uint64_t elapsed_time = 0;
 
-    // Limit to 3ms per update
-    while (elapsed_time < 3000)
+    // Limit to 6ms per update
+    while (elapsed_time < 6000)
     {
         // Cycle through the phases
         current_update_phase = update_sections(current_update_phase);
