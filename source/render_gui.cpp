@@ -45,7 +45,7 @@ int draw_colored_sprite(GXTexObj &texture, vec2i pos, vec2i size, vfloat_t u1, v
 // NOTE: This function doesn't load the texture automatically because it's used by font rendering. Make sure to call use_texture before calling this function.
 int draw_colored_sprite_3d(GXTexObj &texture, vec3f center, vec3f size, vec3f offset, vec3f right, vec3f up, vfloat_t u1, vfloat_t v1, vfloat_t u2, vfloat_t v2, GXColor color)
 {
-    WHY_DOES_NOP_FIX_EVERYTHING;
+    NOP_FIX;
     uint8_t r = color.r;
     uint8_t g = color.g;
     uint8_t b = color.b;
@@ -71,7 +71,7 @@ int draw_colored_sprite_3d(GXTexObj &texture, vec3f center, vec3f size, vec3f of
 
 vfloat_t text_width_3d(std::string str)
 {
-    WHY_DOES_NOP_FIX_EVERYTHING;
+    NOP_FIX;
     vfloat_t width = 0;
     vfloat_t max_width = 0;
     for (size_t i = 0; i < str.size(); i++)
@@ -95,7 +95,7 @@ vfloat_t text_width_3d(std::string str)
 
 void draw_text_3d(vec3f pos, std::string str, GXColor color)
 {
-    WHY_DOES_NOP_FIX_EVERYTHING;
+    NOP_FIX;
     vec3f char_size = vec3f(0.25);
     vec3f right_vec = -angles_to_vector(0, yrot + 90);
     vec3f up_vec = -angles_to_vector(xrot + 90, yrot);
