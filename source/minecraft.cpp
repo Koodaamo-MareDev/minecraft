@@ -27,9 +27,7 @@
 #endif
 
 #define DEFAULT_FIFO_SIZE (256 * 1024)
-#define LOOKAROUND_SENSITIVITY 180.0f
 #define DIRECTIONAL_LIGHT GX_ENABLE
-// #define NO_LOADING_SCREEN
 
 void *frameBuffer[3] = {NULL, NULL, NULL};
 static GXRModeObj *rmode = NULL;
