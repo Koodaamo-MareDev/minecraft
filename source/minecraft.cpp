@@ -449,21 +449,6 @@ int main(int argc, char **argv)
 
             UpdateNetwork();
 
-            if ((wiimote_down & WPAD_CLASSIC_BUTTON_LEFT))
-            {
-                if (!current_world->is_remote())
-                {
-                    vec3i block_pos;
-                    vec3i face;
-                    if (raycast(vec3f(player_pos.x + .5, player_pos.y + .5, player_pos.z + .5), angles_to_vector(xrot, yrot), 128, &block_pos, &face))
-                    {
-                        block_pos = block_pos + face;
-                        vec3f pos = vec3f(block_pos.x, block_pos.y, block_pos.z) + vec3f(0.5, 0.5, 0.5);
-                        current_world->create_explosion(pos, 3, get_chunk_from_pos(block_pos));
-                    }
-                }
-            }
-
             current_world->tick();
 
             wiimote_down = 0;
