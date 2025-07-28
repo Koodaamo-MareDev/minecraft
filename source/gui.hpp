@@ -4,8 +4,6 @@
 #include "render_gui.hpp"
 #include "inventory.hpp"
 
-extern uint32_t raw_wiimote_down;
-extern uint32_t raw_wiimote_held;
 extern int cursor_x;
 extern int cursor_y;
 extern bool wiimote_ir_visible;

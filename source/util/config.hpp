@@ -13,7 +13,7 @@
 struct configuration_value
 {
 private:
-    std::string string_value = "";
+    std::string string_value = "0.0";
     float float_value = 0.0f;
 
 public:
@@ -35,19 +35,20 @@ public:
     configuration_value &operator=(const std::string &value)
     {
         string_value = value;
-        try
+        if (value.empty())
         {
-            float_value = std::stof(value);
+            float_value = 0.0f; // Reset to 0 if the string is empty
+            return *this;
         }
-        catch (const std::invalid_argument &)
+        if (std::string(value).find_first_not_of("0123456789.-") == std::string::npos)
         {
+            // If the string is numeric, convert to float
             try
             {
-                float_value = std::stoi(value);
+                float_value = std::stof(value);
             }
             catch (const std::invalid_argument &)
             {
-                debug::print("Invalid configuration value: %s\n", value.c_str());
                 float_value = 0.0f; // Reset to 0 if conversion fails
             }
         }
@@ -101,22 +102,24 @@ public:
                 std::string key = line.substr(0, pos);
                 std::string value = line.substr(pos + 1);
                 if (value.empty())
-                    continue;
-                try
                 {
-                    kv_pairs[key] = std::stof(value);
+                    kv_pairs[key] = value;
+                    continue; // Skip empty values
                 }
-                catch (const std::invalid_argument &)
+                if (value.find_first_not_of("0123456789.-") == std::string::npos)
                 {
                     try
                     {
-                        kv_pairs[key] = std::stoi(value);
+                        kv_pairs[key] = std::stof(value);
                     }
                     catch (const std::invalid_argument &)
                     {
-                        debug::print("Invalid configuration value for key '%s': %s\n", key.c_str(), value.c_str());
-                        kv_pairs[key] = value; // If conversion fails, store as string
+                        kv_pairs[key] = 0.0f; // Reset to 0 if conversion fails
                     }
+                }
+                else
+                {
+                    kv_pairs[key] = value;
                 }
             }
         }
@@ -132,13 +135,24 @@ public:
         {
             configuration_value value = pair.second;
 
-            // Check if the value is effectively an integer
-            if (std::floor(float(value)) == float(value))
+            if (std::string(value).empty())
             {
-                file << pair.first << "=" << int(value) << "\n";
+                file << pair.first << "=\n"; // Save empty values as empty
+                continue;
+            }
+
+            // Check if the value is a string
+            if (std::string(value).find_first_not_of("0123456789.-") == std::string::npos)
+            {
+                // Check if the value is effectively an integer
+                if (std::floor(float(value)) == float(value))
+                    file << pair.first << "=" << int(value) << "\n";
+                else // Otherwise, save as float
+                    file << pair.first << "=" << float(value) << "\n";
             }
             else
             {
+                // Save as string
                 file << pair.first << "=" << std::string(value) << "\n";
             }
         }

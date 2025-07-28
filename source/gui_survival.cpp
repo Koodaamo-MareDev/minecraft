@@ -1,6 +1,7 @@
 #include "gui_survival.hpp"
 #include "entity.hpp"
 #include "world.hpp"
+#include "util/input/input.hpp"
 
 gui_survival::gui_survival(const gertex::GXView &viewport, inventory::container &container) : gui(viewport), linked_container(container)
 {
@@ -127,10 +128,26 @@ void gui_survival::draw()
 
 void gui_survival::update()
 {
-    if ((raw_wiimote_down & (WPAD_CLASSIC_BUTTON_Y | WPAD_CLASSIC_BUTTON_B)) != 0)
+    bool clicked = false;
+    bool is_right_click = false;
+    for (input::device *dev : input::devices)
     {
-        bool right_click = raw_wiimote_down & WPAD_CLASSIC_BUTTON_Y;
-
+        if (!dev->connected())
+            continue;
+        uint32_t btn_down = dev->get_buttons_down();
+        if (btn_down != 0)
+        {
+            if ((btn_down & input::BUTTON_CANCEL) || (btn_down & input::BUTTON_CONFIRM))
+            {
+                clicked = true;
+                if ((btn_down & input::BUTTON_CANCEL))
+                    is_right_click = true;
+            }
+            break;
+        }
+    }
+    if (clicked)
+    {
         // Get the slot that the cursor is hovering over
         gui_slot *slot = nullptr;
         for (gui_slot &s : hotbar_slots)
@@ -167,7 +184,7 @@ void gui_survival::update()
         // If the slot is valid, interact with it
         if (slot)
         {
-            item_in_hand = slot->interact(item_in_hand, right_click);
+            item_in_hand = slot->interact(item_in_hand, is_right_click);
 
             // Copy the GUI slots to the container after interaction
             for (size_t i = 0; i < linked_container.size(); i++)

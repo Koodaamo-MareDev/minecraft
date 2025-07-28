@@ -18,7 +18,9 @@
 #include "gui_dirtscreen.hpp"
 #include "crapper/client.hpp"
 #include "world.hpp"
-#include "config.hpp"
+#include "util/input/keyboard_mouse.hpp"
+#include "util/input/wiimote_nunchuk.hpp"
+#include "util/input/wiimote_classic.hpp"
 
 #ifdef MONO_LIGHTING
 #include "light_day_mono_rgba.h"
@@ -44,22 +46,9 @@ configuration config;
 
 int frameCounter = 0;
 
-u32 wiimote_down = 0;
-u32 wiimote_held = 0;
-float wiimote_x = 0;
-float wiimote_z = 0;
-float wiimote_rx = 0;
-float wiimote_ry = 0;
-float wiimote_ir_x = 0;
-float wiimote_ir_y = 0;
 bool wiimote_ir_visible = false;
 u32 raw_wiimote_down = 0;
-u32 raw_wiimote_held = 0;
-vec3f left_stick(0, 0, 0);
-vec3f right_stick(0, 0, 0);
 int shoulder_btn_frame_counter = 0;
-float prev_left_shoulder = 0;
-float prev_right_shoulder = 0;
 bool should_destroy_block = false;
 bool should_place_block = false;
 
@@ -237,7 +226,9 @@ int main(int argc, char **argv)
     if (rmode->viTVMode & VI_NON_INTERLACE)
         VIDEO_WaitVSync();
     fb ^= 1;
-
+#ifdef DEBUG
+    debug::init(rmode);
+#endif
     // Init the GPU
     GX_Init(gpfifo, DEFAULT_FIFO_SIZE);
 
@@ -311,6 +302,12 @@ int main(int argc, char **argv)
         viewport.near,      // Near clipping plane
         viewport.far        // Far clipping plane
     };
+
+    input::init();
+    input::add_device(new input::keyboard_mouse);
+    input::add_device(new input::wiimote_nunchuk);
+    input::add_device(new input::wiimote_classic);
+
     current_world = new world;
 
     // Add the player to the world - it should persist until the game is closed
@@ -430,9 +427,6 @@ int main(int argc, char **argv)
             UpdateNetwork();
 
             current_world->tick();
-
-            wiimote_down = 0;
-            wiimote_held = 0;
         }
 
         UpdateCamera(camera);
@@ -484,10 +478,7 @@ int main(int argc, char **argv)
 
         GX_CopyDisp(frameBuffer[fb], GX_TRUE);
 #ifdef DEBUG
-        for (int i = 0; i < rmode->efbHeight; i++)
-        {
-            memcpy((char *)frameBuffer[fb] + i * rmode->viWidth * VI_DISPLAY_PIX_SZ + (rmode->viWidth - 224) * VI_DISPLAY_PIX_SZ, (char *)frameBuffer[2] + i * rmode->viWidth * VI_DISPLAY_PIX_SZ, 224 * VI_DISPLAY_PIX_SZ);
-        }
+        debug::copy_to(frameBuffer[fb]);
 #endif
         VIDEO_SetNextFramebuffer(frameBuffer[fb]);
         VIDEO_Flush();
@@ -514,6 +505,8 @@ int main(int argc, char **argv)
     current_world->save();
     current_world->reset();
     Crapper::deinitNetwork();
+    input::deinit();
+    WPAD_Shutdown();
     delete current_world;
     config.save();
     VIDEO_Flush();
@@ -604,196 +597,86 @@ void UpdateLoadingStatus()
 void GetInput()
 {
     WPAD_ScanPads();
-    static u32 prev_nunchuk_held = 0;
-    raw_wiimote_down = WPAD_ButtonsDown(0);
-    raw_wiimote_held = WPAD_ButtonsHeld(0);
-    if ((raw_wiimote_down & (WPAD_BUTTON_HOME | WPAD_CLASSIC_BUTTON_HOME)))
+    if ((WPAD_ButtonsDown(0) & (WPAD_BUTTON_HOME | WPAD_CLASSIC_BUTTON_HOME)))
         isExiting = true;
-    if ((raw_wiimote_down & WPAD_BUTTON_1))
-    {
-        printf("SPEED: %f, %f\n", wiimote_x, wiimote_z);
-        printf("POS: %f, %f, %f\n", player_pos.x, player_pos.y, player_pos.z);
-    }
 
-    expansion_t expansion;
-    WPAD_Expansion(0, &expansion);
-    left_stick = vec3f(0, 0, 0);
-    right_stick = vec3f(0, 0, 0);
-    static float sensitivity = config.get("look_sensitivity", 360.0f);
-    static float deadzone = std::min(float(config.get("joystick_deadzone", 0.1f)), 0.5f);
-    if (expansion.type == WPAD_EXP_NONE || expansion.type == WPAD_EXP_UNKNOWN)
+    vec3f left_stick = vec3f(0, 0, 0);
+    vec3f right_stick = vec3f(0, 0, 0);
+
+    for (input::device *dev : input::devices)
     {
-        return;
-    }
-    else if (expansion.type == WPAD_EXP_NUNCHUK)
-    {
-        static int ir_tracking_keep_alive = 0;
-        if (ir_tracking_keep_alive % 300 == 0)
+        dev->scan();
+        if (dev->connected())
         {
-            // Enable IR tracking every 5 seconds to prevent tracking loss due to connection issues
-            ir_tracking_keep_alive = 0;
-            WPAD_SetDataFormat(0, WPAD_FMT_BTNS_ACC_IR);
+            left_stick = left_stick + dev->get_left_stick();
+            right_stick = right_stick + dev->get_right_stick();
         }
-        ir_tracking_keep_alive++;
-
-        u32 nunchuk_held = expansion.nunchuk.btns_held;
-        u32 nunchuk_down = expansion.nunchuk.btns_held & ~prev_nunchuk_held;
-        prev_nunchuk_held = nunchuk_held;
-
-        u32 new_raw_wiimote_down = 0;
-        u32 new_raw_wiimote_held = 0;
-
-        // Emulate the right stick with the IR sensor
-        ir_t ir;
-        WPAD_IR(0, &ir);
-        if (ir.valid)
-        {
-            wiimote_ir_visible = true;
-            right_stick.x = (ir.x / ir.vres[0]) - 0.5;
-            right_stick.y = 0.5 - (ir.y / ir.vres[1]);
-
-            wiimote_ir_x = ir.x / ir.vres[0];
-            wiimote_ir_y = ir.y / ir.vres[1];
-
-            // Ensure that the coordinates are at least 0.125 away from the center to prevent accidental movement.
-            if (right_stick.magnitude() < 0.125)
-            {
-                right_stick = vec3f(0, 0, 0);
-            }
-            else
-            {
-                // Magnitude of 0.25 or less means that the stick is near the center. 1 means it's at the edge and means it will move at full speed.
-                right_stick = right_stick.fast_normalize() * ((right_stick.magnitude() - 0.125) / 0.875);
-
-                // Multiply the result by 2 since the edges of the screen are difficult to reach as tracking is lost.
-                right_stick = right_stick * 2;
-            }
-        }
-        else
-        {
-            wiimote_ir_visible = false;
-        }
-
-        if (right_stick.magnitude() > 1.0)
-            right_stick = right_stick.fast_normalize();
-
-        // Map the Wiimote and Nunchuck buttons to the Classic Controller buttons
-        if ((nunchuk_held & NUNCHUK_BUTTON_C))
-            new_raw_wiimote_held |= WPAD_CLASSIC_BUTTON_X;
-        if ((raw_wiimote_held & WPAD_BUTTON_A))
-            new_raw_wiimote_held |= WPAD_CLASSIC_BUTTON_B;
-        if ((nunchuk_held & NUNCHUK_BUTTON_Z))
-            new_raw_wiimote_held |= WPAD_CLASSIC_BUTTON_FULL_L;
-        if ((raw_wiimote_held & WPAD_BUTTON_B))
-            new_raw_wiimote_held |= WPAD_CLASSIC_BUTTON_FULL_R;
-        if ((raw_wiimote_held & WPAD_BUTTON_MINUS))
-            new_raw_wiimote_held |= WPAD_CLASSIC_BUTTON_ZL;
-        if ((raw_wiimote_held & WPAD_BUTTON_PLUS))
-            new_raw_wiimote_held |= WPAD_CLASSIC_BUTTON_ZR;
-
-        if ((nunchuk_down & NUNCHUK_BUTTON_C))
-            new_raw_wiimote_down |= WPAD_CLASSIC_BUTTON_X;
-        if ((raw_wiimote_down & WPAD_BUTTON_A))
-            new_raw_wiimote_down |= WPAD_CLASSIC_BUTTON_B;
-        if ((nunchuk_down & NUNCHUK_BUTTON_Z))
-            new_raw_wiimote_down |= WPAD_CLASSIC_BUTTON_FULL_L;
-        if ((raw_wiimote_down & WPAD_BUTTON_B))
-            new_raw_wiimote_down |= WPAD_CLASSIC_BUTTON_FULL_R;
-        if ((raw_wiimote_down & WPAD_BUTTON_MINUS))
-            new_raw_wiimote_down |= WPAD_CLASSIC_BUTTON_ZL;
-        if ((raw_wiimote_down & WPAD_BUTTON_PLUS))
-            new_raw_wiimote_down |= WPAD_CLASSIC_BUTTON_ZR;
-
-        raw_wiimote_down = new_raw_wiimote_down;
-        raw_wiimote_held = new_raw_wiimote_held;
-        left_stick.x = float(int(expansion.nunchuk.js.pos.x) - int(expansion.nunchuk.js.center.x)) * 2 / (int(expansion.nunchuk.js.max.x) - 2 - int(expansion.nunchuk.js.min.x));
-        left_stick.y = float(int(expansion.nunchuk.js.pos.y) - int(expansion.nunchuk.js.center.y)) * 2 / (int(expansion.nunchuk.js.max.y) - 2 - int(expansion.nunchuk.js.min.y));
-    }
-    else if (expansion.type == WPAD_EXP_CLASSIC)
-    {
-        right_stick.x = float(int(expansion.classic.rjs.pos.x) - int(expansion.classic.rjs.center.x)) * 2 / (int(expansion.classic.rjs.max.x) - 2 - int(expansion.classic.rjs.min.x));
-        right_stick.y = float(int(expansion.classic.rjs.pos.y) - int(expansion.classic.rjs.center.y)) * 2 / (int(expansion.classic.rjs.max.y) - 2 - int(expansion.classic.rjs.min.y));
-        left_stick.x = float(int(expansion.classic.ljs.pos.x) - int(expansion.classic.ljs.center.x)) * 2 / (int(expansion.classic.ljs.max.x) - 2 - int(expansion.classic.ljs.min.x));
-        left_stick.y = float(int(expansion.classic.ljs.pos.y) - int(expansion.classic.ljs.center.y)) * 2 / (int(expansion.classic.ljs.max.y) - 2 - int(expansion.classic.ljs.min.y));
     }
 
-    if (left_stick.magnitude() < deadzone)
-    {
-        left_stick.x = 0;
-        left_stick.y = 0;
-    }
-
-    if (right_stick.magnitude() < deadzone)
-    {
-        right_stick.x = 0;
-        right_stick.y = 0;
-    }
+    should_place_block = false;
+    should_destroy_block = false;
 
     if (!gui::get_gui())
     {
-        float target_x = left_stick.x * sin(DegToRad(yrot + 90));
-        float target_z = left_stick.x * cos(DegToRad(yrot + 90));
-        target_x -= left_stick.y * sin(DegToRad(yrot));
-        target_z -= left_stick.y * cos(DegToRad(yrot));
 
-        if (current_world)
+        yrot -= right_stick.x * current_world->delta_time * input::sensitivity;
+        xrot += right_stick.y * current_world->delta_time * input::sensitivity;
+
+        if (yrot > 360.f)
+            yrot -= 360.f;
+        if (yrot < 0)
+            yrot += 360.f;
+        if (xrot > 90.f)
+            xrot = 90.f;
+        if (xrot < -90.f)
+            xrot = -90.f;
+
+        bool left_shoulder_pressed = false;
+        bool right_shoulder_pressed = false;
+        bool hotbar_slot_changed = false;
+
+        for (input::device *dev : input::devices)
         {
-            yrot -= right_stick.x * current_world->delta_time * sensitivity;
-            xrot += right_stick.y * current_world->delta_time * sensitivity;
+            if (!dev->connected())
+                continue;
 
-            if (yrot > 360.f)
-                yrot -= 360.f;
-            if (yrot < 0)
-                yrot += 360.f;
-            if (xrot > 90.f)
-                xrot = 90.f;
-            if (xrot < -90.f)
-                xrot = -90.f;
+            if ((dev->get_buttons_held() & input::BUTTON_PLACE) && ((dev->get_buttons_down() & input::BUTTON_PLACE) || shoulder_btn_frame_counter % 10 == 0))
+                left_shoulder_pressed = true;
+            if ((dev->get_buttons_held() & input::BUTTON_MINE))
+                right_shoulder_pressed = true;
+            if ((dev->get_buttons_down() & input::BUTTON_HOTBAR_LEFT))
+            {
+                current_world->player.selected_hotbar_slot = (current_world->player.selected_hotbar_slot + 8) % 9;
+                hotbar_slot_changed = true;
+            }
+            if ((dev->get_buttons_down() & input::BUTTON_HOTBAR_RIGHT))
+            {
+                current_world->player.selected_hotbar_slot = (current_world->player.selected_hotbar_slot + 1) % 9;
+                hotbar_slot_changed = true;
+            }
         }
-
-        wiimote_x = target_x;
-        wiimote_z = target_z;
-
-        wiimote_down |= raw_wiimote_down;
-        wiimote_held |= raw_wiimote_held;
-
-        wiimote_rx = right_stick.x;
-        wiimote_ry = right_stick.y;
-
-        if (!((raw_wiimote_held & WPAD_CLASSIC_BUTTON_FULL_L) || (raw_wiimote_held & WPAD_CLASSIC_BUTTON_FULL_R)))
-            shoulder_btn_frame_counter = -1;
-        else
+        if (current_world->is_remote() && hotbar_slot_changed)
+            client.sendBlockItemSwitch(current_world->player.selected_hotbar_slot);
+        if (left_shoulder_pressed || right_shoulder_pressed)
+        {
+            // Increment the shoulder button frame counter while a shoulder button is held
             shoulder_btn_frame_counter++;
-
-        should_place_block = false;
-        should_destroy_block = false;
-        if (shoulder_btn_frame_counter >= 0)
+        }
+        else
+        {
+            // Reset the shoulder button frame counter if no shoulder button is pressed
+            shoulder_btn_frame_counter = -1;
+        }
+        if (right_shoulder_pressed)
+            should_destroy_block = true;
+        else if (left_shoulder_pressed)
         {
             // repeats buttons every 10 frames
-            if ((raw_wiimote_held & WPAD_CLASSIC_BUTTON_FULL_L) && ((raw_wiimote_down & WPAD_CLASSIC_BUTTON_FULL_L) || shoulder_btn_frame_counter % 10 == 0))
+            if (shoulder_btn_frame_counter >= 0 && shoulder_btn_frame_counter % 10 == 0)
+            {
                 should_place_block = true;
-            if ((raw_wiimote_held & WPAD_CLASSIC_BUTTON_FULL_R))
-                should_place_block = !(should_destroy_block = true);
+            }
         }
-        if (raw_wiimote_down & WPAD_CLASSIC_BUTTON_ZL)
-        {
-            current_world->player.selected_hotbar_slot = (current_world->player.selected_hotbar_slot + 8) % 9;
-            if (current_world->is_remote())
-                client.sendBlockItemSwitch(current_world->player.selected_hotbar_slot);
-        }
-        if (raw_wiimote_down & WPAD_CLASSIC_BUTTON_ZR)
-        {
-            current_world->player.selected_hotbar_slot = (current_world->player.selected_hotbar_slot + 1) % 9;
-            if (current_world->is_remote())
-                client.sendBlockItemSwitch(current_world->player.selected_hotbar_slot);
-        }
-    } // If the inventory is visible, don't allow the player to move
-    else
-    {
-        wiimote_x = 0;
-        wiimote_z = 0;
-        should_place_block = false;
-        should_destroy_block = false;
     }
 }
 
@@ -814,17 +697,23 @@ void UpdateLightDir()
 
 void HandleGUI(gertex::GXView &viewport)
 {
-    if ((raw_wiimote_down & WPAD_CLASSIC_BUTTON_X) != 0)
+    for (input::device *dev : input::devices)
     {
-        if (current_world->loaded)
+        if (!dev->connected())
+            continue;
+
+        if ((dev->get_buttons_down() & input::BUTTON_INVENTORY) != 0)
         {
-            if (gui::get_gui())
+            if (current_world->loaded)
             {
-                gui::set_gui(nullptr);
-            }
-            else
-            {
-                gui::set_gui(new gui_survival(viewport, current_world->player.m_inventory));
+                if (gui::get_gui())
+                {
+                    gui::set_gui(nullptr);
+                }
+                else
+                {
+                    gui::set_gui(new gui_survival(viewport, current_world->player.m_inventory));
+                }
             }
         }
     }
@@ -832,7 +721,13 @@ void HandleGUI(gertex::GXView &viewport)
     {
         // Draw the underwater overlay
         static vec3f pan_underwater_texture(0, 0, 0);
-        pan_underwater_texture = pan_underwater_texture + vec3f(wiimote_rx * 0.25, wiimote_ry * 0.25, 0.0);
+        for (input::device *dev : input::devices)
+        {
+            if (!dev->connected())
+                continue;
+            pan_underwater_texture.x += dev->get_right_stick().x * 0.25f;
+            pan_underwater_texture.y += dev->get_right_stick().y * 0.25f;
+        }
         float corrected_height = viewport.height * viewport.aspect_correction;
         pan_underwater_texture.x = std::fmod(pan_underwater_texture.x, viewport.width);
         pan_underwater_texture.y = std::fmod(pan_underwater_texture.y, corrected_height);
@@ -1000,14 +895,23 @@ void UpdateGUI(gertex::GXView &viewport)
     if (!gui::get_gui())
         return;
 
-    cursor_x += left_stick.x * 8;
-    cursor_y -= left_stick.y * 8;
-
-    if (!wiimote_ir_visible)
+    for (input::device *dev : input::devices)
     {
-        // Since you can technically go out of bounds using a joystick, we need to clamp the cursor position; it'd be really annoying losing the cursor
-        cursor_x = std::clamp(cursor_x, 0, int(viewport.width / viewport.aspect_correction));
-        cursor_y = std::clamp(cursor_y, 0, int(viewport.height));
+        if (dev->connected())
+        {
+            // Update the cursor position based on the left stick
+            vec3f left_stick = dev->get_left_stick();
+            cursor_x += left_stick.x * 8;
+            cursor_y -= left_stick.y * 8;
+
+            // Override the cursor position with the pointer position if applicable
+            if (dev->is_ir_visible())
+            {
+                // Since you can technically go out of bounds using a joystick, we need to clamp the cursor position; it'd be really annoying losing the cursor
+                cursor_x = std::clamp(cursor_x, 0, int(viewport.width / viewport.aspect_correction));
+                cursor_y = std::clamp(cursor_y, 0, int(viewport.height));
+            }
+        }
     }
     gui::get_gui()->update();
 }
@@ -1041,10 +945,23 @@ void DrawHUD(gertex::GXView &viewport)
     // Restore the state
     gertex::set_state(state);
 
+    float pointer_x = 0.5f;
+    float pointer_y = 0.5f;
+
     // Draw IR cursor if visible
+    for (input::device *dev : input::devices)
+    {
+        if (dev->is_ir_visible())
+        {
+            wiimote_ir_visible = true;
+            pointer_x = dev->get_pointer_x();
+            pointer_y = dev->get_pointer_y();
+            break;
+        }
+    }
     if (wiimote_ir_visible)
     {
-        draw_textured_quad(icons_texture, wiimote_ir_x * viewport.width - 7, wiimote_ir_y * corrected_height - 3, 48, 48, 32, 32, 56, 56);
+        draw_textured_quad(icons_texture, pointer_x * viewport.width - 7, pointer_y * corrected_height - 3, 48, 48, 32, 32, 56, 56);
     }
 
     // Enable direct colors

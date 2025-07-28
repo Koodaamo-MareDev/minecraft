@@ -18,7 +18,7 @@ include $(DEVKITPPC)/wii_rules
 #---------------------------------------------------------------------------------
 TARGET		:=	$(notdir $(CURDIR))
 BUILD		:=	build
-SOURCES		:=	source source/crapper source/gertex source/math source/nbt source/util source/pnguin source/auxio source/ported source/thirdparty/miniz
+SOURCES		:=	source source/crapper source/gertex source/math source/nbt source/util source/util/input source/pnguin source/auxio source/ported source/thirdparty/miniz
 TEXTURES	:=	textures
 INCLUDES	:=	source source/thirdparty
 DEFINES		:=	-DMINIZ_NO_ARCHIVE_APIS -DMINIZ_NO_ZLIB_COMPATIBLE_NAMES
@@ -35,7 +35,7 @@ LDFLAGS	=	-g $(MACHDEP) -Wl,-Map,$(notdir $@).map
 #---------------------------------------------------------------------------------
 # any extra libraries we wish to link with the project
 #---------------------------------------------------------------------------------
-LIBS	:=	-lwiiuse -lbte -lfat -lvorbisidec -logg -lasnd -logc -lm
+LIBS	:=	-lwiikeyboard -lwiiuse -lbte -lfat -lvorbisidec -logg -lasnd -logc -lm
 
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing

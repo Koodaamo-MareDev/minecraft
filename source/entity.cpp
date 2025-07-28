@@ -14,9 +14,7 @@
 #include "inventory.hpp"
 #include "gui.hpp"
 #include "world.hpp"
-extern float wiimote_x;
-extern float wiimote_z;
-extern u32 wiimote_held;
+#include "util/input/input.hpp"
 
 pathfinding_t pathfinder;
 
@@ -1190,8 +1188,31 @@ void entity_player_local::deserialize(NBTTagCompound *result)
 
 void entity_player_local::tick()
 {
-    movement.x = wiimote_x;
-    movement.z = wiimote_z;
+    if (!gui::get_gui())
+    {
+        for (input::device *dev : input::devices)
+        {
+            if (dev->connected())
+            {
+                // Update the cursor position based on the left stick
+                vec3f left_stick = dev->get_left_stick();
+                movement.x = left_stick.x * sin(DegToRad(yrot + 90));
+                movement.z = left_stick.x * cos(DegToRad(yrot + 90));
+                movement.x -= left_stick.y * sin(DegToRad(yrot));
+                movement.z -= left_stick.y * cos(DegToRad(yrot));
+                movement.y = 0;
+                if (movement.magnitude() > 1)
+                {
+                    movement = movement.fast_normalize();
+                }
+            }
+        }
+    }
+    else
+    {
+        // If a GUI is open, reset the movement
+        movement = vec3f(0);
+    }
     entity_living::tick();
     if (!current_world->is_remote() && aabb.min.y < -750)
         teleport(vec3f(position.x, 256, position.z));
@@ -1209,7 +1230,17 @@ void entity_player_local::animate()
 
 bool entity_player_local::should_jump()
 {
-    return (wiimote_held & WPAD_CLASSIC_BUTTON_B);
+    if (gui::get_gui())
+        return false;
+
+    for (input::device *dev : input::devices)
+    {
+        if (dev->connected() && (dev->get_buttons_held() & input::BUTTON_JUMP))
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 bool entity_player_local::can_remove()
