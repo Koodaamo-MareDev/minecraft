@@ -43,19 +43,15 @@ namespace debug
             return;
         }
 
-        for (int i = 0; i < rmode->efbHeight; i++)
-        {
-            memcpy((char *)fb + i * rmode->viWidth * VI_DISPLAY_PIX_SZ + (rmode->viWidth - 224) * VI_DISPLAY_PIX_SZ, (char *)frame_buffer + i * rmode->viWidth * VI_DISPLAY_PIX_SZ, 224 * VI_DISPLAY_PIX_SZ);
-        }
+        copy_to(fb);
         VIDEO_Flush();
     }
 
     void copy_to(void *fb)
     {
-        if (!frame_buffer || !rmode)
-        {
+        if (!initialized || !fb)
             return;
-        }
+
         for (int i = 0; i < rmode->efbHeight; i++)
         {
             memcpy((char *)fb + i * rmode->viWidth * VI_DISPLAY_PIX_SZ + (rmode->viWidth - 224) * VI_DISPLAY_PIX_SZ, (char *)frame_buffer + i * rmode->viWidth * VI_DISPLAY_PIX_SZ, 224 * VI_DISPLAY_PIX_SZ);
