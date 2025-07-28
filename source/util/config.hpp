@@ -6,6 +6,7 @@
 #include <map>
 #include <stdexcept>
 #include <type_traits>
+#include <cmath>
 
 #include "debuglog.hpp"
 
@@ -129,7 +130,17 @@ public:
 
         for (const auto &pair : kv_pairs)
         {
-            file << pair.first << "=" << std::string(pair.second) << "\n";
+            configuration_value value = pair.second;
+
+            // Check if the value is effectively an integer
+            if (std::floor(float(value)) == float(value))
+            {
+                file << pair.first << "=" << int(value) << "\n";
+            }
+            else
+            {
+                file << pair.first << "=" << std::string(value) << "\n";
+            }
         }
     }
 
