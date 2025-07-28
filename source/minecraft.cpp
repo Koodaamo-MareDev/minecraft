@@ -7,6 +7,8 @@
 #include <ogc/conf.h>
 #include <stdarg.h>
 #include <sys/stat.h>
+#include "util/debuglog.hpp"
+#include "util/config.hpp"
 #include "block_id.hpp"
 #include "timers.hpp"
 #include "raycast.hpp"
@@ -29,7 +31,7 @@
 #define DEFAULT_FIFO_SIZE (256 * 1024)
 #define DIRECTIONAL_LIGHT GX_ENABLE
 
-void *frameBuffer[3] = {NULL, NULL, NULL};
+void *frameBuffer[2] = {NULL, NULL};
 static GXRModeObj *rmode = NULL;
 
 f32 xrot = 0.0f;
@@ -69,24 +71,6 @@ float fog_light_multiplier = 1.0f;
 
 Crapper::MinecraftClient client;
 ByteBuffer receive_buffer;
-
-void dbgprintf(const char *fmt, ...)
-{
-    va_list args;
-    va_start(args, fmt);
-    vprintf(fmt, args);
-    va_end(args);
-
-    // Immediately display the output
-#ifdef DEBUG
-    void *fb = VIDEO_GetNextFramebuffer();
-    for (int i = 0; i < rmode->efbHeight; i++)
-    {
-        memcpy((char *)fb + i * rmode->viWidth * VI_DISPLAY_PIX_SZ + (rmode->viWidth - 224) * VI_DISPLAY_PIX_SZ, (char *)frameBuffer[2] + i * rmode->viWidth * VI_DISPLAY_PIX_SZ, 224 * VI_DISPLAY_PIX_SZ);
-    }
-    VIDEO_Flush();
-#endif
-}
 
 // Function to create the full directory path
 int mkpath(const char *path, mode_t mode)
@@ -243,10 +227,6 @@ int main(int argc, char **argv)
     frameBuffer[0] = MEM_K0_TO_K1(SYS_AllocateFramebuffer(rmode));
     frameBuffer[1] = MEM_K0_TO_K1(SYS_AllocateFramebuffer(rmode));
 
-#ifdef DEBUG
-    frameBuffer[2] = MEM_K0_TO_K1(SYS_AllocateFramebuffer(rmode));
-    CON_Init(frameBuffer[2], 0, 0, rmode->fbWidth, rmode->xfbHeight, rmode->fbWidth * VI_DISPLAY_PIX_SZ);
-#endif
     // Configure video
     VIDEO_Configure(rmode);
     VIDEO_ClearFrameBuffer(rmode, frameBuffer[0], COLOR_BLACK);

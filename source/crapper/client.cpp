@@ -11,10 +11,10 @@
 #include "../sound.hpp"
 #include "../world.hpp"
 #include "../gui_dirtscreen.hpp"
+#include "../util/debuglog.hpp"
 
 extern float xrot;
 extern float yrot;
-void dbgprintf(const char *fmt, ...); // in minecraft.cpp
 namespace Crapper
 {
     bool initNetwork()
@@ -35,10 +35,10 @@ namespace Crapper
         ret = if_config(localip, netmask, gateway, true, 20);
         if (ret >= 0)
         {
-            dbgprintf("Network configured, ip: %s, gw: %s, mask %s\n", localip, gateway, netmask);
+            debug::print("Network configured, ip: %s, gw: %s, mask %s\n", localip, gateway, netmask);
             return true;
         }
-        dbgprintf("Error: Network configuration failed\n");
+        debug::print("Error: Network configuration failed\n");
         return false;
     }
 
@@ -54,7 +54,7 @@ namespace Crapper
         sockfd = net_socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
         if (sockfd < 0)
         {
-            dbgprintf("Error creating socket\n");
+            debug::print("Error creating socket\n");
             status = ErrorStatus::CONNECT_ERROR;
             return;
         }
@@ -68,10 +68,10 @@ namespace Crapper
         hostent *server = net_gethostbyname(host.c_str());
         if (!server)
         {
-            dbgprintf("Unknown hostname. Fallback to plain IP\n");
+            debug::print("Unknown hostname. Fallback to plain IP\n");
             if (inet_aton(host.c_str(), &server_addr.sin_addr) == 0)
             {
-                dbgprintf("Error resolving hostname\n");
+                debug::print("Error resolving hostname\n");
                 status = ErrorStatus::CONNECT_ERROR;
                 close();
                 return;
@@ -105,7 +105,7 @@ namespace Crapper
             int sent = net_write(sockfd, &buffer.ptr()[offset], length);
             if (sent < 0)
             {
-                dbgprintf("Error sending data: %d %s\n", sent, strerror(-sent));
+                debug::print("Error sending data: %d %s\n", sent, strerror(-sent));
                 status = ErrorStatus::SEND_ERROR;
                 break;
             }
@@ -135,7 +135,7 @@ namespace Crapper
             {
                 if (received == -EAGAIN)
                     break; // No data to read
-                dbgprintf("Error receiving data: %d %s\n", received, strerror(-received));
+                debug::print("Error receiving data: %d %s\n", received, strerror(-received));
                 status = ErrorStatus::RECEIVE_ERROR;
                 return;
             }
@@ -360,7 +360,7 @@ namespace Crapper
 
     void MinecraftClient::joinServer(std::string host, uint16_t port)
     {
-        dbgprintf("Connecting to server %s:%d\n", host.c_str(), port);
+        debug::print("Connecting to server %s:%d\n", host.c_str(), port);
         status = ErrorStatus::OK;
         current_world->set_remote(true);
         connect(host, port);
@@ -368,7 +368,7 @@ namespace Crapper
         if (status != ErrorStatus::OK)
         {
             current_world->set_remote(false);
-            dbgprintf("Error connecting to server\n");
+            debug::print("Error connecting to server\n");
             return;
         }
 
@@ -377,7 +377,7 @@ namespace Crapper
         if (status != ErrorStatus::OK)
         {
             current_world->set_remote(false);
-            dbgprintf("Error connecting to server\n");
+            debug::print("Error connecting to server\n");
             return;
         }
     }
@@ -403,7 +403,7 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        dbgprintf("Server hash: %s\n", server_hash.c_str());
+        debug::print("Server hash: %s\n", server_hash.c_str());
         sendLoginRequest();
     }
 
@@ -445,20 +445,20 @@ namespace Crapper
 
         if (srv_checksum != "WiiMCsrv")
         {
-            dbgprintf("Incompatible server\n");
+            debug::print("Incompatible server\n");
             status = ErrorStatus::RECEIVE_ERROR;
             return;
         }
         set_world_hell(dimension);
 
-        dbgprintf("Player entity ID: %d\n", entity_id);
-        dbgprintf("World seed: %lld\n", seed);
+        debug::print("Player entity ID: %d\n", entity_id);
+        debug::print("World seed: %lld\n", seed);
 
         if (current_world->player.m_entity)
         {
             if (current_world->player.m_entity->chunk)
             {
-                dbgprintf("Player entity already exists in a chunk even though no chunks should be loaded yet. This must be a bug!!!\n");
+                debug::print("Player entity already exists in a chunk even though no chunks should be loaded yet. This must be a bug!!!\n");
                 status = ErrorStatus::RECEIVE_ERROR;
                 return;
             }
@@ -488,7 +488,7 @@ namespace Crapper
     {
         if (message.size() > 100)
         {
-            dbgprintf("Chat message too long\n");
+            debug::print("Chat message too long\n");
             return;
         }
         // Send chat message packet
@@ -504,7 +504,7 @@ namespace Crapper
         std::string message = buffer.readString();
         if (buffer.underflow)
             return;
-        dbgprintf("[CHAT] %s\n", message.c_str());
+        debug::print("[CHAT] %s\n", message.c_str());
     }
 
     void MinecraftClient::handleTimeUpdate(ByteBuffer &buffer)
@@ -535,19 +535,19 @@ namespace Crapper
         entity_physical *entity = get_entity_by_id(entity_id);
         if (!entity)
         {
-            dbgprintf("Received player equipment for unknown entity %d\n", entity_id);
+            debug::print("Received player equipment for unknown entity %d\n", entity_id);
             return;
         }
         entity_player *player = dynamic_cast<entity_player *>(entity);
         if (!player)
         {
-            dbgprintf("Received player equipment for non-player entity %d\n", entity_id);
+            debug::print("Received player equipment for non-player entity %d\n", entity_id);
             return;
         }
         // Update the player's equipment
         if (slot < 0 || slot >= 5)
         {
-            dbgprintf("Invalid equipment slot %d for entity %d\n", slot, entity_id);
+            debug::print("Invalid equipment slot %d for entity %d\n", slot, entity_id);
             return;
         }
         if (item == -1)
@@ -586,7 +586,7 @@ namespace Crapper
 
     void MinecraftClient::handleRespawn(ByteBuffer &buffer)
     {
-        dbgprintf("Respawned\n");
+        debug::print("Respawned\n");
     }
 
     void MinecraftClient::sendGrounded(bool on_ground)
@@ -662,7 +662,7 @@ namespace Crapper
 
         // Mirror the packet back to the server
         sendPlayerPositionLook();
-        dbgprintf("Player position: %f %f %f and look: %f %f\n", x, y, z, yaw, pitch);
+        debug::print("Player position: %f %f %f and look: %f %f\n", x, y, z, yaw, pitch);
     }
 
     void MinecraftClient::handleUseBed(ByteBuffer &buffer)
@@ -895,7 +895,7 @@ namespace Crapper
 
         default:
             entity = new entity_physical();
-            dbgprintf("Generic vehicle %d spawned at %f %f %f with entity type %d\n", entity_id, x, y, z, type);
+            debug::print("Generic vehicle %d spawned at %f %f %f with entity type %d\n", entity_id, x, y, z, type);
             break;
         }
         entity->set_server_position(vec3i(x, y, z));
@@ -920,7 +920,7 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        dbgprintf("Mob %d spawned at %f %f %f with entity type %d\n", entity_id, x / 32., y / 32., z / 32., int(type & 0xFF));
+        debug::print("Mob %d spawned at %f %f %f with entity type %d\n", entity_id, x / 32., y / 32., z / 32., int(type & 0xFF));
 #ifdef DEBUGENTITIES
         // Print metadata
         for (size_t i = 0; i < metadata.metadata.size(); i++)
@@ -928,19 +928,19 @@ namespace Crapper
             switch (metadata.metadata[i].type)
             {
             case 0:
-                dbgprintf("Metadata %d: %d\n", i, metadata.getByte(i));
+                debug::print("Metadata %d: %d\n", i, metadata.getByte(i));
                 break;
             case 1:
-                dbgprintf("Metadata %d: %d\n", i, metadata.getShort(i));
+                debug::print("Metadata %d: %d\n", i, metadata.getShort(i));
                 break;
             case 2:
-                dbgprintf("Metadata %d: %d\n", i, metadata.getInt(i));
+                debug::print("Metadata %d: %d\n", i, metadata.getInt(i));
                 break;
             case 3:
-                dbgprintf("Metadata %d: %f\n", i, metadata.getFloat(i));
+                debug::print("Metadata %d: %f\n", i, metadata.getFloat(i));
                 break;
             case 4:
-                dbgprintf("Metadata %d: %s\n", i, metadata.getString(i).c_str());
+                debug::print("Metadata %d: %s\n", i, metadata.getString(i).c_str());
                 break;
             case 5:
             {
@@ -948,14 +948,14 @@ namespace Crapper
                 uint8_t item_count;
                 uint8_t item_meta;
                 metadata.getItem(i, item_id, item_count, item_meta);
-                dbgprintf("Metadata %d: %d %d %d\n", i, item_id, item_count, item_meta);
+                debug::print("Metadata %d: %d %d %d\n", i, item_id, item_count, item_meta);
                 break;
             }
             case 6:
             {
                 int32_t mx, my, mz;
                 metadata.getPosition(i, mx, my, mz);
-                dbgprintf("Metadata %d: %d %d %d\n", i, mx, my, mz);
+                debug::print("Metadata %d: %d %d %d\n", i, mx, my, mz);
                 break;
             }
             }
@@ -998,7 +998,7 @@ namespace Crapper
         entity->entity_id = entity_id;
         add_entity(entity);
 
-        dbgprintf("Painting %d named %s spawned at %d %d %d with facing value %d\n", entity_id, title.c_str(), x, y, z, direction);
+        debug::print("Painting %d named %s spawned at %d %d %d with facing value %d\n", entity_id, title.c_str(), x, y, z, direction);
     }
 
     void MinecraftClient::handleEntityMotion(ByteBuffer &buffer)
@@ -1141,7 +1141,7 @@ namespace Crapper
             if (living_entity)
                 living_entity->hurt(0);
         }
-        dbgprintf("Entity %d status: %d\n", entity_id, status);
+        debug::print("Entity %d status: %d\n", entity_id, status);
     }
 
     void MinecraftClient::handleAttachEntity(ByteBuffer &buffer)
@@ -1156,21 +1156,21 @@ namespace Crapper
         entity_physical *entity = get_entity_by_id(entity_id);
         if (!entity)
         {
-            dbgprintf("Unknown entity %d\n", entity_id);
+            debug::print("Unknown entity %d\n", entity_id);
             return;
         }
         if (vehicle_id == -1)
         {
-            dbgprintf("Entity %d stopped riding entity\n", entity_id);
+            debug::print("Entity %d stopped riding entity\n", entity_id);
             return;
         }
         entity_physical *vehicle = get_entity_by_id(vehicle_id);
         if (!vehicle)
         {
-            dbgprintf("Entity %d started riding unknown entity %d\n", entity_id, vehicle_id);
+            debug::print("Entity %d started riding unknown entity %d\n", entity_id, vehicle_id);
             return;
         }
-        dbgprintf("Entity %d started riding entity %d\n", entity_id, vehicle_id);
+        debug::print("Entity %d started riding entity %d\n", entity_id, vehicle_id);
     }
 
     void MinecraftClient::handleMetadata(ByteBuffer &buffer)
@@ -1188,7 +1188,7 @@ namespace Crapper
         {
             return;
         }
-        dbgprintf("Received entity %d metadata\n", entity_id);
+        debug::print("Received entity %d metadata\n", entity_id);
     }
 
     void MinecraftClient::handlePreChunk(ByteBuffer &buffer)
@@ -1228,8 +1228,8 @@ namespace Crapper
             }
             catch (std::bad_alloc &e)
             {
-                dbgprintf("Failed to allocate memory for chunk\n");
-                dbgprintf("Chunk count: %d\n", get_chunks().size());
+                debug::print("Failed to allocate memory for chunk\n");
+                debug::print("Chunk count: %d\n", get_chunks().size());
             }
         }
 #endif
@@ -1270,7 +1270,7 @@ namespace Crapper
 
         if (result < 0 || uint32_t(decompressed_result_size) != decompressed_size)
         {
-            dbgprintf("Wrong decompressed size: %s\n", mz_error(result));
+            debug::print("Wrong decompressed size: %s\n", mz_error(result));
             delete[] decompressed_data;
             return;
         }
@@ -1292,8 +1292,8 @@ namespace Crapper
                 // This can cause the client to run out of memory, especially on the Wii.
 
                 // We will log the error and rethrow an exception to indicate failure.
-                dbgprintf("Failed to allocate memory for chunk\n");
-                dbgprintf("Chunk count: %d\n", get_chunks().size());
+                debug::print("Failed to allocate memory for chunk\n");
+                debug::print("Chunk count: %d\n", get_chunks().size());
                 
                 // We need to free the decompressed data before throwing an exception
                 delete[] decompressed_data;
@@ -1439,7 +1439,7 @@ namespace Crapper
             chunk_t *chunk = get_chunk_from_pos(pos);
             if (!chunk)
             {
-                dbgprintf("Could not change block at %d %d %d as chunk doesn't exist!\n", pos.x, pos.y, pos.z);
+                debug::print("Could not change block at %d %d %d as chunk doesn't exist!\n", pos.x, pos.y, pos.z);
                 continue;
             }
             block_t *block = chunk->get_block(pos);
@@ -1579,7 +1579,7 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        dbgprintf("Sign at %d %d %d updated with text:\n%s\n%s\n%s\n%s\n", x, y, z, text1.c_str(), text2.c_str(), text3.c_str(), text4.c_str());
+        debug::print("Sign at %d %d %d updated with text:\n%s\n%s\n%s\n%s\n", x, y, z, text1.c_str(), text2.c_str(), text3.c_str(), text4.c_str());
     }
 
     void MinecraftClient::handleKick(ByteBuffer &buffer)
@@ -1880,7 +1880,7 @@ namespace Crapper
         }
         default:
         {
-            dbgprintf("Unknown packet ID: 0x%02X\n", packet_id);
+            debug::print("Unknown packet ID: 0x%02X\n", packet_id);
 
             gui_dirtscreen *dirtscreen = dynamic_cast<gui_dirtscreen *>(gui::get_gui());
             if (!dirtscreen)

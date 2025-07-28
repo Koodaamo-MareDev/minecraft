@@ -7,6 +7,8 @@
 #include <stdexcept>
 #include <type_traits>
 
+#include "debuglog.hpp"
+
 struct configuration_value
 {
 private:
@@ -38,7 +40,15 @@ public:
         }
         catch (const std::invalid_argument &)
         {
-            float_value = 0.0f; // Reset to 0 if conversion fails
+            try
+            {
+                float_value = std::stoi(value);
+            }
+            catch (const std::invalid_argument &)
+            {
+                debug::print("Invalid configuration value: %s\n", value.c_str());
+                float_value = 0.0f; // Reset to 0 if conversion fails
+            }
         }
         return *this;
     }
@@ -66,6 +76,7 @@ private:
     // Default config location
     // C++17 doesn't support constexpr for std::string
     constexpr static const char *default_config_location = "/apps/minecraft/config.txt";
+
 public:
     configuration() {}
 
@@ -96,7 +107,15 @@ public:
                 }
                 catch (const std::invalid_argument &)
                 {
-                    kv_pairs[key] = value;
+                    try
+                    {
+                        kv_pairs[key] = std::stoi(value);
+                    }
+                    catch (const std::invalid_argument &)
+                    {
+                        debug::print("Invalid configuration value for key '%s': %s\n", key.c_str(), value.c_str());
+                        kv_pairs[key] = value; // If conversion fails, store as string
+                    }
                 }
             }
         }
