@@ -552,89 +552,23 @@ vec3f vector_to_angles(const vec3f &vec)
     return result;
 }
 
-// Function to calculate the signed distance from a point to a frustum plane
-float distance_to_plane(const vec3f &point, const frustum_t &frustum, int planeIndex)
+bool is_cube_visible(const frustum_t &frustum, const vec3f &center, float size)
 {
-    const plane_t &plane = frustum.planes[planeIndex];
-    return (plane.direction.x * point.x + plane.direction.y + plane.direction.z * point.z + plane.distance) / plane.direction.fast_magnitude();
-}
+    vfloat_t r = (size * 0.5f) * M_SQRT3; // Radius of the cube's bounding sphere
 
-// Function to calculate the distance from a point to a frustum
-float distance_to_frustum(const vec3f &point, const frustum_t &frustum)
-{
-    float minDistance = distance_to_plane(point, frustum, 0);
-
-    for (int i = 1; i < 6; ++i)
-    {
-        float distance = distance_to_plane(point, frustum, i);
-        if (distance < minDistance)
-        {
-            minDistance = distance;
-        }
-    }
-
-    return minDistance;
-}
-
-// Function to calculate the frustum planes from camera parameters
-frustum_t calculate_frustum(camera_t &camera)
-{
-    frustum_t frustum;
-
-    constexpr float fov_margin = 10.0f; // Used to prevent overculling of blocks at the edges of the screen
-
-    // Calculate half-width and half-height at near plane
-    float half_fov = camera.fov * 0.5f;
-
-    // Calculate forward vector
-    guVector forward = angles_to_vector(camera.rot.x, camera.rot.y);
-    guVector backward = vec3f() - forward;
-
-    // Calculate the 4 perspective frustum planes (not near and far)
-    guVector right_vec = -angles_to_vector(camera.rot.x, camera.rot.y + 90 + half_fov + fov_margin);
-    guVector left_vec = -angles_to_vector(camera.rot.x, camera.rot.y - 90 - half_fov - fov_margin);
-    guVector up_vec = -angles_to_vector(camera.rot.x + 90 + half_fov + fov_margin, camera.rot.y);
-    guVector down_vec = -angles_to_vector(camera.rot.x - 90 - half_fov - fov_margin, camera.rot.y);
-
-    // Calculate points on the near and far planes
-    guVector near_center = (vec3f(forward) * (camera.near));
-
-    guVecScale(&left_vec, &left_vec, camera.aspect);
-    guVecScale(&right_vec, &right_vec, camera.aspect);
-
-    // Calculate the frustum plane equations in the form Ax + By + Cz + D = 0
-    frustum.planes[0].direction = left_vec;
-    frustum.planes[0].distance = guVecDotProduct(&left_vec, &near_center);
-
-    frustum.planes[1].direction = right_vec;
-    frustum.planes[1].distance = guVecDotProduct(&right_vec, &near_center);
-
-    frustum.planes[2].direction = down_vec;
-    frustum.planes[2].distance = guVecDotProduct(&down_vec, &near_center);
-
-    frustum.planes[3].direction = up_vec;
-    frustum.planes[3].distance = guVecDotProduct(&up_vec, &near_center);
-
-    frustum.planes[4].direction = forward;
-    frustum.planes[4].distance = camera.near;
-
-    frustum.planes[5].direction = backward;
-    frustum.planes[5].distance = camera.far;
-
-    // Normalize the plane equations
     for (int i = 0; i < 6; ++i)
     {
-        plane_t &plane = frustum.planes[i];
-        vfloat_t length = Q_rsqrt(plane.direction.x * plane.direction.x +
-                                  plane.direction.y * plane.direction.y +
-                                  plane.direction.z * plane.direction.z);
-        plane.direction.x *= length;
-        plane.direction.y *= length;
-        plane.direction.z *= length;
-        plane.distance *= length;
+        const plane_t &plane = frustum.planes[i];
+        vfloat_t dist = plane.direction.x * center.x +
+                        plane.direction.y * center.y +
+                        plane.direction.z * center.z +
+                        plane.distance;
+
+        if (dist > r)
+            return false; // Completely outside
     }
 
-    return frustum;
+    return true; // At least partially visible
 }
 
 void transform_view(gertex::GXMatrix view, guVector world_pos, guVector object_scale, guVector object_rot, bool load)
@@ -884,6 +818,145 @@ void draw_particles(camera_t &camera, particle *particles, int count)
         // Restore default vertex format
         GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, BASE3D_POS_FRAC_BITS);
     }
+}
+
+vec3f cross(const vec3f &a, const vec3f &b)
+{
+    return vec3f(
+        a.y * b.z - a.z * b.y,
+        a.z * b.x - a.x * b.z,
+        a.x * b.y - a.y * b.x);
+}
+
+vec3f rotate_vector(const vec3f &v, const vec3f &rot_deg)
+{
+    float rx = rot_deg.x * (M_DTOR);
+    float ry = rot_deg.y * (M_DTOR);
+    float rz = rot_deg.z * (M_DTOR);
+
+    vec3f res = v;
+
+    // Rotate around Z
+    res = vec3f(
+        res.x * cos(rz) - res.y * sin(rz),
+        res.x * sin(rz) + res.y * cos(rz),
+        res.z);
+
+    // Rotate around X
+    res = vec3f(
+        res.x,
+        res.y * cos(rx) - res.z * sin(rx),
+        res.y * sin(rx) + res.z * cos(rx));
+
+    // Rotate around Y
+    res = vec3f(
+        res.x * cos(ry) + res.z * sin(ry),
+        res.y,
+        -res.x * sin(ry) + res.z * cos(ry));
+
+    return res;
+}
+
+void draw_frustum(const camera_t &cam)
+{
+    use_texture(white_texture);
+    float nearH = tan(cam.fov * 0.5f * M_DTOR) * cam.near;
+    float nearW = nearH * cam.aspect;
+    float farH = tan(cam.fov * 0.5f * M_DTOR) * cam.far;
+    float farW = farH * cam.aspect;
+
+    // Camera orientation vectors
+    vec3f forward = rotate_vector(vec3f(0, 0, -1), cam.rot);
+    vec3f up = rotate_vector(vec3f(0, 1, 0), cam.rot);
+    vec3f right = cross(forward, up).normalize();
+
+    vec3f camPos = cam.position;
+
+    vec3f nearCenter = camPos + forward * cam.near;
+    vec3f farCenter = camPos + forward * cam.far;
+
+    // 8 corners of the frustum
+    vec3f ntl = nearCenter + up * nearH - right * nearW;
+    vec3f ntr = nearCenter + up * nearH + right * nearW;
+    vec3f nbl = nearCenter - up * nearH - right * nearW;
+    vec3f nbr = nearCenter - up * nearH + right * nearW;
+
+    vec3f ftl = farCenter + up * farH - right * farW;
+    vec3f ftr = farCenter + up * farH + right * farW;
+    vec3f fbl = farCenter - up * farH - right * farW;
+    vec3f fbr = farCenter - up * farH + right * farW;
+
+    // Draw each frustum face using GX
+
+    // Use floats for vertex positions
+    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_F32, 0);
+
+    auto draw_quad = [](vec3f a, vec3f b, vec3f c, vec3f d, uint8_t r, uint8_t g, uint8_t bcol)
+    {
+        GX_BeginGroup(GX_QUADS, 4);
+        GX_VertexF({d, 0, 1, r, g, bcol, 127});
+        GX_VertexF({c, 1, 1, r, g, bcol, 127});
+        GX_VertexF({b, 1, 0, r, g, bcol, 127});
+        GX_VertexF({a, 0, 0, r, g, bcol, 127});
+        GX_EndGroup();
+    };
+
+    // Near plane - RED
+    draw_quad(nbl, nbr, ntr, ntl, 255, 0, 0);
+    // Far plane - GREEN
+    draw_quad(fbr, fbl, ftl, ftr, 0, 255, 0);
+    // Left plane - BLUE
+    draw_quad(fbl, nbl, ntl, ftl, 0, 0, 255);
+    // Right plane - YELLOW
+    draw_quad(nbr, fbr, ftr, ntr, 255, 255, 0);
+    // Top plane - CYAN
+    draw_quad(ntl, ntr, ftr, ftl, 0, 255, 255);
+    // Bottom plane - MAGENTA
+    draw_quad(fbl, fbr, nbr, nbl, 255, 0, 255);
+}
+
+// Returns normalized normal and signed plane distance
+plane_t make_plane(const vec3f &a, const vec3f &b, const vec3f &c)
+{
+    vec3f ab = b - a;
+    vec3f ac = c - a;
+    vec3f normal = cross(ab, ac).normalize();
+    float distance = -(normal.x * a.x + normal.y * a.y + normal.z * a.z);
+    return {normal, distance};
+}
+
+void build_frustum(const camera_t &cam, frustum_t &frustum)
+{
+    float nearH = tan(cam.fov * 0.5f * M_DTOR) * cam.near;
+    float nearW = nearH * cam.aspect;
+    float farH = tan(cam.fov * 0.5f * M_DTOR) * cam.far;
+    float farW = farH * cam.aspect;
+
+    vec3f forward = rotate_vector(vec3f(0, 0, -1), cam.rot);
+    vec3f up = rotate_vector(vec3f(0, 1, 0), cam.rot);
+    vec3f right = cross(forward, up).normalize();
+
+    vec3f camPos = cam.position;
+    vec3f nearCenter = camPos + forward * cam.near;
+    vec3f farCenter = camPos + forward * cam.far;
+
+    vec3f ntl = nearCenter + up * nearH - right * nearW;
+    vec3f ntr = nearCenter + up * nearH + right * nearW;
+    vec3f nbl = nearCenter - up * nearH - right * nearW;
+    vec3f nbr = nearCenter - up * nearH + right * nearW;
+
+    vec3f ftl = farCenter + up * farH - right * farW;
+    vec3f ftr = farCenter + up * farH + right * farW;
+    vec3f fbl = farCenter - up * farH - right * farW;
+    vec3f fbr = farCenter - up * farH + right * farW;
+
+    // Define planes using counter-clockwise winding to keep normals facing *inward*
+    frustum.planes[0] = make_plane(nbl, nbr, ntr); // Near
+    frustum.planes[1] = make_plane(fbr, fbl, ftl); // Far
+    frustum.planes[2] = make_plane(fbl, nbl, ntl); // Left
+    frustum.planes[3] = make_plane(nbr, fbr, ftr); // Right
+    frustum.planes[4] = make_plane(ntl, ntr, ftr); // Top
+    frustum.planes[5] = make_plane(fbl, fbr, nbr); // Bottom
 }
 
 void draw_stars()

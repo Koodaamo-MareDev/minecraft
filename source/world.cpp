@@ -98,7 +98,7 @@ void world::update_frustum(camera_t &camera)
 {
     if (!frustum)
         frustum = new frustum_t;
-    *frustum = calculate_frustum(camera);
+    build_frustum(camera, *frustum);
 }
 
 void world::update_chunks()
@@ -408,22 +408,19 @@ void world::calculate_visibility()
     std::deque<section_node> section_queue;
     std::deque<section *> visited;
     vec3f fpos = player_pos;
-    for (int y = -1; y <= 1; y++)
-    {
-        section_node entry;
-        entry.sect = section_at(vec3i(int(fpos.x), int(fpos.y) + y * 8, int(fpos.z)));
+    section_node entry;
+    entry.sect = section_at(vec3i(int(fpos.x), int(fpos.y), int(fpos.z)));
 
-        // Check if there is a VBO at the player's position
-        if (!entry.sect)
-            return;
+    // Check if there is a VBO at the player's position
+    if (!entry.sect)
+        return;
 
-        // Initialize the rest of the entry node
-        entry.from = -1;
-        for (uint8_t i = 0; i < 6; i++)
-            entry.dirs[i] = 0;
-        section_queue.push_back(entry);
-        visited.push_front(entry.sect);
-    }
+    // Initialize the rest of the entry node
+    entry.from = -1;
+    for (uint8_t i = 0; i < 6; i++)
+        entry.dirs[i] = 0;
+    section_queue.push_front(entry);
+    visited.push_front(entry.sect);
 
     while (!section_queue.empty())
     {
@@ -461,14 +458,10 @@ void world::calculate_visibility()
             // Check if the section is within the render distance
             if (std::abs(section_offset.x) + std::abs(section_offset.z) > RENDER_DISTANCE)
                 return;
-            // Apply frustum culling
-            for (uint8_t i = 0; i < 6; i++)
+
+            if (!is_cube_visible(*frustum, vec3f(pos.x + 8, pos.y + 8, pos.z + 8), 16.0f))
             {
-                if (distance_to_plane(section_offset, *frustum, i) < -22.7f)
-                {
-                    // If the section is outside the frustum, skip it
-                    return;
-                }
+                return;
             }
 
             // Mark the section as visited

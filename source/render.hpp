@@ -76,11 +76,9 @@ vec3f angles_to_vector(float x, float y);
 
 vec3f vector_to_angles(const vec3f &vec);
 
-float distance_to_plane(const vec3f &point, const frustum_t &frustum, int planeIndex);
+bool is_cube_visible(const frustum_t &frustum, const vec3f &center, float size);
 
-float distance_to_frustum(const vec3f &point, const frustum_t &frustum);
-
-frustum_t calculate_frustum(camera_t &camera);
+void build_frustum(const camera_t &cam, frustum_t &frustum);
 
 void transform_view(gertex::GXMatrix view, guVector world_pos, guVector object_scale = guVector{1, 1, 1}, guVector object_rot = guVector{0, 0, 0}, bool load = true);
 
@@ -95,6 +93,8 @@ GXColor get_lightmap_color(uint8_t light);
 void draw_particle(camera_t &camera, vec3f pos, uint32_t texture_index, float size, uint8_t brightness);
 
 void draw_particles(camera_t &camera, particle *particles, int count);
+
+void draw_frustum(const camera_t &cam);
 
 void draw_stars();
 
