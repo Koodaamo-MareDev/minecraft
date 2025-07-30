@@ -145,6 +145,9 @@ namespace gertex
         state.blend_mode = mode;
         switch (mode)
         {
+        case GXBlendMode::overwrite:
+            GX_SetBlendMode(GX_BM_NONE, GX_BL_ZERO, GX_BL_ZERO, GX_LO_NOOP);
+            break;
         case GXBlendMode::normal:
             GX_SetBlendMode(GX_BM_BLEND, GX_BL_SRCALPHA, GX_BL_INVSRCALPHA, GX_LO_NOOP);
             break;

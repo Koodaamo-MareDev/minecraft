@@ -95,6 +95,7 @@ namespace gertex
     enum class GXBlendMode
     {
         none,
+        overwrite,
         normal,
         additive,
         inverse,
