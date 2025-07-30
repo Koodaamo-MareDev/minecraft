@@ -792,7 +792,7 @@ void world::draw(camera_t &camera)
 
     // Prepare opaque rendering parameters
     GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
-    gertex::set_blending(gertex::GXBlendMode::normal);
+    gertex::set_blending(gertex::GXBlendMode::overwrite);
     GX_SetAlphaUpdate(GX_TRUE);
 
     // Draw particles
