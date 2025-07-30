@@ -40,12 +40,12 @@ void init_missing_texture(GXTexObj &texture)
     GX_InitTexObjFilterMode(&texture, GX_NEAR, GX_NEAR);
 }
 
-void init_png_texture(GXTexObj &texture, const std::string &filename)
+void init_png_texture(GXTexObj &texture, const std::string &filename, uint32_t mipmap_levels = 0)
 {
     try
     {
         pnguin::PNGFile png_file(RESOURCES_DIR "textures/" + filename);
-        png_file.to_tpl(texture);
+        png_file.to_tpl(texture, mipmap_levels);
     }
     catch (std::exception &e)
     {
@@ -63,7 +63,7 @@ void init_textures()
     init_png_texture(sun_texture, "terrain/sun.png");
     init_png_texture(moon_texture, "terrain/moon.png");
     init_png_texture(particles_texture, "particles.png");
-    init_png_texture(terrain_texture, "terrain.png");
+    init_png_texture(terrain_texture, "terrain.png", 3);
     init_png_texture(icons_texture, "gui/icons.png");
     init_png_texture(container_texture, "gui/container.png");
     init_png_texture(underwater_texture, "misc/water.png");

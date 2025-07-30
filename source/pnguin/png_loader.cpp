@@ -306,9 +306,18 @@ pnguin::PNGFile::PNGFile(const std::string &filename)
     }
 }
 
-void pnguin::PNGFile::to_tpl(GXTexObj &texture)
+void pnguin::PNGFile::to_tpl(GXTexObj &texture, uint8_t mipmap_count)
 {
-    const uint32_t tpl_size = width * height << 2;
+    uint32_t tmp_width = width;
+    uint32_t tmp_height = height;
+    uint32_t total_mipmaps = mipmap_count;
+    uint32_t tpl_size = width * height << 2;
+    while (mipmap_count-- > 0)
+    {
+        tmp_width >>= 1;
+        tmp_height >>= 1;
+        tpl_size += (tmp_width) * (tmp_height) << 2;
+    }
     uint8_t *res = (uint8_t *)memalign(32, tpl_size);
     uint8_t *res_ptr = res;
     uint8_t *tmp_ptr = (uint8_t *)pixels.ptr();
@@ -330,9 +339,74 @@ void pnguin::PNGFile::to_tpl(GXTexObj &texture)
             res_ptr[index + index_within] = *tmp_ptr++;
         }
     }
+    // If mipmaps are requested, generate them
+    uint8_t *mip_ptr = res + (width * height << 2);
+    for (uint32_t i = 1; i <= total_mipmaps; i++)
+    {
+        uint32_t mip_width = width >> i;
+        uint32_t mip_height = height >> i;
+        uint32_t mip_size = mip_width * mip_height << 2;
+
+        // Check if the mipmap size is valid
+        if (mip_width == 0 || mip_height == 0 || mip_size == 0)
+            break;
+        for (uint32_t y = 0; y < mip_height; y++)
+        {
+            for (uint32_t x = 0; x < mip_width; x++)
+            {
+                // Get the most opaque pixel
+                uint8_t avg[4] = {0, 0, 0, 0};
+                bool all_opaque = true;
+                void *pixel_ptr = nullptr;
+                for (uint32_t yy = 0; yy < 2; yy++)
+                {
+                    for (uint32_t xx = 0; xx < 2; xx++)
+                    {
+                        uint32_t src_x = (x << i) + xx;
+                        uint32_t src_y = (y << i) + yy;
+                        uint32_t src_index = (width * src_y + src_x) << 2;
+                        uint8_t *ptr = &pixels.ptr()[src_index];
+                        avg[0] += ptr[0] >> 2;
+                        avg[1] += ptr[1] >> 2;
+                        avg[2] += ptr[2] >> 2;
+                        uint8_t alpha = ptr[3];
+                        if (alpha >= avg[3])
+                        {
+                            avg[3] = alpha;
+                            pixel_ptr = ptr;
+                        }
+                        if (alpha != 255)
+                        {
+                            all_opaque = false;
+                        }
+                    }
+                }
+                if (all_opaque)
+                {
+                    avg[3] = 255;
+                    pixel_ptr = avg;
+                }
+
+                // Get the index to the 4x4 texel in the target texture
+                int index = (mip_width << 2) * (y & ~3) + ((x & ~3) << 4);
+
+                // Put the data within the 4x4 texel into the target texture
+                int index_within = ((x & 3) + ((y & 3) << 2)) << 1;
+
+                mip_ptr[index + index_within + 1] = ((uint8_t *)pixel_ptr)[0];
+                mip_ptr[index + index_within + 32] = ((uint8_t *)pixel_ptr)[1];
+                mip_ptr[index + index_within + 33] = ((uint8_t *)pixel_ptr)[2];
+                mip_ptr[index + index_within] = ((uint8_t *)pixel_ptr)[3];
+            }
+        }
+        mip_ptr += mip_size;
+    }
 
     // Set the texture parameters
     DCFlushRange(res, tpl_size);
     GX_InitTexObj(&texture, res, width, height, GX_TF_RGBA8, GX_MIRROR, GX_MIRROR, GX_FALSE);
-    GX_InitTexObjFilterMode(&texture, GX_NEAR, GX_NEAR);
+    if (total_mipmaps > 0)
+        GX_InitTexObjLOD(&texture, GX_NEAR_MIP_LIN, GX_NEAR, 0, total_mipmaps - 1, -0.8f, GX_ENABLE, GX_DISABLE, GX_ANISO_1);
+    else
+        GX_InitTexObjFilterMode(&texture, GX_NEAR, GX_NEAR);
 }

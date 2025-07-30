@@ -24,7 +24,7 @@ namespace pnguin
         uint32_t get_width() const { return width; }
         uint32_t get_height() const { return height; }
         const uint8_t *get_data() const { return pixels.ptr(); }
-        void to_tpl(GXTexObj &texture);
+        void to_tpl(GXTexObj &texture, uint8_t mipmap_count = 0);
     };
 }
 #endif
