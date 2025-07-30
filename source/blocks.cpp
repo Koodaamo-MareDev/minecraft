@@ -754,7 +754,7 @@ blockproperties_t block_properties[256] = {
     blockproperties_t().id(BlockID::iron_ore).tool(inventory::tool_type::pickaxe, inventory::tool_tier::stone).hardness(3.0f).texture(33).sound(SoundType::stone),
     blockproperties_t().id(BlockID::coal_ore).tool(inventory::tool_type::pickaxe, inventory::tool_tier::stone).hardness(3.0f).texture(34).sound(SoundType::stone),
     blockproperties_t().id(BlockID::wood).tool(inventory::tool_type::axe, inventory::tool_tier::no_tier).hardness(2.0f).texture(20).sound(SoundType::wood).render_type(RenderType::full_special),
-    blockproperties_t().id(BlockID::leaves).hardness(0.2f).texture(186).sound(SoundType::grass).opacity(1).transparent(true).render_type(RenderType::full_special),
+    blockproperties_t().id(BlockID::leaves).hardness(0.2f).texture(186).sound(SoundType::grass).opacity(1).transparent(true).render_type(RenderType::special).nonflat(true),
     blockproperties_t().id(BlockID::sponge).hardness(0.6f).texture(48).sound(SoundType::grass),
     blockproperties_t().id(BlockID::glass).hardness(0.3f).texture(49).sound(SoundType::glass).opacity(0).transparent(true).drops(std::bind(no_drop, std::placeholders::_1)),
     blockproperties_t().id(BlockID::lapis_ore).tool(inventory::tool_type::pickaxe, inventory::tool_tier::stone).hardness(3.0f).texture(160).sound(SoundType::stone),

@@ -77,6 +77,28 @@ int render_cube(chunk_t &chunk, block_t *block, const vec3i &pos, bool transpare
     return vertexCount;
 }
 
+int render_inverted_cube(chunk_t &chunk, block_t *block, const vec3i &pos, bool transparent)
+{
+    int vertexCount = 0;
+    for (uint8_t face = 0; face < 6; face++)
+    {
+        if (block->get_opacity(face))
+            vertexCount += render_back_face(pos, face, get_default_texture_index(block->get_blockid()), &chunk, block);
+    }
+    return vertexCount;
+}
+
+int render_inverted_cube_special(chunk_t &chunk, block_t *block, const vec3i &pos, bool transparent)
+{
+    int vertexCount = 0;
+    for (uint8_t face = 0; face < 6; face++)
+    {
+        if (block->get_opacity(face))
+            vertexCount += render_back_face(pos, face, get_face_texture_index(block, face), &chunk, block);
+    }
+    return vertexCount;
+}
+
 int render_cube_special(chunk_t &chunk, block_t *block, const vec3i &pos, bool transparent)
 {
     int vertexCount = 0;
@@ -102,6 +124,8 @@ int render_special(chunk_t &chunk, block_t *block, const vec3i &pos)
         return render_door(chunk, block, pos);
     case BlockID::cactus:
         return render_cactus(chunk, block, pos);
+    case BlockID::leaves:
+        return render_leaves(chunk, block, pos);
     default:
         return 0;
     }
@@ -413,6 +437,13 @@ int render_cactus(chunk_t &chunk, block_t *block, const vec3i &pos)
     GX_VertexLit({vertex_pos + vec3f{-.5, 0.5, -.4375}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_NZ);
     GX_VertexLit({vertex_pos + vec3f{-.5, -.5, -.4375}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NZ);
 
+    return vertexCount;
+}
+int render_leaves(chunk_t &chunk, block_t *block, const vec3i &pos)
+{
+    int vertexCount = 0;
+    vertexCount += render_cube_special(chunk, block, pos, true);
+    vertexCount += render_inverted_cube_special(chunk, block, pos, true);
     return vertexCount;
 }
 int render_cross(chunk_t &chunk, block_t *block, const vec3i &pos)

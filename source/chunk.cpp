@@ -363,11 +363,6 @@ void chunk_t::recalculate_visibility(block_t *block, vec3i pos)
     block_t *neighbors[6];
     get_neighbors(pos, neighbors, this);
     uint8_t visibility = 0x40;
-    if (block->get_blockid() == BlockID::leaves)
-    {
-        block->visibility_flags = 0x7F;
-        return;
-    }
     for (int i = 0; i < 6; i++)
     {
         block_t *other_block = neighbors[i];

@@ -349,16 +349,8 @@ vec3i vertical_add(const vec3i &a, uint8_t b)
     return vec3i(a.x * 16, a.y - 17 + b * 2, a.z * 16);
 }
 
-int render_face(vec3i pos, uint8_t face, uint32_t texture_index, chunk_t *near, block_t *block, uint8_t min_y, uint8_t max_y)
+void get_face(vec3i pos, uint8_t face, uint32_t texture_index, chunk_t *near, block_t *block, uint8_t min_y, uint8_t max_y, vertex_property16_t *out_vertices, uint8_t *out_lighting, uint8_t *out_ao)
 {
-    if (!base3d_is_drawing || face >= 6)
-    {
-        static vertex_property_t tmp;
-        // This is just a dummy call to GX_Vertex to keep buffer size up to date.
-        for (int i = 0; i < 4; i++)
-            GX_VertexLit(tmp, 0, 0);
-        return 4;
-    }
     vec3i vertex_pos((pos.x & 0xF) << BASE3D_POS_FRAC_BITS, (pos.y & 0xF) << BASE3D_POS_FRAC_BITS, (pos.z & 0xF) << BASE3D_POS_FRAC_BITS);
     if (!block)
         block = get_block_at(pos, near);
@@ -427,6 +419,44 @@ int render_face(vec3i pos, uint8_t face, uint32_t texture_index, chunk_t *near, 
         }
     }
 #undef SMOOTH
+    if (out_vertices)
+    {
+        for (uint8_t i = 0; i < 4; i++)
+        {
+            out_vertices[i] = vertices[i];
+        }
+    }
+    if (out_lighting)
+    {
+        for (uint8_t i = 0; i < 4; i++)
+        {
+            out_lighting[i] = lighting[i];
+        }
+    }
+    if (out_ao)
+    {
+        for (uint8_t i = 0; i < 4; i++)
+        {
+            out_ao[i] = ao[i];
+        }
+    }
+}
+
+int render_face(vec3i pos, uint8_t face, uint32_t texture_index, chunk_t *near, block_t *block, uint8_t min_y, uint8_t max_y)
+{
+    if (!base3d_is_drawing || face >= 6)
+    {
+        vertex_property16_t tmp;
+        // This is just a dummy call to GX_Vertex to keep buffer size up to date.
+        for (int i = 0; i < 4; i++)
+            GX_VertexLit16(tmp, 0, 0);
+        return 4;
+    }
+    uint8_t ao[4] = {0, 0, 0, 0};
+    uint8_t lighting[4] = {0, 0, 0, 0};
+    vertex_property16_t vertices[4];
+    uint8_t index = 0;
+    get_face(pos, face, texture_index, near, block, min_y, max_y, vertices, lighting, ao);
     if (texture_index >= 240 && texture_index < 250)
     {
         // Force full brightness for breaking block override
@@ -444,6 +474,42 @@ int render_face(vec3i pos, uint8_t face, uint32_t texture_index, chunk_t *near, 
     GX_VertexLit16(vertices[index], lighting[index], face + ao[index]);
     index = (index + 1) & 3;
     GX_VertexLit16(vertices[index], lighting[index], face + ao[index]);
+    return 4;
+}
+
+int render_back_face(vec3i pos, uint8_t face, uint32_t texture_index, chunk_t *near, block_t *block, uint8_t min_y, uint8_t max_y)
+{
+    if (!base3d_is_drawing || face >= 6)
+    {
+        static vertex_property16_t tmp;
+        // This is just a dummy call to GX_Vertex to keep buffer size up to date.
+        for (int i = 0; i < 4; i++)
+            GX_VertexLit16(tmp, 0, 0);
+        return 4;
+    }
+    uint8_t ao[4] = {0, 0, 0, 0};
+    uint8_t lighting[4] = {0, 0, 0, 0};
+    vertex_property16_t vertices[4];
+    uint8_t index = 0;
+    get_face(pos, face, texture_index, near, block, min_y, max_y, vertices, lighting, ao);
+    if (texture_index >= 240 && texture_index < 250)
+    {
+        // Force full brightness for breaking block override
+        lighting[0] = lighting[1] = lighting[2] = lighting[3] = 255;
+        // Reset ambient occlusion
+        ao[0] = ao[1] = ao[2] = ao[3] = 0;
+        // Set the face to the top face
+        face = FACE_PY;
+    }
+    // Reverse the order of vertices for back face rendering (3 - index)
+    index = (ao[0] + ao[3] > ao[1] + ao[2]);
+    GX_VertexLit16(vertices[3 - index], lighting[3 - index], face + ao[3 - index]);
+    index = (index + 1) & 3;
+    GX_VertexLit16(vertices[3 - index], lighting[3 - index], face + ao[3 - index]);
+    index = (index + 1) & 3;
+    GX_VertexLit16(vertices[3 - index], lighting[3 - index], face + ao[3 - index]);
+    index = (index + 1) & 3;
+    GX_VertexLit16(vertices[3 - index], lighting[3 - index], face + ao[3 - index]);
     return 4;
 }
 
