@@ -581,7 +581,6 @@ void UpdateLoadingStatus()
             if (is_loading)
             {
                 // Update the loading screen
-                dirtscreen->set_text("Loading level\n\n\nBuilding terrain");
                 dirtscreen->set_progress(loading_progress, required);
             }
             else

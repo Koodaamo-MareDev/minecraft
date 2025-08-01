@@ -1156,6 +1156,10 @@ void world::save()
 
 bool world::load()
 {
+    gui_dirtscreen *dirtscreen = new gui_dirtscreen(gertex::GXView());
+    dirtscreen->set_text("Loading level\n\n\nBuilding terrain");
+    gui::set_gui(dirtscreen);
+
     // Load the world from disk if in singleplayer
     if (is_remote())
         return false;
