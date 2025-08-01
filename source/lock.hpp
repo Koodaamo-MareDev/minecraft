@@ -21,10 +21,7 @@ public:
 
     lock_t(mutex_t &mutex) : mutex(mutex)
     {
-        if (mutex == LWP_MUTEX_NULL)
-        {
-            mutex = LWP_MutexInit(&mutex, false);
-        }
+        init(mutex);
         lock();
     }
 
@@ -36,6 +33,21 @@ public:
     ~lock_t()
     {
         unlock();
+    }
+    static void init(mutex_t &mutex)
+    {
+        if (mutex == LWP_MUTEX_NULL)
+        {
+            mutex = LWP_MutexInit(&mutex, false);
+        }
+    }
+    static void destroy(mutex_t &mutex)
+    {
+        if (mutex != LWP_MUTEX_NULL)
+        {
+            LWP_MutexDestroy(mutex);
+            mutex = LWP_MUTEX_NULL;
+        }
     }
 };
 
