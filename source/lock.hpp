@@ -10,7 +10,8 @@ class lock_t
 private:
     mutex_t mutex;
 
-    lock_t(const lock_t&);
+    lock_t(const lock_t &);
+
 public:
     void lock()
     {
@@ -18,8 +19,12 @@ public:
             usleep(1);
     }
 
-    lock_t(mutex_t mutex) : mutex(mutex)
+    lock_t(mutex_t &mutex) : mutex(mutex)
     {
+        if (mutex == LWP_MUTEX_NULL)
+        {
+            mutex = LWP_MutexInit(&mutex, false);
+        }
         lock();
     }
 
@@ -27,12 +32,11 @@ public:
     {
         LWP_MutexUnlock(mutex);
     }
-    
+
     ~lock_t()
     {
         unlock();
     }
-
 };
 
 #endif
