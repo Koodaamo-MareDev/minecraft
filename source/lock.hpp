@@ -19,9 +19,10 @@ public:
             usleep(1);
     }
 
-    lock_t(mutex_t &mutex) : mutex(mutex)
+    lock_t(mutex_t &mutex)
     {
         init(mutex);
+        this->mutex = mutex;
         lock();
     }
 
@@ -38,7 +39,7 @@ public:
     {
         if (mutex == LWP_MUTEX_NULL)
         {
-            mutex = LWP_MutexInit(&mutex, false);
+            LWP_MutexInit(&mutex, false);
         }
     }
     static void destroy(mutex_t &mutex)
