@@ -1220,16 +1220,15 @@ namespace Crapper
             lock_t chunk_lock(chunk_mutex);
             try
             {
-                chunk_t *chunk = new chunk_t;
-                chunk->x = x;
-                chunk->z = z;
+                chunk_t *chunk = new chunk_t(x, z);
                 chunk->generation_stage = ChunkGenStage::empty;
                 get_chunks().push_back(chunk);
             }
-            catch (std::bad_alloc &e)
+            catch (std::exception &e)
             {
-                debug::print("Failed to allocate memory for chunk\n");
+                debug::print("Chunk initialization failed: %s\n", e.what());
                 debug::print("Chunk count: %d\n", get_chunks().size());
+                throw e; // Rethrow the exception to indicate failure
             }
         }
 #endif
