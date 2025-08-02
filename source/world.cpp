@@ -1251,10 +1251,7 @@ void world::reset()
     // Stop the chunk manager
     deinit_chunk_manager();
 
-    light_engine::reset();
-    gui_dirtscreen *dirtscreen = new gui_dirtscreen(gertex::GXView());
-    dirtscreen->set_text("Loading level");
-    gui::set_gui(dirtscreen);
+    light_engine::deinit();
     loaded = false;
     time_of_day = 0;
     ticks = 0;
@@ -1274,6 +1271,7 @@ void world::reset()
     mcr::cleanup();
 
     // Start the chunk manager without a chunk provider
+    light_engine::init();
     init_chunk_manager(nullptr);
 }
 
