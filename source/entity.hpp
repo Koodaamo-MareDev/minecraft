@@ -258,6 +258,7 @@ private:
 class entity_player : public entity_living
 {
 public:
+    std::string player_name = "";
     int selected_hotbar_slot = 0;
     bool in_bed = false;
     vec3i bed_pos = vec3i(0, 0, 0);
@@ -291,7 +292,6 @@ public:
 class entity_player_mp : public entity_player
 {
 public:
-    std::string player_name = "";
     entity_player_mp(const vec3f &position, std::string player_name);
 
     virtual void tick();
