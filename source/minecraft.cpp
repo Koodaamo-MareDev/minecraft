@@ -380,7 +380,7 @@ int main(int argc, char **argv)
         if (HWButton != -1)
         {
             gui_dirtscreen *dirtscreen = new gui_dirtscreen(viewport);
-            dirtscreen->set_text("Saving world...");
+            dirtscreen->set_text("Saving level...");
             gui::set_gui(dirtscreen);
             isExiting = true;
         }
