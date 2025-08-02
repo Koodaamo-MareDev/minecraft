@@ -332,6 +332,12 @@ int main(int argc, char **argv)
 
     gertex::GXFog fog = gertex::GXFog{true, gertex::GXFogType::linear, viewport.near, viewport.far, viewport.near, viewport.far, background};
 
+    // Setup the loading screen
+    gui_dirtscreen *dirtscreen = new gui_dirtscreen(viewport);
+    dirtscreen->set_text("Loading level\n\n\nBuilding terrain");
+    gui::set_gui(dirtscreen);
+
+    // Optionally join a server if the configuration specifies one
     std::string server_ip = config.get<std::string>("server", "");
 
     if (!server_ip.empty() && Crapper::initNetwork())
