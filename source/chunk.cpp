@@ -141,19 +141,13 @@ void deinit_chunk_manager()
     chunk_manager_thread_handle = LWP_THREAD_NULL;
 
     // Cleanup the chunk mutex
-    if (chunk_mutex != LWP_MUTEX_NULL)
-        LWP_MutexDestroy(chunk_mutex);
-    chunk_mutex = LWP_MUTEX_NULL;
+    lock_t::destroy(chunk_mutex);
 }
 
 void init_chunk_manager(chunkprovider *chunk_provider)
 {
     if (chunk_manager_thread_handle != LWP_THREAD_NULL)
         return;
-
-    // Initialize the chunk mutex if it hasn't been initialized yet
-    if (chunk_mutex == LWP_MUTEX_NULL)
-        LWP_MutexInit(&chunk_mutex, false);
 
     // Chunk provider can be null if something else will be providing the chunks.
     // This should only happen when in a remote world which means that chunks are
