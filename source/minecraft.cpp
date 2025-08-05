@@ -204,7 +204,7 @@ int main(int argc, char **argv)
         // Attempt to load the configuration file from the default location
         config.load();
     }
-    catch (std::exception &e)
+    catch (std::runtime_error &e)
     {
         printf("Using config defaults. %s\n", e.what());
     }

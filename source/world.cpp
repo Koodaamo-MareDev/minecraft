@@ -1128,7 +1128,7 @@ void world::save()
             for (chunk_t *c : get_chunks())
                 c->write();
         }
-        catch (std::exception &e)
+        catch (std::runtime_error &e)
         {
             printf("Failed to save chunk: %s\n", e.what());
         }
@@ -1169,7 +1169,7 @@ bool world::load()
     {
         level = NBTBase::readGZip(file, file_size);
     }
-    catch (std::exception &e)
+    catch (std::runtime_error &e)
     {
         printf("Failed to load level.dat: %s\n", e.what());
     }

@@ -47,7 +47,7 @@ void init_png_texture(GXTexObj &texture, const std::string &filename, uint32_t m
         pnguin::PNGFile png_file(RESOURCES_DIR "textures/" + filename);
         png_file.to_tpl(texture, mipmap_levels);
     }
-    catch (std::exception &e)
+    catch (std::runtime_error &e)
     {
         printf("Failed to load %s: %s\n", filename.c_str(), e.what());
         init_missing_texture(texture);
