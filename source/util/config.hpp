@@ -40,7 +40,12 @@ public:
             float_value = 0.0f; // Reset to 0 if the string is empty
             return *this;
         }
-        if (std::string(value).find_first_not_of("0123456789.-") == std::string::npos)
+        // Only permit up to one dot in the string (lazy way of determining if it's an IP address or a float)
+        size_t dot_pos = std::string(value).find('.');
+        size_t last_dot = std::string(value).rfind('.');
+
+        // Check if the value is a number
+        if (std::string(value).find_first_not_of("0123456789.-") == std::string::npos && (dot_pos == std::string::npos || dot_pos == last_dot))
         {
             // If the string is numeric, convert to float
             try
@@ -106,7 +111,12 @@ public:
                     kv_pairs[key] = value;
                     continue; // Skip empty values
                 }
-                if (value.find_first_not_of("0123456789.-") == std::string::npos)
+                // Only permit up to one dot in the string (lazy way of determining if it's an IP address or a float)
+                size_t dot_pos = std::string(value).find('.');
+                size_t last_dot = std::string(value).rfind('.');
+
+                // Check if the value is a number
+                if (std::string(value).find_first_not_of("0123456789.-") == std::string::npos && (dot_pos == std::string::npos || dot_pos == last_dot))
                 {
                     try
                     {
@@ -141,8 +151,12 @@ public:
                 continue;
             }
 
-            // Check if the value is a string
-            if (std::string(value).find_first_not_of("0123456789.-") == std::string::npos)
+            // Only permit up to one dot in the string (lazy way of determining if it's an IP address or a float)
+            size_t dot_pos = std::string(value).find('.');
+            size_t last_dot = std::string(value).rfind('.');
+
+            // Check if the value is a number
+            if (std::string(value).find_first_not_of("0123456789.-") == std::string::npos && (dot_pos == std::string::npos || dot_pos == last_dot))
             {
                 // Check if the value is effectively an integer
                 if (std::floor(float(value)) == float(value))
