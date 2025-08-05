@@ -20,8 +20,8 @@
 #include "chunkprovider.hpp"
 #include "util/face_pair.hpp"
 #include "util/crashfix.hpp"
+#include "util/debuglog.hpp"
 
-extern Crapper::MinecraftClient client;
 extern bool should_destroy_block;
 extern bool should_place_block;
 extern gui *current_gui;
@@ -35,6 +35,8 @@ world::world()
     chdir(save_path.c_str());
 
     light_engine::init();
+
+    player.m_entity = new entity_player_local(vec3f(0, -999, 0));
 }
 
 world::~world()
@@ -49,16 +51,46 @@ world::~world()
 
 bool world::is_remote()
 {
-    return remote;
+    return client != nullptr;
 }
 
 void world::set_remote(bool value)
 {
-    remote = value;
+    if (value && !client)
+    {
+        client = new Crapper::MinecraftClient(this);
+    }
+    else if (!value && client)
+    {
+        client->disconnect();
+        delete client;
+        client = nullptr;
+    }
 }
 
 void world::tick()
 {
+    if (client)
+    {
+        try
+        {
+            client->tick();
+        }
+        catch (const std::runtime_error &e)
+        {
+            debug::print("Network error: %s\n", e.what());
+
+            // Go back to singleplayer
+            reset();
+            if (!load())
+                create();
+
+            // Inform the user about the network error
+            gui_dirtscreen *dirtscreen = new gui_dirtscreen(gertex::GXView());
+            dirtscreen->set_text(std::string(e.what()));
+            gui::set_gui(dirtscreen);
+        }
+    }
     update_entities();
     calculate_visibility();
     cleanup_chunks();
@@ -579,7 +611,7 @@ void world::edit_blocks()
                         {
                             if (player.raycast_face == face_offsets[face_num])
                             {
-                                client.sendBlockDig(2, editable_pos.x, editable_pos.y, editable_pos.z, (face_num + 4) % 6);
+                                client->sendBlockDig(2, editable_pos.x, editable_pos.y, editable_pos.z, (face_num + 4) % 6);
                                 break;
                             }
                         }
@@ -729,7 +761,7 @@ void world::place_block(const vec3i pos, const vec3i targeted, block_t *new_bloc
         player.m_inventory[player.selected_hotbar_slot] = inventory::item_stack();
 
     if (is_remote())
-        client.sendPlaceBlock(targeted.x, targeted.y, targeted.z, (face + 4) % 6, new_block->id, 1, new_block->meta);
+        client->sendPlaceBlock(targeted.x, targeted.y, targeted.z, (face + 4) % 6, new_block->id, 1, new_block->meta);
 }
 
 void world::spawn_drop(const vec3i &pos, const block_t *old_block, inventory::item_stack item)
@@ -1258,7 +1290,7 @@ void world::reset()
     last_entity_tick = 0;
     last_fluid_tick = 0;
     hell = false;
-    remote = false;
+    set_remote(false);
     if (player.m_entity)
         player.m_entity->chunk = nullptr;
     player.m_inventory.clear();
@@ -1402,7 +1434,7 @@ void world::update_player()
                 {
                     if (player.raycast_face == face_offsets[face_num])
                     {
-                        client.sendBlockDig(0, player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z, (face_num + 4) % 6);
+                        client->sendBlockDig(0, player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z, (face_num + 4) % 6);
                         break;
                     }
                 }
@@ -1418,7 +1450,7 @@ void world::update_player()
                     // Swing the player's arm - TODO: Add a proper client-side animation
                     if (is_remote())
                     {
-                        client.sendAnimation(1);
+                        client->sendAnimation(1);
                     }
 
                     // Play the mining sound

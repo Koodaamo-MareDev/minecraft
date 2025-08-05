@@ -5,6 +5,7 @@
 #include <math/vec3i.hpp>
 #include <math/vec3f.hpp>
 #include <math/math_utils.h>
+#include <crapper/client.hpp>
 
 #include "particle.hpp"
 #include "sound.hpp"
@@ -86,6 +87,7 @@ public:
     int64_t seed = 0;
     chunkprovider *chunk_provider = nullptr;
     frustum_t *frustum = nullptr;
+    Crapper::MinecraftClient *client = nullptr;
 
     std::string name = "world";
 
@@ -126,8 +128,6 @@ public:
     void reset();
 
 private:
-    bool remote = false;
-
     particle_system m_particle_system;
     sound_system m_sound_system;
 

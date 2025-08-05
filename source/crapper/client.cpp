@@ -54,9 +54,14 @@ namespace Crapper
         sockfd = net_socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
         if (sockfd < 0)
         {
-            debug::print("Error creating socket\n");
-            status = ErrorStatus::CONNECT_ERROR;
-            return;
+            throw std::runtime_error("Failed to create socket");
+        }
+
+        // Set socket to non-blocking using net_ioctl
+        u32 nonBlocking = 1;
+        if (net_ioctl(sockfd, FIONBIO, &nonBlocking) < 0)
+        {
+            throw std::runtime_error("Failed to set non-blocking mode");
         }
 
         // Set up server address
@@ -71,20 +76,19 @@ namespace Crapper
             debug::print("Unknown hostname. Fallback to plain IP\n");
             if (inet_aton(host.c_str(), &server_addr.sin_addr) == 0)
             {
-                debug::print("Error resolving hostname\n");
-                status = ErrorStatus::CONNECT_ERROR;
-                close();
-                return;
+                throw std::runtime_error("Unknown host");
             }
         }
         else
-            memcpy(&server_addr.sin_addr.s_addr, server->h_addr, server->h_length);
-
-        if (net_connect(sockfd, (sockaddr *)&server_addr, sizeof(server_addr)) < 0)
         {
-            close();
-            status = ErrorStatus::CONNECT_ERROR;
-            return;
+            memcpy(&server_addr.sin_addr.s_addr, server->h_addr, server->h_length);
+        }
+
+        // Attempt to connect to the server
+        int result = net_connect(sockfd, (sockaddr *)&server_addr, sizeof(server_addr));
+        if (result < 0 && result != -EINPROGRESS)
+        {
+            throw std::runtime_error("Failed to connect to server: " + std::string(strerror(-result)));
         }
     }
 
@@ -106,7 +110,9 @@ namespace Crapper
             if (sent < 0)
             {
                 debug::print("Error sending data: %d %s\n", sent, strerror(-sent));
-                status = ErrorStatus::SEND_ERROR;
+
+                // We don't want to throw an error here, just set the status.
+                status = ErrorStatus::ERROR;
                 break;
             }
             offset += sent;
@@ -135,9 +141,8 @@ namespace Crapper
             {
                 if (received == -EAGAIN)
                     break; // No data to read
-                debug::print("Error receiving data: %d %s\n", received, strerror(-received));
-                status = ErrorStatus::RECEIVE_ERROR;
-                return;
+
+                throw std::runtime_error("Error receiving data: " + std::string(strerror(-received)));
             }
             else if (received == 0)
             {
@@ -153,6 +158,27 @@ namespace Crapper
     void Client::close()
     {
         net_close(sockfd);
+    }
+
+    bool Client::is_connected()
+    {
+        fd_set write_fds;
+        FD_ZERO(&write_fds);
+        FD_SET(sockfd, &write_fds);
+
+        // We don't want to block here, so we use a zero timeout
+        timeval timeout;
+        timeout.tv_sec = 0;
+        timeout.tv_usec = 0;
+
+        net_select(sockfd + 1, nullptr, &write_fds, nullptr, &timeout);
+
+        if (FD_ISSET(sockfd, &write_fds))
+        {
+            // Socket is writable - assume we are connected
+            return true;
+        }
+        return false; // Not connected
     }
 
     void Metadata::write(ByteBuffer &buffer, int index)
@@ -358,27 +384,28 @@ namespace Crapper
         }
     }
 
+    MinecraftClient::MinecraftClient(world *remote_world)
+    {
+        if (remote_world == nullptr)
+            throw std::runtime_error("World cannot be null");
+        this->remote_world = remote_world;
+    }
+
     void MinecraftClient::joinServer(std::string host, uint16_t port)
     {
-        debug::print("Connecting to server %s:%d\n", host.c_str(), port);
+        debug::print("Connecting to %s:%d\n", host.c_str(), port);
+
+        gui_dirtscreen *dirtscreen = dynamic_cast<gui_dirtscreen *>(gui::get_gui());
+        if (dirtscreen)
+            dirtscreen->set_text("Connecting to\n\n\n" + host + ":" + std::to_string(port));
+
         status = ErrorStatus::OK;
-        current_world->set_remote(true);
+        state = ConnectionState::CONNECT;
         connect(host, port);
 
         if (status != ErrorStatus::OK)
         {
-            current_world->set_remote(false);
-            debug::print("Error connecting to server\n");
-            return;
-        }
-
-        sendHandshake();
-
-        if (status != ErrorStatus::OK)
-        {
-            current_world->set_remote(false);
-            debug::print("Error connecting to server\n");
-            return;
+            throw std::runtime_error("Failed to connect to server");
         }
     }
 
@@ -404,6 +431,9 @@ namespace Crapper
             return;
 
         debug::print("Server hash: %s\n", server_hash.c_str());
+        gui_dirtscreen *dirtscreen = dynamic_cast<gui_dirtscreen *>(gui::get_gui());
+        if (dirtscreen)
+            dirtscreen->set_text("Logging in");
         sendLoginRequest();
     }
 
@@ -445,43 +475,42 @@ namespace Crapper
 
         if (srv_checksum != "WiiMCsrv")
         {
-            debug::print("Incompatible server\n");
-            status = ErrorStatus::RECEIVE_ERROR;
-            return;
+            throw std::runtime_error("Incompatible server");
         }
         set_world_hell(dimension);
 
         debug::print("Player entity ID: %d\n", entity_id);
         debug::print("World seed: %lld\n", seed);
 
-        if (current_world->player.m_entity)
+        if (remote_world->player.m_entity)
         {
-            if (current_world->player.m_entity->chunk)
+            if (remote_world->player.m_entity->chunk)
             {
                 debug::print("Player entity already exists in a chunk even though no chunks should be loaded yet. This must be a bug!!!\n");
-                status = ErrorStatus::RECEIVE_ERROR;
+                status = ErrorStatus::ERROR;
                 return;
             }
 
             // Remove the old player entity
-            remove_entity(current_world->player.m_entity->entity_id);
+            remove_entity(remote_world->player.m_entity->entity_id);
         }
 
         // Create a new player entity
-        current_world->player.m_entity = new entity_player_local(vec3f(0.5, -999, 0.5));
-        current_world->player.m_entity->entity_id = entity_id;
-        add_entity(current_world->player.m_entity);
+        remote_world->player.m_entity = new entity_player_local(vec3f(0.5, -999, 0.5));
+        remote_world->player.m_entity->entity_id = entity_id;
+        add_entity(remote_world->player.m_entity);
 
-        if (!current_world->loaded)
+        if (!remote_world->loaded)
         {
             gui_dirtscreen *dirtscreen = dynamic_cast<gui_dirtscreen *>(gui::get_gui());
             if (!dirtscreen)
                 dirtscreen = new gui_dirtscreen(gertex::GXView());
-            dirtscreen->set_text("Loading level\n\nDownloading terrain");
+            dirtscreen->set_text("Loading level\n\n\nDownloading terrain");
             dirtscreen->set_progress(0, 0);
             gui::set_gui(dirtscreen);
         }
         login_success = true;
+        state = ConnectionState::PLAY;
     }
 
     void MinecraftClient::sendChatMessage(std::string message)
@@ -515,9 +544,9 @@ namespace Crapper
             return;
         int32_t new_time = time % 24000;
         // Update the time of day if the difference is greater than half a second
-        if (std::abs(new_time - current_world->time_of_day) > 10)
+        if (std::abs(new_time - remote_world->time_of_day) > 10)
         {
-            current_world->time_of_day = new_time;
+            remote_world->time_of_day = new_time;
         }
     }
 
@@ -566,9 +595,9 @@ namespace Crapper
     {
         // Read entity health
         int16_t health = buffer.readShort();
-        if (current_world->player.m_entity)
+        if (remote_world->player.m_entity)
         {
-            current_world->player.m_entity->health = health;
+            remote_world->player.m_entity->health = health;
             if (health <= 0)
             {
                 sendRespawn();
@@ -613,11 +642,11 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        if (!current_world->player.m_entity)
+        if (!remote_world->player.m_entity)
             return;
 
-        current_world->player.m_entity->teleport(vec3f(x, y, z));
-        current_world->player.m_entity->on_ground = on_ground;
+        remote_world->player.m_entity->teleport(vec3f(x, y, z));
+        remote_world->player.m_entity->on_ground = on_ground;
     }
 
     void MinecraftClient::handlePlayerLook(ByteBuffer &buffer)
@@ -630,11 +659,11 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        if (!current_world->player.m_entity)
+        if (!remote_world->player.m_entity)
             return;
 
-        current_world->player.m_entity->rotation = vec3f(-pitch, -yaw, 0);
-        current_world->player.m_entity->on_ground = on_ground;
+        remote_world->player.m_entity->rotation = vec3f(-pitch, -yaw, 0);
+        remote_world->player.m_entity->on_ground = on_ground;
         xrot = pitch;
         yrot = yaw;
     }
@@ -653,12 +682,12 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        if (!current_world->player.m_entity)
+        if (!remote_world->player.m_entity)
             return;
 
-        current_world->player.m_entity->teleport(vec3f(x, y, z));
-        current_world->player.m_entity->rotation = vec3f(-pitch, -yaw, 0);
-        current_world->player.m_entity->on_ground = on_ground;
+        remote_world->player.m_entity->teleport(vec3f(x, y, z));
+        remote_world->player.m_entity->rotation = vec3f(-pitch, -yaw, 0);
+        remote_world->player.m_entity->on_ground = on_ground;
 
         // Mirror the packet back to the server
         sendPlayerPositionLook();
@@ -688,48 +717,48 @@ namespace Crapper
 
     void MinecraftClient::sendPlayerPositionLook()
     {
-        if (!current_world->player.m_entity)
+        if (!remote_world->player.m_entity)
             return;
 
         // Send player position and look packet
         ByteBuffer buffer;
         buffer.writeByte(0x0D); // Packet ID
-        buffer.writeDouble(current_world->player.m_entity->position.x);
-        buffer.writeDouble(current_world->player.m_entity->aabb.min.y);
-        buffer.writeDouble(current_world->player.m_entity->position.y);
-        buffer.writeDouble(current_world->player.m_entity->position.z);
-        buffer.writeFloat(180 - current_world->player.m_entity->rotation.y); // Yaw
-        buffer.writeFloat(-current_world->player.m_entity->rotation.x);      // Pitch
-        buffer.writeBool(current_world->player.m_entity->on_ground);
+        buffer.writeDouble(remote_world->player.m_entity->position.x);
+        buffer.writeDouble(remote_world->player.m_entity->aabb.min.y);
+        buffer.writeDouble(remote_world->player.m_entity->position.y);
+        buffer.writeDouble(remote_world->player.m_entity->position.z);
+        buffer.writeFloat(180 - remote_world->player.m_entity->rotation.y); // Yaw
+        buffer.writeFloat(-remote_world->player.m_entity->rotation.x);      // Pitch
+        buffer.writeBool(remote_world->player.m_entity->on_ground);
         send(buffer);
     }
 
     void MinecraftClient::sendPlayerPosition()
     {
-        if (!current_world->player.m_entity)
+        if (!remote_world->player.m_entity)
             return;
 
         // Send player position packet
         ByteBuffer buffer;
         buffer.writeByte(0x0B); // Packet ID
-        buffer.writeDouble(current_world->player.m_entity->position.x);
-        buffer.writeDouble(current_world->player.m_entity->position.y);
-        buffer.writeDouble(current_world->player.m_entity->position.z);
-        buffer.writeBool(current_world->player.m_entity->on_ground);
+        buffer.writeDouble(remote_world->player.m_entity->position.x);
+        buffer.writeDouble(remote_world->player.m_entity->position.y);
+        buffer.writeDouble(remote_world->player.m_entity->position.z);
+        buffer.writeBool(remote_world->player.m_entity->on_ground);
         send(buffer);
     }
 
     void MinecraftClient::sendPlayerLook()
     {
-        if (!current_world->player.m_entity)
+        if (!remote_world->player.m_entity)
             return;
 
         // Send player look packet
         ByteBuffer buffer;
-        buffer.writeByte(0x0C);                                              // Packet ID
-        buffer.writeFloat(180 - current_world->player.m_entity->rotation.y); // Yaw
-        buffer.writeFloat(-current_world->player.m_entity->rotation.x);      // Pitch
-        buffer.writeBool(current_world->player.m_entity->on_ground);
+        buffer.writeByte(0x0C);                                             // Packet ID
+        buffer.writeFloat(180 - remote_world->player.m_entity->rotation.y); // Yaw
+        buffer.writeFloat(-remote_world->player.m_entity->rotation.x);      // Pitch
+        buffer.writeBool(remote_world->player.m_entity->on_ground);
         send(buffer);
     }
 
@@ -785,8 +814,8 @@ namespace Crapper
     {
         // Send player animation packet
         ByteBuffer buffer;
-        buffer.writeByte(0x12);                                     // Packet ID
-        buffer.writeInt(current_world->player.m_entity->entity_id); // Entity ID
+        buffer.writeByte(0x12);                                    // Packet ID
+        buffer.writeInt(remote_world->player.m_entity->entity_id); // Entity ID
         buffer.writeByte(animation_id);
         send(buffer);
     }
@@ -1208,10 +1237,10 @@ namespace Crapper
             if (chunk)
             {
                 // Mark chunk for removal
-                current_world->remove_chunk(chunk);
+                remote_world->remove_chunk(chunk);
 
                 // Also trigger a cleanup immediately
-                current_world->cleanup_chunks();
+                remote_world->cleanup_chunks();
             }
         }
 #ifdef PREALLOCATE_CHUNKS
@@ -1224,11 +1253,12 @@ namespace Crapper
                 chunk->generation_stage = ChunkGenStage::empty;
                 get_chunks().push_back(chunk);
             }
-            catch (std::exception &e)
+            catch (...)
             {
-                debug::print("Chunk initialization failed: %s\n", e.what());
+                debug::print("Chunk initialization failed\n");
                 debug::print("Chunk count: %d\n", get_chunks().size());
-                throw e; // Rethrow the exception to indicate failure
+
+                std::rethrow_exception(std::current_exception());
             }
         }
 #endif
@@ -1293,7 +1323,7 @@ namespace Crapper
                 // We will log the error and rethrow an exception to indicate failure.
                 debug::print("Failed to allocate memory for chunk\n");
                 debug::print("Chunk count: %d\n", get_chunks().size());
-                
+
                 // We need to free the decompressed data before throwing an exception
                 delete[] decompressed_data;
 
@@ -1472,7 +1502,7 @@ namespace Crapper
             return;
 
         // Create explosion effect
-        current_world->create_explosion(vec3f(x, y, z), radius, nullptr);
+        remote_world->create_explosion(vec3f(x, y, z), radius, nullptr);
     }
 
     int MinecraftClient::clientToNetworkSlot(int slot_id)
@@ -1513,7 +1543,7 @@ namespace Crapper
             return;
         if (window_id == 0 && slot_id < 36 && slot_id >= 0)
         {
-            current_world->player.m_inventory[slot_id] = item;
+            remote_world->player.m_inventory[slot_id] = item;
         }
     }
 
@@ -1524,7 +1554,7 @@ namespace Crapper
         buffer.writeByte(0xFF); // Packet ID
         buffer.writeString("Disconnected by client");
         send(buffer);
-        status = ErrorStatus::SEND_ERROR;
+        state = ConnectionState::DISCONNECTED;
         close();
     }
 
@@ -1558,7 +1588,7 @@ namespace Crapper
                 int slot_id = networkToClientSlot(i);
                 if (slot_id >= 0 && slot_id < 36)
                 {
-                    current_world->player.m_inventory[slot_id] = items[i];
+                    remote_world->player.m_inventory[slot_id] = items[i];
                 }
             }
         }
@@ -1588,14 +1618,12 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        gui_dirtscreen *dirtscreen = dynamic_cast<gui_dirtscreen *>(gui::get_gui());
-        if (!dirtscreen)
-            dirtscreen = new gui_dirtscreen(gertex::GXView());
-        dirtscreen->set_text("Connection lost\n\n" + message);
-        dirtscreen->set_progress(0, 0);
+        gui_dirtscreen *dirtscreen = new gui_dirtscreen(gertex::GXView());
+        dirtscreen->set_text("Connection lost\n\n\n" + message);
         gui::set_gui(dirtscreen);
 
-        status = ErrorStatus::RECEIVE_ERROR;
+        close();
+        state = ConnectionState::DISCONNECTED;
     }
 
     void MinecraftClient::sendKeepAlive()
@@ -1880,29 +1908,86 @@ namespace Crapper
         default:
         {
             debug::print("Unknown packet ID: 0x%02X\n", packet_id);
-
-            gui_dirtscreen *dirtscreen = dynamic_cast<gui_dirtscreen *>(gui::get_gui());
-            if (!dirtscreen)
-                dirtscreen = new gui_dirtscreen(gertex::GXView());
-            dirtscreen->set_text("Connection Lost\n\nReason: Received unknown packet " + std::to_string(packet_id));
-            dirtscreen->set_progress(0, 0);
-            gui::set_gui(dirtscreen);
-
-            status = ErrorStatus::RECEIVE_ERROR;
-            break;
+            throw std::runtime_error("Received unknown packet " + std::to_string(packet_id));
         }
         }
         if (!buffer.underflow && status == ErrorStatus::OK)
         {
             buffer.erase(buffer.begin(), buffer.begin() + buffer.offset);
         }
-        if (status != ErrorStatus::OK)
-        {
-            current_world->set_remote(false);
-            buffer.clear();
-        }
         bool last_message = buffer.underflow || status != ErrorStatus::OK;
         buffer.underflow = false;
         return last_message;
+    }
+
+    void MinecraftClient::tick()
+    {
+        try
+        {
+            if (state == ConnectionState::HANDSHAKE || state == ConnectionState::PLAY)
+            {
+                // Receive packets
+                receive(receive_buffer);
+
+                // Handle up to 100 packets
+                for (int i = 0; i < 100 && status == Crapper::ErrorStatus::OK; i++)
+                {
+                    if (handlePacket(receive_buffer))
+                        break;
+                }
+            }
+            switch (state)
+            {
+            case ConnectionState::CONNECT:
+                if (is_connected())
+                {
+                    sendHandshake();
+                    state = ConnectionState::HANDSHAKE;
+                    watchdog_timer = TIMEOUT_TICKS; // Reset watchdog timer
+                }
+                else
+                {
+                    // Check if the connection has timed out
+                    if (watchdog_timer-- <= 0)
+                        throw std::runtime_error("Failed to connect to server");
+                }
+                break;
+            case ConnectionState::PLAY:
+            {
+                // Send keep alive every 900 ticks (every 45 seconds)
+                if (remote_world->ticks % 900 == 0)
+                    sendKeepAlive();
+
+                // Send the player's position and look every 3 ticks
+                if (remote_world->ticks % 3 == 0)
+                    sendPlayerPositionLook();
+
+                // Send the player's grounded status if it has changed
+                bool on_ground = remote_world->player.m_entity->on_ground;
+                if (on_ground != this->on_ground)
+                    sendGrounded(on_ground);
+
+                if (status != ErrorStatus::OK)
+                    throw std::runtime_error("Something went wrong");
+                break;
+            }
+            default:
+                break;
+            }
+        }
+        catch (...)
+        {
+            // Update state
+            status = ErrorStatus::ERROR;
+            state = ConnectionState::DISCONNECTED;
+
+            close();
+
+            // Just clear the buffer as it's no longer usable
+            receive_buffer.clear();
+
+            // We'll let the caller handle the error
+            std::rethrow_exception(std::current_exception());
+        }
     }
 } // namespace Crapper

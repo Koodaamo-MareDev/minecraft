@@ -10,6 +10,8 @@
 #include <math/vec3i.hpp>
 #include <ported/ByteBuffer.hpp>
 
+class world;
+
 namespace Crapper
 {
     bool initNetwork();
@@ -18,9 +20,7 @@ namespace Crapper
     enum class ErrorStatus
     {
         OK,
-        CONNECT_ERROR,
-        SEND_ERROR,
-        RECEIVE_ERROR
+        ERROR
     };
 
     class Client
@@ -37,6 +37,8 @@ namespace Crapper
         void receive(ByteBuffer &buffer);
 
         void close();
+
+        bool is_connected();
 
         Client() : sockfd(-1), status(ErrorStatus::OK) {}
 
@@ -110,8 +112,22 @@ namespace Crapper
         void read(ByteBuffer &buffer);
     };
 
+    enum class ConnectionState
+    {
+        NONE = 0,
+        CONNECT,
+        HANDSHAKE,
+        PLAY,
+        DISCONNECTED
+    };
+
     class MinecraftClient : public Client
     {
+    private:
+        constexpr static int32_t TIMEOUT_TICKS = 200;
+        int32_t watchdog_timer = TIMEOUT_TICKS;
+        ConnectionState state = ConnectionState::NONE;
+
     public:
         std::string username = "WiiUser";
         int32_t entity_id = 0;
@@ -119,6 +135,11 @@ namespace Crapper
         uint8_t dimension = 0;
         bool login_success = false;
         bool on_ground = false;
+        ByteBuffer receive_buffer;
+        world *remote_world = nullptr;
+
+        MinecraftClient(world *remote_world);
+
         void joinServer(std::string host, uint16_t port);
         void handleKeepAlive(ByteBuffer &buffer);
         void sendLoginRequest();
@@ -173,6 +194,7 @@ namespace Crapper
         void handleKick(ByteBuffer &buffer);
         void handleSetSlot(ByteBuffer &buffer);
         void disconnect();
+        void tick();
 
         int clientToNetworkSlot(int slot_id);
         int networkToClientSlot(int slot_id);

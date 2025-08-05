@@ -16,7 +16,6 @@
 #include "inventory.hpp"
 #include "gui_survival.hpp"
 #include "gui_dirtscreen.hpp"
-#include "crapper/client.hpp"
 #include "world.hpp"
 #include "util/input/keyboard_mouse.hpp"
 #include "util/input/wiimote_nunchuk.hpp"
@@ -57,9 +56,6 @@ int cursor_y = 0;
 
 float fog_depth_multiplier = 1.0f;
 float fog_light_multiplier = 1.0f;
-
-Crapper::MinecraftClient client;
-ByteBuffer receive_buffer;
 
 // Function to create the full directory path
 int mkpath(const char *path, mode_t mode)
@@ -105,7 +101,6 @@ int mkpath(const char *path, mode_t mode)
 
     return 0;
 }
-void UpdateNetwork();
 void UpdateLoadingStatus();
 void UpdateLightDir();
 void HandleGUI(gertex::GXView &viewport);
@@ -310,9 +305,17 @@ int main(int argc, char **argv)
 
     current_world = new world;
 
+    // Generate a "unique" username based on the device ID
+    uint32_t dev_id = 0;
+    ES_GetDeviceID(&dev_id);
+
+    entity_player_local *player_entity = current_world->player.m_entity;
+
+    // Use the username from the config or generate a default one
+    player_entity->player_name = std::string(config.get<std::string>("username", "Wii_" + std::to_string(dev_id)));
+
     // Add the player to the world - it should persist until the game is closed
-    current_world->player.m_entity = new entity_player_local(vec3f(0.5, -999, 0.5));
-    add_entity(current_world->player.m_entity);
+    add_entity(player_entity);
 
     current_world->reset();
     current_world->seed = gettime();
@@ -344,21 +347,17 @@ int main(int argc, char **argv)
     {
         int32_t server_port = config.get<int32_t>("port", 25565);
 
-        // Generate a "unique" username based on the device ID
-        uint32_t dev_id = 0;
-        ES_GetDeviceID(&dev_id);
-
-        // Use the username from the config or generate a default one
-        client.username = std::string(config.get<std::string>("username", "Wii_" + std::to_string(dev_id)));
-        config["username"] = client.username;
-
-        // Attempt to connect to the server
-        client.joinServer(server_ip, server_port);
-
-        if (client.status != Crapper::ErrorStatus::OK)
+        try
         {
-            // Reset the world if the connection failed
-            current_world->reset();
+            // Attempt to connect to the server
+            current_world->set_remote(true);
+            current_world->client->joinServer(server_ip, server_port);
+        }
+        catch (std::runtime_error &e)
+        {
+            // If connection fails, set the world to local
+            current_world->set_remote(false);
+            printf("Failed to connect to server: %s\n", e.what());
         }
     }
 
@@ -429,8 +428,6 @@ int main(int argc, char **argv)
         for (uint32_t i = current_world->last_entity_tick, count = 0; i < current_world->ticks && count < 10; i++, count++)
         {
             update_textures();
-
-            UpdateNetwork();
 
             current_world->tick();
         }
@@ -503,10 +500,6 @@ int main(int argc, char **argv)
         current_world->partial_ticks -= int(current_world->partial_ticks);
 
         fb ^= 1;
-    }
-    if (client.status == Crapper::ErrorStatus::OK && current_world->is_remote())
-    {
-        client.disconnect();
     }
     current_world->save();
     current_world->reset();
@@ -661,7 +654,7 @@ void GetInput()
             }
         }
         if (current_world->is_remote() && hotbar_slot_changed)
-            client.sendBlockItemSwitch(current_world->player.selected_hotbar_slot);
+            current_world->client->sendBlockItemSwitch(current_world->player.selected_hotbar_slot);
         if (left_shoulder_pressed || right_shoulder_pressed)
         {
             // Increment the shoulder button frame counter while a shoulder button is held
@@ -854,45 +847,6 @@ void UpdateCamera(camera_t &camera)
     player->rotation.y = yrot;
 
     current_world->update_frustum(camera);
-}
-
-void UpdateNetwork()
-{
-    if (client.status != Crapper::ErrorStatus::OK || !current_world->is_remote())
-        return;
-    // Receive packets
-    client.receive(receive_buffer);
-
-    // Handle up to 100 packets
-    for (int i = 0; i < 100 && client.status == Crapper::ErrorStatus::OK; i++)
-    {
-        if (client.handlePacket(receive_buffer))
-            break;
-    }
-
-    // Check for errors
-    // NOTE: Won't run if the client is disconnected before the handshake.
-    if (client.status != Crapper::ErrorStatus::OK)
-    {
-        // Reset the world if the connection is lost
-        current_world->reset();
-        return;
-    }
-    if (!client.login_success)
-        return;
-
-    // Send keep alive every 2700 frames (every 45 seconds)
-    if (current_world->ticks % 900 == 0)
-        client.sendKeepAlive();
-
-    // Send the player's position and look every 3 ticks
-    if (current_world->ticks % 3 == 0 && frameCounter != 0)
-        client.sendPlayerPositionLook();
-
-    // Send the player's grounded status if it has changed
-    bool on_ground = current_world->player.m_entity->on_ground;
-    if (frameCounter > 0 && client.on_ground != on_ground)
-        client.sendGrounded(on_ground);
 }
 
 void UpdateGUI(gertex::GXView &viewport)
