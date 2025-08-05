@@ -30,7 +30,6 @@
 #endif
 
 #define DEFAULT_FIFO_SIZE (256 * 1024)
-#define DIRECTIONAL_LIGHT GX_ENABLE
 
 void *frameBuffer[2] = {NULL, NULL};
 static GXRModeObj *rmode = NULL;
@@ -102,7 +101,6 @@ int mkpath(const char *path, mode_t mode)
     return 0;
 }
 void UpdateLoadingStatus();
-void UpdateLightDir();
 void HandleGUI(gertex::GXView &viewport);
 void UpdateGUI(gertex::GXView &viewport);
 void DrawGUI(gertex::GXView &viewport);
@@ -260,17 +258,17 @@ int main(int argc, char **argv)
     // Setup the default vertex attribute table
     GX_ClearVtxDesc();
     GX_SetVtxDesc(GX_VA_POS, GX_DIRECT);
-    GX_SetVtxDesc(GX_VA_NRM, GX_INDEX8);
     GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
+    GX_SetVtxDesc(GX_VA_CLR1, GX_INDEX8);
     GX_SetVtxDesc(GX_VA_TEX0, GX_DIRECT);
     GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, BASE3D_POS_FRAC_BITS);
-    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_NRM, GX_NRM_XYZ, GX_F32, 0);
     GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_CLR0, GX_CLR_RGBA, GX_RGBA8, 0);
+    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_CLR1, GX_CLR_RGBA, GX_RGBA8, 0);
     GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_TEX0, GX_TEX_ST, GX_F32, 0);
 
     // Prepare TEV
-    GX_SetNumChans(1);
-    GX_SetChanCtrl(GX_COLOR0, DIRECTIONAL_LIGHT, GX_SRC_REG, GX_SRC_VTX, GX_LIGHT0, GX_DF_CLAMP, GX_AF_SPOT);
+    GX_SetNumChans(2);
+    GX_SetChanCtrl(GX_COLOR0, GX_DISABLE, GX_SRC_REG, GX_SRC_VTX, GX_LIGHTNULL, GX_DF_NONE, GX_AF_NONE);
     GX_SetChanAmbColor(GX_COLOR0, GXColor{0, 0, 0, 255});
     GX_SetChanMatColor(GX_COLOR0, GXColor{255, 255, 255, 255});
     GX_SetNumTexGens(1);
@@ -420,8 +418,6 @@ int main(int argc, char **argv)
         // Set the background color
         GX_SetCopyClear(background, 0x00FFFFFF);
         fog.color = background;
-
-        UpdateLightDir();
 
         GetInput();
 
@@ -676,21 +672,6 @@ void GetInput()
             }
         }
     }
-}
-
-// TODO: Finish fake lighting
-void UpdateLightDir()
-{
-    if (!DIRECTIONAL_LIGHT)
-        return;
-    GXLightObj light;
-    guVector look_dir{0, 1, 0};
-    GX_InitLightPos(&light, look_dir.x * -8192, look_dir.y * -8192, look_dir.z * -8192);
-    GX_InitLightColor(&light, GXColor{255, 255, 255, 255});
-    GX_InitLightAttnA(&light, 1.0, 0.0, 0.0);
-    GX_InitLightDistAttn(&light, 1.0, 1.0, GX_DA_OFF);
-    GX_InitLightDir(&light, look_dir.x, look_dir.y, look_dir.z);
-    GX_LoadLightObj(&light, GX_LIGHT0);
 }
 
 void HandleGUI(gertex::GXView &viewport)
@@ -1006,57 +987,54 @@ void DrawGUI(gertex::GXView &viewport)
     else
         draw_textured_quad(icons_texture, cursor_x - 16, cursor_y - 16, 32, 32, 0, 32, 32, 64);
 }
-
 void PrepareTEV()
 {
-
-    GX_SetNumTevStages(3);
+    GX_SetNumTevStages(4);
     GX_SetTexCoordGen(GX_TEXCOORD0, GX_TG_MTX2x4, GX_TG_TEX0, GX_IDENTITY);
 
-    // Stage 0 handles the basics like texture mapping and lighting
+    // -------- Stage 0: Texture * CLR0 --------
 
-    // Set the TEV stage 0 to use the texture coordinates and the texture map
     GX_SetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
 
-    // Set the alpha sources to the texture alpha and the rasterized alpha
-    GX_SetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_TEXA, GX_CA_RASA, GX_CA_ZERO);
-    GX_SetTevAlphaOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
-
-    // Set the color sources to the texture color and the rasterized color
     GX_SetTevColorIn(GX_TEVSTAGE0, GX_CC_ZERO, GX_CC_TEXC, GX_CC_RASC, GX_CC_ZERO);
     GX_SetTevColorOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
 
-    // Stage 1 handles blending the texture with a constant color additively
+    GX_SetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_TEXA, GX_CA_RASA, GX_CA_ZERO);
+    GX_SetTevAlphaOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
 
-    // Set the TEV stage 1 to use the texture coordinates and the texture map
-    GX_SetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+    // -------- Stage 1: PREV * CLR1 --------
 
-    // Keep the alpha as it was from the previous stage
-    GX_SetTevAlphaIn(GX_TEVSTAGE1, GX_CA_APREV, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO);
-    GX_SetTevAlphaOp(GX_TEVSTAGE1, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
+    GX_SetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD0, GX_TEXMAP_DISABLE, GX_COLOR1A1);
 
-    // Set the constant color to black
-    GX_SetTevKColor(GX_KCOLOR0, (GXColor){0, 0, 0, 255});
-    GX_SetTevKColorSel(GX_TEVSTAGE1, GX_TEV_KCSEL_K0);
-
-    // Additive blending
-    GX_SetTevColorIn(GX_TEVSTAGE1, GX_CC_CPREV, GX_CC_ZERO, GX_CC_ZERO, GX_CC_KONST);
+    GX_SetTevColorIn(GX_TEVSTAGE1, GX_CC_ZERO, GX_CC_CPREV, GX_CC_RASC, GX_CC_ZERO);
     GX_SetTevColorOp(GX_TEVSTAGE1, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
 
-    // Stage 2 handles the final color output by multiplying the stage 1 color with the constant color
+    GX_SetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_APREV, GX_CA_RASA, GX_CA_ZERO);
+    GX_SetTevAlphaOp(GX_TEVSTAGE1, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
 
-    // Set the TEV stage 2 to use the texture coordinates and the texture map
-    GX_SetTevOrder(GX_TEVSTAGE2, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+    // -------- Stage 2: Add Konst0 --------
 
-    // Keep the alpha as it was from the previous stage
+    GX_SetTevOrder(GX_TEVSTAGE2, GX_TEXCOORD0, GX_TEXMAP_DISABLE, GX_COLOR0A0);
+
+    GX_SetTevKColor(GX_KCOLOR0, (GXColor){0, 0, 0, 255}); // Default to black (i.e. no effect)
+    GX_SetTevKColorSel(GX_TEVSTAGE2, GX_TEV_KCSEL_K0);
+
+    GX_SetTevColorIn(GX_TEVSTAGE2, GX_CC_CPREV, GX_CC_ZERO, GX_CC_ZERO, GX_CC_KONST);
+    GX_SetTevColorOp(GX_TEVSTAGE2, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
+
     GX_SetTevAlphaIn(GX_TEVSTAGE2, GX_CA_APREV, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO);
     GX_SetTevAlphaOp(GX_TEVSTAGE2, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
 
-    // Set the constant color to white
-    GX_SetTevKColor(GX_KCOLOR1, (GXColor){255, 255, 255, 255});
-    GX_SetTevKColorSel(GX_TEVSTAGE2, GX_TEV_KCSEL_K1);
+    // -------- Stage 3: Multiply by Konst1 --------
 
-    // Multiply the color from the previous stage with the constant color
-    GX_SetTevColorIn(GX_TEVSTAGE2, GX_CC_ZERO, GX_CC_CPREV, GX_CC_KONST, GX_CC_ZERO);
-    GX_SetTevColorOp(GX_TEVSTAGE2, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
+    GX_SetTevOrder(GX_TEVSTAGE3, GX_TEXCOORD0, GX_TEXMAP_DISABLE, GX_COLOR0A0);
+
+    GX_SetTevKColor(GX_KCOLOR1, (GXColor){255, 255, 255, 255}); // White by default
+    GX_SetTevKColorSel(GX_TEVSTAGE3, GX_TEV_KCSEL_K1);
+
+    GX_SetTevColorIn(GX_TEVSTAGE3, GX_CC_ZERO, GX_CC_CPREV, GX_CC_KONST, GX_CC_ZERO);
+    GX_SetTevColorOp(GX_TEVSTAGE3, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
+
+    GX_SetTevAlphaIn(GX_TEVSTAGE3, GX_CA_APREV, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO);
+    GX_SetTevAlphaOp(GX_TEVSTAGE3, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
 }
