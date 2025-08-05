@@ -27,7 +27,6 @@ enum class ChunkGenStage : uint8_t
 };
 
 extern guVector player_pos;
-extern uint32_t world_tick;
 
 inline vec2i block_to_chunk_pos(const vec3i &pos)
 {
