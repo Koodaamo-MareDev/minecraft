@@ -535,7 +535,7 @@ void chunk_t::refresh_section_visibility(int index)
     if (empty)
     {
         // No blocks to process, skip the flood fill
-        vbo.visibility_flags = 0x3FFFFFFF;
+        vbo.visibility_flags = 0x7FFF;
         return;
     }
     vbo.visibility_flags = 0;

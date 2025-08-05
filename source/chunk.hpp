@@ -95,7 +95,7 @@ public:
     vbo_buffer_t cached_solid = vbo_buffer_t();
     vbo_buffer_t transparent = vbo_buffer_t();
     vbo_buffer_t cached_transparent = vbo_buffer_t();
-    uint32_t visibility_flags = 0;
+    uint16_t visibility_flags = 0;
 
     bool has_solid_fluid = false;
     bool has_transparent_fluid = false;
