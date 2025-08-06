@@ -419,7 +419,7 @@ namespace Crapper
         // Send handshake packet
         ByteBuffer buffer;
         buffer.writeByte(0x02); // Packet ID
-        buffer.writeString(username);
+        buffer.writeString(remote_world->player.m_entity->player_name);
         send(buffer);
     }
 
@@ -441,9 +441,9 @@ namespace Crapper
     {
         // Send login packet
         ByteBuffer buffer;
-        buffer.writeByte(0x01); // Packet ID
-        buffer.writeInt(9);     // Protocol version
-        buffer.writeString(username);
+        buffer.writeByte(0x01);                                         // Packet ID
+        buffer.writeInt(9);                                             // Protocol version
+        buffer.writeString(remote_world->player.m_entity->player_name); // Player name
 
         // This is the password field which is not used by the vanilla server.
         // We can use it to indicate the server that we are a Wii client.

@@ -129,7 +129,6 @@ namespace Crapper
         ConnectionState state = ConnectionState::NONE;
 
     public:
-        std::string username = "WiiUser";
         int32_t entity_id = 0;
         int64_t seed = 0;
         uint8_t dimension = 0;
