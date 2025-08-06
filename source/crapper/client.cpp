@@ -1618,12 +1618,7 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        gui_dirtscreen *dirtscreen = new gui_dirtscreen(gertex::GXView());
-        dirtscreen->set_text("Connection lost\n\n\n" + message);
-        gui::set_gui(dirtscreen);
-
-        close();
-        state = ConnectionState::DISCONNECTED;
+        throw std::runtime_error("Connection lost\n\n\n" + message);
     }
 
     void MinecraftClient::sendKeepAlive()
