@@ -421,6 +421,9 @@ namespace Crapper
         buffer.writeByte(0x02); // Packet ID
         buffer.writeString(remote_world->player.m_entity->player_name);
         send(buffer);
+
+        if (status != ErrorStatus::OK)
+            throw std::runtime_error("Failed to connect to server");
     }
 
     void MinecraftClient::handleHandshake(ByteBuffer &buffer)
