@@ -891,10 +891,6 @@ void world::draw_scene(bool opaque)
         }
     }
 
-    // Sort the vbos to draw the nearest ones first in the solid pass, and the furthest ones first in the transparent pass
-    std::sort(sections_to_draw.begin(), sections_to_draw.end(), [opaque](std::pair<section *, vbo_buffer_t *> &a, std::pair<section *, vbo_buffer_t *> &b)
-              { return (b.first < a.first) ^ opaque; });
-
     // Draw the vbos
     for (std::pair<section *, vbo_buffer_t *> &pair : sections_to_draw)
     {
