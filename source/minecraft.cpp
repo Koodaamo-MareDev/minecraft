@@ -138,11 +138,6 @@ void LightMapBlend(const uint8_t *src0, const uint8_t *src1, uint8_t *dst, uint8
     }
 }
 
-float flerp(float a, float b, float f)
-{
-    return a + f * (b - a);
-}
-
 void init_fail(std::string message)
 {
     if (frameBuffer[0])
@@ -396,9 +391,9 @@ int main(int argc, char **argv)
 
         block_t *block = get_block_at(current_world->player.m_entity->get_head_blockpos());
         if (block)
-            fog_light_multiplier = flerp(fog_light_multiplier, std::pow(0.9f, (15.0f - block->sky_light)), 0.05f);
+            fog_light_multiplier = lerpf(fog_light_multiplier, std::pow(0.9f, (15.0f - block->sky_light)), 0.05f);
 
-        fog_depth_multiplier = flerp(fog_depth_multiplier, std::min(std::max(player_pos.y, 24.f) / 36.f, 1.0f), 0.05f);
+        fog_depth_multiplier = lerpf(fog_depth_multiplier, std::min(std::max(player_pos.y, 24.f) / 36.f, 1.0f), 0.05f);
 
         float fog_multiplier = current_world->hell ? 0.5f : 1.0f;
         if (current_world->player.in_fluid == BlockID::lava)
@@ -711,7 +706,7 @@ void HandleGUI(gertex::GXView &viewport)
         pan_underwater_texture.x = std::fmod(pan_underwater_texture.x, viewport.width);
         pan_underwater_texture.y = std::fmod(pan_underwater_texture.y, corrected_height);
         static float vignette_strength = 0;
-        vignette_strength = flerp(vignette_strength, 1.0f - (current_world->player.m_entity->light_level) / 15.0f, 0.01f);
+        vignette_strength = lerpf(vignette_strength, 1.0f - (current_world->player.m_entity->light_level) / 15.0f, 0.01f);
         vignette_strength = std::clamp(vignette_strength, 0.0f, 1.0f);
         uint8_t vignette_alpha = 0xFF * vignette_strength;
         if (current_world->player.in_fluid == BlockID::water)
