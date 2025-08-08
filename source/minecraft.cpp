@@ -778,8 +778,23 @@ void DrawDebugInfo(gertex::GXView &viewport)
     // Update the last frame time
     last_frame_time = current_frame_time;
 
+    std::string memory_usage_str = "Chunk Memory Usage: ";
+    
+    // Get the current memory usage in bytes
+    size_t memory_usage = current_world->memory_usage;
+    if (memory_usage > 1024 * 1024)
+    {
+        // Convert to megabytes
+        memory_usage_str += str::ftos(memory_usage / (1024.0 * 1024.0), 1) + " MB";
+    }
+    else
+    {
+        // Convert to kilobytes
+        memory_usage_str += str::ftos(memory_usage / 1024.0, 1) + " KB";
+    }
+
     // Display debug information
-    gui::draw_text_with_shadow(0, viewport.ystart, "Memory: " + std::to_string(current_world->memory_usage) + " B");
+    gui::draw_text_with_shadow(0, viewport.ystart, memory_usage_str);
     gui::draw_text_with_shadow(0, viewport.ystart + 16, std::to_string(int(fps)) + " fps", fps_color(int(fps)));
     std::string resolution_str = std::to_string(int(viewport.width)) + "x" + std::to_string(int(viewport.height));
     std::string widescreen_str = viewport.widescreen ? " Widescreen" : "";
