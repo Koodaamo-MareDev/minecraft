@@ -866,7 +866,7 @@ uint32_t chunk_t::size()
 {
     uint32_t base_size = sizeof(chunk_t);
     for (int i = 0; i < VERTICAL_SECTION_COUNT; i++)
-        base_size += this->sections[i].cached_solid.length + this->sections[i].cached_transparent.length + sizeof(section);
+        base_size += this->sections[i].cached_solid.length + this->sections[i].cached_transparent.length + this->sections[i].solid.length + this->sections[i].transparent.length;
     for (entity_physical *&entity : entities)
         base_size += entity->size();
     return base_size;
