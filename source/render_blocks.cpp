@@ -442,8 +442,8 @@ int render_cactus(chunk_t &chunk, block_t *block, const vec3i &pos)
 int render_leaves(chunk_t &chunk, block_t *block, const vec3i &pos)
 {
     int vertexCount = 0;
-    vertexCount += render_cube_special(chunk, block, pos, true);
     vertexCount += render_inverted_cube_special(chunk, block, pos, true);
+    vertexCount += render_cube_special(chunk, block, pos, true);
     return vertexCount;
 }
 int render_cross(chunk_t &chunk, block_t *block, const vec3i &pos)
