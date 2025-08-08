@@ -41,7 +41,7 @@ void gui_dirtscreen::refresh()
 
 void gui_dirtscreen::set_text(const std::string &text)
 {
-    text_lines = split_string(text, '\n');
+    text_lines = str::split(text, '\n');
 }
 
 void gui_dirtscreen::set_progress(uint8_t progress, uint8_t max_progress)

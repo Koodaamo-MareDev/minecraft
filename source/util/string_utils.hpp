@@ -5,17 +5,30 @@
 #include <sstream>
 #include <vector>
 
-inline std::vector<std::string> split_string(const std::string &str, char delimiter)
+namespace str
 {
-    std::vector<std::string> tokens;
-    std::stringstream ss(str);
-    std::string token;
 
-    while (std::getline(ss, token, delimiter))
+    inline std::vector<std::string> split(const std::string &str, char delimiter)
     {
-        tokens.push_back(token);
+        std::vector<std::string> tokens;
+        std::stringstream ss(str);
+        std::string token;
+
+        while (std::getline(ss, token, delimiter))
+        {
+            tokens.push_back(token);
+        }
+
+        return tokens;
     }
 
-    return tokens;
+    inline std::string ftos(float value, int precision = 2)
+    {
+        std::ostringstream out;
+        out.precision(precision);
+        out << std::fixed << value;
+        return out.str();
+    }
+
 }
 #endif
