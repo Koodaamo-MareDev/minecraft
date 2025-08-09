@@ -20,7 +20,7 @@
 #include "util/input/keyboard_mouse.hpp"
 #include "util/input/wiimote_nunchuk.hpp"
 #include "util/input/wiimote_classic.hpp"
-
+#include "util/string_utils.hpp"
 #ifdef MONO_LIGHTING
 #include "light_day_mono_rgba.h"
 #include "light_night_mono_rgba.h"
