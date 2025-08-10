@@ -279,6 +279,8 @@ int main(int argc, char **argv)
     cursor_x = viewport.width / 2;
     cursor_y = viewport.height * viewport.aspect_correction / 2;
 
+    bool vsync = ((int)config.get("vsync", 0) != 0);
+
     f32 FOV = config.get<float>("fov", 90.0f);
 
     camera_t camera = {
@@ -475,7 +477,10 @@ int main(int argc, char **argv)
 #endif
         VIDEO_SetNextFramebuffer(frameBuffer[fb]);
         VIDEO_Flush();
-        VIDEO_WaitVSync();
+        if (vsync)
+            VIDEO_WaitVSync(); // Wait for vertical sync - if the frame lasts too long (which it often does) it will kill the frame rate
+        else
+            usleep(1000); // Give other tasks a chance to run - 1 ms seems sufficient
         frameCounter++;
         current_world->delta_time = time_diff_s(frame_start, time_get());
 
