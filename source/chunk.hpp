@@ -100,16 +100,6 @@ public:
     bool has_transparent_fluid = false;
 
     bool has_updated = false;
-
-    int player_taxicab_distance()
-    {
-        return std::abs((this->x & ~15) - (int(std::floor(player_pos.x)) & ~15)) + std::abs((this->y & ~15) - (int(std::floor(player_pos.y)) & ~15)) + std::abs((this->z & ~15) - (int(std::floor(player_pos.z)) & ~15));
-    }
-
-    bool operator<(section &other)
-    {
-        return this->player_taxicab_distance() < other.player_taxicab_distance();
-    }
 };
 
 class NBTTagCompound;
