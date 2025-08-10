@@ -13,8 +13,6 @@
 #include "../gui_dirtscreen.hpp"
 #include "../util/debuglog.hpp"
 
-extern float xrot;
-extern float yrot;
 namespace Crapper
 {
     bool initNetwork()
@@ -667,8 +665,6 @@ namespace Crapper
 
         remote_world->player.m_entity->rotation = vec3f(-pitch, -yaw, 0);
         remote_world->player.m_entity->on_ground = on_ground;
-        xrot = pitch;
-        yrot = yaw;
     }
 
     void MinecraftClient::handlePlayerPositionLook(ByteBuffer &buffer)

@@ -21,6 +21,7 @@
 #include "util/input/wiimote_nunchuk.hpp"
 #include "util/input/wiimote_classic.hpp"
 #include "util/string_utils.hpp"
+#include <sys/unistd.h>
 
 #include "light_day_mono_rgba.h"
 #include "light_night_mono_rgba.h"
@@ -31,10 +32,6 @@
 
 void *frameBuffer[2] = {NULL, NULL};
 static GXRModeObj *rmode = NULL;
-
-f32 xrot = 0.0f;
-f32 yrot = 0.0f;
-guVector player_pos = {0.F, 80.0F, 0.F};
 
 world *current_world = nullptr;
 
@@ -103,7 +100,7 @@ void UpdateGUI(gertex::GXView &viewport);
 void DrawGUI(gertex::GXView &viewport);
 void DrawHUD(gertex::GXView &viewport);
 void DrawDebugInfo(gertex::GXView &viewport);
-void UpdateCamera(camera_t &camera);
+void UpdateCamera();
 void PrepareTEV();
 void GetInput();
 //---------------------------------------------------------------------------------
@@ -268,14 +265,11 @@ int main(int argc, char **argv)
 
     f32 FOV = config.get<float>("fov", 90.0f);
 
-    camera_t camera = {
-        {0.0f, 0.0f, 0.0f},
-        {0.0f, 0.0f, 0.0f}, // Camera position
-        FOV,                // Field of view
-        viewport.aspect,    // Aspect ratio
-        viewport.near,      // Near clipping plane
-        viewport.far        // Far clipping plane
-    };
+    camera_t &camera = get_camera();
+    camera.fov = FOV;
+    camera.aspect = viewport.aspect / viewport.aspect_correction;
+    camera.near = viewport.near;
+    camera.far = viewport.far;
 
     input::init();
     input::add_device(new input::keyboard_mouse);
@@ -301,9 +295,6 @@ int main(int argc, char **argv)
 
     GX_SetZCompLoc(GX_FALSE);
     GX_SetLineWidth(16, GX_VTXFMT0);
-    player_pos.x = 0;
-    player_pos.y = -1000;
-    player_pos.z = 0;
     init_face_normals();
     PrepareTEV();
 
@@ -371,7 +362,7 @@ int main(int argc, char **argv)
         if (block)
             fog_light_multiplier = lerpf(fog_light_multiplier, std::pow(0.9f, (15.0f - block->sky_light)), 0.05f);
 
-        fog_depth_multiplier = lerpf(fog_depth_multiplier, std::min(std::max(player_pos.y, 24.f) / 36.f, 1.0f), 0.05f);
+        fog_depth_multiplier = lerpf(fog_depth_multiplier, std::min(std::max(camera.position.y, 24.) / 36., 1.0), 0.05f);
 
         float fog_multiplier = current_world->hell ? 0.5f : 1.0f;
         if (current_world->player.in_fluid == BlockID::lava)
@@ -401,7 +392,7 @@ int main(int argc, char **argv)
             current_world->tick();
         }
 
-        UpdateCamera(camera);
+        UpdateCamera();
 
         current_world->update();
 
@@ -570,36 +561,31 @@ void GetInput()
     if ((WPAD_ButtonsDown(0) & (WPAD_BUTTON_HOME | WPAD_CLASSIC_BUTTON_HOME)))
         isExiting = true;
 
-    vec3f left_stick = vec3f(0, 0, 0);
     vec3f right_stick = vec3f(0, 0, 0);
 
     for (input::device *dev : input::devices)
     {
         dev->scan();
         if (dev->connected())
-        {
-            left_stick = left_stick + dev->get_left_stick();
             right_stick = right_stick + dev->get_right_stick();
-        }
     }
-
     should_place_block = false;
     should_destroy_block = false;
 
     if (!gui::get_gui())
     {
+        entity_player_local *player = current_world->player.m_entity;
+        player->rotation.y -= right_stick.x * current_world->delta_time * input::sensitivity;
+        player->rotation.x += right_stick.y * current_world->delta_time * input::sensitivity;
 
-        yrot -= right_stick.x * current_world->delta_time * input::sensitivity;
-        xrot += right_stick.y * current_world->delta_time * input::sensitivity;
-
-        if (yrot > 360.f)
-            yrot -= 360.f;
-        if (yrot < 0)
-            yrot += 360.f;
-        if (xrot > 90.f)
-            xrot = 90.f;
-        if (xrot < -90.f)
-            xrot = -90.f;
+        if (player->rotation.y > 360.f)
+            player->rotation.y -= 360.f;
+        if (player->rotation.y < 0)
+            player->rotation.y += 360.f;
+        if (player->rotation.x > 90.f)
+            player->rotation.x = 90.f;
+        if (player->rotation.x < -90.f)
+            player->rotation.x = -90.f;
 
         bool left_shoulder_pressed = false;
         bool right_shoulder_pressed = false;
@@ -777,19 +763,10 @@ void DrawDebugInfo(gertex::GXView &viewport)
     gui::draw_text_with_shadow(0, viewport.ystart + 32, resolution_str + widescreen_str);
 }
 
-void Render(guVector chunkPos, void *buffer, u32 length)
+void UpdateCamera()
 {
-    if (!buffer || !length)
-        return;
-    transform_view(gertex::get_view_matrix(), chunkPos);
-    // Render
-    GX_CallDispList(buffer, length); // Draw the box
-}
-
-void UpdateCamera(camera_t &camera)
-{
+    camera_t &camera = get_camera();
     entity_player_local *player = current_world->player.m_entity;
-    player_pos = player->get_position(std::fmod(current_world->partial_ticks, 1));
 
     // View bobbing
     static float view_bob_angle = 0;
@@ -798,10 +775,10 @@ void UpdateCamera(camera_t &camera)
     vfloat_t view_bob_amount = 0.15;
 
     vec3f h_velocity = vec3f(player->velocity.x, 0, player->velocity.z);
-    view_bob_angle += h_velocity.magnitude();
+    view_bob_angle += h_velocity.magnitude() * current_world->delta_time * 60;
     if (h_velocity.sqr_magnitude() > 0.001 && player->on_ground)
     {
-        target_view_bob_offset = (vec3f(0, std::abs(std::sin(view_bob_angle)) * view_bob_amount * 2, 0) + angles_to_vector(0, yrot + 90) * std::cos(view_bob_angle) * view_bob_amount);
+        target_view_bob_offset = (vec3f(0, std::abs(std::sin(view_bob_angle)) * view_bob_amount * 2, 0) + angles_to_vector(0, player->rotation.y + 90) * std::cos(view_bob_angle) * view_bob_amount);
         target_view_bob_screen_offset = view_bob_amount * vec3f(std::sin(view_bob_angle), -std::abs(std::cos(view_bob_angle)), 0);
     }
     else
@@ -811,12 +788,8 @@ void UpdateCamera(camera_t &camera)
     }
     current_world->player.view_bob_offset = vec3f::lerp(current_world->player.view_bob_offset, target_view_bob_offset, 0.035);
     current_world->player.view_bob_screen_offset = vec3f::lerp(current_world->player.view_bob_screen_offset, target_view_bob_screen_offset, 0.035);
-    player_pos = current_world->player.view_bob_offset + player_pos;
-    camera.position = player_pos;
-    camera.rot.x = xrot;
-    camera.rot.y = yrot;
-    player->rotation.x = xrot;
-    player->rotation.y = yrot;
+    camera.position = current_world->player.view_bob_offset + player->get_position(std::fmod(current_world->partial_ticks, 1));
+    camera.rot = player->rotation;
 
     current_world->update_frustum(camera);
 }

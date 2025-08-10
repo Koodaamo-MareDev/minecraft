@@ -18,8 +18,6 @@
 #include "particle.hpp"
 #include "gertex/gertex.hpp"
 
-extern guVector player_pos;
-extern float xrot, yrot;
 extern uint8_t light_map[1024];
 
 struct plane_t
@@ -55,6 +53,8 @@ inline uint8_t get_face_light_index(vec3i pos, uint8_t face, chunk_t *near, bloc
     }
     return other_block->light;
 }
+
+camera_t &get_camera();
 
 void init_textures();
 

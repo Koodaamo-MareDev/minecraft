@@ -230,6 +230,15 @@ void replace_air_at(vec3i pos, BlockID id, chunk_t *near)
         block->set_blockid(id);
 }
 
+int32_t chunk_t::player_taxicab_distance()
+{
+    entity_player_local *player = current_world->player.m_entity;
+    if (!player)
+        return 0;
+    vec3f pos = player->get_position(0);
+    return std::abs((this->x << 4) - (int32_t(std::floor(pos.x)) & ~15)) + std::abs((this->z << 4) - (int32_t(std::floor(pos.z)) & ~15));
+}
+
 void chunk_t::update_height_map(vec3i pos)
 {
     pos.x &= 15;

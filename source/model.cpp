@@ -129,7 +129,8 @@ void model_t::render(vfloat_t distance, float partialTicks, bool transparency)
 {
     prepare();
     use_texture(texture);
-    transform_view(gertex::get_view_matrix(), vec3f(player_pos) * 2 - pos, vec3f(1), rot, false);
+    camera_t &camera = get_camera();
+    transform_view(gertex::get_view_matrix(), vec3f(camera.position) * 2 - pos, vec3f(1), rot, false);
     for (auto &box : boxes)
     {
         box->render();

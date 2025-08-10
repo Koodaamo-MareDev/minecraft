@@ -103,7 +103,7 @@ void world::tick()
         memory_usage += chunk ? chunk->size() : 0;
     }
 
-    m_sound_system.update(angles_to_vector(0, yrot + 90), player.m_entity->get_position(std::fmod(partial_ticks, 1)));
+    m_sound_system.update(angles_to_vector(0, get_camera().rot.y + 90), player.m_entity->get_position(std::fmod(partial_ticks, 1)));
 
     current_world->last_entity_tick = current_world->ticks;
 }
@@ -136,6 +136,7 @@ void world::update_frustum(camera_t &camera)
 void world::update_chunks()
 {
     int light_up_calls = 0;
+    float ypos = get_camera().position.y;
     for (chunk_t *&chunk : get_chunks())
     {
         if (chunk)
@@ -153,7 +154,7 @@ void world::update_chunks()
             // Tick chunks
             for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
             {
-                float vdistance = std::abs(j * 16 - player_pos.y);
+                float vdistance = std::abs(j * 16 - ypos);
                 if (!is_remote() && chunk->has_fluid_updates[j] && vdistance <= SIMULATION_DISTANCE * 16 && ticks - last_fluid_tick >= 5)
                     update_fluid_section(chunk, j);
             }
@@ -439,7 +440,7 @@ void world::calculate_visibility()
 
     std::deque<section_node> section_queue;
     std::deque<section *> visited;
-    vec3f fpos = player_pos;
+    vec3f fpos = get_camera().position;
     section_node entry;
     entry.sect = section_at(vec3i(int(fpos.x), int(fpos.y), int(fpos.z)));
 
@@ -523,7 +524,7 @@ void world::calculate_visibility()
 
 void world::edit_blocks()
 {
-    guVector forward = angles_to_vector(xrot, yrot);
+    camera_t &camera = get_camera();
 
     if (!player.selected_item)
         return;
@@ -537,7 +538,7 @@ void world::edit_blocks()
     block_t selected_block = block_t{uint8_t(player.selected_item->id & 0xFF), 0x7F, uint8_t(player.selected_item->meta & 0xFF)};
     bool finish_destroying = should_destroy_block && player.block_mine_progress >= 1.0f;
 
-    player.draw_block_outline = raycast_precise(vec3f(player_pos.x, player_pos.y, player_pos.z), vec3f(forward.x, forward.y, forward.z), 4, &player.raycast_pos, &player.raycast_face, player.block_bounds);
+    player.draw_block_outline = raycast_precise(camera.position, angles_to_vector(camera.rot.x, camera.rot.y), 4, &player.raycast_pos, &player.raycast_face, player.block_bounds);
     if (player.draw_block_outline)
     {
         BlockID new_blockid = finish_destroying ? BlockID::air : selected_block.get_blockid();
@@ -925,7 +926,7 @@ void world::draw_scene(bool opaque)
 
             // Apply the transformation for the block breaking animation
             vec3f adjusted_offset = vec3f(player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z) + vec3f(0.5);
-            vec3f towards_camera = vec3f(player_pos) - adjusted_offset;
+            vec3f towards_camera = vec3f(get_camera().position) - adjusted_offset;
             towards_camera.fast_normalize();
             towards_camera = towards_camera * 0.002;
 
@@ -953,7 +954,7 @@ void world::draw_scene(bool opaque)
         GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
         vec3f outline_pos = player.raycast_pos;
 
-        vec3f towards_camera = vec3f(player_pos) - outline_pos;
+        vec3f towards_camera = vec3f(get_camera().position) - outline_pos;
         towards_camera.fast_normalize();
         towards_camera = towards_camera * 0.002;
 

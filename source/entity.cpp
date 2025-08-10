@@ -1190,16 +1190,17 @@ void entity_player_local::tick()
 {
     if (!gui::get_gui())
     {
+        camera_t &camera = get_camera();
         for (input::device *dev : input::devices)
         {
             if (dev->connected())
             {
                 // Update the cursor position based on the left stick
                 vec3f left_stick = dev->get_left_stick();
-                movement.x = left_stick.x * sin(DegToRad(yrot + 90));
-                movement.z = left_stick.x * cos(DegToRad(yrot + 90));
-                movement.x -= left_stick.y * sin(DegToRad(yrot));
-                movement.z -= left_stick.y * cos(DegToRad(yrot));
+                movement.x = left_stick.x * sin(DegToRad(camera.rot.y + 90));
+                movement.z = left_stick.x * cos(DegToRad(camera.rot.y + 90));
+                movement.x -= left_stick.y * sin(DegToRad(camera.rot.y));
+                movement.z -= left_stick.y * cos(DegToRad(camera.rot.y));
                 movement.y = 0;
                 if (movement.magnitude() > 1)
                 {
@@ -1290,8 +1291,9 @@ void entity_player_mp::render(float partial_ticks, bool transparency)
         vec3f bg_size = vec3f(0.25);
         bg_size.x *= (text_width_3d(player_name) + 2) * 0.125;
         bg_size.y += 0.03125;
-        vec3f right_vec = -angles_to_vector(0, yrot + 90);
-        vec3f up_vec = -angles_to_vector(xrot + 90, yrot);
+        camera_t &camera = get_camera();
+        vec3f right_vec = -angles_to_vector(0, camera.rot.y + 90);
+        vec3f up_vec = -angles_to_vector(camera.rot.x + 90, camera.rot.y);
         draw_colored_sprite_3d(white_texture, vec3f(0, 2.375, 0), bg_size, vec3f(0, -0.03125 * 0.5, 0), right_vec, up_vec, 0, 0, 1, 1, GXColor{0, 0, 0, 0x3F});
 
         // Render partially transparent name tag (as seen behind walls)

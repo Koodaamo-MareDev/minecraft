@@ -26,8 +26,6 @@ enum class ChunkGenStage : uint8_t
     invalid = 0xFF,
 };
 
-extern guVector player_pos;
-
 inline vec2i block_to_chunk_pos(const vec3i &pos)
 {
     return vec2i((pos.x & ~0xF) >> 4, (pos.z & ~0xF) >> 4);
@@ -197,10 +195,7 @@ public:
         block->set_blockid(id);
     }
 
-    int32_t player_taxicab_distance()
-    {
-        return std::abs((this->x << 4) - (int32_t(std::floor(player_pos.x)) & ~15)) + std::abs((this->z << 4) - (int32_t(std::floor(player_pos.z)) & ~15));
-    }
+    int32_t player_taxicab_distance();
 
     bool operator<(chunk_t &other)
     {

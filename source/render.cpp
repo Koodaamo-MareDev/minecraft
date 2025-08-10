@@ -30,6 +30,19 @@ GXTexObj inventory_texture;
 water_texanim_t water_still_anim;
 lava_texanim_t lava_still_anim;
 
+camera_t &get_camera()
+{
+    static camera_t camera = {
+        {0.0, 0.0, 0.0},     // Camera rotation
+        {0.0, 0.0, 0.0},     // Camera position
+        90.0,                // Field of view
+        1.0,                 // Aspect ratio
+        gertex::CAMERA_NEAR, // Near clipping plane
+        gertex::CAMERA_FAR   // Far clipping plane
+    };
+    return camera;
+}
+
 void init_missing_texture(GXTexObj &texture)
 {
     void *texture_buf = memalign(32, 64); // 4x4 RGBA texture
@@ -651,6 +664,8 @@ void transform_view(gertex::GXMatrix view, guVector world_pos, guVector object_s
     Mtx objrotz;
     guVector axis; // Axis to rotate on
 
+    camera_t &camera = get_camera();
+
     // Reset matrices
     guMtxIdentity(model);
     guMtxIdentity(offset);
@@ -662,7 +677,7 @@ void transform_view(gertex::GXMatrix view, guVector world_pos, guVector object_s
 
     // Position the chunks on the screen
     guMtxTrans(offset, -world_pos.x, -world_pos.y, -world_pos.z);
-    guMtxTrans(posmtx, player_pos.x, player_pos.y, player_pos.z);
+    guMtxTrans(posmtx, camera.position.x, camera.position.y, camera.position.z);
 
     // Scale the object
     guMtxScale(scalemtx, object_scale.x, object_scale.y, object_scale.z);
@@ -686,11 +701,11 @@ void transform_view(gertex::GXMatrix view, guVector world_pos, guVector object_s
     axis.x = 1;
     axis.y = 0;
     axis.z = 0;
-    guMtxRotAxisDeg(rotx, &axis, xrot);
+    guMtxRotAxisDeg(rotx, &axis, camera.rot.x);
     axis.x = 0;
     axis.y = 1;
     axis.z = 0;
-    guMtxRotAxisDeg(roty, &axis, yrot);
+    guMtxRotAxisDeg(roty, &axis, camera.rot.y);
 
     // Apply matrices
     guMtxConcat(objrotz, objroty, objroty);
@@ -1141,10 +1156,12 @@ GXColor get_sky_color(bool cave_darkness)
     if (current_world && current_world->hell)
         return GXColor{0x20, 0, 0, 0xFF};
 
-    float elevation_brightness = std::pow(std::clamp((player_pos.y) * 0.03125f, 0.0f, 1.0f), 2.0f);
-    if (player_pos.y < -500.0f)
+    camera_t &camera = get_camera();
+
+    float elevation_brightness = std::pow(std::clamp((camera.position.y) * 0.03125, 0.0, 1.0), 2.0);
+    if (camera.position.y < -500.0)
     {
-        elevation_brightness = std::clamp((player_pos.y + 500.0f) / -250.0f, 0.0f, 1.0f);
+        elevation_brightness = std::clamp((camera.position.y + 500.0) / -250.0, 0.0, 1.0);
     }
     float sky_multiplier = get_sky_multiplier();
     float brightness = elevation_brightness * sky_multiplier;
@@ -1229,7 +1246,7 @@ void draw_sunrise()
     axis = {0, 0, 1};
     guMtxRotAxisDeg(mtx_tmp.mtx, &axis, celestial_angle > 0.5f ? 180.0f : 0.0f);
     guMtxConcat(mtx.mtx, mtx_tmp.mtx, mtx.mtx);
-    transform_view(mtx, player_pos);
+    transform_view(mtx, get_camera().position);
 
     uint8_t quality = 16;
     float centerX = 0.0f;
@@ -1281,7 +1298,7 @@ void draw_sky(GXColor background)
     guMtxRotAxisDeg(celestial_rotated_view.mtx, &axis, get_celestial_angle() * 360.0f);
     guMtxConcat(gertex::get_view_matrix().mtx, celestial_rotated_view.mtx, celestial_rotated_view.mtx);
 
-    transform_view(celestial_rotated_view, player_pos);
+    transform_view(celestial_rotated_view, get_camera().position);
     draw_stars();
     float size = 30.0f;
     float dist = 98.0f;
