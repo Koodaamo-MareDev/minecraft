@@ -44,7 +44,6 @@ configuration config;
 
 int frameCounter = 0;
 
-bool wiimote_ir_visible = false;
 u32 raw_wiimote_down = 0;
 int shoulder_btn_frame_counter = 0;
 bool should_destroy_block = false;
@@ -855,7 +854,7 @@ void UpdateGUI(gertex::GXView &viewport)
             cursor_y -= left_stick.y * 8;
 
             // Override the cursor position with the pointer position if applicable
-            if (dev->is_ir_visible())
+            if (dev->is_pointer_visible())
             {
                 // Since you can technically go out of bounds using a joystick, we need to clamp the cursor position; it'd be really annoying losing the cursor
                 cursor_x = std::clamp(cursor_x, 0, int(viewport.width / viewport.aspect_correction));
@@ -898,18 +897,20 @@ void DrawHUD(gertex::GXView &viewport)
     float pointer_x = 0.5f;
     float pointer_y = 0.5f;
 
+    bool pointer_visible = false;
+
     // Draw IR cursor if visible
     for (input::device *dev : input::devices)
     {
-        if (dev->is_ir_visible())
+        if (dev->is_pointer_visible())
         {
-            wiimote_ir_visible = true;
+            pointer_visible = true;
             pointer_x = dev->get_pointer_x();
             pointer_y = dev->get_pointer_y();
             break;
         }
     }
-    if (wiimote_ir_visible)
+    if (pointer_visible)
     {
         draw_textured_quad(icons_texture, pointer_x * viewport.width - 7, pointer_y * corrected_height - 3, 48, 48, 32, 32, 56, 56);
     }
@@ -991,8 +992,20 @@ void DrawGUI(gertex::GXView &viewport)
     if (!gui::get_gui()->use_cursor())
         return;
 
+    bool pointer_visible = false;
+
+    for (input::device *dev : input::devices)
+    {
+        if (dev->is_pointer_visible())
+        {
+            pointer_visible = true;
+            cursor_x = dev->get_pointer_x();
+            cursor_y = dev->get_pointer_y();
+        }
+    }
+
     // Draw the cursor
-    if (wiimote_ir_visible && !gui::get_gui()->contains(cursor_x, cursor_y))
+    if (pointer_visible && !gui::get_gui()->contains(cursor_x, cursor_y))
         draw_textured_quad(icons_texture, cursor_x - 7, cursor_y - 3, 32, 48, 32, 32, 48, 56);
     else
         draw_textured_quad(icons_texture, cursor_x - 16, cursor_y - 16, 32, 32, 0, 32, 32, 64);

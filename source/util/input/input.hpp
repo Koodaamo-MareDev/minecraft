@@ -53,16 +53,16 @@ namespace input
         virtual vec3f get_left_stick() const { return joysticks[JOY_LEFT]; }
         virtual vec3f get_right_stick() const { return joysticks[JOY_RIGHT]; }
         virtual vec3f get_aux_stick() const { return joysticks[JOY_AUX]; }
-        virtual bool is_ir_visible() const { return pointer_visible; }
-        virtual float get_pointer_x() const { return 0.5f; }
-        virtual float get_pointer_y() const { return 0.5f; }
+        virtual bool is_pointer_visible() const { return pointer_visible; }
+        virtual float get_pointer_x() const { return pointer_position.x; }
+        virtual float get_pointer_y() const { return pointer_position.y; }
         virtual bool connected() const { return false; } // Returns true if the device is connected, false otherwise
 
     protected:
         uint32_t buttons_held = 0;
         uint32_t buttons_down = 0;
         vec3f joysticks[3] = {vec3f(0), vec3f(0), vec3f(0)};
-        vec3f pointer_position = vec3f(0, 0, 0);
+        vec3f pointer_position = vec3f(0.5f, 0.5f, 0);
         bool pointer_visible = false;
     };
 

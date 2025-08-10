@@ -20,8 +20,8 @@ namespace input
         WPADData *data = WPAD_Data(0);
         if (data->exp.type == WPAD_EXP_NUNCHUK)
         {
-            buttons_down = data->btns_d;
-            buttons_held = data->btns_h;
+            buttons_down = 0;
+            buttons_held = 0;
 
             joysticks[JOY_LEFT].x = float(int(data->exp.nunchuk.js.pos.x) - int(data->exp.nunchuk.js.center.x)) * 2 / (int(data->exp.nunchuk.js.max.x) - 2 - int(data->exp.nunchuk.js.min.x));
             joysticks[JOY_LEFT].y = float(int(data->exp.nunchuk.js.pos.y) - int(data->exp.nunchuk.js.center.y)) * 2 / (int(data->exp.nunchuk.js.max.y) - 2 - int(data->exp.nunchuk.js.min.y));
@@ -34,8 +34,8 @@ namespace input
             }
 
             // Map the buttons
-            MAP_BUTTON(NUNCHUK_BUTTON_C, BUTTON_INVENTORY, data->exp.nunchuk.btns_held, buttons_held);
-            MAP_BUTTON(NUNCHUK_BUTTON_Z, BUTTON_PLACE, data->exp.nunchuk.btns_held, buttons_held);
+            MAP_BUTTON(WPAD_BUTTON_1, BUTTON_INVENTORY, data->btns_h, buttons_held);
+            MAP_BUTTON(WPAD_NUNCHUK_BUTTON_Z, BUTTON_PLACE, data->btns_h, buttons_held);
             MAP_BUTTON(WPAD_BUTTON_A, BUTTON_JUMP, data->btns_h, buttons_held);
             MAP_BUTTON(WPAD_BUTTON_B, BUTTON_MINE, data->btns_h, buttons_held);
             MAP_BUTTON(WPAD_BUTTON_DOWN, BUTTON_TOGGLE_SNEAK, data->btns_h, buttons_held);
@@ -45,6 +45,17 @@ namespace input
             MAP_BUTTON(WPAD_BUTTON_A, BUTTON_CONFIRM, data->btns_h, buttons_held);
             MAP_BUTTON(WPAD_BUTTON_B, BUTTON_CANCEL, data->btns_h, buttons_held);
 
+            MAP_BUTTON(WPAD_BUTTON_1, BUTTON_INVENTORY, data->btns_d, buttons_down);
+            MAP_BUTTON(WPAD_NUNCHUK_BUTTON_Z, BUTTON_PLACE, data->btns_d, buttons_down);
+            MAP_BUTTON(WPAD_BUTTON_A, BUTTON_JUMP, data->btns_d, buttons_down);
+            MAP_BUTTON(WPAD_BUTTON_B, BUTTON_MINE, data->btns_d, buttons_down);
+            MAP_BUTTON(WPAD_BUTTON_DOWN, BUTTON_TOGGLE_SNEAK, data->btns_d, buttons_down);
+            MAP_BUTTON(WPAD_BUTTON_2, BUTTON_TOGGLE_PAUSE, data->btns_d, buttons_down);
+            MAP_BUTTON(WPAD_BUTTON_MINUS, BUTTON_HOTBAR_LEFT, data->btns_d, buttons_down);
+            MAP_BUTTON(WPAD_BUTTON_PLUS, BUTTON_HOTBAR_RIGHT, data->btns_d, buttons_down);
+            MAP_BUTTON(WPAD_BUTTON_A, BUTTON_CONFIRM, data->btns_d, buttons_down);
+            MAP_BUTTON(WPAD_BUTTON_B, BUTTON_CANCEL, data->btns_d, buttons_down);
+
             // Handle IR pointer
             if (data->ir.valid)
             {
@@ -53,8 +64,8 @@ namespace input
                 pointer_position.x = data->ir.x / data->ir.vres[0];
                 pointer_position.y = data->ir.y / data->ir.vres[1];
 
-                joysticks[JOY_RIGHT].x = (data->ir.x - data->ir.vres[0]) - 0.5f;
-                joysticks[JOY_RIGHT].y = 0.5 - (data->ir.y - data->ir.vres[1]);
+                joysticks[JOY_RIGHT].x = (pointer_position.x - 0.5f) * 2; // Scale to [-1, 1]
+                joysticks[JOY_RIGHT].y = (pointer_position.y - 0.5f) * -2; // Scale to [-1, 1] and invert
 
                 if (joysticks[JOY_RIGHT].magnitude() < 0.125)
                 {
@@ -74,6 +85,8 @@ namespace input
             else
             {
                 pointer_visible = false;
+                joysticks[JOY_RIGHT].x = 0;
+                joysticks[JOY_RIGHT].y = 0;
             }
 
             if (joysticks[JOY_RIGHT].magnitude() > 1.0)

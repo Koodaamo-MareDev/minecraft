@@ -6,7 +6,6 @@
 
 extern int cursor_x;
 extern int cursor_y;
-extern bool wiimote_ir_visible;
 
 class gui_slot
 {
