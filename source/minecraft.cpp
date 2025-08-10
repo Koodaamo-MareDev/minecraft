@@ -21,13 +21,11 @@
 #include "util/input/wiimote_nunchuk.hpp"
 #include "util/input/wiimote_classic.hpp"
 #include "util/string_utils.hpp"
-#ifdef MONO_LIGHTING
+
 #include "light_day_mono_rgba.h"
 #include "light_night_mono_rgba.h"
-#else
 #include "light_day_rgba.h"
 #include "light_night_rgba.h"
-#endif
 
 #define DEFAULT_FIFO_SIZE (256 * 1024)
 
@@ -279,6 +277,8 @@ int main(int argc, char **argv)
     cursor_x = viewport.width / 2;
     cursor_y = viewport.height * viewport.aspect_correction / 2;
 
+    bool mono_lighting = ((int)config.get("mono_lighting", 0) != 0);
+
     bool vsync = ((int)config.get("vsync", 0) != 0);
 
     f32 FOV = config.get<float>("fov", 90.0f);
@@ -380,11 +380,7 @@ int main(int argc, char **argv)
         GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, BASE3D_POS_FRAC_BITS);
         if (!current_world->hell)
         {
-#ifdef MONO_LIGHTING
-            LightMapBlend(light_day_mono_rgba, light_night_mono_rgba, light_map, 255 - uint8_t(sky_multiplier * 255));
-#else
-            LightMapBlend(light_day_rgba, light_night_rgba, light_map, 255 - uint8_t(sky_multiplier * 255));
-#endif
+            LightMapBlend(mono_lighting ? light_day_mono_rgba : light_day_rgba, mono_lighting ? light_night_mono_rgba : light_night_rgba, light_map, 255 - uint8_t(sky_multiplier * 255));
             GX_SetArray(GX_VA_CLR0, light_map, 4 * sizeof(u8));
             GX_InvVtxCache();
         }
