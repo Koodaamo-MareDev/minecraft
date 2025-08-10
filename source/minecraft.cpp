@@ -208,17 +208,11 @@ int main(int argc, char **argv)
     VIDEO_SetBlack(FALSE);
     VIDEO_Flush();
     VIDEO_WaitVSync();
-    if (rmode->viTVMode & VI_NON_INTERLACE)
-        VIDEO_WaitVSync();
-    fb ^= 1;
 #ifdef DEBUG
     debug::init(rmode);
 #endif
     // Init the GPU
     GX_Init(gpfifo, DEFAULT_FIFO_SIZE);
-
-    // Clears the bg to color and clears the z buffer
-    GX_SetCopyClear(background, 0x00FFFFFF);
 
     // other gx setup
     GX_SetViewport(0, 0, rmode->fbWidth, rmode->efbHeight, 0, 1);
@@ -242,10 +236,7 @@ int main(int argc, char **argv)
     {
         GX_SetPixelFmt(GX_PF_RGBA6_Z24, GX_ZC_LINEAR);
     }
-    GX_CopyDisp(frameBuffer[fb], GX_TRUE);
     GX_SetDispCopyGamma(GX_GM_1_0);
-
-    GX_SetColorUpdate(GX_TRUE);
 
     // Setup the default vertex attribute table
     GX_ClearVtxDesc();
@@ -260,13 +251,7 @@ int main(int argc, char **argv)
 
     // Prepare TEV
     GX_SetNumChans(2);
-    GX_SetChanCtrl(GX_COLOR0, GX_DISABLE, GX_SRC_REG, GX_SRC_VTX, GX_LIGHTNULL, GX_DF_NONE, GX_AF_NONE);
-    GX_SetChanAmbColor(GX_COLOR0, GXColor{0, 0, 0, 255});
-    GX_SetChanMatColor(GX_COLOR0, GXColor{255, 255, 255, 255});
     GX_SetNumTexGens(1);
-
-    GX_InvVtxCache();
-    GX_InvalidateTexAll();
 
     init_textures();
     update_textures();
@@ -313,9 +298,7 @@ int main(int argc, char **argv)
 
     current_world->reset();
     current_world->seed = gettime();
-    VIDEO_Flush();
-    VIDEO_WaitVSync();
-    GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
+
     GX_SetZCompLoc(GX_FALSE);
     GX_SetLineWidth(16, GX_VTXFMT0);
     player_pos.x = 0;
@@ -364,8 +347,6 @@ int main(int argc, char **argv)
         }
     }
 
-    GX_SetArray(GX_VA_CLR0, light_map, 4 * sizeof(u8));
-
     while (!isExiting)
     {
         u64 frame_start = time_get();
@@ -377,13 +358,13 @@ int main(int argc, char **argv)
             gui::set_gui(dirtscreen);
             isExiting = true;
         }
-        GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, BASE3D_POS_FRAC_BITS);
+
         if (!current_world->hell)
         {
             LightMapBlend(mono_lighting ? light_day_mono_rgba : light_day_rgba, mono_lighting ? light_night_mono_rgba : light_night_rgba, light_map, 255 - uint8_t(sky_multiplier * 255));
-            GX_SetArray(GX_VA_CLR0, light_map, 4 * sizeof(u8));
-            GX_InvVtxCache();
         }
+        GX_SetArray(GX_VA_CLR0, light_map, 4 * sizeof(u8));
+        GX_InvVtxCache();
         background = get_sky_color();
 
         block_t *block = get_block_at(current_world->player.m_entity->get_head_blockpos());
