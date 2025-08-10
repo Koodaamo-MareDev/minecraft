@@ -1922,7 +1922,7 @@ namespace Crapper
     {
         try
         {
-            if (state == ConnectionState::HANDSHAKE || state == ConnectionState::PLAY)
+            if ((state == ConnectionState::HANDSHAKE || state == ConnectionState::PLAY) && is_connected())
             {
                 // Receive packets
                 receive(receive_buffer);
@@ -1937,11 +1937,11 @@ namespace Crapper
             switch (state)
             {
             case ConnectionState::CONNECT:
-                if (is_connected())
+            case ConnectionState::HANDSHAKE:
+                if (is_connected() && state == ConnectionState::CONNECT)
                 {
                     sendHandshake();
                     state = ConnectionState::HANDSHAKE;
-                    watchdog_timer = TIMEOUT_TICKS; // Reset watchdog timer
                 }
                 else
                 {
