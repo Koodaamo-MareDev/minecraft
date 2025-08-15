@@ -35,14 +35,11 @@ World::World()
     chdir(save_path.c_str());
 
     LightEngine::init();
-
-    player.m_entity = new EntityPlayerLocal(Vec3f(0, -999, 0));
 }
 
 World::~World()
 {
     LightEngine::deinit();
-    delete player.m_entity;
     if (chunk_provider)
         delete chunk_provider;
     if (frustum)
@@ -103,7 +100,7 @@ void World::tick()
         memory_usage += chunk ? chunk->size() : 0;
     }
 
-    m_sound_system.update(angles_to_vector(0, get_camera().rot.y + 90), player.m_entity->get_position(std::fmod(partial_ticks, 1)));
+    m_sound_system.update(angles_to_vector(0, get_camera().rot.y + 90), player.get_position(std::fmod(partial_ticks, 1)));
 
     current_world->last_entity_tick = current_world->ticks;
 }
@@ -536,16 +533,16 @@ void World::edit_blocks()
         return;
     }
     Block selected_block = Block{uint8_t(player.selected_item->id & 0xFF), 0x7F, uint8_t(player.selected_item->meta & 0xFF)};
-    bool finish_destroying = should_destroy_block && player.block_mine_progress >= 1.0f;
+    bool finish_destroying = should_destroy_block && player.mining_progress >= 1.0f;
 
-    player.draw_block_outline = raycast_precise(camera.position, angles_to_vector(camera.rot.x, camera.rot.y), 4, &player.raycast_pos, &player.raycast_face, player.block_bounds);
-    if (player.draw_block_outline)
+    player.raycast_target_found = raycast_precise(camera.position, angles_to_vector(camera.rot.x, camera.rot.y), 4, &player.raycast_target_pos, &player.raycast_target_face, player.raycast_target_bounds);
+    if (player.raycast_target_found)
     {
         BlockID new_blockid = finish_destroying ? BlockID::air : selected_block.get_blockid();
         if (finish_destroying || should_place_block)
         {
-            Block *targeted_block = get_block_at(player.raycast_pos);
-            Vec3i editable_pos = finish_destroying ? (player.raycast_pos) : (player.raycast_pos + player.raycast_face);
+            Block *targeted_block = get_block_at(player.raycast_target_pos);
+            Vec3i editable_pos = finish_destroying ? (player.raycast_target_pos) : (player.raycast_target_pos + player.raycast_target_face);
             Block *editable_block = get_block_at(editable_pos);
             if (editable_block)
             {
@@ -559,10 +556,10 @@ void World::edit_blocks()
                     {
                         bool same_as_target = targeted_block->get_blockid() == new_blockid;
 
-                        uint8_t new_meta = player.raycast_face.y == -1 ? 8 : 0;
+                        uint8_t new_meta = player.raycast_target_face.y == -1 ? 8 : 0;
                         new_meta ^= same_as_target;
 
-                        if (player.raycast_face.y != 0 && (new_meta ^ 8) == (targeted_block->meta & 8) && same_as_target)
+                        if (player.raycast_target_face.y != 0 && (new_meta ^ 8) == (targeted_block->meta & 8) && same_as_target)
                         {
                             targeted_block->set_blockid(BlockID(uint8_t(new_blockid) - 1));
                             targeted_block->meta = 0;
@@ -575,9 +572,9 @@ void World::edit_blocks()
                         else
                         {
                             editable_block->set_blockid(new_blockid);
-                            if (player.raycast_face.y == 0 && properties(targeted_blockid).m_render_type == RenderType::slab)
+                            if (player.raycast_target_face.y == 0 && properties(targeted_blockid).m_render_type == RenderType::slab)
                                 editable_block->meta = targeted_block->meta;
-                            else if (player.raycast_face.y == 0)
+                            else if (player.raycast_target_face.y == 0)
                                 editable_block->meta = new_meta;
                             else
                                 editable_block->meta = new_meta ^ same_as_target;
@@ -610,7 +607,7 @@ void World::edit_blocks()
                         // Send block destruction packet to the server
                         for (uint8_t face_num = 0; face_num < 6; face_num++)
                         {
-                            if (player.raycast_face == face_offsets[face_num])
+                            if (player.raycast_target_face == face_offsets[face_num])
                             {
                                 client->sendBlockDig(2, editable_pos.x, editable_pos.y, editable_pos.z, (face_num + 4) % 6);
                                 break;
@@ -627,9 +624,9 @@ void World::edit_blocks()
                     }
                     for (uint8_t face_num = 0; face_num < 6; face_num++)
                     {
-                        if (player.raycast_face == face_offsets[face_num])
+                        if (player.raycast_target_face == face_offsets[face_num])
                         {
-                            place_block(editable_pos, player.raycast_pos, &selected_block, face_num);
+                            place_block(editable_pos, player.raycast_target_pos, &selected_block, face_num);
                             break;
                         }
                     }
@@ -640,7 +637,7 @@ void World::edit_blocks()
 
     if (finish_destroying)
     {
-        player.block_mine_progress = 0.0f;
+        player.mining_progress = 0.0f;
         player.mining_tick = -6;
     }
 
@@ -650,8 +647,8 @@ void World::edit_blocks()
 
 int World::prepare_chunks(int count)
 {
-    const int center_x = (int(std::floor(player.m_entity->position.x)) >> 4);
-    const int center_z = (int(std::floor(player.m_entity->position.z)) >> 4);
+    const int center_x = (int(std::floor(player.position.x)) >> 4);
+    const int center_z = (int(std::floor(player.position.z)) >> 4);
     const int start_x = center_x - CHUNK_DISTANCE;
     const int start_z = center_z - CHUNK_DISTANCE;
 
@@ -757,9 +754,9 @@ void World::place_block(const Vec3i pos, const Vec3i targeted, Block *new_block,
     sound.pitch *= 0.8f;
     sound.position = Vec3f(pos.x, pos.y, pos.z);
     m_sound_system.play_sound(sound);
-    player.m_inventory[player.selected_hotbar_slot].count--;
-    if (player.m_inventory[player.selected_hotbar_slot].count == 0)
-        player.m_inventory[player.selected_hotbar_slot] = inventory::ItemStack();
+    player.items[player.selected_hotbar_slot].count--;
+    if (player.items[player.selected_hotbar_slot].count == 0)
+        player.items[player.selected_hotbar_slot] = inventory::ItemStack();
 
     if (is_remote())
         client->sendPlaceBlock(targeted.x, targeted.y, targeted.z, (face + 4) % 6, new_block->id, 1, new_block->meta);
@@ -906,10 +903,10 @@ void World::draw_scene(bool opaque)
         chunk->render_entities(partial_ticks, !opaque);
     }
 
-    if (player.draw_block_outline && should_destroy_block && player.mining_tick > 0)
+    if (player.raycast_target_found && should_destroy_block && player.mining_tick > 0)
     {
-        Chunk *targeted_chunk = get_chunk_from_pos(player.raycast_pos);
-        Block *targeted_block = targeted_chunk ? targeted_chunk->get_block(player.raycast_pos) : nullptr;
+        Chunk *targeted_chunk = get_chunk_from_pos(player.raycast_target_pos);
+        Block *targeted_block = targeted_chunk ? targeted_chunk->get_block(player.raycast_target_pos) : nullptr;
         if (targeted_block && targeted_block->get_blockid() != BlockID::air)
         {
             // Create a copy of the targeted block for rendering
@@ -925,7 +922,7 @@ void World::draw_scene(bool opaque)
             gertex::set_blending(gertex::GXBlendMode::multiply2);
 
             // Apply the transformation for the block breaking animation
-            Vec3f adjusted_offset = Vec3f(player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z) + Vec3f(0.5);
+            Vec3f adjusted_offset = Vec3f(player.raycast_target_pos.x, player.raycast_target_pos.y, player.raycast_target_pos.z) + Vec3f(0.5);
             Vec3f towards_camera = Vec3f(get_camera().position) - adjusted_offset;
             towards_camera.fast_normalize();
             towards_camera = towards_camera * 0.002;
@@ -933,7 +930,7 @@ void World::draw_scene(bool opaque)
             transform_view(gertex::get_view_matrix(), adjusted_offset + towards_camera);
 
             // Override texture index for the block breaking animation
-            override_texture_index(240 + (int)(player.block_mine_progress * 10.0f));
+            override_texture_index(240 + (int)(player.mining_progress * 10.0f));
 
             render_single_block(targeted_block_copy, !opaque);
 
@@ -949,49 +946,39 @@ void World::draw_scene(bool opaque)
     GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
 
     // Draw block outlines
-    if (!opaque && player.draw_block_outline)
+    if (!opaque && player.raycast_target_found)
     {
         GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
-        Vec3f outline_pos = player.raycast_pos;
+        Vec3f outline_pos = player.raycast_target_pos;
 
         Vec3f towards_camera = Vec3f(get_camera().position) - outline_pos;
         towards_camera.fast_normalize();
         towards_camera = towards_camera * 0.002;
 
-        Vec3f b_min = Vec3f(player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z) + Vec3f(1.0);
-        Vec3f b_max = Vec3f(player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z);
-        for (AABB &bounds : player.block_bounds)
-        {
-            b_min.x = std::min(bounds.min.x, b_min.x);
-            b_min.y = std::min(bounds.min.y, b_min.y);
-            b_min.z = std::min(bounds.min.z, b_min.z);
-
-            b_max.x = std::max(bounds.max.x, b_max.x);
-            b_max.y = std::max(bounds.max.y, b_max.y);
-            b_max.z = std::max(bounds.max.z, b_max.z);
-        }
+        Vec3f b_min = player.raycast_target_bounds.min;
+        Vec3f b_max = player.raycast_target_bounds.max;
         Vec3f floor_b_min = Vec3f(std::floor(b_min.x), std::floor(b_min.y), std::floor(b_min.z));
 
-        AABB block_outer_bounds;
-        block_outer_bounds.min = b_min - floor_b_min;
-        block_outer_bounds.max = b_max - floor_b_min;
+        AABB relative_target_bounds;
+        relative_target_bounds.min = b_min - floor_b_min;
+        relative_target_bounds.max = b_max - floor_b_min;
 
         transform_view(gertex::get_view_matrix(), floor_b_min + towards_camera);
 
         // Draw the block outline
-        draw_bounds(&block_outer_bounds);
+        draw_bounds(&relative_target_bounds);
     }
 }
 
 void World::draw_selected_block()
 {
-    player.selected_item = &player.m_inventory[player.selected_hotbar_slot];
+    player.selected_item = &player.items[player.selected_hotbar_slot];
     if (get_chunks().size() == 0 || !player.selected_item || player.selected_item->empty())
         return;
 
     uint8_t light_value = 0;
     // Get the block at the player's position
-    Block *view_block = get_block_at(current_world->player.m_entity->get_foot_blockpos());
+    Block *view_block = get_block_at(current_world->player.get_foot_blockpos());
     if (view_block)
     {
         // Set the light level of the selected block
@@ -1163,7 +1150,7 @@ void World::save()
         }
         NBTTagCompound level;
         NBTTagCompound *level_data = (NBTTagCompound *)level.setTag("Data", new NBTTagCompound());
-        player.m_entity->serialize((NBTTagCompound *)level_data->setTag("Player", new NBTTagCompound));
+        player.serialize((NBTTagCompound *)level_data->setTag("Player", new NBTTagCompound));
         level_data->setTag("Time", new NBTTagLong(ticks));
         level_data->setTag("SpawnX", new NBTTagInt(0));
         level_data->setTag("SpawnY", new NBTTagInt(skycast(Vec3i(0, 0, 0), nullptr)));
@@ -1245,7 +1232,7 @@ bool World::load()
     // Load the player data if it exists
     NBTTagCompound *player_tag = level_data->getCompound("Player");
     if (player_tag)
-        player.m_entity->deserialize(player_tag);
+        player.deserialize(player_tag);
 
     // Clean up
     delete level;
@@ -1288,9 +1275,7 @@ void World::reset()
     last_fluid_tick = 0;
     hell = false;
     set_remote(false);
-    if (player.m_entity)
-        player.m_entity->chunk = nullptr;
-    player.m_inventory.clear();
+    player = EntityPlayerLocal(Vec3f(0, -999, 0));
     for (Chunk *chunk : get_chunks())
     {
         if (chunk)
@@ -1363,7 +1348,7 @@ void World::update_player()
     if (is_remote())
     {
         // Only resolve collisions for the player entity - the server will handle the rest
-        if (player && player->chunk)
+        if (player && player.chunk)
         {
             // Resolve collisions with neighboring chunks' entities
             for (auto &&e : get_entities())
@@ -1391,18 +1376,18 @@ void World::update_player()
                     continue;
 
                 // Check if the entity is close enough (within a chunk) to the player and then resolve collision if it collides with the player
-                if (std::abs(entity->chunk->x - player->chunk->x) <= 1 && std::abs(entity->chunk->z - player->chunk->z) <= 1 && player->collides(entity))
+                if (std::abs(entity->chunk->x - player.chunk->x) <= 1 && std::abs(entity->chunk->z - player.chunk->z) <= 1 && player.collides(entity))
                 {
                     // Resolve the collision from the player's perspective
-                    player->resolve_collision(entity);
+                    player.resolve_collision(entity);
                 }
             }
         }
     }
 #endif
-    Vec3i block_pos = player.m_entity->get_head_blockpos();
+    Vec3i block_pos = player.get_head_blockpos();
     Block *block = get_block_at(block_pos);
-    if (block && properties(block->id).m_fluid && block_pos.y + 2 - get_fluid_height(block_pos, block->get_blockid(), player.m_entity->chunk) >= player.m_entity->aabb.min.y + player.m_entity->y_offset)
+    if (block && properties(block->id).m_fluid && block_pos.y + 2 - get_fluid_height(block_pos, block->get_blockid(), player.chunk) >= player.aabb.min.y + player.y_offset)
     {
         player.in_fluid = properties(block->id).m_base_fluid;
     }
@@ -1411,14 +1396,14 @@ void World::update_player()
         player.in_fluid = BlockID::air;
     }
 
-    if (should_destroy_block && player.block_mine_progress < 1.0f && player.draw_block_outline)
+    if (should_destroy_block && player.mining_progress < 1.0f && player.raycast_target_found)
     {
         static Block *last_targeted_block = nullptr;
-        Block *targeted_block = get_block_at(player.raycast_pos);
+        Block *targeted_block = get_block_at(player.raycast_target_pos);
         if (last_targeted_block != targeted_block)
         {
             // Reset the progress if the targeted block has changed
-            player.block_mine_progress = 0.0f;
+            player.mining_progress = 0.0f;
             last_targeted_block = targeted_block;
         }
 
@@ -1429,9 +1414,9 @@ void World::update_player()
                 // Send block dig packet to the server
                 for (uint8_t face_num = 0; face_num < 6; face_num++)
                 {
-                    if (player.raycast_face == face_offsets[face_num])
+                    if (player.raycast_target_face == face_offsets[face_num])
                     {
-                        client->sendBlockDig(0, player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z, (face_num + 4) % 6);
+                        client->sendBlockDig(0, player.raycast_target_pos.x, player.raycast_target_pos.y, player.raycast_target_pos.z, (face_num + 4) % 6);
                         break;
                     }
                 }
@@ -1454,7 +1439,7 @@ void World::update_player()
                     Sound sound = get_mine_sound(targeted_block->get_blockid());
                     sound.pitch *= 0.5f;
                     sound.volume = 0.15f;
-                    sound.position = Vec3f(player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z);
+                    sound.position = Vec3f(player.raycast_target_pos.x, player.raycast_target_pos.y, player.raycast_target_pos.z);
                     play_sound(sound);
 
                     // Add block breaking particles
@@ -1468,22 +1453,8 @@ void World::update_player()
                     int u = PARTICLE_X(texture_index);
                     int v = PARTICLE_Y(texture_index);
 
-                    // Calculate the bounds of the block to spawn particles around
-                    Vec3f b_min = Vec3f(player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z) + Vec3f(1.0, 1.0, 1.0);
-                    Vec3f b_max = Vec3f(player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z);
                     bool hitbox = false;
-                    for (AABB &bounds : player.block_bounds)
-                    {
-                        hitbox = true;
-                        b_min.x = std::min(bounds.min.x, b_min.x);
-                        b_min.y = std::min(bounds.min.y, b_min.y);
-                        b_min.z = std::min(bounds.min.z, b_min.z);
-
-                        b_max.x = std::max(bounds.max.x, b_max.x);
-                        b_max.y = std::max(bounds.max.y, b_max.y);
-                        b_max.z = std::max(bounds.max.z, b_max.z);
-                    }
-                    AABB block_outer_bounds = AABB(b_min, b_max);
+                    AABB &target_bounds = player.raycast_target_bounds;
                     javaport::Random rng;
 
                     for (int i = 0; hitbox && i < 8; i++)
@@ -1491,7 +1462,7 @@ void World::update_player()
                         // Randomize the particle position and velocity
                         Vec3f local_pos = Vec3f(rng.nextFloat(), rng.nextFloat(), rng.nextFloat());
 
-                        Vec3f pos = (block_outer_bounds.min + block_outer_bounds.max) * 0.5 + local_pos;
+                        Vec3f pos = (target_bounds.min + target_bounds.max) * 0.5 + local_pos;
 
                         // Put the particle at the edge of the block by rounding the position to the nearest block edge on a random axis
                         // This will ensure that the particles are spawned at the edges of the block
@@ -1509,9 +1480,9 @@ void World::update_player()
                             pos.z = std::round(pos.z);
                         }
                         // Force the particle within the bounds of the block
-                        pos.x = std::clamp(pos.x - 0.5, block_outer_bounds.min.x, block_outer_bounds.max.x) - 0.5;
-                        pos.y = std::clamp(pos.y - 0.5, block_outer_bounds.min.y, block_outer_bounds.max.y);
-                        pos.z = std::clamp(pos.z - 0.5, block_outer_bounds.min.z, block_outer_bounds.max.z) - 0.5;
+                        pos.x = std::clamp(pos.x - 0.5, target_bounds.min.x, target_bounds.max.x) - 0.5;
+                        pos.y = std::clamp(pos.y - 0.5, target_bounds.min.y, target_bounds.max.y);
+                        pos.z = std::clamp(pos.z - 0.5, target_bounds.min.z, target_bounds.max.z) - 0.5;
 
                         particle.position = pos;
 
@@ -1530,17 +1501,17 @@ void World::update_player()
                 }
 
                 // Increase the mining progress
-                player.block_mine_progress += properties(targeted_block->get_blockid()).get_break_multiplier(*player.selected_item, player.m_entity->on_ground, basefluid(player.in_fluid) == BlockID::water);
+                player.mining_progress += properties(targeted_block->get_blockid()).get_break_multiplier(*player.selected_item, player.on_ground, basefluid(player.in_fluid) == BlockID::water);
             }
             else
             {
-                player.block_mine_progress = 0.0f;
+                player.mining_progress = 0.0f;
             }
         }
     }
     else
     {
-        player.block_mine_progress = 0.0f;
+        player.mining_progress = 0.0f;
         if (player.mining_tick < 0)
             player.mining_tick++;
         else
@@ -1556,9 +1527,4 @@ void World::add_particle(const Particle &particle)
 void World::play_sound(const Sound &sound)
 {
     m_sound_system.play_sound(sound);
-}
-
-PlayerProperties::PlayerProperties()
-{
-    this->selected_item = &this->m_inventory[selected_hotbar_slot];
 }

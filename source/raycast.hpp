@@ -421,7 +421,7 @@ inline bool raycast_precise(
     float dst,
     Vec3i *output,
     Vec3i *output_face,
-    std::vector<AABB> &aabbs)
+    AABB &aabb)
 {
     // From "A Fast Voxel Traversal Algorithm for Ray Tracing"
     // by John Amanatides and Andrew Woo, 1987
@@ -482,7 +482,8 @@ inline bool raycast_precise(
     Vec3i maxvec = Vec3i(int(origin.x) + (dst + 1), int(origin.y) + (dst + 1), int(origin.z) + (dst + 1));
     Vec3i minvec = Vec3i(int(origin.x) - (dst + 1), int(origin.y) - (dst + 1), int(origin.z) - (dst + 1));
 
-    aabbs.clear();
+    std::vector<AABB> aabbs;
+
     while (true)
     {
         if (!(x < minvec.x || y < minvec.y || z < minvec.z || x >= maxvec.x || y >= maxvec.y || z >= maxvec.z))
@@ -514,6 +515,24 @@ inline bool raycast_precise(
                             if (raycast_aabb(origin, direction, dst, output, output_face, m_aabb))
                             {
                                 *output = block_pos;
+
+                                // Calculate bounding volume for all AABB's within
+                                Vec3f b_min = Vec3f(std::numeric_limits<vfloat_t>::max());
+                                Vec3f b_max = Vec3f(std::numeric_limits<vfloat_t>::lowest());
+                                for (AABB &bounds : aabbs)
+                                {
+                                    b_min.x = std::min(bounds.min.x, b_min.x);
+                                    b_min.y = std::min(bounds.min.y, b_min.y);
+                                    b_min.z = std::min(bounds.min.z, b_min.z);
+
+                                    b_max.x = std::max(bounds.max.x, b_max.x);
+                                    b_max.y = std::max(bounds.max.y, b_max.y);
+                                    b_max.z = std::max(bounds.max.z, b_max.z);
+                                }
+
+                                aabb.min = b_min;
+                                aabb.max = b_max;
+
                                 return true;
                             }
                         }

@@ -282,13 +282,13 @@ int main(int argc, char **argv)
     uint32_t dev_id = 0;
     ES_GetDeviceID(&dev_id);
 
-    EntityPlayerLocal *player_entity = current_world->player.m_entity;
+    EntityPlayerLocal &player_entity = current_world->player;
 
     // Use the username from the config or generate a default one
-    player_entity->player_name = std::string(config.get<std::string>("username", "Wii_" + std::to_string(dev_id)));
+    player_entity.player_name = std::string(config.get<std::string>("username", "Wii_" + std::to_string(dev_id)));
 
     // Add the player to the world - it should persist until the game is closed
-    add_entity(player_entity);
+    add_entity(&player_entity);
 
     current_world->reset();
     current_world->seed = gettime();
@@ -358,7 +358,7 @@ int main(int argc, char **argv)
         GX_InvVtxCache();
         background = get_sky_color();
 
-        Block *block = get_block_at(current_world->player.m_entity->get_head_blockpos());
+        Block *block = get_block_at(current_world->player.get_head_blockpos());
         if (block)
             fog_light_multiplier = lerpf(fog_light_multiplier, std::pow(0.9f, (15.0f - block->sky_light)), 0.05f);
 
@@ -495,7 +495,7 @@ void UpdateLoadingStatus()
 
         // Check if a 3x3 chunk area around the player is loaded
 
-        Vec3i player_chunk_pos = current_world->player.m_entity->get_foot_blockpos();
+        Vec3i player_chunk_pos = current_world->player.get_foot_blockpos();
 
         int min_y = std::max(0, (player_chunk_pos.y >> 4) - 1);
         int max_y = std::min(VERTICAL_SECTION_COUNT - 1, (player_chunk_pos.y >> 4) + 1);
@@ -574,18 +574,18 @@ void GetInput()
 
     if (!Gui::get_gui())
     {
-        EntityPlayerLocal *player = current_world->player.m_entity;
-        player->rotation.y -= right_stick.x * current_world->delta_time * input::sensitivity;
-        player->rotation.x += right_stick.y * current_world->delta_time * input::sensitivity;
+        EntityPlayerLocal &player = current_world->player;
+        player.rotation.y -= right_stick.x * current_world->delta_time * input::sensitivity;
+        player.rotation.x += right_stick.y * current_world->delta_time * input::sensitivity;
 
-        if (player->rotation.y > 360.f)
-            player->rotation.y -= 360.f;
-        if (player->rotation.y < 0)
-            player->rotation.y += 360.f;
-        if (player->rotation.x > 90.f)
-            player->rotation.x = 90.f;
-        if (player->rotation.x < -90.f)
-            player->rotation.x = -90.f;
+        if (player.rotation.y > 360.f)
+            player.rotation.y -= 360.f;
+        if (player.rotation.y < 0)
+            player.rotation.y += 360.f;
+        if (player.rotation.x > 90.f)
+            player.rotation.x = 90.f;
+        if (player.rotation.x < -90.f)
+            player.rotation.x = -90.f;
 
         bool left_shoulder_pressed = false;
         bool right_shoulder_pressed = false;
@@ -653,7 +653,7 @@ void HandleGUI(gertex::GXView &viewport)
                 }
                 else
                 {
-                    Gui::set_gui(new GuiSurvival(viewport, current_world->player.m_inventory));
+                    Gui::set_gui(new GuiSurvival(viewport, current_world->player.items));
                 }
             }
         }
@@ -673,7 +673,7 @@ void HandleGUI(gertex::GXView &viewport)
         pan_underwater_texture.x = std::fmod(pan_underwater_texture.x, viewport.width);
         pan_underwater_texture.y = std::fmod(pan_underwater_texture.y, corrected_height);
         static float vignette_strength = 0;
-        vignette_strength = lerpf(vignette_strength, 1.0f - (current_world->player.m_entity->light_level) / 15.0f, 0.01f);
+        vignette_strength = lerpf(vignette_strength, 1.0f - (current_world->player.light_level) / 15.0f, 0.01f);
         vignette_strength = std::clamp(vignette_strength, 0.0f, 1.0f);
         uint8_t vignette_alpha = 0xFF * vignette_strength;
         if (current_world->player.in_fluid == BlockID::water)
@@ -741,7 +741,7 @@ void DrawDebugInfo(gertex::GXView &viewport)
     last_frame_time = current_frame_time;
 
     std::string memory_usage_str = "Chunk Memory Usage: ";
-    
+
     // Get the current memory usage in bytes
     size_t memory_usage = current_world->memory_usage;
     if (memory_usage > 1024 * 1024)
@@ -766,7 +766,7 @@ void DrawDebugInfo(gertex::GXView &viewport)
 void UpdateCamera()
 {
     Camera &camera = get_camera();
-    EntityPlayerLocal *player = current_world->player.m_entity;
+    EntityPlayerLocal &player = current_world->player;
 
     // View bobbing
     static float view_bob_angle = 0;
@@ -774,11 +774,11 @@ void UpdateCamera()
     Vec3f target_view_bob_screen_offset;
     vfloat_t view_bob_amount = 0.15;
 
-    Vec3f h_velocity = Vec3f(player->velocity.x, 0, player->velocity.z);
+    Vec3f h_velocity = Vec3f(player.velocity.x, 0, player.velocity.z);
     view_bob_angle += h_velocity.magnitude() * current_world->delta_time * 60;
-    if (h_velocity.sqr_magnitude() > 0.001 && player->on_ground)
+    if (h_velocity.sqr_magnitude() > 0.001 && player.on_ground)
     {
-        target_view_bob_offset = (Vec3f(0, std::abs(std::sin(view_bob_angle)) * view_bob_amount * 2, 0) + angles_to_vector(0, player->rotation.y + 90) * std::cos(view_bob_angle) * view_bob_amount);
+        target_view_bob_offset = (Vec3f(0, std::abs(std::sin(view_bob_angle)) * view_bob_amount * 2, 0) + angles_to_vector(0, player.rotation.y + 90) * std::cos(view_bob_angle) * view_bob_amount);
         target_view_bob_screen_offset = view_bob_amount * Vec3f(std::sin(view_bob_angle), -std::abs(std::cos(view_bob_angle)), 0);
     }
     else
@@ -788,8 +788,8 @@ void UpdateCamera()
     }
     current_world->player.view_bob_offset = Vec3f::lerp(current_world->player.view_bob_offset, target_view_bob_offset, 0.035);
     current_world->player.view_bob_screen_offset = Vec3f::lerp(current_world->player.view_bob_screen_offset, target_view_bob_screen_offset, 0.035);
-    camera.position = current_world->player.view_bob_offset + player->get_position(std::fmod(current_world->partial_ticks, 1));
-    camera.rot = player->rotation;
+    camera.position = current_world->player.view_bob_offset + player.get_position(std::fmod(current_world->partial_ticks, 1));
+    camera.rot = player.rotation;
 
     current_world->update_frustum(camera);
 }
@@ -884,7 +884,7 @@ void DrawHUD(gertex::GXView &viewport)
     // Draw the hotbar items
     for (size_t i = 0; i < 9; i++)
     {
-        Gui::draw_item((viewport.width - 364) / 2 + i * 40 + 6, corrected_height - 38, current_world->player.m_inventory[i], viewport);
+        Gui::draw_item((viewport.width - 364) / 2 + i * 40 + 6, corrected_height - 38, current_world->player.items[i], viewport);
     }
 
     // Restore the orthogonal position matrix
@@ -895,7 +895,7 @@ void DrawHUD(gertex::GXView &viewport)
     GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
 
     // Draw the player's health above the hotbar. The texture size is 9x9 but they overlap by 1 pixel.
-    int health = current_world->player.m_entity->health;
+    int health = current_world->player.health;
 
     // Empty hearts
     for (int i = 0; i < 10; i++)

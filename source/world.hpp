@@ -18,29 +18,6 @@ class Camera;
 class ChunkProvider;
 class Frustum;
 
-class PlayerProperties
-{
-public:
-    EntityPlayerLocal *m_entity = nullptr;
-    BlockID in_fluid = BlockID::air;
-    Vec3f view_bob_offset = Vec3f(0, 0, 0);
-    Vec3f view_bob_screen_offset = Vec3f(0, 0, 0);
-
-    // Raycast related
-    Vec3i raycast_pos = Vec3i(0, 0, 0);
-    Vec3i raycast_face = Vec3i(0, 0, 0);
-    std::vector<AABB> block_bounds;
-    bool draw_block_outline = false;
-    float block_mine_progress = 0.0f;
-    int mining_tick = 0;
-
-    inventory::Container m_inventory = inventory::Container(40, 36); // 4 rows of 9 slots, the rest 4 are the armor slots
-    inventory::ItemStack *selected_item = nullptr;
-    int selected_hotbar_slot = 0;
-
-    PlayerProperties();
-};
-
 enum class SectionUpdatePhase : uint8_t
 {
     BLOCK_VISIBILITY = 0,   // Update visibility of blocks in a section
@@ -81,7 +58,7 @@ public:
     double delta_time = 0.0;
     double partial_ticks = 0.0;
     size_t memory_usage = 0;
-    PlayerProperties player;
+    EntityPlayerLocal player = EntityPlayerLocal(Vec3f(0, -999, 0));
     bool loaded = false;
     bool hell = false;
     int64_t seed = 0;

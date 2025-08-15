@@ -417,7 +417,7 @@ namespace Crapper
         // Send handshake packet
         ByteBuffer buffer;
         buffer.writeByte(0x02); // Packet ID
-        buffer.writeString(remote_world->player.m_entity->player_name);
+        buffer.writeString(remote_world->player.player_name);
         send(buffer);
 
         if (status != ErrorStatus::OK)
@@ -442,9 +442,9 @@ namespace Crapper
     {
         // Send login packet
         ByteBuffer buffer;
-        buffer.writeByte(0x01);                                         // Packet ID
-        buffer.writeInt(9);                                             // Protocol version
-        buffer.writeString(remote_world->player.m_entity->player_name); // Player name
+        buffer.writeByte(0x01);                               // Packet ID
+        buffer.writeInt(9);                                   // Protocol version
+        buffer.writeString(remote_world->player.player_name); // Player name
 
         // This is the password field which is not used by the vanilla server.
         // We can use it to indicate the server that we are a Wii client.
@@ -483,23 +483,20 @@ namespace Crapper
         debug::print("Player entity ID: %d\n", entity_id);
         debug::print("World seed: %lld\n", seed);
 
-        if (remote_world->player.m_entity)
+        if (remote_world->player.chunk)
         {
-            if (remote_world->player.m_entity->chunk)
-            {
-                debug::print("Player entity already exists in a chunk even though no chunks should be loaded yet. This must be a bug!!!\n");
-                status = ErrorStatus::ERROR;
-                return;
-            }
-
-            // Remove the old player entity
-            remove_entity(remote_world->player.m_entity->entity_id);
+            debug::print("Player entity already exists in a chunk even though no chunks should be loaded yet. This must be a bug!!!\n");
+            status = ErrorStatus::ERROR;
+            return;
         }
 
+        // Remove the old player entity
+        remove_entity(remote_world->player.entity_id);
+
         // Create a new player entity
-        remote_world->player.m_entity = new EntityPlayerLocal(Vec3f(0.5, -999, 0.5));
-        remote_world->player.m_entity->entity_id = entity_id;
-        add_entity(remote_world->player.m_entity);
+        remote_world->player = EntityPlayerLocal(Vec3f(0.5, -999, 0.5));
+        remote_world->player.entity_id = entity_id;
+        add_entity(&remote_world->player);
 
         if (!remote_world->loaded)
         {
@@ -596,13 +593,10 @@ namespace Crapper
     {
         // Read entity health
         int16_t health = buffer.readShort();
-        if (remote_world->player.m_entity)
+        remote_world->player.health = health;
+        if (health <= 0)
         {
-            remote_world->player.m_entity->health = health;
-            if (health <= 0)
-            {
-                sendRespawn();
-            }
+            sendRespawn();
         }
     }
 
@@ -643,11 +637,8 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        if (!remote_world->player.m_entity)
-            return;
-
-        remote_world->player.m_entity->teleport(Vec3f(x, y, z));
-        remote_world->player.m_entity->on_ground = on_ground;
+        remote_world->player.teleport(Vec3f(x, y, z));
+        remote_world->player.on_ground = on_ground;
     }
 
     void MinecraftClient::handlePlayerLook(ByteBuffer &buffer)
@@ -660,11 +651,8 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        if (!remote_world->player.m_entity)
-            return;
-
-        remote_world->player.m_entity->rotation = Vec3f(-pitch, -yaw, 0);
-        remote_world->player.m_entity->on_ground = on_ground;
+        remote_world->player.rotation = Vec3f(-pitch, -yaw, 0);
+        remote_world->player.on_ground = on_ground;
     }
 
     void MinecraftClient::handlePlayerPositionLook(ByteBuffer &buffer)
@@ -681,12 +669,9 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        if (!remote_world->player.m_entity)
-            return;
-
-        remote_world->player.m_entity->teleport(Vec3f(x, y, z));
-        remote_world->player.m_entity->rotation = Vec3f(-pitch, -yaw, 0);
-        remote_world->player.m_entity->on_ground = on_ground;
+        remote_world->player.teleport(Vec3f(x, y, z));
+        remote_world->player.rotation = Vec3f(-pitch, -yaw, 0);
+        remote_world->player.on_ground = on_ground;
 
         // Mirror the packet back to the server
         sendPlayerPositionLook();
@@ -716,48 +701,39 @@ namespace Crapper
 
     void MinecraftClient::sendPlayerPositionLook()
     {
-        if (!remote_world->player.m_entity)
-            return;
-
         // Send player position and look packet
         ByteBuffer buffer;
         buffer.writeByte(0x0D); // Packet ID
-        buffer.writeDouble(remote_world->player.m_entity->position.x);
-        buffer.writeDouble(remote_world->player.m_entity->aabb.min.y);
-        buffer.writeDouble(remote_world->player.m_entity->position.y);
-        buffer.writeDouble(remote_world->player.m_entity->position.z);
-        buffer.writeFloat(180 - remote_world->player.m_entity->rotation.y); // Yaw
-        buffer.writeFloat(-remote_world->player.m_entity->rotation.x);      // Pitch
-        buffer.writeBool(remote_world->player.m_entity->on_ground);
+        buffer.writeDouble(remote_world->player.position.x);
+        buffer.writeDouble(remote_world->player.aabb.min.y);
+        buffer.writeDouble(remote_world->player.position.y);
+        buffer.writeDouble(remote_world->player.position.z);
+        buffer.writeFloat(180 - remote_world->player.rotation.y); // Yaw
+        buffer.writeFloat(-remote_world->player.rotation.x);      // Pitch
+        buffer.writeBool(remote_world->player.on_ground);
         send(buffer);
     }
 
     void MinecraftClient::sendPlayerPosition()
     {
-        if (!remote_world->player.m_entity)
-            return;
-
         // Send player position packet
         ByteBuffer buffer;
         buffer.writeByte(0x0B); // Packet ID
-        buffer.writeDouble(remote_world->player.m_entity->position.x);
-        buffer.writeDouble(remote_world->player.m_entity->position.y);
-        buffer.writeDouble(remote_world->player.m_entity->position.z);
-        buffer.writeBool(remote_world->player.m_entity->on_ground);
+        buffer.writeDouble(remote_world->player.position.x);
+        buffer.writeDouble(remote_world->player.position.y);
+        buffer.writeDouble(remote_world->player.position.z);
+        buffer.writeBool(remote_world->player.on_ground);
         send(buffer);
     }
 
     void MinecraftClient::sendPlayerLook()
     {
-        if (!remote_world->player.m_entity)
-            return;
-
         // Send player look packet
         ByteBuffer buffer;
-        buffer.writeByte(0x0C);                                             // Packet ID
-        buffer.writeFloat(180 - remote_world->player.m_entity->rotation.y); // Yaw
-        buffer.writeFloat(-remote_world->player.m_entity->rotation.x);      // Pitch
-        buffer.writeBool(remote_world->player.m_entity->on_ground);
+        buffer.writeByte(0x0C);                                   // Packet ID
+        buffer.writeFloat(180 - remote_world->player.rotation.y); // Yaw
+        buffer.writeFloat(-remote_world->player.rotation.x);      // Pitch
+        buffer.writeBool(remote_world->player.on_ground);
         send(buffer);
     }
 
@@ -813,8 +789,8 @@ namespace Crapper
     {
         // Send player animation packet
         ByteBuffer buffer;
-        buffer.writeByte(0x12);                                    // Packet ID
-        buffer.writeInt(remote_world->player.m_entity->entity_id); // Entity ID
+        buffer.writeByte(0x12);                          // Packet ID
+        buffer.writeInt(remote_world->player.entity_id); // Entity ID
         buffer.writeByte(animation_id);
         send(buffer);
     }
@@ -1542,7 +1518,7 @@ namespace Crapper
             return;
         if (window_id == 0 && slot_id < 36 && slot_id >= 0)
         {
-            remote_world->player.m_inventory[slot_id] = item;
+            remote_world->player.items[slot_id] = item;
         }
     }
 
@@ -1587,7 +1563,7 @@ namespace Crapper
                 int slot_id = networkToClientSlot(i);
                 if (slot_id >= 0 && slot_id < 36)
                 {
-                    remote_world->player.m_inventory[slot_id] = items[i];
+                    remote_world->player.items[slot_id] = items[i];
                 }
             }
         }
@@ -1957,7 +1933,7 @@ namespace Crapper
                     sendPlayerPositionLook();
 
                 // Send the player's grounded status if it has changed
-                bool on_ground = remote_world->player.m_entity->on_ground;
+                bool on_ground = remote_world->player.on_ground;
                 if (on_ground != this->on_ground)
                     sendGrounded(on_ground);
 

@@ -642,7 +642,7 @@ void EntityCreeper::tick()
                     continue;
                 for (EntityPhysical *entity : curr_chunk->entities)
                 {
-                    if (entity && !entity->dead && entity == current_world->player.m_entity)
+                    if (entity && !entity->dead && dynamic_cast<EntityPlayer *>(entity))
                     {
                         Vec3f entity_position = entity->get_position(0);
                         Vec3f direction = entity_position - position;
@@ -865,10 +865,7 @@ void EntityItem::render(float partial_ticks, bool transparency)
     Vec3f item_rot = Vec3f(0, 0, 0);
 
     // Get the direction towards the player
-    if (current_world->player.m_entity)
-    {
-        item_rot.y = current_world->player.m_entity->rotation.y + 180;
-    }
+    item_rot.y = current_world->player.rotation.y + 180;
 
     // Lock the item rotation to the y-axis
     item_rot.x = 0;
@@ -935,7 +932,7 @@ void EntityItem::resolve_collision(EntityPhysical *b)
     if (!player)
         return;
 
-    inventory::ItemStack left_over = current_world->player.m_inventory.add(item_stack);
+    inventory::ItemStack left_over = current_world->player.items.add(item_stack);
     if (left_over.count)
     {
         if (left_over.count != item_stack.count)
@@ -956,7 +953,7 @@ void EntityItem::resolve_collision(EntityPhysical *b)
     {
         // Play the pop sound if the player picks up the stack
         pickup(b->get_position(0) - Vec3f(0, 0.5, 0));
-        
+
         if (Gui::get_gui())
             Gui::get_gui()->refresh();
     }
@@ -1151,7 +1148,7 @@ void EntityPlayer::hurt(uint16_t damage)
     EntityLiving::hurt(damage);
     javaport::Random rng;
     Sound sound = get_sound("random/hurt");
-    sound.position = current_world->player.m_entity->position;
+    sound.position = current_world->player.position;
     sound.volume = 0.5;
     sound.pitch = rng.nextFloat() * 0.4 + 0.8;
     current_world->play_sound(sound);

@@ -232,10 +232,8 @@ void replace_air_at(Vec3i pos, BlockID id, Chunk *near)
 
 int32_t Chunk::player_taxicab_distance()
 {
-    EntityPlayerLocal *player = current_world->player.m_entity;
-    if (!player)
-        return 0;
-    Vec3f pos = player->get_position(0);
+    EntityPlayerLocal &player = current_world->player;
+    Vec3f pos = player.get_position(0);
     return std::abs((this->x << 4) - (int32_t(std::floor(pos.x)) & ~15)) + std::abs((this->z << 4) - (int32_t(std::floor(pos.z)) & ~15));
 }
 

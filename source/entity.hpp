@@ -272,6 +272,22 @@ public:
 class EntityPlayerLocal : public EntityPlayer
 {
 public:
+    BlockID in_fluid = BlockID::air;
+
+    float mining_progress = 0.0f;
+    int mining_tick = 0;
+
+    Vec3f view_bob_offset = Vec3f(0, 0, 0);
+    Vec3f view_bob_screen_offset = Vec3f(0, 0, 0);
+
+    bool raycast_target_found = false;
+    Vec3i raycast_target_pos = Vec3i(0, 0, 0);
+    Vec3i raycast_target_face = Vec3i(0, 0, 0);
+    AABB raycast_target_bounds;
+
+    inventory::Container items = inventory::Container(40, 36); // 4 rows of 9 slots, the rest 4 are the armor slots
+    inventory::ItemStack *selected_item = nullptr;
+
     EntityPlayerLocal(const Vec3f &position);
 
     virtual void serialize(NBTTagCompound *result);
