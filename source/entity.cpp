@@ -999,7 +999,7 @@ void EntityExplosive::explode()
 void EntityLiving::hurt(uint16_t damage)
 {
     health -= damage;
-    if (health <= 0 && !current_world->is_remote())
+    if (health >= 0x8000 && !current_world->is_remote())
         dead = true;
 }
 
