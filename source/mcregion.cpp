@@ -7,7 +7,7 @@ uint32_t open_file_count = 0;
  * @param size The size of the block to allocate.
  * @param index The index of the chunk to allocate the block for - used for reallocation.
  */
-uint32_t mcr::region::allocate(uint32_t size, uint16_t index)
+uint32_t mcr::Region::allocate(uint32_t size, uint16_t index)
 {
     // If the size is greater than 1MB, return 0 as an error.
     if (size > 0x100000)
@@ -93,7 +93,7 @@ uint32_t mcr::region::allocate(uint32_t size, uint16_t index)
 /**
  * Opens the region file for reading and writing.
  */
-std::fstream &mcr::region::open()
+std::fstream &mcr::Region::open()
 {
     // Return the file if it is already open.
     if (file.is_open())
@@ -130,7 +130,7 @@ std::fstream &mcr::region::open()
 /**
  * Closes the region file.
  */
-void mcr::region::close()
+void mcr::Region::close()
 {
     // Close the file if it is open.
     if (file.is_open())
@@ -141,7 +141,7 @@ void mcr::region::close()
     }
 }
 
-bool mcr::region::is_open()
+bool mcr::Region::is_open()
 {
     return file.is_open();
 }
@@ -149,9 +149,9 @@ bool mcr::region::is_open()
 /**
  * Returns a reference to the deque of regions.
  */
-std::deque<mcr::region *> &mcr::get_regions()
+std::deque<mcr::Region *> &mcr::get_regions()
 {
-    static std::deque<mcr::region *> regions;
+    static std::deque<mcr::Region *> regions;
     return regions;
 }
 
@@ -160,10 +160,10 @@ std::deque<mcr::region *> &mcr::get_regions()
  * @param x The x coordinate of the region.
  * @param z The z coordinate of the region.
  */
-mcr::region *mcr::get_region(int32_t x, int32_t z)
+mcr::Region *mcr::get_region(int32_t x, int32_t z)
 {
     // Search for the region in the deque.
-    for (mcr::region *region : get_regions())
+    for (mcr::Region *region : get_regions())
     {
         if (region->x == x && region->z == z)
         {
@@ -176,7 +176,7 @@ mcr::region *mcr::get_region(int32_t x, int32_t z)
     // If the file does not exist, create a new region.
     if (!region_file.is_open())
     {
-        mcr::region *new_region = new mcr::region();
+        mcr::Region *new_region = new mcr::Region();
         new_region->x = x;
         new_region->z = z;
         get_regions().push_back(new_region);
@@ -184,7 +184,7 @@ mcr::region *mcr::get_region(int32_t x, int32_t z)
     }
 
     // Read the region file.
-    mcr::region *region = new mcr::region();
+    mcr::Region *region = new mcr::Region();
     region->x = x;
     region->z = z;
     region_file.read(reinterpret_cast<char *>(region->locations), sizeof(region->locations));
@@ -195,10 +195,10 @@ mcr::region *mcr::get_region(int32_t x, int32_t z)
     return region;
 }
 
-void mcr::close_redundant_region(mcr::region *exclude)
+void mcr::close_redundant_region(mcr::Region *exclude)
 {
     // Close the first region that is not the excluded region.
-    for (mcr::region *region : get_regions())
+    for (mcr::Region *region : get_regions())
     {
         if (region != exclude && region->is_open())
         {
@@ -210,7 +210,7 @@ void mcr::close_redundant_region(mcr::region *exclude)
 
 void mcr::cleanup()
 {
-    for (mcr::region *&region : mcr::get_regions())
+    for (mcr::Region *&region : mcr::get_regions())
     {
         region->close();
         delete region;

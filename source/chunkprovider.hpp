@@ -8,19 +8,19 @@
 #include "block_id.hpp"
 #include "ported/NoiseSynthesizer.hpp"
 
-class chunk_t;
+class Chunk;
 
-class chunkprovider
+class ChunkProvider
 {
 public:
-    chunkprovider() {};
-    virtual ~chunkprovider() {};
+    ChunkProvider() {};
+    virtual ~ChunkProvider() {};
 
-    virtual void provide_chunk(chunk_t *chunk)
+    virtual void provide_chunk(Chunk *chunk)
     {
     }
 
-    virtual void populate_chunk(chunk_t *chunk)
+    virtual void populate_chunk(Chunk *chunk)
     {
     }
 
@@ -29,25 +29,25 @@ protected:
     BlockID blocks[16 * 16 * WORLD_HEIGHT];
 };
 
-class chunkprovider_overworld : public chunkprovider
+class ChunkProviderOverworld : public ChunkProvider
 {
 public:
-    chunkprovider_overworld(uint64_t seed);
+    ChunkProviderOverworld(uint64_t seed);
 
-    virtual void provide_chunk(chunk_t *chunk);
-    virtual void populate_chunk(chunk_t *chunk);
+    virtual void provide_chunk(Chunk *chunk);
+    virtual void populate_chunk(Chunk *chunk);
 
 protected: 
-    void plant_tree(vec3i pos, int height, chunk_t *chunk);
-    void generate_trees(vec3i pos, chunk_t *chunk, javaport::Random &rng);
+    void plant_tree(Vec3i pos, int height, Chunk *chunk);
+    void generate_trees(Vec3i pos, Chunk *chunk, javaport::Random &rng);
     
-    void generate_flowers(vec3i pos, chunk_t *chunk, javaport::Random &rng);
+    void generate_flowers(Vec3i pos, Chunk *chunk, javaport::Random &rng);
     
-    void generate_vein(vec3i pos, BlockID id, chunk_t *chunk, javaport::Random &rng);
-    void generate_ore_type(vec3i pos, BlockID id, int count, int max_height, chunk_t *chunk, javaport::Random &rng);
-    void generate_ores(vec3i pos, chunk_t *chunk, javaport::Random &rng);
+    void generate_vein(Vec3i pos, BlockID id, Chunk *chunk, javaport::Random &rng);
+    void generate_ore_type(Vec3i pos, BlockID id, int count, int max_height, Chunk *chunk, javaport::Random &rng);
+    void generate_ores(Vec3i pos, Chunk *chunk, javaport::Random &rng);
     
-    void generate_features(chunk_t *chunk);
+    void generate_features(Chunk *chunk);
 };
 
 #endif

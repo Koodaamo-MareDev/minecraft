@@ -33,9 +33,9 @@
 void *frameBuffer[2] = {NULL, NULL};
 static GXRModeObj *rmode = NULL;
 
-world *current_world = nullptr;
+World *current_world = nullptr;
 
-configuration config;
+Configuration config;
 
 int frameCounter = 0;
 
@@ -183,7 +183,7 @@ int main(int argc, char **argv)
         init_fail("Failed to initialize FAT filesystem");
     try
     {
-        // Attempt to load the configuration file from the default location
+        // Attempt to load the Configuration file from the default location
         config.load();
     }
     catch (std::runtime_error &e)
@@ -265,24 +265,24 @@ int main(int argc, char **argv)
 
     f32 FOV = config.get<float>("fov", 90.0f);
 
-    camera_t &camera = get_camera();
+    Camera &camera = get_camera();
     camera.fov = FOV;
     camera.aspect = viewport.aspect / viewport.aspect_correction;
     camera.near = viewport.near;
     camera.far = viewport.far;
 
     input::init();
-    input::add_device(new input::keyboard_mouse);
-    input::add_device(new input::wiimote_nunchuk);
-    input::add_device(new input::wiimote_classic);
+    input::add_device(new input::KeyboardMouse);
+    input::add_device(new input::WiimoteNunchuk);
+    input::add_device(new input::WiimoteClassic);
 
-    current_world = new world;
+    current_world = new World;
 
     // Generate a "unique" username based on the device ID
     uint32_t dev_id = 0;
     ES_GetDeviceID(&dev_id);
 
-    entity_player_local *player_entity = current_world->player.m_entity;
+    EntityPlayerLocal *player_entity = current_world->player.m_entity;
 
     // Use the username from the config or generate a default one
     player_entity->player_name = std::string(config.get<std::string>("username", "Wii_" + std::to_string(dev_id)));
@@ -299,16 +299,16 @@ int main(int argc, char **argv)
     PrepareTEV();
 
     inventory::init_items();
-    gui::init_matrices(viewport.aspect_correction);
+    Gui::init_matrices(viewport.aspect_correction);
 
     gertex::GXFog fog = gertex::GXFog{true, gertex::GXFogType::linear, viewport.near, viewport.far, viewport.near, viewport.far, background};
 
     // Setup the loading screen
-    gui_dirtscreen *dirtscreen = new gui_dirtscreen(viewport);
+    GuiDirtscreen *dirtscreen = new GuiDirtscreen(viewport);
     dirtscreen->set_text("Loading level\n\n\nBuilding terrain");
-    gui::set_gui(dirtscreen);
+    Gui::set_gui(dirtscreen);
 
-    // Optionally join a server if the configuration specifies one
+    // Optionally join a server if the Configuration specifies one
     std::string server_ip = config.get<std::string>("server", "");
 
     if (!server_ip.empty() && Crapper::initNetwork())
@@ -344,9 +344,9 @@ int main(int argc, char **argv)
         float sky_multiplier = get_sky_multiplier();
         if (HWButton != -1)
         {
-            gui_dirtscreen *dirtscreen = new gui_dirtscreen(viewport);
+            GuiDirtscreen *dirtscreen = new GuiDirtscreen(viewport);
             dirtscreen->set_text("Saving level...");
-            gui::set_gui(dirtscreen);
+            Gui::set_gui(dirtscreen);
             isExiting = true;
         }
 
@@ -358,7 +358,7 @@ int main(int argc, char **argv)
         GX_InvVtxCache();
         background = get_sky_color();
 
-        block_t *block = get_block_at(current_world->player.m_entity->get_head_blockpos());
+        Block *block = get_block_at(current_world->player.m_entity->get_head_blockpos());
         if (block)
             fog_light_multiplier = lerpf(fog_light_multiplier, std::pow(0.9f, (15.0f - block->sky_light)), 0.05f);
 
@@ -495,7 +495,7 @@ void UpdateLoadingStatus()
 
         // Check if a 3x3 chunk area around the player is loaded
 
-        vec3i player_chunk_pos = current_world->player.m_entity->get_foot_blockpos();
+        Vec3i player_chunk_pos = current_world->player.m_entity->get_foot_blockpos();
 
         int min_y = std::max(0, (player_chunk_pos.y >> 4) - 1);
         int max_y = std::min(VERTICAL_SECTION_COUNT - 1, (player_chunk_pos.y >> 4) + 1);
@@ -506,8 +506,8 @@ void UpdateLoadingStatus()
         {
             for (int z = -1; z <= 1; z++)
             {
-                vec3i chunk_pos = player_chunk_pos + vec3i(x * 16, 0, z * 16);
-                chunk_t *chunk = get_chunk_from_pos(chunk_pos);
+                Vec3i chunk_pos = player_chunk_pos + Vec3i(x * 16, 0, z * 16);
+                Chunk *chunk = get_chunk_from_pos(chunk_pos);
                 if (!chunk || chunk->generation_stage != ChunkGenStage::done)
                 {
                     continue;
@@ -537,7 +537,7 @@ void UpdateLoadingStatus()
             loading_progress = 0;
         }
 
-        gui_dirtscreen *dirtscreen = dynamic_cast<gui_dirtscreen *>(gui::get_gui());
+        GuiDirtscreen *dirtscreen = dynamic_cast<GuiDirtscreen *>(Gui::get_gui());
         if (dirtscreen)
         {
             if (is_loading)
@@ -549,7 +549,7 @@ void UpdateLoadingStatus()
             {
                 // The world is loaded - remove the loading screen
                 current_world->loaded = true;
-                gui::set_gui(nullptr);
+                Gui::set_gui(nullptr);
             }
         }
     }
@@ -561,9 +561,9 @@ void GetInput()
     if ((WPAD_ButtonsDown(0) & (WPAD_BUTTON_HOME | WPAD_CLASSIC_BUTTON_HOME)))
         isExiting = true;
 
-    vec3f right_stick = vec3f(0, 0, 0);
+    Vec3f right_stick = Vec3f(0, 0, 0);
 
-    for (input::device *dev : input::devices)
+    for (input::Device *dev : input::devices)
     {
         dev->scan();
         if (dev->connected())
@@ -572,9 +572,9 @@ void GetInput()
     should_place_block = false;
     should_destroy_block = false;
 
-    if (!gui::get_gui())
+    if (!Gui::get_gui())
     {
-        entity_player_local *player = current_world->player.m_entity;
+        EntityPlayerLocal *player = current_world->player.m_entity;
         player->rotation.y -= right_stick.x * current_world->delta_time * input::sensitivity;
         player->rotation.x += right_stick.y * current_world->delta_time * input::sensitivity;
 
@@ -591,7 +591,7 @@ void GetInput()
         bool right_shoulder_pressed = false;
         bool hotbar_slot_changed = false;
 
-        for (input::device *dev : input::devices)
+        for (input::Device *dev : input::devices)
         {
             if (!dev->connected())
                 continue;
@@ -638,7 +638,7 @@ void GetInput()
 
 void HandleGUI(gertex::GXView &viewport)
 {
-    for (input::device *dev : input::devices)
+    for (input::Device *dev : input::devices)
     {
         if (!dev->connected())
             continue;
@@ -647,13 +647,13 @@ void HandleGUI(gertex::GXView &viewport)
         {
             if (current_world->loaded)
             {
-                if (gui::get_gui())
+                if (Gui::get_gui())
                 {
-                    gui::set_gui(nullptr);
+                    Gui::set_gui(nullptr);
                 }
                 else
                 {
-                    gui::set_gui(new gui_survival(viewport, current_world->player.m_inventory));
+                    Gui::set_gui(new GuiSurvival(viewport, current_world->player.m_inventory));
                 }
             }
         }
@@ -661,8 +661,8 @@ void HandleGUI(gertex::GXView &viewport)
     if (current_world->loaded)
     {
         // Draw the underwater overlay
-        static vec3f pan_underwater_texture(0, 0, 0);
-        for (input::device *dev : input::devices)
+        static Vec3f pan_underwater_texture(0, 0, 0);
+        for (input::Device *dev : input::devices)
         {
             if (!dev->connected())
                 continue;
@@ -681,7 +681,7 @@ void HandleGUI(gertex::GXView &viewport)
             draw_textured_quad(underwater_texture, pan_underwater_texture.x - viewport.width, pan_underwater_texture.y - viewport.height, viewport.width * 3, corrected_height * 3, 0, 0, 48, 48);
         }
         use_texture(vignette_texture);
-        draw_colored_sprite(vignette_texture, vec2i(0, 0), vec2i(viewport.width, corrected_height), 0, 0, 256, 256, GXColor{0xFF, 0xFF, 0xFF, vignette_alpha});
+        draw_colored_sprite(vignette_texture, Vec2i(0, 0), Vec2i(viewport.width, corrected_height), 0, 0, 256, 256, GXColor{0xFF, 0xFF, 0xFF, vignette_alpha});
 
         DrawHUD(viewport);
     }
@@ -756,38 +756,38 @@ void DrawDebugInfo(gertex::GXView &viewport)
     }
 
     // Display debug information
-    gui::draw_text_with_shadow(0, viewport.ystart, memory_usage_str);
-    gui::draw_text_with_shadow(0, viewport.ystart + 16, std::to_string(int(fps)) + " fps", fps_color(int(fps)));
+    Gui::draw_text_with_shadow(0, viewport.ystart, memory_usage_str);
+    Gui::draw_text_with_shadow(0, viewport.ystart + 16, std::to_string(int(fps)) + " fps", fps_color(int(fps)));
     std::string resolution_str = std::to_string(int(viewport.width)) + "x" + std::to_string(int(viewport.height));
     std::string widescreen_str = viewport.widescreen ? " Widescreen" : "";
-    gui::draw_text_with_shadow(0, viewport.ystart + 32, resolution_str + widescreen_str);
+    Gui::draw_text_with_shadow(0, viewport.ystart + 32, resolution_str + widescreen_str);
 }
 
 void UpdateCamera()
 {
-    camera_t &camera = get_camera();
-    entity_player_local *player = current_world->player.m_entity;
+    Camera &camera = get_camera();
+    EntityPlayerLocal *player = current_world->player.m_entity;
 
     // View bobbing
     static float view_bob_angle = 0;
-    vec3f target_view_bob_offset;
-    vec3f target_view_bob_screen_offset;
+    Vec3f target_view_bob_offset;
+    Vec3f target_view_bob_screen_offset;
     vfloat_t view_bob_amount = 0.15;
 
-    vec3f h_velocity = vec3f(player->velocity.x, 0, player->velocity.z);
+    Vec3f h_velocity = Vec3f(player->velocity.x, 0, player->velocity.z);
     view_bob_angle += h_velocity.magnitude() * current_world->delta_time * 60;
     if (h_velocity.sqr_magnitude() > 0.001 && player->on_ground)
     {
-        target_view_bob_offset = (vec3f(0, std::abs(std::sin(view_bob_angle)) * view_bob_amount * 2, 0) + angles_to_vector(0, player->rotation.y + 90) * std::cos(view_bob_angle) * view_bob_amount);
-        target_view_bob_screen_offset = view_bob_amount * vec3f(std::sin(view_bob_angle), -std::abs(std::cos(view_bob_angle)), 0);
+        target_view_bob_offset = (Vec3f(0, std::abs(std::sin(view_bob_angle)) * view_bob_amount * 2, 0) + angles_to_vector(0, player->rotation.y + 90) * std::cos(view_bob_angle) * view_bob_amount);
+        target_view_bob_screen_offset = view_bob_amount * Vec3f(std::sin(view_bob_angle), -std::abs(std::cos(view_bob_angle)), 0);
     }
     else
     {
-        target_view_bob_offset = vec3f(0);
-        target_view_bob_screen_offset = vec3f(0);
+        target_view_bob_offset = Vec3f(0);
+        target_view_bob_screen_offset = Vec3f(0);
     }
-    current_world->player.view_bob_offset = vec3f::lerp(current_world->player.view_bob_offset, target_view_bob_offset, 0.035);
-    current_world->player.view_bob_screen_offset = vec3f::lerp(current_world->player.view_bob_screen_offset, target_view_bob_screen_offset, 0.035);
+    current_world->player.view_bob_offset = Vec3f::lerp(current_world->player.view_bob_offset, target_view_bob_offset, 0.035);
+    current_world->player.view_bob_screen_offset = Vec3f::lerp(current_world->player.view_bob_screen_offset, target_view_bob_screen_offset, 0.035);
     camera.position = current_world->player.view_bob_offset + player->get_position(std::fmod(current_world->partial_ticks, 1));
     camera.rot = player->rotation;
 
@@ -796,15 +796,15 @@ void UpdateCamera()
 
 void UpdateGUI(gertex::GXView &viewport)
 {
-    if (!gui::get_gui())
+    if (!Gui::get_gui())
         return;
 
-    for (input::device *dev : input::devices)
+    for (input::Device *dev : input::devices)
     {
         if (dev->connected())
         {
             // Update the cursor position based on the left stick
-            vec3f left_stick = dev->get_left_stick();
+            Vec3f left_stick = dev->get_left_stick();
             cursor_x += left_stick.x * 8;
             cursor_y -= left_stick.y * 8;
 
@@ -817,7 +817,7 @@ void UpdateGUI(gertex::GXView &viewport)
             }
         }
     }
-    gui::get_gui()->update();
+    Gui::get_gui()->update();
 }
 
 void DrawHUD(gertex::GXView &viewport)
@@ -855,7 +855,7 @@ void DrawHUD(gertex::GXView &viewport)
     bool pointer_visible = false;
 
     // Draw IR cursor if visible
-    for (input::device *dev : input::devices)
+    for (input::Device *dev : input::devices)
     {
         if (dev->is_pointer_visible())
         {
@@ -884,7 +884,7 @@ void DrawHUD(gertex::GXView &viewport)
     // Draw the hotbar items
     for (size_t i = 0; i < 9; i++)
     {
-        gui::draw_item((viewport.width - 364) / 2 + i * 40 + 6, corrected_height - 38, current_world->player.m_inventory[i], viewport);
+        Gui::draw_item((viewport.width - 364) / 2 + i * 40 + 6, corrected_height - 38, current_world->player.m_inventory[i], viewport);
     }
 
     // Restore the orthogonal position matrix
@@ -918,7 +918,7 @@ void DrawHUD(gertex::GXView &viewport)
 
 void DrawGUI(gertex::GXView &viewport)
 {
-    gui *m_gui = gui::get_gui();
+    Gui *m_gui = Gui::get_gui();
     if (!m_gui)
         return;
 
@@ -935,7 +935,7 @@ void DrawGUI(gertex::GXView &viewport)
 
     // Draw the GUI elements
     m_gui->viewport = viewport;
-    gui::get_gui()->draw();
+    Gui::get_gui()->draw();
 
     // Restore the orthogonal position matrix
     gertex::pop_matrix();
@@ -944,12 +944,12 @@ void DrawGUI(gertex::GXView &viewport)
     // Enable direct colors
     GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
 
-    if (!gui::get_gui()->use_cursor())
+    if (!Gui::get_gui()->use_cursor())
         return;
 
     bool pointer_visible = false;
 
-    for (input::device *dev : input::devices)
+    for (input::Device *dev : input::devices)
     {
         if (dev->is_pointer_visible())
         {
@@ -960,7 +960,7 @@ void DrawGUI(gertex::GXView &viewport)
     }
 
     // Draw the cursor
-    if (pointer_visible && !gui::get_gui()->contains(cursor_x, cursor_y))
+    if (pointer_visible && !Gui::get_gui()->contains(cursor_x, cursor_y))
         draw_textured_quad(icons_texture, cursor_x - 7, cursor_y - 3, 32, 48, 32, 32, 48, 56);
     else
         draw_textured_quad(icons_texture, cursor_x - 16, cursor_y - 16, 32, 32, 0, 32, 32, 64);

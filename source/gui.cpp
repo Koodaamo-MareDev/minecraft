@@ -5,9 +5,9 @@
 gertex::GXMatrix gui_block_matrix;
 gertex::GXMatrix gui_item_matrix;
 
-gui *gui::current_gui = nullptr;
+Gui *Gui::current_gui = nullptr;
 
-void gui::init_matrices(float aspect_correction)
+void Gui::init_matrices(float aspect_correction)
 {
     // Prepare matrices for rendering GUI elements
     Mtx tmp_matrix;
@@ -28,7 +28,7 @@ void gui::init_matrices(float aspect_correction)
     guMtxTransApply(gui_item_matrix.mtx, gui_item_matrix.mtx, 0.0f, 0.0f, -10.0f);
 }
 
-int gui::text_width(std::string str)
+int Gui::text_width(std::string str)
 {
     int width = 0;
     int max_width = 0;
@@ -51,7 +51,7 @@ int gui::text_width(std::string str)
     return std::max(max_width, width);
 }
 
-void gui::draw_text(int x, int y, std::string str, GXColor color)
+void Gui::draw_text(int x, int y, std::string str, GXColor color)
 {
     // Enable direct colors
     GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
@@ -81,14 +81,14 @@ void gui::draw_text(int x, int y, std::string str, GXColor color)
         uint16_t cy = uint16_t(c >> 4) << 3;
 
         // Draw the character
-        draw_colored_sprite(font_texture, vec2i(x + x_offset, y + y_offset), vec2i(16, 16), cx, cy, cx + 8, cy + 8, color);
+        draw_colored_sprite(font_texture, Vec2i(x + x_offset, y + y_offset), Vec2i(16, 16), cx, cy, cx + 8, cy + 8, color);
 
         // Move the cursor to the next column
         x_offset += font_tile_widths[c] * 2;
     }
 }
 
-void gui::draw_text_with_shadow(int x, int y, std::string str, GXColor color)
+void Gui::draw_text_with_shadow(int x, int y, std::string str, GXColor color)
 {
     GXColor shadow = color * 0.25;
     shadow.a = color.a;
@@ -96,7 +96,7 @@ void gui::draw_text_with_shadow(int x, int y, std::string str, GXColor color)
     draw_text(x, y, str, color);
 }
 
-void gui::draw_item(int x, int y, inventory::item_stack stack, gertex::GXView &viewport)
+void Gui::draw_item(int x, int y, inventory::ItemStack stack, gertex::GXView &viewport)
 {
     if (stack.empty())
         return;
@@ -108,14 +108,14 @@ void gui::draw_item(int x, int y, inventory::item_stack stack, gertex::GXView &v
     GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
 
     // Draw the item
-    inventory::item item = stack.as_item();
+    inventory::Item item = stack.as_item();
     Mtx tmp_matrix;
 
     if (item.is_block())
     {
         use_texture(terrain_texture);
 
-        block_t block = {uint8_t(item.id & 0xFF), 0x7F, uint8_t(stack.meta & 0xFF), 0xF, 0xF};
+        Block block = {uint8_t(item.id & 0xFF), 0x7F, uint8_t(stack.meta & 0xFF), 0xF, 0xF};
 
         RenderType render_type = properties(item.id).m_render_type;
         if (!properties(item.id).m_fluid && (properties(item.id).m_nonflat || render_type == RenderType::full || render_type == RenderType::full_special || render_type == RenderType::slab))
@@ -161,22 +161,22 @@ void gui::draw_item(int x, int y, inventory::item_stack stack, gertex::GXView &v
     }
 }
 
-void gui::draw_container(int x, int y, inventory::container &container, gertex::GXView &viewport)
+void Gui::draw_container(int x, int y, inventory::Container &Container, gertex::GXView &viewport)
 {
-    for (size_t i = 0; i < container.size(); i++)
+    for (size_t i = 0; i < Container.size(); i++)
     {
-        draw_item(x + (i % 9) * 36, y + (i / 9) * 36, container[i], viewport);
+        draw_item(x + (i % 9) * 36, y + (i / 9) * 36, Container[i], viewport);
     }
 }
 
-inventory::item_stack gui_slot::interact(inventory::item_stack hand, bool right_click)
+inventory::ItemStack GuiSlot::interact(inventory::ItemStack hand, bool right_click)
 {
     // If the slot is empty, place the item in the slot
     if (item.empty())
     {
         // Do nothing if both the hand and the slot are empty
         if (hand.empty())
-            return inventory::item_stack();
+            return inventory::ItemStack();
 
         if (right_click)
         {
@@ -185,14 +185,14 @@ inventory::item_stack gui_slot::interact(inventory::item_stack hand, bool right_
             item.count = 1;
             hand.count--;
             if (hand.empty())
-                return inventory::item_stack();
+                return inventory::ItemStack();
             return hand;
         }
         else
         {
             // Left click to place the entire stack
             item = hand;
-            return inventory::item_stack();
+            return inventory::ItemStack();
         }
     }
 
@@ -229,7 +229,7 @@ inventory::item_stack gui_slot::interact(inventory::item_stack hand, bool right_
         }
 
         // Return an empty stack
-        return inventory::item_stack();
+        return inventory::ItemStack();
     }
 
     // Take half of the stack if right clicking with an empty hand
@@ -242,7 +242,7 @@ inventory::item_stack gui_slot::interact(inventory::item_stack hand, bool right_
     }
 
     // Swap the stacks - in this case it doesn't matter if it's a right or left click
-    inventory::item_stack temp = item;
+    inventory::ItemStack temp = item;
     item = hand;
     return temp;
 }

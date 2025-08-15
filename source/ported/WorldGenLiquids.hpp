@@ -10,7 +10,7 @@ namespace javaport
     public:
         BlockID liquid;
         WorldGenLiquids(BlockID liquid) : liquid(liquid) {}
-        bool generate(Random &rng, vec3i pos);
+        bool generate(Random &rng, Vec3i pos);
     };
 }
 

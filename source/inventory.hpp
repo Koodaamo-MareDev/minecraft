@@ -10,7 +10,7 @@
 
 #include "block_id.hpp"
 
-class entity_physical;
+class EntityPhysical;
 
 namespace inventory
 {
@@ -36,12 +36,12 @@ namespace inventory
         diamond,
     };
 
-    class item;
-    void default_on_use(item &item, vec3i pos, vec3i face, entity_physical *entity);
+    class Item;
+    void default_on_use(Item &item, Vec3i pos, Vec3i face, EntityPhysical *entity);
 
     void init_items();
 
-    class item
+    class Item
     {
     public:
         uint16_t id = 0;
@@ -51,9 +51,9 @@ namespace inventory
         tool_tier tier = wood;
         float efficiency = 1.0f;
         int32_t damage = 0;
-        std::function<void(item &, vec3i, vec3i, entity_physical *)> on_use = default_on_use;
+        std::function<void(Item &, Vec3i, Vec3i, EntityPhysical *)> on_use = default_on_use;
 
-        item(uint16_t id = 0, uint8_t max_stack = 64, std::function<void(item &, vec3i, vec3i, entity_physical *)> on_use = default_on_use) : id(id), max_stack(max_stack), on_use(on_use) {}
+        Item(uint16_t id = 0, uint8_t max_stack = 64, std::function<void(Item &, Vec3i, Vec3i, EntityPhysical *)> on_use = default_on_use) : id(id), max_stack(max_stack), on_use(on_use) {}
 
         bool is_block() const
         {
@@ -63,19 +63,19 @@ namespace inventory
         float get_efficiency(BlockID block_id, tool_type type, tool_tier tier) const;
     };
 
-    extern item item_list[512];
+    extern Item item_list[512];
 
-    class item_stack
+    class ItemStack
     {
     public:
         uint16_t id;
         uint8_t count;
         uint16_t meta;
 
-        item_stack(uint16_t id = 0, uint8_t count = 0, uint16_t meta = 0) : id(id), count(count), meta(meta) {}
-        item_stack(BlockID id, uint8_t count = 0, uint16_t meta = 0) : id(uint8_t(id)), count(count), meta(meta) {}
+        ItemStack(uint16_t id = 0, uint8_t count = 0, uint16_t meta = 0) : id(id), count(count), meta(meta) {}
+        ItemStack(BlockID id, uint8_t count = 0, uint16_t meta = 0) : id(uint8_t(id)), count(count), meta(meta) {}
 
-        item &as_item() const
+        Item &as_item() const
         {
             return item_list[id & 0x1FF];
         }
@@ -93,14 +93,14 @@ namespace inventory
         }
     };
 
-    class container
+    class Container
     {
     private:
-        std::vector<item_stack> stacks;
+        std::vector<ItemStack> stacks;
         uint32_t usable_slots;
 
     public:
-        container(size_t size, uint32_t usable_slots) : usable_slots(usable_slots)
+        Container(size_t size, uint32_t usable_slots) : usable_slots(usable_slots)
         {
             if (size < usable_slots)
             {
@@ -108,9 +108,9 @@ namespace inventory
             }
             stacks.resize(size);
         }
-        container(size_t size) : container(size, size) {}
+        Container(size_t size) : Container(size, size) {}
 
-        item_stack &operator[](size_t index)
+        ItemStack &operator[](size_t index)
         {
             if (index >= stacks.size())
             {
@@ -120,7 +120,7 @@ namespace inventory
         }
 
         /**
-         * Clears the container i.e. sets all item_stacks to empty
+         * Clears the Container i.e. sets all item_stacks to empty
          */
         void clear();
 
@@ -135,19 +135,19 @@ namespace inventory
         size_t count();
 
         /**
-         * Adds the item_stack to the container
+         * Adds the item_stack to the Container
          * If there's no space, it will return the remaining stack.
          * @param stack the item_stack to add
          * @return the remaining stack
          */
-        item_stack add(item_stack stack);
+        ItemStack add(ItemStack stack);
 
         /**
          * Inserts the item_stack at the specified index
          * @param stack the item_stack to insert
          * @param index the index to insert the item_stack
          */
-        void replace(item_stack stack, size_t index);
+        void replace(ItemStack stack, size_t index);
 
         /**
          * Places the item at the specified index
@@ -156,7 +156,7 @@ namespace inventory
          * @param item the item to place
          * @param index the index to place the item
          */
-        item_stack place(item_stack item, size_t index);
+        ItemStack place(ItemStack item, size_t index);
     };
 } // namespace inventory
 #endif

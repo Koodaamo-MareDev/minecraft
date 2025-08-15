@@ -11,27 +11,27 @@ namespace inventory
         item_list[257].texture_index = 98;
     }
 
-    item item_list[512];
+    Item item_list[512];
 
-    void default_on_use(item &item, vec3i pos, vec3i face, entity_physical *entity)
+    void default_on_use(Item &item, Vec3i pos, Vec3i face, EntityPhysical *entity)
     {
         // Do nothing
     }
 
-    void container::clear()
+    void Container::clear()
     {
         for (size_t i = 0; i < size(); i++)
         {
-            stacks[i] = item_stack();
+            stacks[i] = ItemStack();
         }
     }
 
-    size_t container::size()
+    size_t Container::size()
     {
         return stacks.size();
     }
 
-    size_t container::count()
+    size_t Container::count()
     {
         size_t count = 0;
         for (size_t i = 0; i < size(); i++)
@@ -44,12 +44,12 @@ namespace inventory
         return count;
     }
 
-    item_stack container::add(item_stack stack)
+    ItemStack Container::add(ItemStack stack)
     {
         // Search for stacks with the same id and meta
         for (size_t i = 0; i < size() && i < usable_slots; i++)
         {
-            item_stack &current = stacks[i];
+            ItemStack &current = stacks[i];
             size_t max_stack = current.as_item().max_stack;
 
             // Skip full stacks
@@ -68,7 +68,7 @@ namespace inventory
                     current.count = max_stack;
                     continue;
                 }
-                return item_stack();
+                return ItemStack();
             }
         }
 
@@ -78,7 +78,7 @@ namespace inventory
             if (stacks[i].empty())
             {
                 stacks[i] = stack;
-                return item_stack();
+                return ItemStack();
             }
         }
 
@@ -86,7 +86,7 @@ namespace inventory
         return stack;
     }
 
-    void container::replace(item_stack stack, size_t index)
+    void Container::replace(ItemStack stack, size_t index)
     {
         if (index < size())
         {
@@ -94,17 +94,17 @@ namespace inventory
         }
     }
 
-    item_stack container::place(item_stack stack, size_t index)
+    ItemStack Container::place(ItemStack stack, size_t index)
     {
         if (index < size())
         {
-            item_stack &orig = stacks[index];
+            ItemStack &orig = stacks[index];
 
             // If the stack is empty, just place the stack
             if (orig.id == 0)
             {
                 orig = stack;
-                return item_stack();
+                return ItemStack();
             }
 
             // If the stack is the same, add the stack
@@ -123,11 +123,11 @@ namespace inventory
                 }
 
                 // Return an empty stack
-                return item_stack();
+                return ItemStack();
             }
 
             // Swap the stacks
-            item_stack temp = orig;
+            ItemStack temp = orig;
             orig = stack;
             return temp;
         }
@@ -136,7 +136,7 @@ namespace inventory
         return stack;
     }
 
-    float item::get_efficiency(BlockID block_id, tool_type block_tool_type, tool_tier block_tool_tier) const
+    float Item::get_efficiency(BlockID block_id, tool_type block_tool_type, tool_tier block_tool_tier) const
     {
         // Swords have a fixed efficiency
         if (tool == tool_type::sword)

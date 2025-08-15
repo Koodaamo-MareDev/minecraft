@@ -4,8 +4,8 @@
 #include <cstdint>
 #include <math/vec3i.hpp>
 
-class chunk_t;
-class block_t;
-int render_fluid(chunk_t &chunk, block_t *block, const vec3i &pos);
-int render_section_fluids(chunk_t &chunk, int index, bool transparent, int vertexCount);
+class Chunk;
+class Block;
+int render_fluid(Chunk &chunk, Block *block, const Vec3i &pos);
+int render_section_fluids(Chunk &chunk, int index, bool transparent, int vertexCount);
 #endif

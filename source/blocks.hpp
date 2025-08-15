@@ -11,8 +11,8 @@
 
 #define FLUID_UPDATE_REQUIRED_FLAG 0x10
 #define FLOAT_TO_FLUIDMETA(A) (int(roundf((A)*8)))
-class block_t;
-class chunk_t;
+class Block;
+class Chunk;
 
 int8_t get_block_opacity(BlockID blockid);
 
@@ -20,21 +20,21 @@ uint8_t get_block_luminance(BlockID block_id);
 
 void override_texture_index(int32_t texture_index);
 uint32_t get_default_texture_index(BlockID blockid);
-uint32_t get_face_texture_index(block_t *block, int face);
+uint32_t get_face_texture_index(Block *block, int face);
 
 bool is_solid(BlockID block_id);
-void update_fluid(block_t *block, vec3i pos, chunk_t *near = nullptr);
-void set_fluid_level(block_t *block, uint8_t level);
-uint8_t get_fluid_meta_level(block_t *block);
-uint8_t get_fluid_visual_level(vec3i pos, BlockID block_id, chunk_t *near = nullptr);
+void update_fluid(Block *block, Vec3i pos, Chunk *near = nullptr);
+void set_fluid_level(Block *block, uint8_t level);
+uint8_t get_fluid_meta_level(Block *block);
+uint8_t get_fluid_visual_level(Vec3i pos, BlockID block_id, Chunk *near = nullptr);
 
 bool is_fluid_overridable(BlockID id);
 float get_percent_air(int fluid_level);
-float get_fluid_height(vec3i pos, BlockID block_type, chunk_t *near = nullptr);
+float get_fluid_height(Vec3i pos, BlockID block_type, Chunk *near = nullptr);
 
-sound get_step_sound(BlockID block_id);
-sound get_mine_sound(BlockID block_id);
-sound get_break_sound(BlockID block_id);
+Sound get_step_sound(BlockID block_id);
+Sound get_mine_sound(BlockID block_id);
+Sound get_break_sound(BlockID block_id);
 
 inline bool is_flowing_fluid(BlockID id)
 {

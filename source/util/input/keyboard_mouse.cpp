@@ -7,7 +7,7 @@ namespace input
     static uint8_t joystick_src_mouse_move;
     static uint8_t joystick_src_mouse_scroll;
 
-    void keyboard_mouse::init()
+    void KeyboardMouse::init()
     {
         if (initialized)
             return;
@@ -23,13 +23,13 @@ namespace input
         initialized = true;
     }
 
-    keyboard_mouse::keyboard_mouse()
+    KeyboardMouse::KeyboardMouse()
     {
         init();
         KEYBOARD_Init(NULL);
         MOUSE_Init();
 
-        // Load joystick bindings from configuration
+        // Load joystick bindings from Configuration
         for (const auto &pair : string_joystick_dst_mapping)
         {
             std::string binding = config.get<std::string>(pair.first, "");
@@ -45,7 +45,7 @@ namespace input
             }
         }
 
-        // Initialize button map from configuration
+        // Initialize button map from Configuration
         for (const auto &pair : string_button_mapping)
         {
             std::string binding = config.get<std::string>(pair.first, "");
@@ -75,18 +75,18 @@ namespace input
         }
     }
 
-    keyboard_mouse::~keyboard_mouse()
+    KeyboardMouse::~KeyboardMouse()
     {
         KEYBOARD_Deinit();
         MOUSE_Deinit();
     }
 
-    void keyboard_mouse::scan()
+    void KeyboardMouse::scan()
     {
         buttons_down = 0;
-        joysticks[JOY_LEFT] = vec3f(0);
-        joysticks[JOY_RIGHT] = vec3f(0);
-        joysticks[JOY_AUX] = vec3f(0);
+        joysticks[JOY_LEFT] = Vec3f(0);
+        joysticks[JOY_RIGHT] = Vec3f(0);
+        joysticks[JOY_AUX] = Vec3f(0);
 
         // Get keyboard events
         keyboard_event event;
@@ -104,9 +104,9 @@ namespace input
                 debug::print("Keyboard disconnected\n");
                 buttons_down = 0;
                 buttons_held = 0;
-                joysticks[JOY_LEFT] = vec3f(0);
-                joysticks[JOY_RIGHT] = vec3f(0);
-                joysticks[JOY_AUX] = vec3f(0);
+                joysticks[JOY_LEFT] = Vec3f(0);
+                joysticks[JOY_RIGHT] = Vec3f(0);
+                joysticks[JOY_AUX] = Vec3f(0);
                 break;
             case KEYBOARD_PRESSED:
                 debug::print("Key pressed: %d\n", event.keycode);
@@ -165,7 +165,7 @@ namespace input
                 }
 
                 // Process mouse movement
-                vec3f mouse_movement(event.rx / 64.0f, event.ry / -64.0f, event.rz);
+                Vec3f mouse_movement(event.rx / 64.0f, event.ry / -64.0f, event.rz);
                 for (const auto &pair : joystick_bindings)
                 {
                     if (pair.second == joystick_src_mouse_move)
@@ -192,7 +192,7 @@ namespace input
         joysticks[JOY_RIGHT].y -= bool(buttons_held & JOYRIGHT_UP);
     }
 
-    bool keyboard_mouse::connected() const
+    bool KeyboardMouse::connected() const
     {
         return keyboard_connected || MOUSE_IsConnected();
     }

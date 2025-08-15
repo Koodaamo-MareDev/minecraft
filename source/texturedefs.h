@@ -21,7 +21,7 @@ extern GXTexObj items_texture;
 extern GXTexObj inventory_texture;
 
 // Animated textures
-extern water_texanim_t water_still_anim;
-extern lava_texanim_t lava_still_anim;
+extern WaterTexAnim water_still_anim;
+extern LavaTexanim lava_still_anim;
 
 #endif

@@ -2,18 +2,18 @@
 #include "timers.hpp"
 #include "sounds.hpp"
 #include "util/constants.hpp"
-sound::sound(aiff_container &aiff_data)
+Sound::Sound(AiffContainer &aiff_data)
 {
     set_aiff_data(aiff_data);
 }
 
-sound::sound(aiff_container *aiff_data)
+Sound::Sound(AiffContainer *aiff_data)
 {
     if (aiff_data)
         set_aiff_data(*aiff_data);
 }
 
-void sound::set_aiff_data(aiff_container &aiff_data)
+void Sound::set_aiff_data(AiffContainer &aiff_data)
 {
     this->valid = aiff_data.data != nullptr;
     if (!valid)
@@ -21,7 +21,7 @@ void sound::set_aiff_data(aiff_container &aiff_data)
     this->aiff_data = aiff_data.data;
 }
 
-void sound::play()
+void Sound::play()
 {
     if (!valid)
         return;
@@ -35,7 +35,7 @@ void sound::play()
     ASND_PauseVoice(voice, 0);
 }
 
-void sound::pause()
+void Sound::pause()
 {
     if (!valid)
         return;
@@ -43,7 +43,7 @@ void sound::pause()
         return;
 }
 
-void sound::stop()
+void Sound::stop()
 {
     if (!valid)
         return;
@@ -51,7 +51,7 @@ void sound::stop()
         return;
 }
 
-void sound::update(vec3f head_right, vec3f head_position)
+void Sound::update(Vec3f head_right, Vec3f head_position)
 {
     if (!valid)
         return;
@@ -63,7 +63,7 @@ void sound::update(vec3f head_right, vec3f head_position)
         return;
     }
 
-    vec3f relative_position = position - head_position;
+    Vec3f relative_position = position - head_position;
 
     guVector head_direction = head_right;
     guVector sound_direction = (position - head_position).fast_normalize();
@@ -109,18 +109,18 @@ void sound::update(vec3f head_right, vec3f head_position)
     ASND_ChangeVolumeVoice(voice, left, right);
 }
 
-sound_system::sound_system()
+SoundSystem::SoundSystem()
 {
     ASND_Init();
     ASND_Pause(0);
 }
 
-sound_system::~sound_system()
+SoundSystem::~SoundSystem()
 {
     ASND_End();
 }
 
-void sound_system::update(vec3f head_right, vec3f head_position)
+void SoundSystem::update(Vec3f head_right, Vec3f head_position)
 {
     this->head_position = head_position;
     this->head_right = head_right;
@@ -143,13 +143,13 @@ void sound_system::update(vec3f head_right, vec3f head_position)
     }
 }
 
-void sound_system::play_sound(sound snd)
+void SoundSystem::play_sound(Sound snd)
 {
     if (!snd.valid)
         return;
     for (int i = 0; i < 15; i++)
     {
-        sound &s = sounds[i];
+        Sound &s = sounds[i];
         if (!s.valid || s.voice < 0)
         {
             s = snd;
@@ -160,7 +160,7 @@ void sound_system::play_sound(sound snd)
     }
 }
 
-void sound_system::play_music(std::string filename)
+void SoundSystem::play_music(std::string filename)
 {
     // Ensure that the filename is not empty
     if (filename.empty())

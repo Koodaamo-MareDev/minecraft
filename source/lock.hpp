@@ -5,12 +5,12 @@
 #include <ogc/mutex.h>
 #include <unistd.h>
 
-class lock_t
+class Lock
 {
 private:
     mutex_t mutex;
 
-    lock_t(const lock_t &);
+    Lock(const Lock &);
 
 public:
     void lock()
@@ -19,7 +19,7 @@ public:
             usleep(1);
     }
 
-    lock_t(mutex_t &mutex)
+    Lock(mutex_t &mutex)
     {
         init(mutex);
         this->mutex = mutex;
@@ -31,7 +31,7 @@ public:
         LWP_MutexUnlock(mutex);
     }
 
-    ~lock_t()
+    ~Lock()
     {
         unlock();
     }

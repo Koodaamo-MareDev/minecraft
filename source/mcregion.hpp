@@ -8,7 +8,7 @@
 namespace mcr
 {
     constexpr int32_t MAX_OPEN_FILES = 8;
-    class region
+    class Region
     {
     public:
         int32_t x = 0;
@@ -25,11 +25,11 @@ namespace mcr
         std::fstream file;
     };
 
-    region *get_region(int32_t x, int32_t z);
+    Region *get_region(int32_t x, int32_t z);
 
-    std::deque<region *> &get_regions();
+    std::deque<Region *> &get_regions();
 
-    void close_redundant_region(mcr::region *exclude);
+    void close_redundant_region(mcr::Region *exclude);
     
     void cleanup();
 } // namespace mcr

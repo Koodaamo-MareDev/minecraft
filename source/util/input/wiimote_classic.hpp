@@ -5,11 +5,11 @@
 
 namespace input
 {
-    class wiimote_classic : public device
+    class WiimoteClassic : public Device
     {
     public:
-        wiimote_classic();
-        ~wiimote_classic() override;
+        WiimoteClassic();
+        ~WiimoteClassic() override;
 
         void scan() override;
         bool connected() const override;

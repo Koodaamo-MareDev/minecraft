@@ -1,15 +1,15 @@
 #include "aabb.hpp"
 
-vec3f aabb_t::push_out(aabb_t other)
+Vec3f AABB::push_out(AABB other)
 {
     // Check if the two AABBs intersect
     if (!this->intersects(other))
     {
-        return vec3f(0, 0, 0);
+        return Vec3f(0, 0, 0);
     }
 
     // Calculate the vector to push out the AABB
-    vec3f push = vec3f(0, 0, 0);
+    Vec3f push = Vec3f(0, 0, 0);
 
     // Calculate the distance to push out the AABB
     float dx1 = other.max.x - this->min.x;
@@ -41,16 +41,16 @@ vec3f aabb_t::push_out(aabb_t other)
     return push;
 }
 
-vec3f aabb_t::push_out_horizontal(aabb_t other)
+Vec3f AABB::push_out_horizontal(AABB other)
 {
     // Check if the two AABBs intersect
     if (!this->intersects(other))
     {
-        return vec3f(0, 0, 0);
+        return Vec3f(0, 0, 0);
     }
 
     // Initialize the push vector
-    vec3f push = vec3f(0, 0, 0);
+    Vec3f push = Vec3f(0, 0, 0);
 
     // Calculate the distance to push out the AABB
     float dx1 = other.max.x - this->min.x;

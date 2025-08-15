@@ -9,7 +9,7 @@ namespace javaport
     class WorldGenerator
     {
     public:
-        virtual bool generate(Random &rng, vec3i pos) = 0;
+        virtual bool generate(Random &rng, Vec3i pos) = 0;
     };
 }
 

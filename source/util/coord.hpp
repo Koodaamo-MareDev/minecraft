@@ -5,9 +5,9 @@
 #include "math/vec3i.hpp"
 #include <cstring>
 
-class chunk_t;
+class Chunk;
 
-struct coord
+struct Coord
 {
     union
     {
@@ -41,20 +41,20 @@ struct coord
         int16_t _index;
     };
 
-    chunk_t *chunk = nullptr;
+    Chunk *chunk = nullptr;
 
-    coord(vec3i pos, chunk_t *chunk = nullptr) : chunk(chunk)
+    Coord(Vec3i pos, Chunk *chunk = nullptr) : chunk(chunk)
     {
         coords.x = pos.x & 0xF;
         coords.z = pos.z & 0xF;
         coords.y = pos.y & 0xFF;
     }
 
-    coord(int16_t packed, chunk_t *chunk = nullptr) : _index(packed), chunk(chunk)
+    Coord(int16_t packed, Chunk *chunk = nullptr) : _index(packed), chunk(chunk)
     {
     }
 
-    coord(uint16_t packed, chunk_t *chunk = nullptr) : index(packed), chunk(chunk)
+    Coord(uint16_t packed, Chunk *chunk = nullptr) : index(packed), chunk(chunk)
     {
     }
 
@@ -68,7 +68,7 @@ struct coord
         return index;
     }
 
-    operator vec3i() const;
+    operator Vec3i() const;
 };
 
 #endif

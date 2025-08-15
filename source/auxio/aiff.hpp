@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <cstring>
 
-struct common_chunk
+struct CommonChunk
 {
     char chunk_id[4];
     int32_t chunk_size;
@@ -14,30 +14,30 @@ struct common_chunk
     uint8_t sample_rate[10];
 }__attribute__((packed, aligned(2)));
 
-struct sound_data_chunk
+struct SoundDataChunk
 {
     char chunk_id[4];
     int32_t chunk_size;
     int8_t sound_data[];
 }__attribute__((packed, aligned(2)));
 
-struct aiff
+struct Aiff
 {
     char chunk_id[4];
     int32_t chunk_size;
     char form_type[4];
-    common_chunk common;
-    sound_data_chunk sound_data;
+    CommonChunk common;
+    SoundDataChunk sound_data;
 }__attribute__((packed, aligned(2)));
 
-class aiff_container
+class AiffContainer
 {
 public:
     unsigned char* bin_data = nullptr;
-    aiff *data = nullptr;
-    aiff_container(uint8_t *raw_data);
+    Aiff *data = nullptr;
+    AiffContainer(uint8_t *raw_data);
 };
 
-aiff *validate_aiff(uint8_t *data);
+Aiff *validate_aiff(uint8_t *data);
 
 #endif

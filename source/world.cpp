@@ -24,24 +24,24 @@
 
 extern bool should_destroy_block;
 extern bool should_place_block;
-extern gui *current_gui;
+extern Gui *current_gui;
 extern int mkpath(const char *path, mode_t mode);
 
-world::world()
+World::World()
 {
     std::string save_path = "/apps/minecraft/saves/" + name;
     std::string region_path = save_path + "/region";
     mkpath(region_path.c_str(), 0777);
     chdir(save_path.c_str());
 
-    light_engine::init();
+    LightEngine::init();
 
-    player.m_entity = new entity_player_local(vec3f(0, -999, 0));
+    player.m_entity = new EntityPlayerLocal(Vec3f(0, -999, 0));
 }
 
-world::~world()
+World::~World()
 {
-    light_engine::deinit();
+    LightEngine::deinit();
     delete player.m_entity;
     if (chunk_provider)
         delete chunk_provider;
@@ -49,12 +49,12 @@ world::~world()
         delete frustum;
 }
 
-bool world::is_remote()
+bool World::is_remote()
 {
     return client != nullptr;
 }
 
-void world::set_remote(bool value)
+void World::set_remote(bool value)
 {
     if (value && !client)
     {
@@ -68,7 +68,7 @@ void world::set_remote(bool value)
     }
 }
 
-void world::tick()
+void World::tick()
 {
     if (client)
     {
@@ -86,9 +86,9 @@ void world::tick()
                 create();
 
             // Inform the user about the network error
-            gui_dirtscreen *dirtscreen = new gui_dirtscreen(gertex::GXView());
+            GuiDirtscreen *dirtscreen = new GuiDirtscreen(gertex::GXView());
             dirtscreen->set_text(std::string(e.what()));
-            gui::set_gui(dirtscreen);
+            Gui::set_gui(dirtscreen);
         }
     }
     update_entities();
@@ -98,7 +98,7 @@ void world::tick()
 
     // Calculate chunk memory usage
     memory_usage = 0;
-    for (chunk_t *&chunk : get_chunks())
+    for (Chunk *&chunk : get_chunks())
     {
         memory_usage += chunk ? chunk->size() : 0;
     }
@@ -108,9 +108,9 @@ void world::tick()
     current_world->last_entity_tick = current_world->ticks;
 }
 
-void world::update()
+void World::update()
 {
-    static section_update_phase current_update_phase = section_update_phase::BLOCK_VISIBILITY;
+    static SectionUpdatePhase current_update_phase = SectionUpdatePhase::BLOCK_VISIBILITY;
     // If there are no chunks loaded, we can skip the update
     uint64_t start_time = time_get();
     uint64_t elapsed_time = 0;
@@ -126,18 +126,18 @@ void world::update()
     m_particle_system.update(delta_time);
 }
 
-void world::update_frustum(camera_t &camera)
+void World::update_frustum(Camera &camera)
 {
     if (!frustum)
-        frustum = new frustum_t;
+        frustum = new Frustum;
     build_frustum(camera, *frustum);
 }
 
-void world::update_chunks()
+void World::update_chunks()
 {
     int light_up_calls = 0;
     float ypos = get_camera().position.y;
-    for (chunk_t *&chunk : get_chunks())
+    for (Chunk *&chunk : get_chunks())
     {
         if (chunk)
         {
@@ -177,14 +177,14 @@ void world::update_chunks()
     }
 }
 
-void world::update_fluid_section(chunk_t *chunk, int index)
+void World::update_fluid_section(Chunk *chunk, int index)
 {
-    auto int_to_blockpos = [](ptrdiff_t x) -> vec3i
+    auto int_to_blockpos = [](ptrdiff_t x) -> Vec3i
     {
-        return vec3i(x & 0xF, (x >> 8) & MAX_WORLD_Y, (x >> 4) & 0xF);
+        return Vec3i(x & 0xF, (x >> 8) & MAX_WORLD_Y, (x >> 4) & 0xF);
     };
 
-    static std::vector<std::vector<block_t *>> fluid_levels(8);
+    static std::vector<std::vector<Block *>> fluid_levels(8);
     static bool init = false;
     if (!init)
     {
@@ -200,7 +200,7 @@ void world::update_fluid_section(chunk_t *chunk, int index)
 
     for (size_t i = 0; i < 4096; i++)
     {
-        block_t *block = &chunk->blockstates[i | (index << 12)];
+        Block *block = &chunk->blockstates[i | (index << 12)];
         if ((block->meta & FLUID_UPDATE_REQUIRED_FLAG))
             fluid_levels[get_fluid_meta_level(block) & 7][i] = block;
     }
@@ -208,13 +208,13 @@ void world::update_fluid_section(chunk_t *chunk, int index)
     uint16_t curr_fluid_count = 0;
     for (size_t i = 0; i < fluid_levels.size(); i++)
     {
-        std::vector<block_t *> &blocks = fluid_levels[i];
-        for (block_t *&block : blocks)
+        std::vector<Block *> &blocks = fluid_levels[i];
+        for (Block *&block : blocks)
         {
             if (!block)
                 continue;
             if ((basefluid(block->get_blockid()) != BlockID::lava || fluid_update_count % 6 == 0))
-                update_fluid(block, vec3i(chunkX, 0, chunkZ) + int_to_blockpos(block - chunk->blockstates), chunk);
+                update_fluid(block, Vec3i(chunkX, 0, chunkZ) + int_to_blockpos(block - chunk->blockstates), chunk);
             curr_fluid_count++;
             block = nullptr;
         }
@@ -222,23 +222,23 @@ void world::update_fluid_section(chunk_t *chunk, int index)
     chunk->has_fluid_updates[index] = (curr_fluid_count != 0);
 }
 
-section_update_phase world::update_sections(section_update_phase phase)
+SectionUpdatePhase World::update_sections(SectionUpdatePhase phase)
 {
     // Buffer to hold VBOs that need to be flushed
-    static std::vector<section *> vbos_to_flush;
+    static std::vector<Section *> vbos_to_flush;
 
     // Pointer to the current VBO being processed
-    static section *curr_section = nullptr;
+    static Section *curr_section = nullptr;
 
     // Gets the VBO at the given position
-    auto section_at = [](const vec3i &pos) -> section *
+    auto section_at = [](const Vec3i &pos) -> Section *
     {
         // Out of bounds check for Y coordinate
         if (pos.y < 0 || pos.y >= WORLD_HEIGHT)
             return nullptr;
 
         // Get the chunk from the position
-        chunk_t *chunk = get_chunk_from_pos(pos);
+        Chunk *chunk = get_chunk_from_pos(pos);
 
         // If the chunk doesn't exist, neither does the VBO
         if (!chunk)
@@ -250,9 +250,9 @@ section_update_phase world::update_sections(section_update_phase phase)
     // Process the current VBO based on the phase
     switch (phase)
     {
-    case section_update_phase::BLOCK_VISIBILITY:
+    case SectionUpdatePhase::BLOCK_VISIBILITY:
     {
-        for (chunk_t *&chunk : get_chunks())
+        for (Chunk *&chunk : get_chunks())
         {
             if (chunk && chunk->generation_stage == ChunkGenStage::done && !chunk->light_update_count)
             {
@@ -264,7 +264,7 @@ section_update_phase world::update_sections(section_update_phase phase)
                     if (i == 2)
                         i = 4;
                     // Check if the surrounding chunk exists and has no lighting updates pending
-                    chunk_t *surrounding_chunk = get_chunk(chunk->x + face_offsets[i].x, chunk->z + face_offsets[i].z);
+                    Chunk *surrounding_chunk = get_chunk(chunk->x + face_offsets[i].x, chunk->z + face_offsets[i].z);
                     if (!surrounding_chunk || surrounding_chunk->light_update_count || surrounding_chunk->generation_stage != ChunkGenStage::done)
                     {
                         surrounding = false;
@@ -276,7 +276,7 @@ section_update_phase world::update_sections(section_update_phase phase)
                     continue;
                 for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
                 {
-                    section &other_section = chunk->sections[j];
+                    Section &other_section = chunk->sections[j];
                     if (other_section.visible && other_section.dirty && (!curr_section || other_section.chunk < curr_section->chunk))
                     {
                         // If the current section is not set or the other section is closer to the player, set it as the current section
@@ -297,17 +297,17 @@ section_update_phase world::update_sections(section_update_phase phase)
 
         break;
     }
-    case section_update_phase::SECTION_VISIBILITY:
+    case SectionUpdatePhase::SECTION_VISIBILITY:
         if (!curr_section)
             break;
         curr_section->chunk->refresh_section_visibility(curr_section->y >> 4);
         break;
-    case section_update_phase::SOLID:
+    case SectionUpdatePhase::SOLID:
         if (!curr_section)
             break;
         curr_section->chunk->build_vbo(curr_section->y >> 4, false);
         break;
-    case section_update_phase::TRANSPARENT:
+    case SectionUpdatePhase::TRANSPARENT:
         if (!curr_section)
             break;
         curr_section->chunk->build_vbo(curr_section->y >> 4, true);
@@ -321,19 +321,19 @@ section_update_phase world::update_sections(section_update_phase phase)
         // Reset the section pointer
         curr_section = nullptr;
         break;
-    case section_update_phase::FLUSH:
+    case SectionUpdatePhase::FLUSH:
     {
         // Flush cached buffers
-        std::vector<section *> skipped_sections;
-        for (section *current : vbos_to_flush)
+        std::vector<Section *> skipped_sections;
+        for (Section *current : vbos_to_flush)
         {
             if (current->dirty)
                 continue;
             bool updated_neighbors = true;
             for (int i = 0; i < 6; i++)
             {
-                vec3i neighbor_pos = vec3i(current->x, current->y, current->z) + face_offsets[i] * 16;
-                section *neighbor = section_at(neighbor_pos);
+                Vec3i neighbor_pos = Vec3i(current->x, current->y, current->z) + face_offsets[i] * 16;
+                Section *neighbor = section_at(neighbor_pos);
                 if (!neighbor || !neighbor->visible)
                     continue;
 
@@ -374,7 +374,7 @@ section_update_phase world::update_sections(section_update_phase phase)
         vbos_to_flush.clear();
 
         // Add back the sections that had to be skipped
-        for (section *skipped : skipped_sections)
+        for (Section *skipped : skipped_sections)
         {
             vbos_to_flush.push_back(skipped);
         }
@@ -383,10 +383,10 @@ section_update_phase world::update_sections(section_update_phase phase)
     default:
         break;
     }
-    if (phase++ != section_update_phase::FLUSH && !curr_section)
+    if (phase++ != SectionUpdatePhase::FLUSH && !curr_section)
     {
         // Skip to flush phase if no section is set
-        phase = section_update_phase::FLUSH;
+        phase = SectionUpdatePhase::FLUSH;
     }
 
     return phase;
@@ -399,18 +399,18 @@ section_update_phase world::update_sections(section_update_phase phase)
  * https://tomcc.github.io/index.html
  */
 
-struct section_node
+struct SectionNode
 {
-    section *sect;
+    Section *sect;
     int8_t from;     // The face we entered the VBO from
     uint8_t dirs[6]; // For preventing revisits of the same face
 };
 
-void world::calculate_visibility()
+void World::calculate_visibility()
 {
     init_face_pairs();
     // Reset visibility status for all VBOs
-    for (chunk_t *&chunk : get_chunks())
+    for (Chunk *&chunk : get_chunks())
     {
         if (chunk)
         {
@@ -422,14 +422,14 @@ void world::calculate_visibility()
     }
 
     // Gets the VBO at the given position
-    auto section_at = [](const vec3i &pos) -> section *
+    auto section_at = [](const Vec3i &pos) -> Section *
     {
         // Out of bounds check for Y coordinate
         if (pos.y < 0 || pos.y >= WORLD_HEIGHT)
             return nullptr;
 
         // Get the chunk from the position
-        chunk_t *chunk = get_chunk_from_pos(pos);
+        Chunk *chunk = get_chunk_from_pos(pos);
 
         // If the chunk doesn't exist, neither does the VBO
         if (!chunk)
@@ -438,11 +438,11 @@ void world::calculate_visibility()
         return &chunk->sections[pos.y >> 4];
     };
 
-    std::deque<section_node> section_queue;
-    std::deque<section *> visited;
-    vec3f fpos = get_camera().position;
-    section_node entry;
-    entry.sect = section_at(vec3i(int(fpos.x), int(fpos.y), int(fpos.z)));
+    std::deque<SectionNode> section_queue;
+    std::deque<Section *> visited;
+    Vec3f fpos = get_camera().position;
+    SectionNode entry;
+    entry.sect = section_at(Vec3i(int(fpos.x), int(fpos.y), int(fpos.z)));
 
     // Check if there is a VBO at the player's position
     if (!entry.sect)
@@ -457,13 +457,13 @@ void world::calculate_visibility()
 
     while (!section_queue.empty())
     {
-        section_node node = section_queue.front();
+        SectionNode node = section_queue.front();
         section_queue.pop_front();
 
         // Mark the VBO as visible
         node.sect->visible = true;
 
-        auto visit = [&](vec3i pos, int8_t through)
+        auto visit = [&](Vec3i pos, int8_t through)
         {
             NOP_FIX;
             // Don't revisit directions we have already visited
@@ -471,7 +471,7 @@ void world::calculate_visibility()
                 return;
 
             // Skip if the position is out of bounds
-            section *next_section = section_at(pos);
+            Section *next_section = section_at(pos);
             if (!next_section)
                 return;
 
@@ -486,13 +486,13 @@ void world::calculate_visibility()
                     return;
             }
 
-            vec3f section_offset = vec3f(pos.x + 8, pos.y + 8, pos.z + 8) - fpos;
+            Vec3f section_offset = Vec3f(pos.x + 8, pos.y + 8, pos.z + 8) - fpos;
 
             // Check if the section is within the render distance
             if (std::abs(section_offset.x) + std::abs(section_offset.z) > RENDER_DISTANCE)
                 return;
 
-            if (!is_cube_visible(*frustum, vec3f(pos.x + 8, pos.y + 8, pos.z + 8), 16.0f))
+            if (!is_cube_visible(*frustum, Vec3f(pos.x + 8, pos.y + 8, pos.z + 8), 16.0f))
             {
                 return;
             }
@@ -501,7 +501,7 @@ void world::calculate_visibility()
             visited.push_front(next_section);
 
             // Prepare next node
-            section_node new_node;
+            SectionNode new_node;
             new_node.sect = next_section;
             new_node.from = through ^ 1;
 
@@ -514,7 +514,7 @@ void world::calculate_visibility()
             // Add the new node to the queue
             section_queue.push_back(new_node);
         };
-        vec3i origin = vec3i(node.sect->x, node.sect->y, node.sect->z);
+        Vec3i origin = Vec3i(node.sect->x, node.sect->y, node.sect->z);
         for (uint8_t i = 0; i < 6; i++)
         {
             visit(origin + (face_offsets[i] * 16), i ^ 1);
@@ -522,9 +522,9 @@ void world::calculate_visibility()
     }
 }
 
-void world::edit_blocks()
+void World::edit_blocks()
 {
-    camera_t &camera = get_camera();
+    Camera &camera = get_camera();
 
     if (!player.selected_item)
         return;
@@ -535,7 +535,7 @@ void world::edit_blocks()
         should_destroy_block = false;
         return;
     }
-    block_t selected_block = block_t{uint8_t(player.selected_item->id & 0xFF), 0x7F, uint8_t(player.selected_item->meta & 0xFF)};
+    Block selected_block = Block{uint8_t(player.selected_item->id & 0xFF), 0x7F, uint8_t(player.selected_item->meta & 0xFF)};
     bool finish_destroying = should_destroy_block && player.block_mine_progress >= 1.0f;
 
     player.draw_block_outline = raycast_precise(camera.position, angles_to_vector(camera.rot.x, camera.rot.y), 4, &player.raycast_pos, &player.raycast_face, player.block_bounds);
@@ -544,12 +544,12 @@ void world::edit_blocks()
         BlockID new_blockid = finish_destroying ? BlockID::air : selected_block.get_blockid();
         if (finish_destroying || should_place_block)
         {
-            block_t *targeted_block = get_block_at(player.raycast_pos);
-            vec3i editable_pos = finish_destroying ? (player.raycast_pos) : (player.raycast_pos + player.raycast_face);
-            block_t *editable_block = get_block_at(editable_pos);
+            Block *targeted_block = get_block_at(player.raycast_pos);
+            Vec3i editable_pos = finish_destroying ? (player.raycast_pos) : (player.raycast_pos + player.raycast_face);
+            Block *editable_block = get_block_at(editable_pos);
             if (editable_block)
             {
-                block_t old_block = *editable_block;
+                Block old_block = *editable_block;
                 BlockID old_blockid = editable_block->get_blockid();
                 BlockID targeted_blockid = targeted_block->get_blockid();
                 if (!is_remote())
@@ -648,7 +648,7 @@ void world::edit_blocks()
     should_place_block = false;
 }
 
-int world::prepare_chunks(int count)
+int World::prepare_chunks(int count)
 {
     const int center_x = (int(std::floor(player.m_entity->position.x)) >> 4);
     const int center_z = (int(std::floor(player.m_entity->position.z)) >> 4);
@@ -668,11 +668,11 @@ int world::prepare_chunks(int count)
     return count;
 }
 
-void world::remove_chunk(chunk_t *chunk)
+void World::remove_chunk(Chunk *chunk)
 {
     for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
     {
-        section &current = chunk->sections[j];
+        Section &current = chunk->sections[j];
         current.visible = false;
 
         if (current.solid && current.solid != current.cached_solid)
@@ -690,17 +690,17 @@ void world::remove_chunk(chunk_t *chunk)
     chunk->generation_stage = ChunkGenStage::invalid;
 }
 
-void world::cleanup_chunks()
+void World::cleanup_chunks()
 {
-    std::deque<chunk_t *> &chunks = get_chunks();
+    std::deque<Chunk *> &chunks = get_chunks();
     chunks.erase(
         std::remove_if(chunks.begin(), chunks.end(),
-                       [](chunk_t *&c)
+                       [](Chunk *&c)
                        {if(!c) return true; if(c->generation_stage == ChunkGenStage::invalid) {delete c; c = nullptr; return true;} return false; }),
         chunks.end());
 }
 
-void world::destroy_block(const vec3i pos, block_t *old_block)
+void World::destroy_block(const Vec3i pos, Block *old_block)
 {
     BlockID old_blockid = old_block->get_blockid();
     set_block_at(pos, BlockID::air);
@@ -711,7 +711,7 @@ void world::destroy_block(const vec3i pos, block_t *old_block)
 
     int texture_index = get_face_texture_index(old_block, FACE_NX);
 
-    particle particle;
+    Particle particle;
     particle.max_life_time = 60;
     particle.physics = PPHYSIC_FLAG_ALL;
     particle.type = PTYPE_BLOCK_BREAK;
@@ -722,8 +722,8 @@ void world::destroy_block(const vec3i pos, block_t *old_block)
     for (int i = 0; i < 64; i++)
     {
         // Randomize the particle position and velocity
-        particle.position = vec3f(pos.x, pos.y, pos.z) + vec3f(rng.nextFloat() - .5f, rng.nextFloat() - .5f, rng.nextFloat() - .5f);
-        particle.velocity = vec3f(rng.nextFloat() - .5f, rng.nextFloat() - .25f, rng.nextFloat() - .5f) * 7.5;
+        particle.position = Vec3f(pos.x, pos.y, pos.z) + Vec3f(rng.nextFloat() - .5f, rng.nextFloat() - .5f, rng.nextFloat() - .5f);
+        particle.velocity = Vec3f(rng.nextFloat() - .5f, rng.nextFloat() - .25f, rng.nextFloat() - .5f) * 7.5;
 
         // Randomize the particle texture coordinates
         particle.u = u + (rng.next(2) << 2);
@@ -735,10 +735,10 @@ void world::destroy_block(const vec3i pos, block_t *old_block)
         add_particle(particle);
     }
 
-    sound sound = get_break_sound(old_blockid);
+    Sound sound = get_break_sound(old_blockid);
     sound.volume = 0.4f;
     sound.pitch *= 0.8f;
-    sound.position = vec3f(pos.x, pos.y, pos.z);
+    sound.position = Vec3f(pos.x, pos.y, pos.z);
     play_sound(sound);
 
     if (is_remote())
@@ -750,55 +750,55 @@ void world::destroy_block(const vec3i pos, block_t *old_block)
     spawn_drop(pos, old_block, properties(old_blockid).m_drops(*old_block));
 }
 
-void world::place_block(const vec3i pos, const vec3i targeted, block_t *new_block, uint8_t face)
+void World::place_block(const Vec3i pos, const Vec3i targeted, Block *new_block, uint8_t face)
 {
-    sound sound = get_mine_sound(new_block->get_blockid());
+    Sound sound = get_mine_sound(new_block->get_blockid());
     sound.volume = 0.4f;
     sound.pitch *= 0.8f;
-    sound.position = vec3f(pos.x, pos.y, pos.z);
+    sound.position = Vec3f(pos.x, pos.y, pos.z);
     m_sound_system.play_sound(sound);
     player.m_inventory[player.selected_hotbar_slot].count--;
     if (player.m_inventory[player.selected_hotbar_slot].count == 0)
-        player.m_inventory[player.selected_hotbar_slot] = inventory::item_stack();
+        player.m_inventory[player.selected_hotbar_slot] = inventory::ItemStack();
 
     if (is_remote())
         client->sendPlaceBlock(targeted.x, targeted.y, targeted.z, (face + 4) % 6, new_block->id, 1, new_block->meta);
 }
 
-void world::spawn_drop(const vec3i &pos, const block_t *old_block, inventory::item_stack item)
+void World::spawn_drop(const Vec3i &pos, const Block *old_block, inventory::ItemStack item)
 {
     if (item.empty())
         return;
     // Drop items
     javaport::Random rng;
-    vec3f item_pos = vec3f(pos.x, pos.y, pos.z) + vec3f(0.5);
-    entity_item *entity = new entity_item(item_pos, item);
+    Vec3f item_pos = Vec3f(pos.x, pos.y, pos.z) + Vec3f(0.5);
+    EntityItem *entity = new EntityItem(item_pos, item);
     entity->ticks_existed = 10; // Halves the pickup delay (20 ticks / 2 = 10)
-    entity->velocity = vec3f(rng.nextFloat() - .5f, rng.nextFloat(), rng.nextFloat() - .5f) * 0.25f;
+    entity->velocity = Vec3f(rng.nextFloat() - .5f, rng.nextFloat(), rng.nextFloat() - .5f) * 0.25f;
     add_entity(entity);
 }
 
-void world::create_explosion(vec3f pos, float power, chunk_t *near)
+void World::create_explosion(Vec3f pos, float power, Chunk *near)
 {
     javaport::Random rng;
 
-    sound sound = get_sound("random/old_explode");
+    Sound sound = get_sound("random/old_explode");
     sound.position = pos;
     sound.volume = 0.5;
     sound.pitch = 0.8;
     m_sound_system.play_sound(sound);
 
-    particle particle;
+    Particle particle;
     particle.max_life_time = 80;
     particle.physics = PPHYSIC_FLAG_COLLIDE;
     particle.type = PTYPE_TINY_SMOKE;
     particle.brightness = 0xFF;
-    particle.velocity = vec3f(0, 0.5, 0);
+    particle.velocity = Vec3f(0, 0.5, 0);
     particle.a = 0xFF;
     for (int i = 0; i < 64; i++)
     {
         // Randomize the particle position and velocity
-        particle.position = pos + vec3f(rng.nextFloat() - .5f, rng.nextFloat() - .5f, rng.nextFloat() - .5f) * power * 2;
+        particle.position = pos + Vec3f(rng.nextFloat() - .5f, rng.nextFloat() - .5f, rng.nextFloat() - .5f) * power * 2;
 
         // Randomize the particle life time by up to 10 ticks
         particle.life_time = particle.max_life_time - (rng.nextInt(20)) - 20;
@@ -815,13 +815,13 @@ void world::create_explosion(vec3f pos, float power, chunk_t *near)
         explode(pos, power * 0.75f, near);
 }
 
-void world::draw(camera_t &camera)
+void World::draw(Camera &camera)
 {
     // Enable backface culling for terrain
     GX_SetCullMode(GX_CULL_BACK);
 
     // Prepare the transformation matrix
-    transform_view(gertex::get_view_matrix(), vec3f(0.5));
+    transform_view(gertex::get_view_matrix(), Vec3f(0.5));
 
     // Prepare opaque rendering parameters
     GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
@@ -846,27 +846,27 @@ void world::draw(camera_t &camera)
     draw_scene(false);
 }
 
-void world::draw_scene(bool opaque)
+void World::draw_scene(bool opaque)
 {
-    std::deque<chunk_t *> &chunks = get_chunks();
+    std::deque<Chunk *> &chunks = get_chunks();
     // Use terrain texture
     use_texture(terrain_texture);
 
     // Enable indexed colors
     GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
 
-    std::deque<std::pair<section *, vbo_buffer_t *>> sections_to_draw;
+    std::deque<std::pair<Section *, VBO *>> sections_to_draw;
 
     // Draw the solid pass
     if (opaque)
     {
-        for (chunk_t *&chunk : chunks)
+        for (Chunk *&chunk : chunks)
         {
             if (chunk && chunk->generation_stage == ChunkGenStage::done && chunk->lit_state)
             {
                 for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
                 {
-                    section &current = chunk->sections[j];
+                    Section &current = chunk->sections[j];
                     if (!current.visible || !current.cached_solid.buffer || !current.cached_solid.length)
                         continue;
                     sections_to_draw.push_back(std::make_pair(&current, &current.cached_solid));
@@ -877,13 +877,13 @@ void world::draw_scene(bool opaque)
     // Draw the transparent pass
     else
     {
-        for (chunk_t *&chunk : chunks)
+        for (Chunk *&chunk : chunks)
         {
             if (chunk && chunk->generation_stage == ChunkGenStage::done && chunk->lit_state)
             {
                 for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
                 {
-                    section &current = chunk->sections[j];
+                    Section &current = chunk->sections[j];
                     if (!current.visible || !current.cached_transparent.buffer || !current.cached_transparent.length)
                         continue;
                     sections_to_draw.push_back(std::make_pair(&current, &current.cached_transparent));
@@ -893,27 +893,27 @@ void world::draw_scene(bool opaque)
     }
 
     // Draw the vbos
-    for (std::pair<section *, vbo_buffer_t *> &pair : sections_to_draw)
+    for (std::pair<Section *, VBO *> &pair : sections_to_draw)
     {
-        section *&sect = pair.first;
-        vbo_buffer_t *&buffer = pair.second;
-        transform_view(gertex::get_view_matrix(), vec3f(sect->x, sect->y, sect->z) + vec3f(0.5));
+        Section *&sect = pair.first;
+        VBO *&buffer = pair.second;
+        transform_view(gertex::get_view_matrix(), Vec3f(sect->x, sect->y, sect->z) + Vec3f(0.5));
         GX_CallDispList(buffer->buffer, buffer->length);
     }
 
-    for (chunk_t *&chunk : chunks)
+    for (Chunk *&chunk : chunks)
     {
         chunk->render_entities(partial_ticks, !opaque);
     }
 
     if (player.draw_block_outline && should_destroy_block && player.mining_tick > 0)
     {
-        chunk_t *targeted_chunk = get_chunk_from_pos(player.raycast_pos);
-        block_t *targeted_block = targeted_chunk ? targeted_chunk->get_block(player.raycast_pos) : nullptr;
+        Chunk *targeted_chunk = get_chunk_from_pos(player.raycast_pos);
+        Block *targeted_block = targeted_chunk ? targeted_chunk->get_block(player.raycast_pos) : nullptr;
         if (targeted_block && targeted_block->get_blockid() != BlockID::air)
         {
             // Create a copy of the targeted block for rendering
-            block_t targeted_block_copy = *targeted_block;
+            Block targeted_block_copy = *targeted_block;
 
             // Set light to maximum for rendering
             targeted_block_copy.light = 0xFF;
@@ -925,8 +925,8 @@ void world::draw_scene(bool opaque)
             gertex::set_blending(gertex::GXBlendMode::multiply2);
 
             // Apply the transformation for the block breaking animation
-            vec3f adjusted_offset = vec3f(player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z) + vec3f(0.5);
-            vec3f towards_camera = vec3f(get_camera().position) - adjusted_offset;
+            Vec3f adjusted_offset = Vec3f(player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z) + Vec3f(0.5);
+            Vec3f towards_camera = Vec3f(get_camera().position) - adjusted_offset;
             towards_camera.fast_normalize();
             towards_camera = towards_camera * 0.002;
 
@@ -952,15 +952,15 @@ void world::draw_scene(bool opaque)
     if (!opaque && player.draw_block_outline)
     {
         GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
-        vec3f outline_pos = player.raycast_pos;
+        Vec3f outline_pos = player.raycast_pos;
 
-        vec3f towards_camera = vec3f(get_camera().position) - outline_pos;
+        Vec3f towards_camera = Vec3f(get_camera().position) - outline_pos;
         towards_camera.fast_normalize();
         towards_camera = towards_camera * 0.002;
 
-        vec3f b_min = vec3f(player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z) + vec3f(1.0);
-        vec3f b_max = vec3f(player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z);
-        for (aabb_t &bounds : player.block_bounds)
+        Vec3f b_min = Vec3f(player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z) + Vec3f(1.0);
+        Vec3f b_max = Vec3f(player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z);
+        for (AABB &bounds : player.block_bounds)
         {
             b_min.x = std::min(bounds.min.x, b_min.x);
             b_min.y = std::min(bounds.min.y, b_min.y);
@@ -970,9 +970,9 @@ void world::draw_scene(bool opaque)
             b_max.y = std::max(bounds.max.y, b_max.y);
             b_max.z = std::max(bounds.max.z, b_max.z);
         }
-        vec3f floor_b_min = vec3f(std::floor(b_min.x), std::floor(b_min.y), std::floor(b_min.z));
+        Vec3f floor_b_min = Vec3f(std::floor(b_min.x), std::floor(b_min.y), std::floor(b_min.z));
 
-        aabb_t block_outer_bounds;
+        AABB block_outer_bounds;
         block_outer_bounds.min = b_min - floor_b_min;
         block_outer_bounds.max = b_max - floor_b_min;
 
@@ -983,7 +983,7 @@ void world::draw_scene(bool opaque)
     }
 }
 
-void world::draw_selected_block()
+void World::draw_selected_block()
 {
     player.selected_item = &player.m_inventory[player.selected_hotbar_slot];
     if (get_chunks().size() == 0 || !player.selected_item || player.selected_item->empty())
@@ -991,7 +991,7 @@ void world::draw_selected_block()
 
     uint8_t light_value = 0;
     // Get the block at the player's position
-    block_t *view_block = get_block_at(current_world->player.m_entity->get_foot_blockpos());
+    Block *view_block = get_block_at(current_world->player.m_entity->get_foot_blockpos());
     if (view_block)
     {
         // Set the light level of the selected block
@@ -1006,7 +1006,7 @@ void world::draw_selected_block()
     GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
 
     // Specify the selected block offset
-    vec3f selectedBlockPos = vec3f(+.625f, -.75f, -.75f) + vec3f(-player.view_bob_screen_offset.x, player.view_bob_screen_offset.y, 0);
+    Vec3f selectedBlockPos = Vec3f(+.625f, -.75f, -.75f) + Vec3f(-player.view_bob_screen_offset.x, player.view_bob_screen_offset.y, 0);
 
     int texture_index;
     char *texbuf;
@@ -1014,7 +1014,7 @@ void world::draw_selected_block()
     // Check if the selected item is a block
     if (player.selected_item->as_item().is_block())
     {
-        block_t selected_block = block_t{uint8_t(player.selected_item->id & 0xFF), 0x7F, uint8_t(player.selected_item->meta & 0xFF)};
+        Block selected_block = Block{uint8_t(player.selected_item->id & 0xFF), 0x7F, uint8_t(player.selected_item->meta & 0xFF)};
         selected_block.light = light_value;
         RenderType render_type = properties(selected_block.id).m_render_type;
 
@@ -1097,7 +1097,7 @@ void world::draw_selected_block()
         }
 }
 
-void world::draw_bounds(aabb_t *bounds)
+void World::draw_bounds(AABB *bounds)
 {
     // Save the current state
     gertex::GXState state = gertex::get_state();
@@ -1107,9 +1107,9 @@ void world::draw_bounds(aabb_t *bounds)
 
     GX_BeginGroup(GX_LINES, 24);
 
-    aabb_t aabb = *bounds;
-    vec3f min = aabb.min;
-    vec3f size = aabb.max - aabb.min;
+    AABB aabb = *bounds;
+    Vec3f min = aabb.min;
+    Vec3f size = aabb.max - aabb.min;
 
     for (int i = 0; i < 2; i++)
     {
@@ -1117,7 +1117,7 @@ void world::draw_bounds(aabb_t *bounds)
         {
             for (int k = 0; k < 2; k++)
             {
-                GX_Vertex(vertex_property_t(min + vec3f(size.x * k, size.y * i, size.z * j), 0, 0, 127, 127, 127));
+                GX_Vertex(Vertex(min + Vec3f(size.x * k, size.y * i, size.z * j), 0, 0, 127, 127, 127));
             }
         }
     }
@@ -1127,7 +1127,7 @@ void world::draw_bounds(aabb_t *bounds)
         {
             for (int k = 0; k < 2; k++)
             {
-                GX_Vertex(vertex_property_t(min + vec3f(size.x * i, size.y * k, size.z * j), 0, 0, 127, 127, 127));
+                GX_Vertex(Vertex(min + Vec3f(size.x * i, size.y * k, size.z * j), 0, 0, 127, 127, 127));
             }
         }
     }
@@ -1137,7 +1137,7 @@ void world::draw_bounds(aabb_t *bounds)
         {
             for (int k = 0; k < 2; k++)
             {
-                GX_Vertex(vertex_property_t(min + vec3f(size.x * i, size.y * j, size.z * k), 0, 0, 127, 127, 127));
+                GX_Vertex(Vertex(min + Vec3f(size.x * i, size.y * j, size.z * k), 0, 0, 127, 127, 127));
             }
         }
     }
@@ -1147,14 +1147,14 @@ void world::draw_bounds(aabb_t *bounds)
     gertex::set_state(state);
 }
 
-void world::save()
+void World::save()
 {
     // Save the world to disk if in singleplayer
     if (!is_remote())
     {
         try
         {
-            for (chunk_t *c : get_chunks())
+            for (Chunk *c : get_chunks())
                 c->write();
         }
         catch (std::runtime_error &e)
@@ -1166,7 +1166,7 @@ void world::save()
         player.m_entity->serialize((NBTTagCompound *)level_data->setTag("Player", new NBTTagCompound));
         level_data->setTag("Time", new NBTTagLong(ticks));
         level_data->setTag("SpawnX", new NBTTagInt(0));
-        level_data->setTag("SpawnY", new NBTTagInt(skycast(vec3i(0, 0, 0), nullptr)));
+        level_data->setTag("SpawnY", new NBTTagInt(skycast(Vec3i(0, 0, 0), nullptr)));
         level_data->setTag("SpawnZ", new NBTTagInt(0));
         level_data->setTag("LastPlayed", new NBTTagLong(time(nullptr) * 1000LL));
         level_data->setTag("LevelName", new NBTTagString("Wii World"));
@@ -1183,7 +1183,7 @@ void world::save()
     }
 }
 
-bool world::load()
+bool World::load()
 {
     // Load the world from disk if in singleplayer
     if (is_remote())
@@ -1235,7 +1235,7 @@ bool world::load()
     // Re-initialize the chunk provider
     if (chunk_provider)
         delete chunk_provider;
-    chunk_provider = new chunkprovider_overworld(seed);
+    chunk_provider = new ChunkProviderOverworld(seed);
 
     // Start the chunk manager using the chunk provider
     init_chunk_manager(chunk_provider);
@@ -1254,7 +1254,7 @@ bool world::load()
     return true;
 }
 
-void world::create()
+void World::create()
 {
     // Create a new world
     if (is_remote())
@@ -1269,18 +1269,18 @@ void world::create()
     // Re-initialize the chunk provider
     if (chunk_provider)
         delete chunk_provider;
-    chunk_provider = new chunkprovider_overworld(seed);
+    chunk_provider = new ChunkProviderOverworld(seed);
 
     // Start the chunk manager using the chunk provider
     init_chunk_manager(chunk_provider);
 }
 
-void world::reset()
+void World::reset()
 {
     // Stop the chunk manager
     deinit_chunk_manager();
 
-    light_engine::deinit();
+    LightEngine::deinit();
     loaded = false;
     time_of_day = 0;
     ticks = 0;
@@ -1291,7 +1291,7 @@ void world::reset()
     if (player.m_entity)
         player.m_entity->chunk = nullptr;
     player.m_inventory.clear();
-    for (chunk_t *chunk : get_chunks())
+    for (Chunk *chunk : get_chunks())
     {
         if (chunk)
             remove_chunk(chunk);
@@ -1300,21 +1300,21 @@ void world::reset()
     mcr::cleanup();
 
     // Start the chunk manager without a chunk provider
-    light_engine::init();
+    LightEngine::init();
     init_chunk_manager(nullptr);
 }
 
-void world::update_entities()
+void World::update_entities()
 {
 
     // Find a chunk for any lingering entities
-    std::map<int32_t, entity_physical *> &world_entities = get_entities();
+    std::map<int32_t, EntityPhysical *> &world_entities = get_entities();
     for (auto &&e : world_entities)
     {
-        entity_physical *entity = e.second;
+        EntityPhysical *entity = e.second;
         if (!entity->chunk)
         {
-            vec3i int_pos = vec3i(int(std::floor(entity->position.x)), 0, int(std::floor(entity->position.z)));
+            Vec3i int_pos = Vec3i(int(std::floor(entity->position.x)), 0, int(std::floor(entity->position.z)));
             entity->chunk = get_chunk_from_pos(int_pos);
             if (entity->chunk && std::find(entity->chunk->entities.begin(), entity->chunk->entities.end(), entity) == entity->chunk->entities.end())
                 entity->chunk->entities.push_back(entity);
@@ -1325,7 +1325,7 @@ void world::update_entities()
     {
         for (auto &&e : world_entities)
         {
-            entity_physical *entity = e.second;
+            EntityPhysical *entity = e.second;
 
             if (!entity || entity->dead)
                 continue;
@@ -1337,7 +1337,7 @@ void world::update_entities()
         }
 
         // Update the entities of the world
-        for (chunk_t *&chunk : get_chunks())
+        for (Chunk *&chunk : get_chunks())
         {
             // Update the entities in the chunk
             chunk->update_entities();
@@ -1347,7 +1347,7 @@ void world::update_entities()
         update_player();
         for (auto &&e : world_entities)
         {
-            entity_physical *entity = e.second;
+            EntityPhysical *entity = e.second;
             if (!entity || entity->dead)
                 continue;
             // Tick the entity animations
@@ -1356,7 +1356,7 @@ void world::update_entities()
     }
 }
 
-void world::update_player()
+void World::update_player()
 {
     // FIXME: This is a temporary fix for an crash with an unknown cause
 #ifdef CLIENT_COLLISION
@@ -1400,8 +1400,8 @@ void world::update_player()
         }
     }
 #endif
-    vec3i block_pos = player.m_entity->get_head_blockpos();
-    block_t *block = get_block_at(block_pos);
+    Vec3i block_pos = player.m_entity->get_head_blockpos();
+    Block *block = get_block_at(block_pos);
     if (block && properties(block->id).m_fluid && block_pos.y + 2 - get_fluid_height(block_pos, block->get_blockid(), player.m_entity->chunk) >= player.m_entity->aabb.min.y + player.m_entity->y_offset)
     {
         player.in_fluid = properties(block->id).m_base_fluid;
@@ -1413,8 +1413,8 @@ void world::update_player()
 
     if (should_destroy_block && player.block_mine_progress < 1.0f && player.draw_block_outline)
     {
-        static block_t *last_targeted_block = nullptr;
-        block_t *targeted_block = get_block_at(player.raycast_pos);
+        static Block *last_targeted_block = nullptr;
+        Block *targeted_block = get_block_at(player.raycast_pos);
         if (last_targeted_block != targeted_block)
         {
             // Reset the progress if the targeted block has changed
@@ -1451,14 +1451,14 @@ void world::update_player()
                     }
 
                     // Play the mining sound
-                    sound sound = get_mine_sound(targeted_block->get_blockid());
+                    Sound sound = get_mine_sound(targeted_block->get_blockid());
                     sound.pitch *= 0.5f;
                     sound.volume = 0.15f;
-                    sound.position = vec3f(player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z);
+                    sound.position = Vec3f(player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z);
                     play_sound(sound);
 
                     // Add block breaking particles
-                    particle particle;
+                    Particle particle;
                     particle.max_life_time = 60;
                     particle.physics = PPHYSIC_FLAG_ALL;
                     particle.type = PTYPE_BLOCK_BREAK;
@@ -1469,10 +1469,10 @@ void world::update_player()
                     int v = PARTICLE_Y(texture_index);
 
                     // Calculate the bounds of the block to spawn particles around
-                    vec3f b_min = vec3f(player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z) + vec3f(1.0, 1.0, 1.0);
-                    vec3f b_max = vec3f(player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z);
+                    Vec3f b_min = Vec3f(player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z) + Vec3f(1.0, 1.0, 1.0);
+                    Vec3f b_max = Vec3f(player.raycast_pos.x, player.raycast_pos.y, player.raycast_pos.z);
                     bool hitbox = false;
-                    for (aabb_t &bounds : player.block_bounds)
+                    for (AABB &bounds : player.block_bounds)
                     {
                         hitbox = true;
                         b_min.x = std::min(bounds.min.x, b_min.x);
@@ -1483,15 +1483,15 @@ void world::update_player()
                         b_max.y = std::max(bounds.max.y, b_max.y);
                         b_max.z = std::max(bounds.max.z, b_max.z);
                     }
-                    aabb_t block_outer_bounds = aabb_t(b_min, b_max);
+                    AABB block_outer_bounds = AABB(b_min, b_max);
                     javaport::Random rng;
 
                     for (int i = 0; hitbox && i < 8; i++)
                     {
                         // Randomize the particle position and velocity
-                        vec3f local_pos = vec3f(rng.nextFloat(), rng.nextFloat(), rng.nextFloat());
+                        Vec3f local_pos = Vec3f(rng.nextFloat(), rng.nextFloat(), rng.nextFloat());
 
-                        vec3f pos = (block_outer_bounds.min + block_outer_bounds.max) * 0.5 + local_pos;
+                        Vec3f pos = (block_outer_bounds.min + block_outer_bounds.max) * 0.5 + local_pos;
 
                         // Put the particle at the edge of the block by rounding the position to the nearest block edge on a random axis
                         // This will ensure that the particles are spawned at the edges of the block
@@ -1516,7 +1516,7 @@ void world::update_player()
                         particle.position = pos;
 
                         // Randomize the particle velocity
-                        particle.velocity = vec3f(rng.nextFloat() - .5f, rng.nextFloat() - .25f, rng.nextFloat() - .5f) * 3.0f;
+                        particle.velocity = Vec3f(rng.nextFloat() - .5f, rng.nextFloat() - .25f, rng.nextFloat() - .5f) * 3.0f;
 
                         // Randomize the particle texture coordinates
                         particle.u = u + (rng.next(2) << 2);
@@ -1548,17 +1548,17 @@ void world::update_player()
     }
 }
 
-void world::add_particle(const particle &particle)
+void World::add_particle(const Particle &particle)
 {
     m_particle_system.add_particle(particle);
 }
 
-void world::play_sound(const sound &sound)
+void World::play_sound(const Sound &sound)
 {
     m_sound_system.play_sound(sound);
 }
 
-player_properties::player_properties()
+PlayerProperties::PlayerProperties()
 {
     this->selected_item = &this->m_inventory[selected_hotbar_slot];
 }

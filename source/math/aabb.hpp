@@ -3,32 +3,32 @@
 
 #include "vec3f.hpp"
 
-class aabb_t
+class AABB
 {
 public:
-    vec3f min;
-    vec3f max;
+    Vec3f min;
+    Vec3f max;
 
-    aabb_t() : min(0, 0, 0), max(0, 0, 0) {}
-    aabb_t(vec3f min, vec3f max) : min(min), max(max) {}
+    AABB() : min(0, 0, 0), max(0, 0, 0) {}
+    AABB(Vec3f min, Vec3f max) : min(min), max(max) {}
 
-    bool intersects(aabb_t other)
+    bool intersects(AABB other)
     {
         return (this->min.x <= other.max.x && this->max.x >= other.min.x) &&
                (this->min.y <= other.max.y && this->max.y >= other.min.y) &&
                (this->min.z <= other.max.z && this->max.z >= other.min.z);
     }
 
-    bool contains(vec3f point)
+    bool contains(Vec3f point)
     {
         return (point.x >= this->min.x && point.x <= this->max.x) &&
                (point.y >= this->min.y && point.y <= this->max.y) &&
                (point.z >= this->min.z && point.z <= this->max.z);
     }
 
-    aabb_t extend_by(vec3f offset)
+    AABB extend_by(Vec3f offset)
     {
-        aabb_t result;
+        AABB result;
         if (offset.x < 0)
         {
             result.min.x = this->min.x + offset.x;
@@ -62,7 +62,7 @@ public:
         return result;
     }
 
-    vfloat_t calculate_x_offset(const aabb_t &other, vfloat_t offset)
+    vfloat_t calculate_x_offset(const AABB &other, vfloat_t offset)
     {
         if (other.max.y <= this->min.y || other.min.y >= this->max.y)
             return offset;
@@ -83,7 +83,7 @@ public:
         return offset;
     }
 
-    vfloat_t calculate_y_offset(const aabb_t &other, vfloat_t offset)
+    vfloat_t calculate_y_offset(const AABB &other, vfloat_t offset)
     {
         if (other.max.x <= this->min.x || other.min.x >= this->max.x)
             return offset;
@@ -104,7 +104,7 @@ public:
         return offset;
     }
 
-    vfloat_t calculate_z_offset(const aabb_t &other, vfloat_t offset)
+    vfloat_t calculate_z_offset(const AABB &other, vfloat_t offset)
     {
         if (other.max.x <= this->min.x || other.min.x >= this->max.x)
             return offset;
@@ -125,20 +125,20 @@ public:
         return offset;
     }
 
-    void translate(vec3f offset)
+    void translate(Vec3f offset)
     {
         this->min = this->min + offset;
         this->max = this->max + offset;
     }
 
-    aabb_t inflate(vfloat_t amount)
+    AABB inflate(vfloat_t amount)
     {
-        return aabb_t(this->min - vec3f(amount, amount, amount), this->max + vec3f(amount, amount, amount));
+        return AABB(this->min - Vec3f(amount, amount, amount), this->max + Vec3f(amount, amount, amount));
     }
 
-    vec3f push_out(aabb_t other);
+    Vec3f push_out(AABB other);
 
-    vec3f push_out_horizontal(aabb_t other);
+    Vec3f push_out_horizontal(AABB other);
 };
 
 #endif

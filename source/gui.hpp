@@ -7,17 +7,17 @@
 extern int cursor_x;
 extern int cursor_y;
 
-class gui_slot
+class GuiSlot
 {
 public:
     int x = 0;
     int y = 0;
     uint8_t slot = 0;
-    inventory::item_stack item;
-    gui_slot() = default;
-    gui_slot(int x, int y, inventory::item_stack item) : x(x), y(y), item(item) {}
+    inventory::ItemStack item;
+    GuiSlot() = default;
+    GuiSlot(int x, int y, inventory::ItemStack item) : x(x), y(y), item(item) {}
 
-    inventory::item_stack interact(inventory::item_stack hand, bool right_click);
+    inventory::ItemStack interact(inventory::ItemStack hand, bool right_click);
 
     bool contains(int x, int y)
     {
@@ -25,16 +25,16 @@ public:
     }
 };
 
-class gui
+class Gui
 {
 public:
     gertex::GXView viewport;
-    gui() = delete;
-    inventory::item_stack item_in_hand;
-    gui(const gertex::GXView &viewport) : viewport(viewport)
+    Gui() = delete;
+    inventory::ItemStack item_in_hand;
+    Gui(const gertex::GXView &viewport) : viewport(viewport)
     {
     }
-    virtual ~gui() = default;
+    virtual ~Gui() = default;
     virtual void draw() = 0;
     virtual void update() = 0;
     virtual bool contains(int x, int y) = 0;
@@ -46,22 +46,22 @@ public:
     static int text_width(std::string str);
     static void draw_text(int x, int y, std::string str, GXColor color = {255, 255, 255, 255});
     static void draw_text_with_shadow(int x, int y, std::string str, GXColor color = {255, 255, 255, 255});
-    static void draw_item(int x, int y, inventory::item_stack item, gertex::GXView &viewport);
+    static void draw_item(int x, int y, inventory::ItemStack item, gertex::GXView &viewport);
 
     /**
-     * This function draws the items in the container.
-     * The width of the container is 9 slots.
-     * The container is drawn row by row, starting from the top left corner.
+     * This function draws the items in the Container.
+     * The width of the Container is 9 slots.
+     * The Container is drawn row by row, starting from the top left corner.
      * NOTE: It is up to the user to draw the background.
      **/
-    static void draw_container(int x, int y, inventory::container &container, gertex::GXView &viewport);
+    static void draw_container(int x, int y, inventory::Container &Container, gertex::GXView &viewport);
 
-    static gui *get_gui()
+    static Gui *get_gui()
     {
         return current_gui;
     }
 
-    static void set_gui(gui *gui)
+    static void set_gui(Gui *gui)
     {
         if (current_gui && current_gui != gui)
         {
@@ -72,7 +72,7 @@ public:
     }
 
 protected:
-    static gui *current_gui;
+    static Gui *current_gui;
 };
 
 extern gertex::GXMatrix gui_block_matrix;

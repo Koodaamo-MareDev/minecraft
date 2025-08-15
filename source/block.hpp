@@ -50,14 +50,14 @@ enum class CollisionType : uint8_t
     slab,
 
 };
-class block_t;
+class Block;
 
-void default_aabb(const vec3i &pos, block_t *block, const aabb_t &other, std::vector<aabb_t> &aabb_list);
-void slab_aabb(const vec3i &pos, block_t *block, const aabb_t &other, std::vector<aabb_t> &aabb_list);
-void default_destroy(const vec3i &pos, const block_t &old_block);
-inventory::item_stack default_drop(const block_t &old_block);
+void default_aabb(const Vec3i &pos, Block *block, const AABB &other, std::vector<AABB> &aabb_list);
+void slab_aabb(const Vec3i &pos, Block *block, const AABB &other, std::vector<AABB> &aabb_list);
+void default_destroy(const Vec3i &pos, const Block &old_block);
+inventory::ItemStack default_drop(const Block &old_block);
 
-struct blockproperties_t
+struct BlockProperties
 {
     BlockID m_id = BlockID::air;
     uint8_t m_default_state = 0;
@@ -91,20 +91,20 @@ struct blockproperties_t
         uint8_t m_flags;
     };
 
-    std::function<void(const vec3i &, block_t *, const aabb_t &, std::vector<aabb_t> &)> m_aabb;
+    std::function<void(const Vec3i &, Block *, const AABB &, std::vector<AABB> &)> m_aabb;
 
-    std::function<void(const vec3i &, const block_t &)> m_destroy;
+    std::function<void(const Vec3i &, const Block &)> m_destroy;
 
-    std::function<inventory::item_stack(const block_t &)> m_drops;
+    std::function<inventory::ItemStack(const Block &)> m_drops;
 
-    bool intersects(const vec3i &pos, block_t *block, const aabb_t &other)
+    bool intersects(const Vec3i &pos, Block *block, const AABB &other)
     {
-        std::vector<aabb_t> aabb_list;
+        std::vector<AABB> aabb_list;
         m_aabb(pos, block, other, aabb_list);
         return aabb_list.size() > 0;
     }
 
-    blockproperties_t()
+    BlockProperties()
     {
         // Set bit fields to default values
         m_fall = 0;
@@ -119,7 +119,7 @@ struct blockproperties_t
     }
 
     // FIXME: This is a temporary constructor replacement as the inlay hints are otherwise not visible.
-    blockproperties_t &set(uint8_t default_state, uint8_t texture_index, uint8_t opacity, uint8_t transparent, uint8_t luminance, uint8_t is_solid, uint8_t is_fluid, uint8_t fluid_decay, BlockID base_fluid, BlockID flow_fluid, SoundType sound)
+    BlockProperties &set(uint8_t default_state, uint8_t texture_index, uint8_t opacity, uint8_t transparent, uint8_t luminance, uint8_t is_solid, uint8_t is_fluid, uint8_t fluid_decay, BlockID base_fluid, BlockID flow_fluid, SoundType sound)
     {
         this->state(default_state);
         this->texture(texture_index);
@@ -136,158 +136,158 @@ struct blockproperties_t
     }
 
     // Have setters for each property
-    blockproperties_t &id(BlockID value)
+    BlockProperties &id(BlockID value)
     {
         this->m_id = value;
         return *this;
     }
 
-    blockproperties_t &state(uint8_t value)
+    BlockProperties &state(uint8_t value)
     {
         this->m_default_state = value;
         return *this;
     }
 
-    blockproperties_t &texture(uint8_t value)
+    BlockProperties &texture(uint8_t value)
     {
         this->m_texture_index = value;
         return *this;
     }
 
-    blockproperties_t &opacity(uint8_t value)
+    BlockProperties &opacity(uint8_t value)
     {
         this->m_opacity = value;
         return *this;
     }
 
-    blockproperties_t &transparent(uint8_t value)
+    BlockProperties &transparent(uint8_t value)
     {
         this->m_transparent = value;
         return *this;
     }
 
-    blockproperties_t &luminance(uint8_t value)
+    BlockProperties &luminance(uint8_t value)
     {
         this->m_luminance = value;
         return *this;
     }
 
-    blockproperties_t &solid(bool value)
+    BlockProperties &solid(bool value)
     {
         this->m_solid = value;
         return *this;
     }
 
-    blockproperties_t &fluid(bool value)
+    BlockProperties &fluid(bool value)
     {
         this->m_fluid = value;
         return *this;
     }
 
-    blockproperties_t &fluid_decay(uint8_t value) // Probably going to be removed
+    BlockProperties &fluid_decay(uint8_t value) // Probably going to be removed
     {
         this->m_fluid_decay = value;
         return *this;
     }
 
-    blockproperties_t &base_fluid(BlockID value)
+    BlockProperties &base_fluid(BlockID value)
     {
         this->m_base_fluid = value;
         return *this;
     }
 
-    blockproperties_t &flow_fluid(BlockID value)
+    BlockProperties &flow_fluid(BlockID value)
     {
         this->m_flow_fluid = value;
         return *this;
     }
 
-    blockproperties_t &sound(SoundType value)
+    BlockProperties &sound(SoundType value)
     {
         this->m_sound_type = value;
         return *this;
     }
 
-    blockproperties_t &fall(bool value)
+    BlockProperties &fall(bool value)
     {
         this->m_fall = value;
         return *this;
     }
 
-    blockproperties_t &render_type(RenderType value)
+    BlockProperties &render_type(RenderType value)
     {
         this->m_render_type = value;
         return *this;
     }
 
-    blockproperties_t &valid_item(bool value)
+    BlockProperties &valid_item(bool value)
     {
         this->m_valid_item = value;
         return *this;
     }
 
-    blockproperties_t &needs_support(bool value)
+    BlockProperties &needs_support(bool value)
     {
         this->m_needs_support = value;
         return *this;
     }
 
-    blockproperties_t &nonflat(bool value)
+    BlockProperties &nonflat(bool value)
     {
         this->m_nonflat = value;
         return *this;
     }
 
-    blockproperties_t &collision(CollisionType value)
+    BlockProperties &collision(CollisionType value)
     {
         this->m_collision = value;
         return *this;
     }
 
-    blockproperties_t &slipperiness(float_t value)
+    BlockProperties &slipperiness(float_t value)
     {
         this->m_slipperiness = value;
         return *this;
     }
 
-    blockproperties_t &blast_resistance(float_t value)
+    BlockProperties &blast_resistance(float_t value)
     {
         this->m_blast_resistance = value;
         return *this;
     }
 
-    blockproperties_t &aabb(std::function<void(const vec3i &, block_t *, const aabb_t &, std::vector<aabb_t> &)> aabb_func)
+    BlockProperties &aabb(std::function<void(const Vec3i &, Block *, const AABB &, std::vector<AABB> &)> aabb_func)
     {
         this->m_aabb = aabb_func;
         return *this;
     }
 
-    blockproperties_t &destroy(std::function<void(const vec3i &, const block_t &)> destroy_func)
+    BlockProperties &destroy(std::function<void(const Vec3i &, const Block &)> destroy_func)
     {
         this->m_destroy = destroy_func;
         return *this;
     }
 
-    blockproperties_t &drops(std::function<inventory::item_stack(const block_t &)> drops_func)
+    BlockProperties &drops(std::function<inventory::ItemStack(const Block &)> drops_func)
     {
         this->m_drops = drops_func;
         return *this;
     }
 
-    blockproperties_t &tool(inventory::tool_type tool, inventory::tool_tier tier)
+    BlockProperties &tool(inventory::tool_type tool, inventory::tool_tier tier)
     {
         this->m_tool_type = tool;
         this->m_tool_tier = tier;
         return *this;
     }
 
-    blockproperties_t &hardness(float value)
+    BlockProperties &hardness(float value)
     {
         this->m_hardness = value;
         return *this;
     }
 
-    bool can_be_broken_with(const inventory::item_stack &item) const
+    bool can_be_broken_with(const inventory::ItemStack &item) const
     {
         if (this->m_tool_type == inventory::tool_type::none)
             return true; // Can break with hands or any item
@@ -301,7 +301,7 @@ struct blockproperties_t
         return false; // Cannot break with this item
     }
 
-    float get_break_multiplier(const inventory::item_stack &item, bool on_ground, bool in_water) const
+    float get_break_multiplier(const inventory::ItemStack &item, bool on_ground, bool in_water) const
     {
         if (m_hardness < 0.0f)
             return 0.0f; // Block cannot be broken
@@ -316,19 +316,19 @@ struct blockproperties_t
     }
 };
 
-extern blockproperties_t block_properties[256];
+extern BlockProperties block_properties[256];
 
-inline blockproperties_t &properties(BlockID id)
+inline BlockProperties &properties(BlockID id)
 {
     return block_properties[uint8_t(id)];
 }
 
-inline blockproperties_t &properties(uint8_t id)
+inline BlockProperties &properties(uint8_t id)
 {
     return block_properties[id];
 }
 
-class block_t
+class Block
 {
 public:
     uint8_t id = 0;
@@ -389,12 +389,12 @@ public:
         return block_light <= opacity ? 0 : block_light - opacity;
     }
 
-    void get_aabb(const vec3i &pos, const aabb_t &other, std::vector<aabb_t> &aabb_list)
+    void get_aabb(const Vec3i &pos, const AABB &other, std::vector<AABB> &aabb_list)
     {
         properties(id).m_aabb(pos, this, other, aabb_list);
     }
 
-    bool intersects(const aabb_t &other, const vec3i &pos)
+    bool intersects(const AABB &other, const Vec3i &pos)
     {
         return properties(id).intersects(pos, this, other);
     }

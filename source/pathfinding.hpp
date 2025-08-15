@@ -10,45 +10,45 @@
 
 #include "chunk.hpp"
 
-class pathfinding_t
+class PathFinding
 {
 public:
-    struct node_t
+    struct Node
     {
-        vec3i pos;
-        vec3i parent;
+        Vec3i pos;
+        Vec3i parent;
         int g;
         int f;
         bool in_air = false;
         bool horizontal_in_air = false;
-        bool operator<(const node_t &other) const
+        bool operator<(const Node &other) const
         {
             return f > other.f;
         }
     };
 
-    std::map<vec3i, vec3i> came_from;
-    std::map<vec3i, int> cost_so_far;
-    std::priority_queue<node_t> frontier;
+    std::map<Vec3i, Vec3i> came_from;
+    std::map<Vec3i, int> cost_so_far;
+    std::priority_queue<Node> frontier;
 
-    pathfinding_t() {}
+    PathFinding() {}
 
     void init()
     {
         came_from.clear();
         cost_so_far.clear();
-        frontier = std::priority_queue<node_t>();
+        frontier = std::priority_queue<Node>();
     }
 
-    void reconstruct_path(vec3i start, vec3i goal, std::deque<vec3i> &path);
+    void reconstruct_path(Vec3i start, Vec3i goal, std::deque<Vec3i> &path);
 
-    int heuristic(vec3i a, vec3i b)
+    int heuristic(Vec3i a, Vec3i b)
     {
         return (std::abs(a.x - b.x) + std::abs(a.y - b.y) + std::abs(a.z - b.z));
     }
 
-    bool a_star_search(vec3i start, vec3i goal, std::deque<vec3i> &path);
+    bool a_star_search(Vec3i start, Vec3i goal, std::deque<Vec3i> &path);
 
-    vec3f simple_pathfind(vec3f start, vec3f goal, std::deque<vec3i> &path);
+    Vec3f simple_pathfind(Vec3f start, Vec3f goal, std::deque<Vec3i> &path);
 };
 #endif

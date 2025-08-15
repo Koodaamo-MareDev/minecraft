@@ -19,9 +19,9 @@ namespace javaport
         float biome_noise_2d[64];
         float noise_2d[256];
         float noise_3d[x_max * y_max * z_max];
-        noiser.GetNoiseSet(vec3f(chunkX * 16, 0, chunkZ * 16), vec3i(16, 1, 16), 24.0f, 3, noise_2d);
-        noiser.GetNoiseSet(vec3f(chunkX * 8 - 193.514f, 0, chunkZ * 8 + 93.314f), vec3i(8, 1, 8), 135.24f, 1, biome_noise_2d);
-        noiser.GetNoiseSet(vec3f(chunkX * coarse_width, 0, chunkZ * coarse_width), vec3i(x_max, y_max, z_max), 4.0f, 1, noise_3d);
+        noiser.GetNoiseSet(Vec3f(chunkX * 16, 0, chunkZ * 16), Vec3i(16, 1, 16), 24.0f, 3, noise_2d);
+        noiser.GetNoiseSet(Vec3f(chunkX * 8 - 193.514f, 0, chunkZ * 8 + 93.314f), Vec3i(8, 1, 8), 135.24f, 1, biome_noise_2d);
+        noiser.GetNoiseSet(Vec3f(chunkX * coarse_width, 0, chunkZ * coarse_width), Vec3i(x_max, y_max, z_max), 4.0f, 1, noise_3d);
 
         for (int32_t i = x_max * y_max * z_max - 1; i >= 0; --i)
         {
@@ -114,7 +114,7 @@ namespace javaport
                 }
             }
         }
-        noiser.GetNoiseSet(vec3f(chunkX * 16 - 7193.514f, 0, chunkZ * 16 + 937.314f), vec3i(16, 1, 16), 21.121f, 2, noise_2d);
+        noiser.GetNoiseSet(Vec3f(chunkX * 16 - 7193.514f, 0, chunkZ * 16 + 937.314f), Vec3i(16, 1, 16), 21.121f, 2, noise_2d);
         for (int32_t z = 0, i = 0; z < 16; ++z)
         {
             for (int32_t x = 0; x < 16; ++x, ++i)

@@ -9,45 +9,45 @@
 #include <auxio/aiff.hpp>
 #include <auxio/oggplayer.h>
 
-class sound
+class Sound
 {
 private:
-    aiff *aiff_data = nullptr;
+    Aiff *aiff_data = nullptr;
 
 public:
-    vec3f position = vec3f(0., 0., 0.);
+    Vec3f position = Vec3f(0., 0., 0.);
     float pitch = 1.0f;
     float volume = 1.0f;
     uint8_t left = 255;
     uint8_t right = 255;
     bool valid = false;
     int voice = -1;
-    sound() {}
-    sound(aiff_container &aiff_data);
-    sound(aiff_container* aiff_data);
+    Sound() {}
+    Sound(AiffContainer &aiff_data);
+    Sound(AiffContainer* aiff_data);
 
-    void set_aiff_data(aiff_container &aiff_data);
+    void set_aiff_data(AiffContainer &aiff_data);
     void play();
     void pause();
     void stop();
-    void update(vec3f head_right, vec3f head_position);
+    void update(Vec3f head_right, Vec3f head_position);
 };
 
-class sound_system
+class SoundSystem
 {
 public:
-    vec3f head_right = vec3f(1, 0, 0);
-    vec3f head_position = vec3f(0, 0, 0);
+    Vec3f head_right = Vec3f(1, 0, 0);
+    Vec3f head_position = Vec3f(0, 0, 0);
 
-    sound sounds[15];
+    Sound sounds[15];
     int frames_to_next_music = 0;
 
-    sound_system();
-    ~sound_system();
+    SoundSystem();
+    ~SoundSystem();
 
-    void update(vec3f head_right, vec3f head_position);
+    void update(Vec3f head_right, Vec3f head_position);
 
-    void play_sound(sound sound);
+    void play_sound(Sound sound);
 
     void play_music(std::string filename);
 

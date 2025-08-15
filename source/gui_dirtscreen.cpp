@@ -1,11 +1,11 @@
 #include "gui_dirtscreen.hpp"
 #include "util/string_utils.hpp"
 
-gui_dirtscreen::gui_dirtscreen(const gertex::GXView &viewport) : gui(viewport)
+GuiDirtscreen::GuiDirtscreen(const gertex::GXView &viewport) : Gui(viewport)
 {
 }
 
-void gui_dirtscreen::draw()
+void GuiDirtscreen::draw()
 {
     // Fill the screen with the dirt texture
     int texture_index = properties(BlockID::dirt).m_texture_index;
@@ -13,7 +13,7 @@ void gui_dirtscreen::draw()
 
     for (size_t i = 0; i < text_lines.size(); i++)
     {
-        gui::draw_text_with_shadow((viewport.width - gui::text_width(text_lines[i])) / 2, viewport.aspect_correction * 200 + i * 16, text_lines[i]);
+        Gui::draw_text_with_shadow((viewport.width - Gui::text_width(text_lines[i])) / 2, viewport.aspect_correction * 200 + i * 16, text_lines[i]);
     }
     if (max_progress > 0)
     {
@@ -22,29 +22,29 @@ void gui_dirtscreen::draw()
     }
 }
 
-void gui_dirtscreen::update()
+void GuiDirtscreen::update()
 {
 }
 
-bool gui_dirtscreen::contains(int x, int y)
+bool GuiDirtscreen::contains(int x, int y)
 {
     return true; // Full screen
 }
 
-void gui_dirtscreen::close()
+void GuiDirtscreen::close()
 {
 }
 
-void gui_dirtscreen::refresh()
+void GuiDirtscreen::refresh()
 {
 }
 
-void gui_dirtscreen::set_text(const std::string &text)
+void GuiDirtscreen::set_text(const std::string &text)
 {
     text_lines = str::split(text, '\n');
 }
 
-void gui_dirtscreen::set_progress(uint8_t progress, uint8_t max_progress)
+void GuiDirtscreen::set_progress(uint8_t progress, uint8_t max_progress)
 {
     this->progress = progress;
     this->max_progress = max_progress;

@@ -12,16 +12,16 @@ int draw_textured_quad(GXTexObj &texture, int32_t x, int32_t y, int32_t w, int32
     v1 *= scale_v;
     v2 *= scale_v;
     GX_BeginGroup(GX_QUADS, 4);
-    GX_Vertex(vertex_property_t(scale * vec3f(x, y, 0), u1, v1));
-    GX_Vertex(vertex_property_t(scale * vec3f(x + w, y, 0), u2, v1));
-    GX_Vertex(vertex_property_t(scale * vec3f(x + w, y + h, 0), u2, v2));
-    GX_Vertex(vertex_property_t(scale * vec3f(x, y + h, 0), u1, v2));
+    GX_Vertex(Vertex(scale * Vec3f(x, y, 0), u1, v1));
+    GX_Vertex(Vertex(scale * Vec3f(x + w, y, 0), u2, v1));
+    GX_Vertex(Vertex(scale * Vec3f(x + w, y + h, 0), u2, v2));
+    GX_Vertex(Vertex(scale * Vec3f(x, y + h, 0), u1, v2));
     GX_EndGroup();
     return 4;
 }
 
 // NOTE: This function doesn't load the texture automatically because it's used by font rendering. Make sure to call use_texture before calling this function.
-int draw_colored_sprite(GXTexObj &texture, vec2i pos, vec2i size, vfloat_t u1, vfloat_t v1, vfloat_t u2, vfloat_t v2, GXColor color, float scale)
+int draw_colored_sprite(GXTexObj &texture, Vec2i pos, Vec2i size, vfloat_t u1, vfloat_t v1, vfloat_t u2, vfloat_t v2, GXColor color, float scale)
 {
     uint8_t r = color.r;
     uint8_t g = color.g;
@@ -34,16 +34,16 @@ int draw_colored_sprite(GXTexObj &texture, vec2i pos, vec2i size, vfloat_t u1, v
     v1 *= scale_v;
     v2 *= scale_v;
     GX_BeginGroup(GX_QUADS, 4);
-    GX_Vertex(vertex_property_t(scale * vec3f(pos.x, pos.y, 0), u1, v1, r, g, b, a));
-    GX_Vertex(vertex_property_t(scale * vec3f(pos.x + size.x, pos.y, 0), u2, v1, r, g, b, a));
-    GX_Vertex(vertex_property_t(scale * vec3f(pos.x + size.x, pos.y + size.y, 0), u2, v2, r, g, b, a));
-    GX_Vertex(vertex_property_t(scale * vec3f(pos.x, pos.y + size.y, 0), u1, v2, r, g, b, a));
+    GX_Vertex(Vertex(scale * Vec3f(pos.x, pos.y, 0), u1, v1, r, g, b, a));
+    GX_Vertex(Vertex(scale * Vec3f(pos.x + size.x, pos.y, 0), u2, v1, r, g, b, a));
+    GX_Vertex(Vertex(scale * Vec3f(pos.x + size.x, pos.y + size.y, 0), u2, v2, r, g, b, a));
+    GX_Vertex(Vertex(scale * Vec3f(pos.x, pos.y + size.y, 0), u1, v2, r, g, b, a));
     GX_EndGroup();
     return 4;
 }
 
 // NOTE: This function doesn't load the texture automatically because it's used by font rendering. Make sure to call use_texture before calling this function.
-int draw_colored_sprite_3d(GXTexObj &texture, vec3f center, vec3f size, vec3f offset, vec3f right, vec3f up, vfloat_t u1, vfloat_t v1, vfloat_t u2, vfloat_t v2, GXColor color)
+int draw_colored_sprite_3d(GXTexObj &texture, Vec3f center, Vec3f size, Vec3f offset, Vec3f right, Vec3f up, vfloat_t u1, vfloat_t v1, vfloat_t u2, vfloat_t v2, GXColor color)
 {
     NOP_FIX;
     uint8_t r = color.r;
@@ -57,14 +57,14 @@ int draw_colored_sprite_3d(GXTexObj &texture, vec3f center, vec3f size, vec3f of
     v1 *= scale_v;
     v2 *= scale_v;
     size = size * 0.5;
-    vec3f right_offset = right * size.x;
-    vec3f up_offset = up * size.y;
+    Vec3f right_offset = right * size.x;
+    Vec3f up_offset = up * size.y;
     center = center + right * offset.x + up * offset.y;
     GX_BeginGroup(GX_QUADS, 4);
-    GX_VertexF(vertex_property_t(center - right_offset - up_offset, u1, v1, r, g, b, a));
-    GX_VertexF(vertex_property_t(center + right_offset - up_offset, u2, v1, r, g, b, a));
-    GX_VertexF(vertex_property_t(center + right_offset + up_offset, u2, v2, r, g, b, a));
-    GX_VertexF(vertex_property_t(center - right_offset + up_offset, u1, v2, r, g, b, a));
+    GX_VertexF(Vertex(center - right_offset - up_offset, u1, v1, r, g, b, a));
+    GX_VertexF(Vertex(center + right_offset - up_offset, u2, v1, r, g, b, a));
+    GX_VertexF(Vertex(center + right_offset + up_offset, u2, v2, r, g, b, a));
+    GX_VertexF(Vertex(center - right_offset + up_offset, u1, v2, r, g, b, a));
     GX_EndGroup();
     return 4;
 }
@@ -93,13 +93,13 @@ vfloat_t text_width_3d(std::string str)
     return std::max(max_width, width);
 }
 
-void draw_text_3d(vec3f pos, std::string str, GXColor color)
+void draw_text_3d(Vec3f pos, std::string str, GXColor color)
 {
-    camera_t& camera = get_camera();
+    Camera& camera = get_camera();
     
-    vec3f char_size = vec3f(0.25);
-    vec3f right_vec = -angles_to_vector(0, camera.rot.y + 90);
-    vec3f up_vec = -angles_to_vector(camera.rot.x + 90, camera.rot.y);
+    Vec3f char_size = Vec3f(0.25);
+    Vec3f right_vec = -angles_to_vector(0, camera.rot.y + 90);
+    Vec3f up_vec = -angles_to_vector(camera.rot.x + 90, camera.rot.y);
 
     // Enable direct colors
     GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
@@ -131,7 +131,7 @@ void draw_text_3d(vec3f pos, std::string str, GXColor color)
         uint16_t cx = uint16_t(c & 15) << 3;
         uint16_t cy = uint16_t(c >> 4) << 3;
 
-        vec3f off = vec3f(x_offset - half_width + 4, y_offset, 0.0) * (char_size.x * 0.125);
+        Vec3f off = Vec3f(x_offset - half_width + 4, y_offset, 0.0) * (char_size.x * 0.125);
         // Draw the character
         draw_colored_sprite_3d(font_texture, pos, char_size, off, right_vec, up_vec, cx, cy, cx + 8, cy + 8, color);
 
@@ -150,10 +150,10 @@ int draw_colored_quad(int32_t x, int32_t y, int32_t w, int32_t h, uint8_t r, uin
 {
     use_texture(icons_texture);
     GX_BeginGroup(GX_QUADS, 4);
-    GX_Vertex(vertex_property_t(scale * vec3f(x, y, 0), 0 * BASE3D_PIXEL_UV_SCALE, 16 * BASE3D_PIXEL_UV_SCALE, r, g, b, a));
-    GX_Vertex(vertex_property_t(scale * vec3f(x + w, y, 0), 8 * BASE3D_PIXEL_UV_SCALE, 16 * BASE3D_PIXEL_UV_SCALE, r, g, b, a));
-    GX_Vertex(vertex_property_t(scale * vec3f(x + w, y + h, 0), 8 * BASE3D_PIXEL_UV_SCALE, 24 * BASE3D_PIXEL_UV_SCALE, r, g, b, a));
-    GX_Vertex(vertex_property_t(scale * vec3f(x, y + h, 0), 0 * BASE3D_PIXEL_UV_SCALE, 24 * BASE3D_PIXEL_UV_SCALE, r, g, b, a));
+    GX_Vertex(Vertex(scale * Vec3f(x, y, 0), 0 * BASE3D_PIXEL_UV_SCALE, 16 * BASE3D_PIXEL_UV_SCALE, r, g, b, a));
+    GX_Vertex(Vertex(scale * Vec3f(x + w, y, 0), 8 * BASE3D_PIXEL_UV_SCALE, 16 * BASE3D_PIXEL_UV_SCALE, r, g, b, a));
+    GX_Vertex(Vertex(scale * Vec3f(x + w, y + h, 0), 8 * BASE3D_PIXEL_UV_SCALE, 24 * BASE3D_PIXEL_UV_SCALE, r, g, b, a));
+    GX_Vertex(Vertex(scale * Vec3f(x, y + h, 0), 0 * BASE3D_PIXEL_UV_SCALE, 24 * BASE3D_PIXEL_UV_SCALE, r, g, b, a));
     GX_EndGroup();
     return 4;
 }
@@ -182,10 +182,10 @@ int fill_screen_texture(GXTexObj &texture, gertex::GXView &view, vfloat_t u1, vf
         {
             int x = i * w;
             int y = j * h;
-            GX_Vertex(vertex_property_t(scale * vec3f(x, y, 0), u1, v1, intensity, intensity, intensity));
-            GX_Vertex(vertex_property_t(scale * vec3f(x + w, y, 0), u2, v1, intensity, intensity, intensity));
-            GX_Vertex(vertex_property_t(scale * vec3f(x + w, y + h, 0), u2, v2, intensity, intensity, intensity));
-            GX_Vertex(vertex_property_t(scale * vec3f(x, y + h, 0), u1, v2, intensity, intensity, intensity));
+            GX_Vertex(Vertex(scale * Vec3f(x, y, 0), u1, v1, intensity, intensity, intensity));
+            GX_Vertex(Vertex(scale * Vec3f(x + w, y, 0), u2, v1, intensity, intensity, intensity));
+            GX_Vertex(Vertex(scale * Vec3f(x + w, y + h, 0), u2, v2, intensity, intensity, intensity));
+            GX_Vertex(Vertex(scale * Vec3f(x, y + h, 0), u1, v2, intensity, intensity, intensity));
         }
     }
     GX_EndGroup();

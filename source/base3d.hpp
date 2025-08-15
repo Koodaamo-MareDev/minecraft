@@ -32,10 +32,10 @@ constexpr uint32_t VERTEX_ATTR_LENGTH = (3 * sizeof(int16_t) + 1 * sizeof(uint8_
 constexpr uint32_t VERTEX_ATTR_LENGTH_FLOATPOS = (3 * sizeof(float) + 1 * sizeof(uint8_t) + 1 * sizeof(uint8_t) + 2 * sizeof(float));
 constexpr uint32_t VERTEX_ATTR_LENGTH_DIRECTCOLOR = (3 * sizeof(int16_t) + 1 * sizeof(uint8_t) + 4 * sizeof(uint8_t) + 2 * sizeof(float));
 
-class vertex_property_t
+class Vertex
 {
 public:
-    vec3f pos = vec3f(0, 0, 0);
+    Vec3f pos = Vec3f(0, 0, 0);
     vfloat_t x_uv = 0;
     vfloat_t y_uv = 0;
     uint8_t color_r = 255;
@@ -43,13 +43,13 @@ public:
     uint8_t color_b = 255;
     uint8_t color_a = 255;
     uint8_t index = 0;
-    vertex_property_t(int x) : pos(x), x_uv(x), y_uv(x) {}
-    vertex_property_t(vec3f pos = vec3f(0, 0, 0), vfloat_t x_uv = 0, vfloat_t y_uv = 0, uint8_t color_r = 255, uint8_t color_g = 255, uint8_t color_b = 255, uint8_t color_a = 255, uint8_t index = 0) : pos(pos), x_uv(x_uv), y_uv(y_uv), color_r(color_r), color_g(color_g), color_b(color_b), color_a(color_a), index(index) {}
+    Vertex(int x) : pos(x), x_uv(x), y_uv(x) {}
+    Vertex(Vec3f pos = Vec3f(0, 0, 0), vfloat_t x_uv = 0, vfloat_t y_uv = 0, uint8_t color_r = 255, uint8_t color_g = 255, uint8_t color_b = 255, uint8_t color_a = 255, uint8_t index = 0) : pos(pos), x_uv(x_uv), y_uv(y_uv), color_r(color_r), color_g(color_g), color_b(color_b), color_a(color_a), index(index) {}
 };
-class vertex_property16_t
+class Vertex16
 {
 public:
-    vec3i pos = vec3i(0, 0, 0);
+    Vec3i pos = Vec3i(0, 0, 0);
     vfloat_t x_uv = 0;
     vfloat_t y_uv = 0;
     uint8_t color_r = 255;
@@ -57,8 +57,8 @@ public:
     uint8_t color_b = 255;
     uint8_t color_a = 255;
     uint8_t index = 0;
-    vertex_property16_t(int x) : pos(x), x_uv(x), y_uv(x) {}
-    vertex_property16_t(vec3i pos = vec3i(0, 0, 0), vfloat_t x_uv = 0, vfloat_t y_uv = 0, uint8_t color_r = 255, uint8_t color_g = 255, uint8_t color_b = 255, uint8_t color_a = 255, uint8_t index = 0) : pos(pos), x_uv(x_uv), y_uv(y_uv), color_r(color_r), color_g(color_g), color_b(color_b), color_a(color_a), index(index) {}
+    Vertex16(int x) : pos(x), x_uv(x), y_uv(x) {}
+    Vertex16(Vec3i pos = Vec3i(0, 0, 0), vfloat_t x_uv = 0, vfloat_t y_uv = 0, uint8_t color_r = 255, uint8_t color_g = 255, uint8_t color_b = 255, uint8_t color_a = 255, uint8_t index = 0) : pos(pos), x_uv(x_uv), y_uv(y_uv), color_r(color_r), color_g(color_g), color_b(color_b), color_a(color_a), index(index) {}
 };
 
 extern bool base3d_is_drawing;
@@ -80,7 +80,7 @@ inline uint16_t GX_EndGroup()
     return __group_vtxcount;
 }
 
-inline void GX_Vertex(const vertex_property_t &vert, uint8_t face = 3)
+inline void GX_Vertex(const Vertex &vert, uint8_t face = 3)
 {
     ++__group_vtxcount;
     if (!base3d_is_drawing)
@@ -91,7 +91,7 @@ inline void GX_Vertex(const vertex_property_t &vert, uint8_t face = 3)
     GX_TexCoord2f32(vert.x_uv, vert.y_uv);
 }
 
-inline void GX_VertexLit(const vertex_property_t &vert, uint8_t light, uint8_t face = 3)
+inline void GX_VertexLit(const Vertex &vert, uint8_t light, uint8_t face = 3)
 {
     ++__group_vtxcount;
     if (!base3d_is_drawing)
@@ -102,7 +102,7 @@ inline void GX_VertexLit(const vertex_property_t &vert, uint8_t light, uint8_t f
     GX_TexCoord2f32(vert.x_uv, vert.y_uv);
 }
 
-inline void GX_Vertex16(const vertex_property16_t &vert, uint8_t face = 3)
+inline void GX_Vertex16(const Vertex16 &vert, uint8_t face = 3)
 {
     ++__group_vtxcount;
     if (!base3d_is_drawing)
@@ -113,7 +113,7 @@ inline void GX_Vertex16(const vertex_property16_t &vert, uint8_t face = 3)
     GX_TexCoord2f32(vert.x_uv, vert.y_uv);
 }
 
-inline void GX_VertexLit16(const vertex_property16_t &vert, uint8_t light, uint8_t face = 3)
+inline void GX_VertexLit16(const Vertex16 &vert, uint8_t light, uint8_t face = 3)
 {
     ++__group_vtxcount;
     if (!base3d_is_drawing)
@@ -124,7 +124,7 @@ inline void GX_VertexLit16(const vertex_property16_t &vert, uint8_t light, uint8
     GX_TexCoord2f32(vert.x_uv, vert.y_uv);
 }
 
-inline void GX_VertexF(const vertex_property_t &vert, uint8_t face = 3)
+inline void GX_VertexF(const Vertex &vert, uint8_t face = 3)
 {
     ++__group_vtxcount;
     if (!base3d_is_drawing)
@@ -135,7 +135,7 @@ inline void GX_VertexF(const vertex_property_t &vert, uint8_t face = 3)
     GX_TexCoord2f32(vert.x_uv, vert.y_uv);
 }
 
-inline void GX_VertexLitF(const vertex_property_t &vert, uint8_t light, uint8_t face = 3)
+inline void GX_VertexLitF(const Vertex &vert, uint8_t light, uint8_t face = 3)
 {
     ++__group_vtxcount;
     if (!base3d_is_drawing)
@@ -154,7 +154,7 @@ inline void GX_VertexLitF(const vertex_property_t &vert, uint8_t light, uint8_t 
  *
  * @note This function is quite slow and should be used only when necessary
  */
-inline void GX_VertexT(const vertex_property_t &vert, const gertex::GXMatrix &mtx, uint8_t face = 3)
+inline void GX_VertexT(const Vertex &vert, const gertex::GXMatrix &mtx, uint8_t face = 3)
 {
     ++__group_vtxcount;
     if (!base3d_is_drawing)
@@ -178,7 +178,7 @@ inline void GX_VertexT(const vertex_property_t &vert, const gertex::GXMatrix &mt
  *
  * @note This function is quite slow and should be used only when necessary
  */
-inline void GX_VertexLitT(const vertex_property_t &vert, const gertex::GXMatrix &mtx, uint8_t light, uint8_t face = 3)
+inline void GX_VertexLitT(const Vertex &vert, const gertex::GXMatrix &mtx, uint8_t light, uint8_t face = 3)
 {
     ++__group_vtxcount;
     if (!base3d_is_drawing)

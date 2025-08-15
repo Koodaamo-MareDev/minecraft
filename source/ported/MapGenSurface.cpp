@@ -22,7 +22,7 @@ void javaport::MapGenSurface::populate(int32_t chunkX, int32_t chunkZ, int32_t x
     }
 
     float temperature_noise[16 * 16];
-    noiser.GetNoiseSet(vec3f(x * 16 - 193.514f, 0, z * 16 + 37.314f), vec3i(16, 1, 16), 131.134f, 2, temperature_noise);
+    noiser.GetNoiseSet(Vec3f(x * 16 - 193.514f, 0, z * 16 + 37.314f), Vec3i(16, 1, 16), 131.134f, 2, temperature_noise);
 
     for (int32_t i = 0; i < 16 * 16; i++)
     {

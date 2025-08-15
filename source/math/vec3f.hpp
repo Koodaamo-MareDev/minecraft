@@ -9,69 +9,68 @@
 #include "ogc/gx.h"
 #endif
 
-class vec3i; // Forward declaration
+class Vec3i; // Forward declaration
 
 typedef double vfloat_t;
 
-class vec3f
+class Vec3f
 {
 public:
     // Constructors, member variables, and other member functions
     vfloat_t x = 0, y = 0, z = 0;
-    bool operator==(vec3f const &a) const;
-    vec3f operator+(vec3f const &a) const;
-    vec3f operator-(vec3f const &a) const;
-    vec3f operator+(vec3i const &a) const;
-    vec3f operator-(vec3i const &a) const;
-    vec3f operator*(vfloat_t const &a) const;
-    vec3f operator/(vfloat_t const &a) const;
-    vec3f operator-() const;
-    vec3f operator%(vfloat_t const &b);
-    vec3f fast_normalize() const; // Fast normalization using fast inverse square root
-    vec3f normalize() const;
+    bool operator==(Vec3f const &a) const;
+    Vec3f operator+(Vec3f const &a) const;
+    Vec3f operator-(Vec3f const &a) const;
+    Vec3f operator+(Vec3i const &a) const;
+    Vec3f operator-(Vec3i const &a) const;
+    Vec3f operator*(vfloat_t const &a) const;
+    Vec3f operator/(vfloat_t const &a) const;
+    Vec3f operator-() const;
+    Vec3f operator%(vfloat_t const &b);
+    Vec3f fast_normalize() const; // Fast normalization using fast inverse square root
+    Vec3f normalize() const;
     vfloat_t fast_magnitude() const; // Fast magnitude using fast inverse square root
     vfloat_t magnitude() const;
     vfloat_t sqr_magnitude() const;
-    static vec3f lerp(vec3f a, vec3f b, vfloat_t t)
+    static Vec3f lerp(Vec3f a, Vec3f b, vfloat_t t)
     {
         return a + (b - a) * t;
     }
-    vec3f(vfloat_t x, vfloat_t y, vfloat_t z) : x(x), y(y), z(z) {}
-    vec3f(vfloat_t xyz) : x(xyz), y(xyz), z(xyz) {}
-    vec3f() : x(0), y(0), z(0) {}
+    Vec3f(vfloat_t x, vfloat_t y, vfloat_t z) : x(x), y(y), z(z) {}
+    Vec3f(vfloat_t xyz) : x(xyz), y(xyz), z(xyz) {}
+    Vec3f() : x(0), y(0), z(0) {}
 
-    vec3f abs() const
+    Vec3f abs() const
     {
-        return vec3f{std::abs(x), std::abs(y), std::abs(z)};
+        return Vec3f{std::abs(x), std::abs(y), std::abs(z)};
     }
 
-    vec3i round() const
+    Vec3i round() const
     {
-        return vec3i(static_cast<int32_t>(std::round(x)), static_cast<int32_t>(std::round(y)), static_cast<int32_t>(std::round(z)));
+        return Vec3i(static_cast<int32_t>(std::round(x)), static_cast<int32_t>(std::round(y)), static_cast<int32_t>(std::round(z)));
     }
 
     // Returns the vector split into three axis-aligned vectors
-    std::array<vec3f, 3> split() const
+    std::array<Vec3f, 3> split() const
     {
-        std::array<vec3f, 3> result;
-        result[0] = vec3f(x, 0, 0);
-        result[1] = vec3f(0, y, 0);
-        result[2] = vec3f(0, 0, z);
+        std::array<Vec3f, 3> result;
+        result[0] = Vec3f(x, 0, 0);
+        result[1] = Vec3f(0, y, 0);
+        result[2] = Vec3f(0, 0, z);
         return result;
     }
 
-    // Conversion operator to vec3i
-    operator vec3i() const;
+    operator Vec3i() const;
 
 #if HW_RVL
-    vec3f(guVector a) : x(a.x), y(a.y), z(a.z) {}
+    Vec3f(guVector a) : x(a.x), y(a.y), z(a.z) {}
     operator guVector() const;
 #endif
 
 private:
     // Member variables
 };
-inline vec3f operator*(vfloat_t const &a, vec3f const &b)
+inline Vec3f operator*(vfloat_t const &a, Vec3f const &b)
 {
     return b * a;
 }

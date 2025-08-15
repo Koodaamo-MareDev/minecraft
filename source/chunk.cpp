@@ -30,20 +30,20 @@
 #include "mcregion.hpp"
 #include "world.hpp"
 #include "util/face_pair.hpp"
-const vec3i face_offsets[] = {
-    vec3i{-1, +0, +0},  // Negative X
-    vec3i{+1, +0, +0},  // Positive X
-    vec3i{+0, -1, +0},  // Negative Y
-    vec3i{+0, +1, +0},  // Positive Y
-    vec3i{+0, +0, -1},  // Negative Z
-    vec3i{+0, +0, +1}}; // Positive Z
+const Vec3i face_offsets[] = {
+    Vec3i{-1, +0, +0},  // Negative X
+    Vec3i{+1, +0, +0},  // Positive X
+    Vec3i{+0, -1, +0},  // Negative Y
+    Vec3i{+0, +1, +0},  // Positive Y
+    Vec3i{+0, +0, -1},  // Negative Z
+    Vec3i{+0, +0, +1}}; // Positive Z
 
 mutex_t chunk_mutex = LWP_MUTEX_NULL;
 static lwp_t chunk_manager_thread_handle = LWP_THREAD_NULL;
 static bool run_chunk_manager = false;
 
-std::deque<chunk_t *> chunks;
-std::deque<chunk_t *> pending_chunks;
+std::deque<Chunk *> chunks;
+std::deque<Chunk *> pending_chunks;
 
 // Used to set the world to hell
 void set_world_hell(bool hell)
@@ -52,7 +52,7 @@ void set_world_hell(bool hell)
         return;
 
     // Stop processing any light updates
-    light_engine::reset();
+    LightEngine::reset();
     if (hell)
     {
         // Set the light map to the nether light map
@@ -62,35 +62,35 @@ void set_world_hell(bool hell)
     }
 
     // Disable sky light in hell
-    light_engine::enable_skylight(!hell);
+    LightEngine::enable_skylight(!hell);
 
     current_world->hell = hell;
 }
 
-std::deque<chunk_t *> &get_chunks()
+std::deque<Chunk *> &get_chunks()
 {
     return chunks;
 }
 
-std::map<int32_t, entity_physical *> &get_entities()
+std::map<int32_t, EntityPhysical *> &get_entities()
 {
-    static std::map<int32_t, entity_physical *> world_entities;
+    static std::map<int32_t, EntityPhysical *> world_entities;
     return world_entities;
 }
 
-chunk_t *get_chunk_from_pos(const vec3i &pos)
+Chunk *get_chunk_from_pos(const Vec3i &pos)
 {
     return get_chunk(block_to_chunk_pos(pos));
 }
 
-chunk_t *get_chunk(const vec2i &pos)
+Chunk *get_chunk(const Vec2i &pos)
 {
     return get_chunk(pos.x, pos.y);
 }
 
-chunk_t *get_chunk(int32_t x, int32_t z)
+Chunk *get_chunk(int32_t x, int32_t z)
 {
-    std::deque<chunk_t *>::iterator it = std::find_if(chunks.begin(), chunks.end(), [x, z](chunk_t *chunk)
+    std::deque<Chunk *>::iterator it = std::find_if(chunks.begin(), chunks.end(), [x, z](Chunk *chunk)
                                                       { return chunk && chunk->x == x && chunk->z == z; });
     if (it == chunks.end())
         return nullptr;
@@ -101,10 +101,10 @@ bool add_chunk(int32_t x, int32_t z)
 {
     if (!run_chunk_manager || pending_chunks.size() + chunks.size() >= CHUNK_COUNT)
         return false;
-    lock_t chunk_lock(chunk_mutex);
+    Lock chunk_lock(chunk_mutex);
 
     // Function to find a chunk with the given coordinates
-    auto find_chunk = [x, z](chunk_t *chunk)
+    auto find_chunk = [x, z](Chunk *chunk)
     {
         return chunk && chunk->x == x && chunk->z == z;
     };
@@ -115,10 +115,10 @@ bool add_chunk(int32_t x, int32_t z)
     if (std::find_if(chunks.begin(), chunks.end(), find_chunk) != chunks.end())
         return false;
 
-    chunk_t *chunk = new chunk_t(x, z);
+    Chunk *chunk = new Chunk(x, z);
 
     // Check if the chunk exists in the region file
-    mcr::region *region = mcr::get_region(x >> 5, z >> 5);
+    mcr::Region *region = mcr::get_region(x >> 5, z >> 5);
     if (region->locations[(x & 31) | ((z & 31) << 5)] != 0)
         chunk->generation_stage = ChunkGenStage::loading;
 
@@ -141,10 +141,10 @@ void deinit_chunk_manager()
     chunk_manager_thread_handle = LWP_THREAD_NULL;
 
     // Cleanup the chunk mutex
-    lock_t::destroy(chunk_mutex);
+    Lock::destroy(chunk_mutex);
 }
 
-void init_chunk_manager(chunkprovider *chunk_provider)
+void init_chunk_manager(ChunkProvider *chunk_provider)
 {
     if (chunk_manager_thread_handle != LWP_THREAD_NULL)
         return;
@@ -158,7 +158,7 @@ void init_chunk_manager(chunkprovider *chunk_provider)
     }
     auto chunk_manager_thread = [](void *arg) -> void *
     {
-        chunkprovider *provider = (chunkprovider *)arg;
+        ChunkProvider *provider = (ChunkProvider *)arg;
         run_chunk_manager = true;
         while (run_chunk_manager)
         {
@@ -170,13 +170,13 @@ void init_chunk_manager(chunkprovider *chunk_provider)
                     return NULL;
                 }
             }
-            chunk_t *chunk = pending_chunks.back();
+            Chunk *chunk = pending_chunks.back();
 
             // Generate the base terrain for the chunk
             provider->provide_chunk(chunk);
 
             // Move the chunk to the active list
-            lock_t chunk_lock(chunk_mutex);
+            Lock chunk_lock(chunk_mutex);
             chunks.push_back(chunk);
             pending_chunks.erase(std::find(pending_chunks.begin(), pending_chunks.end(), chunk));
             chunk_lock.unlock();
@@ -197,49 +197,49 @@ void init_chunk_manager(chunkprovider *chunk_provider)
                      50);
 }
 
-BlockID get_block_id_at(const vec3i &position, BlockID default_id, chunk_t *near)
+BlockID get_block_id_at(const Vec3i &position, BlockID default_id, Chunk *near)
 {
-    block_t *block = get_block_at(position, near);
+    Block *block = get_block_at(position, near);
     if (!block)
         return default_id;
     return block->get_blockid();
 }
-block_t *get_block_at(const vec3i &position, chunk_t *near)
+Block *get_block_at(const Vec3i &position, Chunk *near)
 {
     if (position.y < 0 || position.y > MAX_WORLD_Y)
         return nullptr;
     if (near && near->x == (position.x >> 4) && near->z == (position.z >> 4))
         return near->get_block(position);
-    chunk_t *chunk = get_chunk_from_pos(position);
+    Chunk *chunk = get_chunk_from_pos(position);
     if (!chunk)
         return nullptr;
     return chunk->get_block(position);
 }
 
-void set_block_at(const vec3i &pos, BlockID id, chunk_t *near)
+void set_block_at(const Vec3i &pos, BlockID id, Chunk *near)
 {
-    block_t *block = get_block_at(pos, near);
+    Block *block = get_block_at(pos, near);
     if (block)
         block->set_blockid(id);
 }
 
-void replace_air_at(vec3i pos, BlockID id, chunk_t *near)
+void replace_air_at(Vec3i pos, BlockID id, Chunk *near)
 {
-    block_t *block = get_block_at(pos, near);
+    Block *block = get_block_at(pos, near);
     if (block && block->get_blockid() == BlockID::air)
         block->set_blockid(id);
 }
 
-int32_t chunk_t::player_taxicab_distance()
+int32_t Chunk::player_taxicab_distance()
 {
-    entity_player_local *player = current_world->player.m_entity;
+    EntityPlayerLocal *player = current_world->player.m_entity;
     if (!player)
         return 0;
-    vec3f pos = player->get_position(0);
+    Vec3f pos = player->get_position(0);
     return std::abs((this->x << 4) - (int32_t(std::floor(pos.x)) & ~15)) + std::abs((this->z << 4) - (int32_t(std::floor(pos.z)) & ~15));
 }
 
-void chunk_t::update_height_map(vec3i pos)
+void Chunk::update_height_map(Vec3i pos)
 {
     pos.x &= 15;
     pos.z &= 15;
@@ -263,17 +263,17 @@ void chunk_t::update_height_map(vec3i pos)
     }
 }
 
-void update_block_at(const vec3i &pos)
+void update_block_at(const Vec3i &pos)
 {
     if (pos.y > 255 || pos.y < 0)
         return;
-    chunk_t *chunk = get_chunk_from_pos(pos);
+    Chunk *chunk = get_chunk_from_pos(pos);
     if (!chunk)
         return;
     if (!current_world->is_remote())
     {
-        block_t *block = chunk->get_block(pos);
-        blockproperties_t prop = properties(block->id);
+        Block *block = chunk->get_block(pos);
+        BlockProperties prop = properties(block->id);
         if (prop.m_fluid)
         {
             block->meta |= FLUID_UPDATE_REQUIRED_FLAG;
@@ -281,10 +281,10 @@ void update_block_at(const vec3i &pos)
         }
         if (prop.m_fall)
         {
-            BlockID block_below = get_block_id_at(pos + vec3i(0, -1, 0), BlockID::stone, chunk);
+            BlockID block_below = get_block_id_at(pos + Vec3i(0, -1, 0), BlockID::stone, chunk);
             if (block_below == BlockID::air || properties(block_below).m_fluid)
             {
-                add_entity(new entity_falling_block(*block, pos));
+                add_entity(new EntityFallingBlock(*block, pos));
                 block->set_blockid(BlockID::air);
                 block->meta = 0;
 
@@ -293,36 +293,36 @@ void update_block_at(const vec3i &pos)
         }
         if (block->get_blockid() == BlockID::snow_layer)
         {
-            block_t *block_below = chunk->get_block(pos + vec3i(0, -1, 0));
+            Block *block_below = chunk->get_block(pos + Vec3i(0, -1, 0));
             if (block_below && block_below->get_blockid() == BlockID::grass)
             {
                 block_below->meta = 1; // Set the snowy flag
-                update_block_at(pos + vec3i(0, -1, 0));
+                update_block_at(pos + Vec3i(0, -1, 0));
             }
         }
     }
     chunk->update_height_map(pos);
-    light_engine::post(coord(pos, chunk));
+    LightEngine::post(Coord(pos, chunk));
 }
 
-void update_neighbors(const vec3i &pos)
+void update_neighbors(const Vec3i &pos)
 {
     for (int i = 0; i < 6; i++)
     {
-        vec3i neighbour = pos + face_offsets[i];
+        Vec3i neighbour = pos + face_offsets[i];
         update_block_at(neighbour);
     }
 }
 
-void chunk_t::light_up()
+void Chunk::light_up()
 {
     if (!this->lit_state)
     {
-        coord pos = coord(vec3i(), this);
+        Coord pos = Coord(Vec3i(), this);
         for (int i = 0; i < 256; i++)
         {
             pos.coords.h_index = i;
-            int end_y = skycast(vec3i(pos), this);
+            int end_y = skycast(Vec3i(pos), this);
             if (end_y >= MAX_WORLD_Y || end_y <= 0)
                 return;
             this->height_map[i] = end_y + 1;
@@ -332,15 +332,15 @@ void chunk_t::light_up()
             }
 
             // Update top-most block under daylight
-            light_engine::post(pos);
+            LightEngine::post(pos);
 
             // Update block lights
             for (pos.coords.y = 0; pos.coords.y < end_y; pos.coords.y++)
             {
-                block_t *block = &this->blockstates[uint16_t(pos)];
+                Block *block = &this->blockstates[uint16_t(pos)];
                 if (get_block_luminance(block->get_blockid()))
                 {
-                    light_engine::post(pos);
+                    LightEngine::post(pos);
                 }
             }
         }
@@ -348,27 +348,27 @@ void chunk_t::light_up()
     }
 }
 
-void chunk_t::recalculate_height_map()
+void Chunk::recalculate_height_map()
 {
-    coord pos = coord(vec3i(), this);
+    Coord pos = Coord(Vec3i(), this);
     for (int i = 0; i < 256; i++)
     {
         pos.coords.h_index = i;
-        int end_y = skycast(vec3i(pos), this);
+        int end_y = skycast(Vec3i(pos), this);
         if (end_y >= MAX_WORLD_Y || end_y <= 0)
             return;
         this->height_map[i] = end_y + 1;
     }
 }
 
-void chunk_t::recalculate_visibility(block_t *block, vec3i pos)
+void Chunk::recalculate_visibility(Block *block, Vec3i pos)
 {
-    block_t *neighbors[6];
+    Block *neighbors[6];
     get_neighbors(pos, neighbors, this);
     uint8_t visibility = 0x40;
     for (int i = 0; i < 6; i++)
     {
-        block_t *other_block = neighbors[i];
+        Block *other_block = neighbors[i];
         if (!other_block || !other_block->get_visibility())
         {
             visibility |= 1 << i;
@@ -385,11 +385,11 @@ void chunk_t::recalculate_visibility(block_t *block, vec3i pos)
 }
 
 // recalculates the blockstates of a section
-void chunk_t::refresh_section_block_visibility(int index)
+void Chunk::refresh_section_block_visibility(int index)
 {
-    vec3i chunk_pos(this->x * 16, index * 16, this->z * 16);
+    Vec3i chunk_pos(this->x * 16, index * 16, this->z * 16);
 
-    block_t *block = this->get_block(chunk_pos); // Gets the first block of the section
+    Block *block = this->get_block(chunk_pos); // Gets the first block of the section
     for (int y = 0; y < 16; y++)
     {
         for (int z = 0; z < 16; z++)
@@ -398,7 +398,7 @@ void chunk_t::refresh_section_block_visibility(int index)
             {
                 if (!block->get_visibility())
                     continue;
-                vec3i pos = vec3i(x, y, z);
+                Vec3i pos = Vec3i(x, y, z);
                 this->recalculate_visibility(block, chunk_pos + pos);
             }
         }
@@ -406,7 +406,7 @@ void chunk_t::refresh_section_block_visibility(int index)
 }
 
 // These variables are used for the flood fill algorithm
-static std::vector<vec3i> floodfill_start_points;
+static std::vector<Vec3i> floodfill_start_points;
 static uint32_t floodfill_counter = 0;
 static uint32_t floodfill_to_replace = 1;
 static uint32_t floodfill_flood_id = 0;
@@ -415,7 +415,7 @@ static uint8_t floodfill_faces_touched[6] = {0};
 
 // Initialize the flood fill start points for visibility calculations
 // This function generates the start points for the flood fill algorithm
-void chunk_t::init_floodfill_startpoints()
+void Chunk::init_floodfill_startpoints()
 {
     floodfill_start_points.clear();
     constexpr int size = 16;
@@ -424,35 +424,35 @@ void chunk_t::init_floodfill_startpoints()
     for (int y = 0; y < size; ++y)
         for (int z = 0; z < size; ++z)
         {
-            floodfill_start_points.push_back(vec3i(0, y, z));   // x = 0
-            floodfill_start_points.push_back(vec3i(max, y, z)); // x = max
+            floodfill_start_points.push_back(Vec3i(0, y, z));   // x = 0
+            floodfill_start_points.push_back(Vec3i(max, y, z)); // x = max
         }
 
     // Generate faces at y = 0 and y = max, skipping already added edges
     for (int x = 1; x < max; ++x)
         for (int z = 0; z < size; ++z)
         {
-            floodfill_start_points.push_back(vec3i(x, 0, z));   // y = 0
-            floodfill_start_points.push_back(vec3i(x, max, z)); // y = max
+            floodfill_start_points.push_back(Vec3i(x, 0, z));   // y = 0
+            floodfill_start_points.push_back(Vec3i(x, max, z)); // y = max
         }
 
     // Generate faces at z = 0 and z = max, skipping already added edges
     for (int x = 1; x < max; ++x)
         for (int y = 1; y < max; ++y)
         {
-            floodfill_start_points.push_back(vec3i(x, y, 0));   // z = 0
-            floodfill_start_points.push_back(vec3i(x, y, max)); // z = max
+            floodfill_start_points.push_back(Vec3i(x, y, 0));   // z = 0
+            floodfill_start_points.push_back(Vec3i(x, y, max)); // z = max
         }
 }
 
-void chunk_t::vbo_visibility_flood_fill(vec3i start_pos)
+void Chunk::vbo_visibility_flood_fill(Vec3i start_pos)
 {
-    std::deque<vec3i> queue;
+    std::deque<Vec3i> queue;
     queue.push_back(start_pos);
 
     while (!queue.empty())
     {
-        vec3i pos = queue.front();
+        Vec3i pos = queue.front();
         queue.pop_front();
 
         // Bounds check: If out of bounds, mark touched face and continue
@@ -508,17 +508,17 @@ void chunk_t::vbo_visibility_flood_fill(vec3i start_pos)
     }
 }
 
-void chunk_t::refresh_section_visibility(int index)
+void Chunk::refresh_section_visibility(int index)
 {
     init_face_pairs();
-    section &vbo = this->sections[index];
+    Section &vbo = this->sections[index];
 
     // Initialize the flood fill start points if not already initialized
     if (floodfill_start_points.empty())
         init_floodfill_startpoints();
 
     // Rebuild the flood fill grid
-    block_t *block = this->get_block(vec3i(0, index << 4, 0));
+    Block *block = this->get_block(Vec3i(0, index << 4, 0));
     bool empty = true;
     for (uint32_t i = 0; i < 4096; i++, block++)
     {
@@ -529,7 +529,7 @@ void chunk_t::refresh_section_visibility(int index)
         if (!block->id)
             continue;
 
-        blockproperties_t prop = properties(block->id);
+        BlockProperties prop = properties(block->id);
 
         if (prop.m_fluid || prop.m_transparent)
             continue;
@@ -551,7 +551,7 @@ void chunk_t::refresh_section_visibility(int index)
     floodfill_flood_id = 2;
     for (uint32_t i = 0; i < floodfill_start_points.size(); i++)
     {
-        vec3i pos = floodfill_start_points[i];
+        Vec3i pos = floodfill_start_points[i];
 
         // Reset the flood fill state
         floodfill_counter = 0;
@@ -583,9 +583,9 @@ void chunk_t::refresh_section_visibility(int index)
     }
 }
 
-int chunk_t::build_vbo(int index, bool transparent)
+int Chunk::build_vbo(int index, bool transparent)
 {
-    section &vbo = this->sections[index];
+    Section &vbo = this->sections[index];
     static uint8_t vbo_buffer[64000 * VERTEX_ATTR_LENGTH] __attribute__((aligned(32)));
     DCInvalidateRange(vbo_buffer, sizeof(vbo_buffer));
 
@@ -689,7 +689,7 @@ int chunk_t::build_vbo(int index, bool transparent)
     return (0);
 }
 
-void get_neighbors(const vec3i &pos, block_t **neighbors, chunk_t *near)
+void get_neighbors(const Vec3i &pos, Block **neighbors, Chunk *near)
 {
 
     if (((pos.x + 1) & 15) <= 1 || ((pos.z + 1) & 15) <= 1 || ((pos.y + 1) & 255) <= 1 || !near)
@@ -700,20 +700,20 @@ void get_neighbors(const vec3i &pos, block_t **neighbors, chunk_t *near)
             neighbors[x] = near->get_block(pos + face_offsets[x]);
 }
 
-vec3f get_fluid_direction(block_t *block, vec3i pos, chunk_t *chunk)
+Vec3f get_fluid_direction(Block *block, Vec3i pos, Chunk *chunk)
 {
 
     uint8_t fluid_level = get_fluid_meta_level(block);
     if ((fluid_level & 7) == 0)
-        return vec3f(0.0, -1.0, 0.0);
+        return Vec3f(0.0, -1.0, 0.0);
 
     BlockID block_id = block->get_blockid();
 
     // Used to check block types around the fluid
-    block_t *neighbors[6];
+    Block *neighbors[6];
     get_neighbors(pos, neighbors);
 
-    vec3f direction = vec3f(0.0, 0.0, 0.0);
+    Vec3f direction = Vec3f(0.0, 0.0, 0.0);
 
     bool direction_set = false;
     for (int i = 0; i < 6; i++)
@@ -724,9 +724,9 @@ vec3f get_fluid_direction(block_t *block, vec3i pos, chunk_t *chunk)
         {
             direction_set = true;
             if (get_fluid_meta_level(neighbors[i]) < fluid_level)
-                direction = direction - vec3f(face_offsets[i].x, 0, face_offsets[i].z);
+                direction = direction - Vec3f(face_offsets[i].x, 0, face_offsets[i].z);
             else if (get_fluid_meta_level(neighbors[i]) > fluid_level)
-                direction = direction + vec3f(face_offsets[i].x, 0, face_offsets[i].z);
+                direction = direction + Vec3f(face_offsets[i].x, 0, face_offsets[i].z);
             else
                 direction_set = false;
         }
@@ -736,9 +736,9 @@ vec3f get_fluid_direction(block_t *block, vec3i pos, chunk_t *chunk)
     return direction.fast_normalize();
 }
 
-void add_entity(entity_physical *entity)
+void add_entity(EntityPhysical *entity)
 {
-    std::map<int32_t, entity_physical *> &world_entities = get_entities();
+    std::map<int32_t, EntityPhysical *> &world_entities = get_entities();
 
     // If the world is local, assign a unique entity ID to prevent conflicts
     if (!current_world->is_remote())
@@ -749,7 +749,7 @@ void add_entity(entity_physical *entity)
         }
     }
     world_entities[entity->entity_id] = entity;
-    vec3i entity_pos = vec3i(int(std::floor(entity->position.x)), int(std::floor(entity->position.y)), int(std::floor(entity->position.z)));
+    Vec3i entity_pos = Vec3i(int(std::floor(entity->position.x)), int(std::floor(entity->position.y)), int(std::floor(entity->position.z)));
     entity->chunk = get_chunk_from_pos(entity_pos);
     if (entity->chunk)
         entity->chunk->entities.push_back(entity);
@@ -757,7 +757,7 @@ void add_entity(entity_physical *entity)
 
 void remove_entity(int32_t entity_id)
 {
-    entity_physical *entity = get_entity_by_id(entity_id);
+    EntityPhysical *entity = get_entity_by_id(entity_id);
     if (!entity)
     {
         printf("Removing unknown entity %d\n", entity_id);
@@ -766,14 +766,14 @@ void remove_entity(int32_t entity_id)
     entity->dead = true;
     if (!entity->chunk)
     {
-        std::map<int32_t, entity_physical *> &world_entities = get_entities();
+        std::map<int32_t, EntityPhysical *> &world_entities = get_entities();
         if (world_entities.find(entity_id) != world_entities.end())
             world_entities.erase(entity_id);
         delete entity;
     }
 }
 
-entity_physical *get_entity_by_id(int32_t entity_id)
+EntityPhysical *get_entity_by_id(int32_t entity_id)
 {
     try
     {
@@ -785,7 +785,7 @@ entity_physical *get_entity_by_id(int32_t entity_id)
     }
 }
 
-void chunk_t::update_entities()
+void Chunk::update_entities()
 {
     if (!current_world->is_remote())
     {
@@ -794,18 +794,18 @@ void chunk_t::update_entities()
         {
             if (i == FACE_NY)
                 i += 2;
-            chunk_t *neighbor = (i == 6 ? this : get_chunk(this->x + face_offsets[i].x, this->z + face_offsets[i].z));
+            Chunk *neighbor = (i == 6 ? this : get_chunk(this->x + face_offsets[i].x, this->z + face_offsets[i].z));
             if (neighbor)
             {
-                for (entity_physical *&entity : neighbor->entities)
+                for (EntityPhysical *&entity : neighbor->entities)
                 {
-                    for (entity_physical *&this_entity : this->entities)
+                    for (EntityPhysical *&this_entity : this->entities)
                     {
                         // Prevent entities from colliding with themselves
                         if (entity != this_entity && entity->collides(this_entity))
                         {
                             // Resolve the collision - always resolve from the perspective of the non-player entity
-                            if (dynamic_cast<entity_player_local *>(this_entity))
+                            if (dynamic_cast<EntityPlayerLocal *>(this_entity))
                                 entity->resolve_collision(this_entity);
                             else
                                 this_entity->resolve_collision(entity);
@@ -817,9 +817,9 @@ void chunk_t::update_entities()
     }
 
     // Move entities to the correct chunk
-    auto out_of_bounds_selector = [&](entity_physical *&entity)
+    auto out_of_bounds_selector = [&](EntityPhysical *&entity)
     {
-        chunk_t *new_chunk = get_chunk_from_pos(entity->get_foot_blockpos());
+        Chunk *new_chunk = get_chunk_from_pos(entity->get_foot_blockpos());
         if (new_chunk != entity->chunk)
         {
             entity->chunk = new_chunk;
@@ -836,7 +836,7 @@ void chunk_t::update_entities()
     // When in multiplayer, the server will handle entity removal
     if (!current_world->is_remote())
     {
-        auto remove_selector = [&](entity_physical *&entity)
+        auto remove_selector = [&](EntityPhysical *&entity)
         {
             if (entity->can_remove())
             {
@@ -850,9 +850,9 @@ void chunk_t::update_entities()
     }
 }
 
-void chunk_t::render_entities(float partial_ticks, bool transparency)
+void Chunk::render_entities(float partial_ticks, bool transparency)
 {
-    for (entity_physical *&entity : entities)
+    for (EntityPhysical *&entity : entities)
     {
         // Make sure the entity is valid
         if (!entity)
@@ -871,19 +871,19 @@ void chunk_t::render_entities(float partial_ticks, bool transparency)
     gertex::set_color_add(GXColor{0, 0, 0, 255});
 }
 
-uint32_t chunk_t::size()
+uint32_t Chunk::size()
 {
-    uint32_t base_size = sizeof(chunk_t);
+    uint32_t base_size = sizeof(Chunk);
     for (int i = 0; i < VERTICAL_SECTION_COUNT; i++)
         base_size += this->sections[i].cached_solid.length + this->sections[i].cached_transparent.length + this->sections[i].solid.length + this->sections[i].transparent.length;
-    for (entity_physical *&entity : entities)
+    for (EntityPhysical *&entity : entities)
         base_size += entity->size();
     return base_size;
 }
 
-chunk_t::~chunk_t()
+Chunk::~Chunk()
 {
-    for (entity_physical *&entity : entities)
+    for (EntityPhysical *&entity : entities)
     {
         if (!entity)
             continue;
@@ -900,7 +900,7 @@ chunk_t::~chunk_t()
     }
 }
 
-void chunk_t::save(NBTTagCompound &compound)
+void Chunk::save(NBTTagCompound &compound)
 {
     compound.setTag("xPos", new NBTTagInt(x));
     compound.setTag("zPos", new NBTTagInt(z));
@@ -929,7 +929,7 @@ void chunk_t::save(NBTTagCompound &compound)
     }
     for (int i = 0; i < 256; i++)
     {
-        heightmap[i] = lightcast(vec3i(i & 0xF, 0, i >> 4), this);
+        heightmap[i] = lightcast(Vec3i(i & 0xF, 0, i >> 4), this);
     }
     compound.setTag("Blocks", new NBTTagByteArray(blocks));
     compound.setTag("Data", new NBTTagByteArray(data));
@@ -940,7 +940,7 @@ void chunk_t::save(NBTTagCompound &compound)
     compound.setTag("TileEntities", new NBTTagList());
 }
 
-void chunk_t::load(NBTTagCompound &stream)
+void Chunk::load(NBTTagCompound &stream)
 {
     std::vector<uint8_t> blocks = stream.getUByteArray("Blocks");
     std::vector<uint8_t> data = stream.getUByteArray("Data");
@@ -981,11 +981,11 @@ void chunk_t::load(NBTTagCompound &stream)
     }
 }
 
-void chunk_t::write()
+void Chunk::write()
 {
     // Write the chunk using mcregion format
 
-    mcr::region *region = mcr::get_region(x >> 5, z >> 5);
+    mcr::Region *region = mcr::get_region(x >> 5, z >> 5);
     if (!region)
     {
         throw std::runtime_error("Failed to get region for chunk " + std::to_string(x) + ", " + std::to_string(z));
@@ -1074,9 +1074,9 @@ void chunk_t::write()
     chunk_file.flush();
 }
 
-void chunk_t::read()
+void Chunk::read()
 {
-    mcr::region *region = mcr::get_region(x >> 5, z >> 5);
+    mcr::Region *region = mcr::get_region(x >> 5, z >> 5);
 
     // Calculate the offset of the chunk in the file
     uint16_t offset = (x & 0x1F) | ((z & 0x1F) << 5);

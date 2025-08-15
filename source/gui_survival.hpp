@@ -4,19 +4,19 @@
 #include <array>
 #include "gui.hpp"
 
-class gui_survival : public gui
+class GuiSurvival : public Gui
 {
 public:
-    std::array<gui_slot, 9> hotbar_slots;
-    std::array<gui_slot, 27> inventory_slots;
-    std::array<gui_slot, 4> armor_slots;
+    std::array<GuiSlot, 9> hotbar_slots;
+    std::array<GuiSlot, 27> inventory_slots;
+    std::array<GuiSlot, 4> armor_slots;
 
-    inventory::container &linked_container;
+    inventory::Container &linked_container;
 
     int width = 352;
     int height = 332;
 
-    gui_survival(const gertex::GXView &viewport, inventory::container &container);
+    GuiSurvival(const gertex::GXView &viewport, inventory::Container &Container);
 
     void draw() override;
     void update() override;

@@ -18,11 +18,11 @@ namespace input
     constexpr uint8_t MOUSE_BUTTON_WHEEL_UP = 0x08;
     constexpr uint8_t MOUSE_BUTTON_WHEEL_DOWN = 0x10;
 
-    class keyboard_mouse : public device
+    class KeyboardMouse : public Device
     {
     public:
-        keyboard_mouse();
-        ~keyboard_mouse() override;
+        KeyboardMouse();
+        ~KeyboardMouse() override;
         void scan() override;
         bool connected() const override;
         std::map<uint8_t, uint8_t> joystick_bindings;

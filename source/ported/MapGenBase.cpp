@@ -2,7 +2,7 @@
 namespace javaport
 {
 
-    void MapGenBase::generate(chunk_t *chunk, int64_t seed, BlockID *out)
+    void MapGenBase::generate(Chunk *chunk, int64_t seed, BlockID *out)
     {
         rng.setSeed(seed);
         int64_t x_rand = (rng.nextLong()) | 1;

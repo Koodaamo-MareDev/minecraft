@@ -4,11 +4,11 @@
 
 namespace input
 {
-    class wiimote_nunchuk : public device
+    class WiimoteNunchuk : public Device
     {
     public:
-        wiimote_nunchuk();
-        ~wiimote_nunchuk() override;
+        WiimoteNunchuk();
+        ~WiimoteNunchuk() override;
 
         void scan() override;
         float get_pointer_x() const override { return pointer_position.x; }

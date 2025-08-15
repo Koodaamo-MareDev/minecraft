@@ -42,17 +42,17 @@ namespace input
     constexpr uint32_t JOYAUX_LEFT = 0x04000000;
     constexpr uint32_t JOYAUX_RIGHT = 0x08000000;
 
-    class device
+    class Device
     {
     public:
-        virtual ~device() = default;
+        virtual ~Device() = default;
 
         virtual void scan() = 0;
         virtual uint32_t get_buttons_down() const { return buttons_down; }
         virtual uint32_t get_buttons_held() const { return buttons_held; }
-        virtual vec3f get_left_stick() const { return joysticks[JOY_LEFT]; }
-        virtual vec3f get_right_stick() const { return joysticks[JOY_RIGHT]; }
-        virtual vec3f get_aux_stick() const { return joysticks[JOY_AUX]; }
+        virtual Vec3f get_left_stick() const { return joysticks[JOY_LEFT]; }
+        virtual Vec3f get_right_stick() const { return joysticks[JOY_RIGHT]; }
+        virtual Vec3f get_aux_stick() const { return joysticks[JOY_AUX]; }
         virtual bool is_pointer_visible() const { return pointer_visible; }
         virtual float get_pointer_x() const { return pointer_position.x; }
         virtual float get_pointer_y() const { return pointer_position.y; }
@@ -61,23 +61,23 @@ namespace input
     protected:
         uint32_t buttons_held = 0;
         uint32_t buttons_down = 0;
-        vec3f joysticks[3] = {vec3f(0), vec3f(0), vec3f(0)};
-        vec3f pointer_position = vec3f(0.5f, 0.5f, 0);
+        Vec3f joysticks[3] = {Vec3f(0), Vec3f(0), Vec3f(0)};
+        Vec3f pointer_position = Vec3f(0.5f, 0.5f, 0);
         bool pointer_visible = false;
     };
 
     extern std::map<std::string, uint8_t> string_joystick_src_mapping;
     extern std::map<std::string, uint8_t> string_joystick_dst_mapping;
     extern std::map<std::string, uint32_t> string_button_mapping;
-    extern std::vector<input::device *> devices;
+    extern std::vector<input::Device *> devices;
     extern float deadzone;
     extern float sensitivity;
-    extern configuration config;
+    extern Configuration config;
 
     void init();
     void deinit();
     void reload_config();
-    void add_device(device *dev);
+    void add_device(Device *dev);
 }
 
 #endif

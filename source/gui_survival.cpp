@@ -3,7 +3,7 @@
 #include "world.hpp"
 #include "util/input/input.hpp"
 
-gui_survival::gui_survival(const gertex::GXView &viewport, inventory::container &container) : gui(viewport), linked_container(container)
+GuiSurvival::GuiSurvival(const gertex::GXView &viewport, inventory::Container &Container) : Gui(viewport), linked_container(Container)
 {
     int start_x = (viewport.width - width) / 2;
     int start_y = (viewport.aspect_correction * viewport.height - height) / 2;
@@ -11,24 +11,24 @@ gui_survival::gui_survival(const gertex::GXView &viewport, inventory::container 
     // Initialize the hotbar
     for (size_t i = 0; i < hotbar_slots.size(); i++)
     {
-        hotbar_slots[i] = gui_slot(start_x + 16 + i * 36, start_y + 284, inventory::item_stack());
+        hotbar_slots[i] = GuiSlot(start_x + 16 + i * 36, start_y + 284, inventory::ItemStack());
     }
 
     // Initialize the inventory
     for (size_t i = 0; i < inventory_slots.size(); i++)
     {
-        inventory_slots[i] = gui_slot(start_x + 16 + (i % 9) * 36, start_y + 168 + (i / 9) * 36, inventory::item_stack());
+        inventory_slots[i] = GuiSlot(start_x + 16 + (i % 9) * 36, start_y + 168 + (i / 9) * 36, inventory::ItemStack());
     }
 
     // Initialize the armor
     for (size_t i = 0; i < armor_slots.size(); i++)
     {
-        armor_slots[i] = gui_slot(start_x + 16, start_y + 16 + i * 36, inventory::item_stack());
+        armor_slots[i] = GuiSlot(start_x + 16, start_y + 16 + i * 36, inventory::ItemStack());
     }
     refresh();
 }
 
-void gui_survival::draw()
+void GuiSurvival::draw()
 {
     draw_colored_quad(0, 0, viewport.width, viewport.height, 0, 0, 0, 128);
 
@@ -48,19 +48,19 @@ void gui_survival::draw()
     GX_SetCullMode(GX_CULL_BACK);
 
     // Draw the hotbar
-    for (gui_slot &slot : hotbar_slots)
+    for (GuiSlot &slot : hotbar_slots)
     {
         draw_item(slot.x, slot.y, slot.item, viewport);
     }
 
     // Draw the inventory
-    for (gui_slot &slot : inventory_slots)
+    for (GuiSlot &slot : inventory_slots)
     {
         draw_item(slot.x, slot.y, slot.item, viewport);
     }
 
     // Draw the armor
-    for (gui_slot &slot : armor_slots)
+    for (GuiSlot &slot : armor_slots)
     {
         draw_item(slot.x, slot.y, slot.item, viewport);
     }
@@ -69,8 +69,8 @@ void gui_survival::draw()
     GX_SetCullMode(GX_CULL_NONE);
 
     // Get the highlighted slot
-    gui_slot *highlighted_slot = nullptr;
-    for (gui_slot &slot : hotbar_slots)
+    GuiSlot *highlighted_slot = nullptr;
+    for (GuiSlot &slot : hotbar_slots)
     {
         if (slot.contains(cursor_x, cursor_y))
         {
@@ -80,7 +80,7 @@ void gui_survival::draw()
     }
     if (!highlighted_slot)
     {
-        for (gui_slot &slot : inventory_slots)
+        for (GuiSlot &slot : inventory_slots)
         {
             if (slot.contains(cursor_x, cursor_y))
             {
@@ -91,7 +91,7 @@ void gui_survival::draw()
     }
     if (!highlighted_slot)
     {
-        for (gui_slot &slot : armor_slots)
+        for (GuiSlot &slot : armor_slots)
         {
             if (slot.contains(cursor_x, cursor_y))
             {
@@ -126,11 +126,11 @@ void gui_survival::draw()
     }
 }
 
-void gui_survival::update()
+void GuiSurvival::update()
 {
     bool clicked = false;
     bool is_right_click = false;
-    for (input::device *dev : input::devices)
+    for (input::Device *dev : input::devices)
     {
         if (!dev->connected())
             continue;
@@ -149,8 +149,8 @@ void gui_survival::update()
     if (clicked)
     {
         // Get the slot that the cursor is hovering over
-        gui_slot *slot = nullptr;
-        for (gui_slot &s : hotbar_slots)
+        GuiSlot *slot = nullptr;
+        for (GuiSlot &s : hotbar_slots)
         {
             if (s.contains(cursor_x, cursor_y))
             {
@@ -160,7 +160,7 @@ void gui_survival::update()
         }
         if (!slot)
         {
-            for (gui_slot &s : inventory_slots)
+            for (GuiSlot &s : inventory_slots)
             {
                 if (s.contains(cursor_x, cursor_y))
                 {
@@ -171,7 +171,7 @@ void gui_survival::update()
         }
         if (!slot)
         {
-            for (gui_slot &s : armor_slots)
+            for (GuiSlot &s : armor_slots)
             {
                 if (s.contains(cursor_x, cursor_y))
                 {
@@ -186,7 +186,7 @@ void gui_survival::update()
         {
             item_in_hand = slot->interact(item_in_hand, is_right_click);
 
-            // Copy the GUI slots to the container after interaction
+            // Copy the GUI slots to the Container after interaction
             for (size_t i = 0; i < linked_container.size(); i++)
             {
                 if (i < hotbar_slots.size())
@@ -200,9 +200,9 @@ void gui_survival::update()
     }
 }
 
-void gui_survival::close()
+void GuiSurvival::close()
 {
-    // Copy the GUI slots to the container
+    // Copy the GUI slots to the Container
     for (size_t i = 0; i < linked_container.size(); i++)
     {
         if (i < hotbar_slots.size())
@@ -216,17 +216,17 @@ void gui_survival::close()
     // Drop the item in hand
     if (!item_in_hand.empty())
     {
-        entity_physical *player = current_world->player.m_entity;
-        entity_item *item_entity = new entity_item(player->get_position(0), item_in_hand);
+        EntityPhysical *player = current_world->player.m_entity;
+        EntityItem *item_entity = new EntityItem(player->get_position(0), item_in_hand);
         item_entity->velocity = angles_to_vector(player->rotation.x, player->rotation.y) * 0.5;
-        item_entity->chunk = get_chunk_from_pos(vec3i(std::floor(player->position.x), std::floor(player->position.y), std::floor(player->position.z)));
+        item_entity->chunk = get_chunk_from_pos(Vec3i(std::floor(player->position.x), std::floor(player->position.y), std::floor(player->position.z)));
         add_entity(item_entity);
     }
 }
 
-void gui_survival::refresh()
+void GuiSurvival::refresh()
 {
-    // Copy the container to the GUI slots
+    // Copy the Container to the GUI slots
     for (size_t i = 0; i < linked_container.size(); i++)
     {
         if (i < hotbar_slots.size())
@@ -238,7 +238,7 @@ void gui_survival::refresh()
     }
 }
 
-bool gui_survival::contains(int x, int y)
+bool GuiSurvival::contains(int x, int y)
 {
     return x >= (viewport.width - width) / 2 && x < (viewport.width + width) / 2 && y >= (viewport.height - height) / 2 && y < (viewport.height + height) / 2;
 }

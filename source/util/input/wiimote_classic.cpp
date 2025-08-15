@@ -13,15 +13,15 @@
     }
 namespace input
 {
-    wiimote_classic::wiimote_classic()
+    WiimoteClassic::WiimoteClassic()
     {
     }
 
-    wiimote_classic::~wiimote_classic()
+    WiimoteClassic::~WiimoteClassic()
     {
     }
 
-    void wiimote_classic::scan()
+    void WiimoteClassic::scan()
     {
         WPADData *data = WPAD_Data(0);
         if (data->exp.type == WPAD_EXP_CLASSIC)
@@ -76,7 +76,7 @@ namespace input
     }
 }
 
-bool input::wiimote_classic::connected() const
+bool input::WiimoteClassic::connected() const
 {
     return WPAD_Data(0)->exp.type == WPAD_EXP_CLASSIC;
 }

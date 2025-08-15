@@ -36,7 +36,7 @@ namespace Crapper
             debug::print("Network configured, ip: %s, gw: %s, mask %s\n", localip, gateway, netmask);
             return true;
         }
-        debug::print("Error: Network configuration failed\n");
+        debug::print("Error: Network Configuration failed\n");
         return false;
     }
 
@@ -382,7 +382,7 @@ namespace Crapper
         }
     }
 
-    MinecraftClient::MinecraftClient(world *remote_world)
+    MinecraftClient::MinecraftClient(World *remote_world)
     {
         if (remote_world == nullptr)
             throw std::runtime_error("World cannot be null");
@@ -393,7 +393,7 @@ namespace Crapper
     {
         debug::print("Connecting to %s:%d\n", host.c_str(), port);
 
-        gui_dirtscreen *dirtscreen = dynamic_cast<gui_dirtscreen *>(gui::get_gui());
+        GuiDirtscreen *dirtscreen = dynamic_cast<GuiDirtscreen *>(Gui::get_gui());
         if (dirtscreen)
             dirtscreen->set_text("Connecting to\n\n\n" + host + ":" + std::to_string(port));
 
@@ -432,7 +432,7 @@ namespace Crapper
             return;
 
         debug::print("Server hash: %s\n", server_hash.c_str());
-        gui_dirtscreen *dirtscreen = dynamic_cast<gui_dirtscreen *>(gui::get_gui());
+        GuiDirtscreen *dirtscreen = dynamic_cast<GuiDirtscreen *>(Gui::get_gui());
         if (dirtscreen)
             dirtscreen->set_text("Logging in");
         sendLoginRequest();
@@ -497,18 +497,18 @@ namespace Crapper
         }
 
         // Create a new player entity
-        remote_world->player.m_entity = new entity_player_local(vec3f(0.5, -999, 0.5));
+        remote_world->player.m_entity = new EntityPlayerLocal(Vec3f(0.5, -999, 0.5));
         remote_world->player.m_entity->entity_id = entity_id;
         add_entity(remote_world->player.m_entity);
 
         if (!remote_world->loaded)
         {
-            gui_dirtscreen *dirtscreen = dynamic_cast<gui_dirtscreen *>(gui::get_gui());
+            GuiDirtscreen *dirtscreen = dynamic_cast<GuiDirtscreen *>(Gui::get_gui());
             if (!dirtscreen)
-                dirtscreen = new gui_dirtscreen(gertex::GXView());
+                dirtscreen = new GuiDirtscreen(gertex::GXView());
             dirtscreen->set_text("Loading level\n\n\nDownloading terrain");
             dirtscreen->set_progress(0, 0);
-            gui::set_gui(dirtscreen);
+            Gui::set_gui(dirtscreen);
         }
         login_success = true;
         state = ConnectionState::PLAY;
@@ -562,13 +562,13 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        entity_physical *entity = get_entity_by_id(entity_id);
+        EntityPhysical *entity = get_entity_by_id(entity_id);
         if (!entity)
         {
             debug::print("Received player equipment for unknown entity %d\n", entity_id);
             return;
         }
-        entity_player *player = dynamic_cast<entity_player *>(entity);
+        EntityPlayer *player = dynamic_cast<EntityPlayer *>(entity);
         if (!player)
         {
             debug::print("Received player equipment for non-player entity %d\n", entity_id);
@@ -583,12 +583,12 @@ namespace Crapper
         if (item == -1)
         {
             // Remove the item from the slot
-            player->equipment[slot] = inventory::item_stack(); // Clear the slot
+            player->equipment[slot] = inventory::ItemStack(); // Clear the slot
         }
         else
         {
             // Add the item to the slot
-            player->equipment[slot] = inventory::item_stack(item, 1, meta);
+            player->equipment[slot] = inventory::ItemStack(item, 1, meta);
         }
     }
 
@@ -646,7 +646,7 @@ namespace Crapper
         if (!remote_world->player.m_entity)
             return;
 
-        remote_world->player.m_entity->teleport(vec3f(x, y, z));
+        remote_world->player.m_entity->teleport(Vec3f(x, y, z));
         remote_world->player.m_entity->on_ground = on_ground;
     }
 
@@ -663,7 +663,7 @@ namespace Crapper
         if (!remote_world->player.m_entity)
             return;
 
-        remote_world->player.m_entity->rotation = vec3f(-pitch, -yaw, 0);
+        remote_world->player.m_entity->rotation = Vec3f(-pitch, -yaw, 0);
         remote_world->player.m_entity->on_ground = on_ground;
     }
 
@@ -684,8 +684,8 @@ namespace Crapper
         if (!remote_world->player.m_entity)
             return;
 
-        remote_world->player.m_entity->teleport(vec3f(x, y, z));
-        remote_world->player.m_entity->rotation = vec3f(-pitch, -yaw, 0);
+        remote_world->player.m_entity->teleport(Vec3f(x, y, z));
+        remote_world->player.m_entity->rotation = Vec3f(-pitch, -yaw, 0);
         remote_world->player.m_entity->on_ground = on_ground;
 
         // Mirror the packet back to the server
@@ -705,12 +705,12 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        entity_physical *entity = get_entity_by_id(entity_id);
-        entity_player *player = dynamic_cast<entity_player *>(entity);
+        EntityPhysical *entity = get_entity_by_id(entity_id);
+        EntityPlayer *player = dynamic_cast<EntityPlayer *>(entity);
         if (player)
         {
             player->in_bed = in_bed;
-            player->bed_pos = vec3i(x, y, z);
+            player->bed_pos = Vec3i(x, y, z);
         }
     }
 
@@ -843,9 +843,9 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        entity_player_mp *entity = new entity_player_mp(vec3f(x, y, z), player_name);
-        entity->set_server_pos_rot(vec3i(x, y, z), vec3f(pitch, -yaw, 0), 0);
-        entity->teleport(vec3f(x / 32.0, y / 32.0 + 1.0 / 64.0, z / 32.0));
+        EntityPlayerMp *entity = new EntityPlayerMp(Vec3f(x, y, z), player_name);
+        entity->set_server_pos_rot(Vec3i(x, y, z), Vec3f(pitch, -yaw, 0), 0);
+        entity->teleport(Vec3f(x / 32.0, y / 32.0 + 1.0 / 64.0, z / 32.0));
         entity->holding_item = item;
 
         entity->entity_id = entity_id;
@@ -869,9 +869,9 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        entity_item *entity = new entity_item(vec3f(x, y, z), inventory::item_stack(item, count, meta));
-        entity->set_server_position(vec3i(x, y, z));
-        entity->teleport(vec3f(x / 32.0, y / 32.0 + 1.0 / 64.0, z / 32.0));
+        EntityItem *entity = new EntityItem(Vec3f(x, y, z), inventory::ItemStack(item, count, meta));
+        entity->set_server_position(Vec3i(x, y, z));
+        entity->teleport(Vec3f(x / 32.0, y / 32.0 + 1.0 / 64.0, z / 32.0));
         entity->entity_id = entity_id;
         add_entity(entity);
     }
@@ -885,18 +885,18 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        entity_physical *pickup_entity = get_entity_by_id(item_entity_id);
+        EntityPhysical *pickup_entity = get_entity_by_id(item_entity_id);
 
-        entity_physical *entity = get_entity_by_id(entity_id);
+        EntityPhysical *entity = get_entity_by_id(entity_id);
 
         // Make sure the entities exists and the picked up entity is an item entity
         if (!pickup_entity || pickup_entity->type != 1 || !entity)
             return;
 
-        entity_item *item_entity = dynamic_cast<entity_item *>(pickup_entity);
+        EntityItem *item_entity = dynamic_cast<EntityItem *>(pickup_entity);
         if (!item_entity)
             return;
-        item_entity->pickup(entity->get_position(0) - vec3f(0, 0.5, 0));
+        item_entity->pickup(entity->get_position(0) - Vec3f(0, 0.5, 0));
     }
 
     void MinecraftClient::handleVehicleSpawn(ByteBuffer &buffer)
@@ -911,23 +911,23 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        entity_physical *entity = nullptr;
+        EntityPhysical *entity = nullptr;
         switch (type)
         {
         case 70:
-            entity = new entity_falling_block(block_t{uint8_t(BlockID::sand), 0x7F, 0}, vec3i(x / 32, y / 32, z / 32));
+            entity = new EntityFallingBlock(Block{uint8_t(BlockID::sand), 0x7F, 0}, Vec3i(x / 32, y / 32, z / 32));
             break;
         case 71:
-            entity = new entity_falling_block(block_t{uint8_t(BlockID::gravel), 0x7F, 0}, vec3i(x / 32, y / 32, z / 32));
+            entity = new EntityFallingBlock(Block{uint8_t(BlockID::gravel), 0x7F, 0}, Vec3i(x / 32, y / 32, z / 32));
             break;
 
         default:
-            entity = new entity_physical();
+            entity = new EntityPhysical();
             debug::print("Generic vehicle %d spawned at %f %f %f with entity type %d\n", entity_id, x, y, z, type);
             break;
         }
-        entity->set_server_position(vec3i(x, y, z));
-        entity->teleport(vec3f(x / 32.0, y / 32.0 + 1.0 / 64.0, z / 32.0));
+        entity->set_server_position(Vec3i(x, y, z));
+        entity->teleport(Vec3f(x / 32.0, y / 32.0 + 1.0 / 64.0, z / 32.0));
         entity->entity_id = entity_id;
         add_entity(entity);
     }
@@ -990,20 +990,20 @@ namespace Crapper
         }
 #endif
         // Create entity based on type
-        entity_physical *entity = nullptr;
+        EntityPhysical *entity = nullptr;
         switch (type)
         {
         case 50:
-            entity = new entity_creeper(vec3f(x, y, z) / 32.0);
+            entity = new EntityCreeper(Vec3f(x, y, z) / 32.0);
             break;
         default:
-            entity = new entity_living();
+            entity = new EntityLiving();
             break;
         }
         entity->width = 0.6;
         entity->height = 1.8;
-        entity->set_server_pos_rot(vec3i(x, y, z), vec3f(pitch * (360.0 / 256), yaw * (-360.0 / 256), 0), 0);
-        entity->teleport(vec3f(x / 32.0, y / 32.0 + 1.0 / 64.0, z / 32.0));
+        entity->set_server_pos_rot(Vec3i(x, y, z), Vec3f(pitch * (360.0 / 256), yaw * (-360.0 / 256), 0), 0);
+        entity->teleport(Vec3f(x / 32.0, y / 32.0 + 1.0 / 64.0, z / 32.0));
         entity->entity_id = entity_id;
         add_entity(entity);
     }
@@ -1021,8 +1021,8 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        entity_physical *entity = new entity_physical();
-        entity->teleport(vec3f(x, y, z));
+        EntityPhysical *entity = new EntityPhysical();
+        entity->teleport(Vec3f(x, y, z));
         entity->entity_id = entity_id;
         add_entity(entity);
 
@@ -1040,12 +1040,12 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        entity_physical *entity = get_entity_by_id(entity_id);
+        EntityPhysical *entity = get_entity_by_id(entity_id);
         if (!entity)
         {
             return;
         }
-        entity->velocity = vec3f(dx / 8000.0, dy / 8000.0, dz / 8000.0);
+        entity->velocity = Vec3f(dx / 8000.0, dy / 8000.0, dz / 8000.0);
     }
 
     void MinecraftClient::handleDestroyEntity(ByteBuffer &buffer)
@@ -1081,12 +1081,12 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        entity_physical *entity = get_entity_by_id(entity_id);
+        EntityPhysical *entity = get_entity_by_id(entity_id);
         if (!entity)
         {
             return;
         }
-        entity->set_server_position(entity->server_pos + vec3i(dx, dy, dz), 3);
+        entity->set_server_position(entity->server_pos + Vec3i(dx, dy, dz), 3);
     }
 
     void MinecraftClient::handleEntityLook(ByteBuffer &buffer)
@@ -1099,12 +1099,12 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        entity_physical *entity = get_entity_by_id(entity_id);
+        EntityPhysical *entity = get_entity_by_id(entity_id);
         if (!entity)
         {
             return;
         }
-        entity->set_server_pos_rot(entity->server_pos, vec3f(pitch * (360.0 / 256), yaw * (-360.0 / 256), 0), 3);
+        entity->set_server_pos_rot(entity->server_pos, Vec3f(pitch * (360.0 / 256), yaw * (-360.0 / 256), 0), 3);
     }
 
     void MinecraftClient::handleEntityRelMoveLook(ByteBuffer &buffer)
@@ -1120,12 +1120,12 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        entity_physical *entity = get_entity_by_id(entity_id);
+        EntityPhysical *entity = get_entity_by_id(entity_id);
         if (!entity)
         {
             return;
         }
-        entity->set_server_pos_rot(entity->server_pos + vec3i(dx, dy, dz), vec3f(pitch * (360.0 / 256), yaw * (-360.0 / 256), 0), 3);
+        entity->set_server_pos_rot(entity->server_pos + Vec3i(dx, dy, dz), Vec3f(pitch * (360.0 / 256), yaw * (-360.0 / 256), 0), 3);
     }
 
     void MinecraftClient::handleEntityTeleport(ByteBuffer &buffer)
@@ -1141,12 +1141,12 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        entity_physical *entity = get_entity_by_id(entity_id);
+        EntityPhysical *entity = get_entity_by_id(entity_id);
         if (!entity)
         {
             return;
         }
-        entity->set_server_pos_rot(vec3i(x, y, z), vec3f(pitch * (360.0 / 256), yaw * (-360.0 / 256), 0), 0);
+        entity->set_server_pos_rot(Vec3i(x, y, z), Vec3f(pitch * (360.0 / 256), yaw * (-360.0 / 256), 0), 0);
     }
 
     void MinecraftClient::handleEntityStatus(ByteBuffer &buffer)
@@ -1158,14 +1158,14 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        entity_physical *entity = get_entity_by_id(entity_id);
+        EntityPhysical *entity = get_entity_by_id(entity_id);
         if (!entity)
         {
             return;
         }
         if (status == 2)
         {
-            entity_living *living_entity = dynamic_cast<entity_living *>(entity);
+            EntityLiving *living_entity = dynamic_cast<EntityLiving *>(entity);
             if (living_entity)
                 living_entity->hurt(0);
         }
@@ -1181,7 +1181,7 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        entity_physical *entity = get_entity_by_id(entity_id);
+        EntityPhysical *entity = get_entity_by_id(entity_id);
         if (!entity)
         {
             debug::print("Unknown entity %d\n", entity_id);
@@ -1192,7 +1192,7 @@ namespace Crapper
             debug::print("Entity %d stopped riding entity\n", entity_id);
             return;
         }
-        entity_physical *vehicle = get_entity_by_id(vehicle_id);
+        EntityPhysical *vehicle = get_entity_by_id(vehicle_id);
         if (!vehicle)
         {
             debug::print("Entity %d started riding unknown entity %d\n", entity_id, vehicle_id);
@@ -1211,7 +1211,7 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        entity_physical *entity = get_entity_by_id(entity_id);
+        EntityPhysical *entity = get_entity_by_id(entity_id);
         if (!entity)
         {
             return;
@@ -1231,8 +1231,8 @@ namespace Crapper
 
         if (mode == 0)
         {
-            lock_t chunk_lock(chunk_mutex);
-            chunk_t *chunk = get_chunk(x, z);
+            Lock chunk_lock(chunk_mutex);
+            Chunk *chunk = get_chunk(x, z);
             if (chunk)
             {
                 // Mark chunk for removal
@@ -1248,7 +1248,7 @@ namespace Crapper
             lock_t chunk_lock(chunk_mutex);
             try
             {
-                chunk_t *chunk = new chunk_t(x, z);
+                Chunk *chunk = new Chunk(x, z);
                 chunk->generation_stage = ChunkGenStage::empty;
                 get_chunks().push_back(chunk);
             }
@@ -1302,15 +1302,15 @@ namespace Crapper
             delete[] decompressed_data;
             return;
         }
-        vec2i chunk_pos = block_to_chunk_pos(vec3i(start_x, start_y, start_z));
+        Vec2i chunk_pos = block_to_chunk_pos(Vec3i(start_x, start_y, start_z));
 
-        chunk_t *chunk = get_chunk(chunk_pos);
+        Chunk *chunk = get_chunk(chunk_pos);
         bool chunk_exists = chunk != nullptr;
         if (!chunk_exists)
         {
             try
             {
-                chunk = new chunk_t(chunk_pos.x, chunk_pos.y);
+                chunk = new Chunk(chunk_pos.x, chunk_pos.y);
             }
             catch (std::bad_alloc &e)
             {
@@ -1340,7 +1340,7 @@ namespace Crapper
                 for (int y = 0; y < size_y; y++)
                 {
                     uint8_t block_id = decompressed_data[data_index++];
-                    chunk->set_block(vec3i(start_x + x, start_y + y, start_z + z), BlockID(block_id));
+                    chunk->set_block(Vec3i(start_x + x, start_y + y, start_z + z), BlockID(block_id));
                 }
             }
         }
@@ -1352,8 +1352,8 @@ namespace Crapper
                 for (int y = 0; y < size_y; y += 2)
                 {
                     uint8_t metadata = decompressed_data[data_index++];
-                    chunk->get_block(vec3i(start_x + x, start_y + y, start_z + z))->meta = metadata & 0x0F;
-                    chunk->get_block(vec3i(start_x + x, start_y + y + 1, start_z + z))->meta = metadata >> 4;
+                    chunk->get_block(Vec3i(start_x + x, start_y + y, start_z + z))->meta = metadata & 0x0F;
+                    chunk->get_block(Vec3i(start_x + x, start_y + y + 1, start_z + z))->meta = metadata >> 4;
                 }
             }
         }
@@ -1366,8 +1366,8 @@ namespace Crapper
                 for (int y = 0; y < size_y; y += 2)
                 {
                     uint8_t light = decompressed_data[data_index++];
-                    chunk->get_block(vec3i(start_x + x, start_y + y, start_z + z))->block_light = light & 0x0F;
-                    chunk->get_block(vec3i(start_x + x, start_y + y + 1, start_z + z))->block_light = light >> 4;
+                    chunk->get_block(Vec3i(start_x + x, start_y + y, start_z + z))->block_light = light & 0x0F;
+                    chunk->get_block(Vec3i(start_x + x, start_y + y + 1, start_z + z))->block_light = light >> 4;
                 }
             }
         }
@@ -1380,8 +1380,8 @@ namespace Crapper
                 for (int y = 0; y < size_y; y += 2)
                 {
                     uint8_t light = decompressed_data[data_index++];
-                    chunk->get_block(vec3i(start_x + x, start_y + y, start_z + z))->sky_light = light & 0x0F;
-                    chunk->get_block(vec3i(start_x + x, start_y + y + 1, start_z + z))->sky_light = light >> 4;
+                    chunk->get_block(Vec3i(start_x + x, start_y + y, start_z + z))->sky_light = light & 0x0F;
+                    chunk->get_block(Vec3i(start_x + x, start_y + y + 1, start_z + z))->sky_light = light >> 4;
                 }
             }
         }
@@ -1398,7 +1398,7 @@ namespace Crapper
             chunk->sections[vbo_index].dirty = true;
         }
 
-        lock_t chunk_lock(chunk_mutex);
+        Lock chunk_lock(chunk_mutex);
         if (!chunk_exists)
         {
             get_chunks().push_back(chunk);
@@ -1417,8 +1417,8 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        vec3i pos(x, y, z);
-        chunk_t *chunk = get_chunk_from_pos(pos);
+        Vec3i pos(x, y, z);
+        Chunk *chunk = get_chunk_from_pos(pos);
         if (!chunk)
         {
             return;
@@ -1463,14 +1463,14 @@ namespace Crapper
 
         for (uint16_t i = 0; i < count; i++)
         {
-            vec3i pos = vec3i(x + ((coords[i] >> 12) & 0xF), coords[i] & 0xFF, z + ((coords[i] >> 8) & 0xF));
-            chunk_t *chunk = get_chunk_from_pos(pos);
+            Vec3i pos = Vec3i(x + ((coords[i] >> 12) & 0xF), coords[i] & 0xFF, z + ((coords[i] >> 8) & 0xF));
+            Chunk *chunk = get_chunk_from_pos(pos);
             if (!chunk)
             {
                 debug::print("Could not change block at %d %d %d as chunk doesn't exist!\n", pos.x, pos.y, pos.z);
                 continue;
             }
-            block_t *block = chunk->get_block(pos);
+            Block *block = chunk->get_block(pos);
             block->set_blockid(BlockID(types[i]));
             block->meta = metas[i];
             update_block_at(pos);
@@ -1501,7 +1501,7 @@ namespace Crapper
             return;
 
         // Create explosion effect
-        remote_world->create_explosion(vec3f(x, y, z), radius, nullptr);
+        remote_world->create_explosion(Vec3f(x, y, z), radius, nullptr);
     }
 
     int MinecraftClient::clientToNetworkSlot(int slot_id)
@@ -1531,12 +1531,12 @@ namespace Crapper
             return;
 
         slot_id = networkToClientSlot(slot_id);
-        inventory::item_stack item(0, 0, 0);
+        inventory::ItemStack item(0, 0, 0);
         if (item_id >= 0)
         {
             uint8_t count = buffer.readByte();
             uint16_t meta = buffer.readShort() & 0xFFFF;
-            item = inventory::item_stack(item_id, count, meta);
+            item = inventory::ItemStack(item_id, count, meta);
         }
         if (buffer.underflow)
             return;
@@ -1560,7 +1560,7 @@ namespace Crapper
     void MinecraftClient::handleWindowItems(ByteBuffer &buffer)
     {
         // Read inventory
-        std::vector<inventory::item_stack> items;
+        std::vector<inventory::ItemStack> items;
 
         uint8_t window_id = buffer.readByte();
         uint16_t count = buffer.readShort();
@@ -1574,7 +1574,7 @@ namespace Crapper
             {
                 uint8_t count = buffer.readByte();
                 uint16_t meta = buffer.readShort() & 0xFFFF;
-                items.push_back(inventory::item_stack(item_id, count, meta));
+                items.push_back(inventory::ItemStack(item_id, count, meta));
             }
             if (buffer.underflow)
                 return;

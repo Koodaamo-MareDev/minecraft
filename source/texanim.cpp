@@ -1,6 +1,6 @@
 #include "texanim.hpp"
 #include <cmath>
-void texanim_t::update()
+void TexAnim::update()
 {
     if (src_ptr)
     {
@@ -8,7 +8,7 @@ void texanim_t::update()
     }
 }
 
-void texanim_t::copy(void *src_ptr, uint32_t dst_x, uint32_t dst_y)
+void TexAnim::copy(void *src_ptr, uint32_t dst_x, uint32_t dst_y)
 {
     for (uint32_t y = dst_y; y < dst_y + tile_height; y += 4)
     {
@@ -21,7 +21,7 @@ void texanim_t::copy(void *src_ptr, uint32_t dst_x, uint32_t dst_y)
     }
 }
 
-void texanim_t::copy_tpl()
+void TexAnim::copy_tpl()
 {
     const int tpl_size = tile_width * tile_height << 2;
     uint8_t tmp[tpl_size];
@@ -47,7 +47,7 @@ void texanim_t::copy_tpl()
     }
 }
 
-void water_texanim_t::update()
+void WaterTexAnim::update()
 {
     static bool flip = false;
     float *data_a = flip ? this->data_a : this->data_b;
@@ -178,22 +178,22 @@ void water_texanim_t::update()
     flip = !flip;
 
     this->src_ptr = this->texture_data_still;
-    texanim_t::copy_tpl();
-    texanim_t::update();
+    TexAnim::copy_tpl();
+    TexAnim::update();
 
     this->src_ptr = this->texture_data_flow;
-    texanim_t::copy_tpl();
+    TexAnim::copy_tpl();
     for (int x = 0; x < 32; x += 16)
     {
         for (int y = 0; y < 32; y += 16)
         {
-            texanim_t::copy(this->texture_data_flow, flow_dst_x + x, flow_dst_y + y);
+            TexAnim::copy(this->texture_data_flow, flow_dst_x + x, flow_dst_y + y);
         }
     }
     frame--;
 }
 
-void lava_texanim_t::update()
+void LavaTexanim::update()
 {
     static bool flip = false;
     float *data_a = flip ? this->data_a : this->data_b;
@@ -260,16 +260,16 @@ void lava_texanim_t::update()
     memcpy(texture_data_flow + (256 - offset) * 4, texture_data_still, offset * 4);
 
     this->src_ptr = this->texture_data_still;
-    texanim_t::copy_tpl();
-    texanim_t::update();
+    TexAnim::copy_tpl();
+    TexAnim::update();
 
     this->src_ptr = this->texture_data_flow;
-    texanim_t::copy_tpl();
+    TexAnim::copy_tpl();
     for (int x = 0; x < 32; x += 16)
     {
         for (int y = 0; y < 32; y += 16)
         {
-            texanim_t::copy(this->texture_data_flow, flow_dst_x + x, flow_dst_y + y);
+            TexAnim::copy(this->texture_data_flow, flow_dst_x + x, flow_dst_y + y);
         }
     }
 }

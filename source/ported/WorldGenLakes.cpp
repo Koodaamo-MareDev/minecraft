@@ -2,9 +2,9 @@
 #include "../chunk.hpp"
 namespace javaport
 {
-    bool WorldGenLakes::generate(Random &rng, vec3i pos)
+    bool WorldGenLakes::generate(Random &rng, Vec3i pos)
     {
-        chunk_t *chunk = get_chunk_from_pos(pos);
+        Chunk *chunk = get_chunk_from_pos(pos);
         if (!chunk)
             return false;
 
@@ -55,7 +55,7 @@ namespace javaport
                     bool flag = !placements[(x * 16 + z) * 8 + y] && ((x < 15 && placements[((x + 1) * 16 + z) * 8 + y]) || (x > 0 && placements[((x - 1) * 16 + z) * 8 + y]) || (z < 15 && placements[(x * 16 + (z + 1)) * 8 + y]) || (z > 0 && placements[(x * 16 + (z - 1)) * 8 + y]) || (y < 7 && placements[(x * 16 + z) * 8 + (y + 1)]) || (y > 0 && placements[(x * 16 + z) * 8 + (y - 1)]));
                     if (flag)
                     {
-                        BlockID id = get_block_id_at(pos + vec3i(x, y, z), BlockID::air);
+                        BlockID id = get_block_id_at(pos + Vec3i(x, y, z), BlockID::air);
                         if (y >= 4 && properties(id).m_fluid)
                             return false;
                         if (y < 4 && !properties(id).m_solid && id != liquid)
@@ -74,7 +74,7 @@ namespace javaport
                 {
                     if (placements[(x * 16 + z) * 8 + y])
                     {
-                        set_block_at(pos + vec3i(x, y, z), y >= 4 ? BlockID::air : liquid);
+                        set_block_at(pos + Vec3i(x, y, z), y >= 4 ? BlockID::air : liquid);
                     }
                 }
             }
@@ -87,9 +87,9 @@ namespace javaport
             {
                 for (int y = 4; y < 8; y++)
                 {
-                    if (placements[(x * 16 + z) * 8 + y] && get_block_id_at(pos + vec3i(x, y - 1, z), BlockID::air) == BlockID::dirt)
+                    if (placements[(x * 16 + z) * 8 + y] && get_block_id_at(pos + Vec3i(x, y - 1, z), BlockID::air) == BlockID::dirt)
                     {
-                        set_block_at(pos + vec3i(x, y - 1, z), BlockID::grass);
+                        set_block_at(pos + Vec3i(x, y - 1, z), BlockID::grass);
                     }
                 }
             }
@@ -105,9 +105,9 @@ namespace javaport
                     for (int y = 0; y < 8; y++)
                     {
                         bool flag = !placements[(x * 16 + z) * 8 + y] && ((x < 15 && placements[((x + 1) * 16 + z) * 8 + y]) || (x > 0 && placements[((x - 1) * 16 + z) * 8 + y]) || (z < 15 && placements[(x * 16 + (z + 1)) * 8 + y]) || (z > 0 && placements[(x * 16 + (z - 1)) * 8 + y]) || (y < 7 && placements[(x * 16 + z) * 8 + (y + 1)]) || (y > 0 && placements[(x * 16 + z) * 8 + (y - 1)]));
-                        if (flag && (y < 4 || rng.nextInt(2) == 0) && get_block_id_at(pos + vec3i(x, y, z), BlockID::air) == BlockID::air)
+                        if (flag && (y < 4 || rng.nextInt(2) == 0) && get_block_id_at(pos + Vec3i(x, y, z), BlockID::air) == BlockID::air)
                         {
-                            set_block_at(pos + vec3i(x, y, z), BlockID::stone);
+                            set_block_at(pos + Vec3i(x, y, z), BlockID::stone);
                         }
                     }
                 }

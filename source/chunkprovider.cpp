@@ -10,13 +10,13 @@
 #include "ported/WorldGenLiquids.hpp"
 #include "ported/WorldGenLakes.hpp"
 
-chunkprovider_overworld::chunkprovider_overworld(uint64_t seed)
+ChunkProviderOverworld::ChunkProviderOverworld(uint64_t seed)
 {
     // Initialize the noise synthesizer with the seed
     noiser.Init(current_world->seed);
 }
 
-void chunkprovider_overworld::provide_chunk(chunk_t *chunk)
+void ChunkProviderOverworld::provide_chunk(Chunk *chunk)
 {
     // Prioritize loading the chunk from disk if it exists
     if (chunk->generation_stage == ChunkGenStage::loading)
@@ -57,7 +57,7 @@ void chunkprovider_overworld::provide_chunk(chunk_t *chunk)
     }
 
     // Apply the generated blocks to the chunk
-    block_t *block = chunk->blockstates;
+    Block *block = chunk->blockstates;
     for (int32_t i = 0; i < 16 * 16 * WORLD_HEIGHT; i++, block++)
     {
         block->set_blockid(blocks[i]);
@@ -76,12 +76,12 @@ void chunkprovider_overworld::provide_chunk(chunk_t *chunk)
     chunk->generation_stage = ChunkGenStage::features;
 }
 
-void chunkprovider_overworld::populate_chunk(chunk_t *chunk)
+void ChunkProviderOverworld::populate_chunk(Chunk *chunk)
 {
     // Populate the base height map for generating surface features
     for (int z = 0, index = 0; z < 16; z++)
         for (int x = 0; x < 16; x++, index++)
-            chunk->terrain_map[index] = skycast(vec3i(x, 0, z), chunk);
+            chunk->terrain_map[index] = skycast(Vec3i(x, 0, z), chunk);
 
     for (int32_t x = chunk->x - 1; x <= chunk->x + 1; x++)
     {
@@ -92,7 +92,7 @@ void chunkprovider_overworld::populate_chunk(chunk_t *chunk)
                 continue;
 
             // Attempt to generate features for the current chunk and its neighbors
-            chunk_t *neighbor = get_chunk(x, z);
+            Chunk *neighbor = get_chunk(x, z);
             if (neighbor)
             {
                 generate_features(neighbor);
@@ -109,9 +109,9 @@ void chunkprovider_overworld::populate_chunk(chunk_t *chunk)
     chunk->generation_stage = ChunkGenStage::done;
 }
 
-void chunkprovider_overworld::plant_tree(vec3i pos, int height, chunk_t *chunk)
+void ChunkProviderOverworld::plant_tree(Vec3i pos, int height, Chunk *chunk)
 {
-    block_t *base_block = get_block_at(pos - vec3i(0, 1, 0), chunk);
+    Block *base_block = get_block_at(pos - Vec3i(0, 1, 0), chunk);
     if (!base_block)
         return;
     BlockID base_id = base_block->get_blockid();
@@ -127,7 +127,7 @@ void chunkprovider_overworld::plant_tree(vec3i pos, int height, chunk_t *chunk)
         for (int y = height - 3; y < height - 1; y++)
             for (int z = -2; z <= 2; z++)
             {
-                vec3i leaves_pos = pos + vec3i(x, y, z);
+                Vec3i leaves_pos = pos + Vec3i(x, y, z);
                 replace_air_at(leaves_pos, BlockID::leaves, chunk);
             }
     }
@@ -138,7 +138,7 @@ void chunkprovider_overworld::plant_tree(vec3i pos, int height, chunk_t *chunk)
         {
             for (int z = -1; z <= 1; z++)
             {
-                vec3i leaves_off = vec3i(x, y, z);
+                Vec3i leaves_off = Vec3i(x, y, z);
                 // Place the leaves in a "+" pattern at the top.
                 if (y == height && (x | z) && std::abs(x) == std::abs(z))
                     continue;
@@ -154,7 +154,7 @@ void chunkprovider_overworld::plant_tree(vec3i pos, int height, chunk_t *chunk)
     }
 }
 
-void chunkprovider_overworld::generate_trees(vec3i pos, chunk_t *chunk, javaport::Random &rng)
+void ChunkProviderOverworld::generate_trees(Vec3i pos, Chunk *chunk, javaport::Random &rng)
 {
     constexpr size_t tree_count = 8;
     uint32_t tree_positions[tree_count];
@@ -166,11 +166,11 @@ void chunkprovider_overworld::generate_trees(vec3i pos, chunk_t *chunk, javaport
     for (uint32_t c = 0; c < max_trees; c++)
     {
         uint32_t tree_value = tree_positions[c];
-        vec3i tree_pos((tree_value & 15), 0, ((tree_value >> 24) & 15));
+        Vec3i tree_pos((tree_value & 15), 0, ((tree_value >> 24) & 15));
 
         // Place the trees on above ground.
         tree_pos.y = chunk->terrain_map[tree_pos.x | (tree_pos.z << 4)];
-        tree_pos += vec3i(pos.x, 1, pos.z);
+        tree_pos += Vec3i(pos.x, 1, pos.z);
 
         // Trees should only grow on top of the sea level
         if (tree_pos.y >= 64)
@@ -181,7 +181,7 @@ void chunkprovider_overworld::generate_trees(vec3i pos, chunk_t *chunk, javaport
     }
 }
 
-void chunkprovider_overworld::generate_flowers(vec3i pos, chunk_t *chunk, javaport::Random &rng)
+void ChunkProviderOverworld::generate_flowers(Vec3i pos, Chunk *chunk, javaport::Random &rng)
 {
     constexpr size_t flower_count = 16;
     uint32_t flower_positions[flower_count];
@@ -193,16 +193,16 @@ void chunkprovider_overworld::generate_flowers(vec3i pos, chunk_t *chunk, javapo
     for (uint32_t c = 0; c < max_trees; c++)
     {
         uint32_t flower_value = flower_positions[c];
-        vec3i flower_pos((flower_value & 15), 0, ((flower_value >> 24) & 15));
+        Vec3i flower_pos((flower_value & 15), 0, ((flower_value >> 24) & 15));
 
         // Place the flowers above ground.
         flower_pos.y = chunk->terrain_map[flower_pos.x | (flower_pos.z << 4)];
-        flower_pos += vec3i(pos.x, 1, pos.z);
+        flower_pos += Vec3i(pos.x, 1, pos.z);
 
         // Flowers should only grow on top of the sea level
         if (flower_pos.y >= 64)
         {
-            block_t *block = chunk->get_block(flower_pos - vec3i(0, 1, 0));
+            Block *block = chunk->get_block(flower_pos - Vec3i(0, 1, 0));
             if (block->get_blockid() != BlockID::grass)
                 continue;
             block = chunk->get_block(flower_pos);
@@ -213,7 +213,7 @@ void chunkprovider_overworld::generate_flowers(vec3i pos, chunk_t *chunk, javapo
     }
 }
 
-void chunkprovider_overworld::generate_vein(vec3i pos, BlockID id, chunk_t *chunk, javaport::Random &rng)
+void ChunkProviderOverworld::generate_vein(Vec3i pos, BlockID id, Chunk *chunk, javaport::Random &rng)
 {
     for (int x = pos.x; x < pos.x + 2; x++)
     {
@@ -223,8 +223,8 @@ void chunkprovider_overworld::generate_vein(vec3i pos, BlockID id, chunk_t *chun
             {
                 if (rng.nextInt(2) == 0)
                 {
-                    vec3i pos(x, y, z);
-                    block_t *block = get_block_at(pos, chunk);
+                    Vec3i pos(x, y, z);
+                    Block *block = get_block_at(pos, chunk);
                     if (block && block->get_blockid() == BlockID::stone)
                     {
                         block->set_blockid(id);
@@ -235,30 +235,30 @@ void chunkprovider_overworld::generate_vein(vec3i pos, BlockID id, chunk_t *chun
     }
 }
 
-void chunkprovider_overworld::generate_ore_type(vec3i pos, BlockID id, int count, int max_height, chunk_t *chunk, javaport::Random &rng)
+void ChunkProviderOverworld::generate_ore_type(Vec3i pos, BlockID id, int count, int max_height, Chunk *chunk, javaport::Random &rng)
 {
     for (int i = 0; i < count; i++)
     {
         int x = rng.nextInt(16);
         int y = rng.nextInt(80);
         int z = rng.nextInt(16);
-        vec3i offset_pos(x + pos.x, y, z + pos.z);
+        Vec3i offset_pos(x + pos.x, y, z + pos.z);
         if (y > max_height)
             continue;
         generate_vein(offset_pos, id, chunk, rng);
-        block_t *block = get_block_at(offset_pos, chunk);
+        Block *block = get_block_at(offset_pos, chunk);
         x = rng.nextInt(3) - 1;
         y = rng.nextInt(3) - 1;
         z = rng.nextInt(3) - 1;
         if (block && block->get_blockid() == id && (x | y | z) != 0)
         {
-            offset_pos = vec3i(x + offset_pos.x, y + offset_pos.y, z + offset_pos.z);
+            offset_pos = Vec3i(x + offset_pos.x, y + offset_pos.y, z + offset_pos.z);
             generate_vein(offset_pos, id, chunk, rng);
         }
     }
 }
 
-void chunkprovider_overworld::generate_ores(vec3i pos, chunk_t *chunk, javaport::Random &rng)
+void ChunkProviderOverworld::generate_ores(Vec3i pos, Chunk *chunk, javaport::Random &rng)
 {
     int coal_count = rng.nextInt(8) + 16;
     int iron_count = rng.nextInt(4) + 8;
@@ -271,24 +271,24 @@ void chunkprovider_overworld::generate_ores(vec3i pos, chunk_t *chunk, javaport:
     generate_ore_type(pos, BlockID::diamond_ore, diamond_count, 12, chunk, rng);
 }
 
-void chunkprovider_overworld::generate_features(chunk_t *chunk)
+void ChunkProviderOverworld::generate_features(Chunk *chunk)
 {
     javaport::Random rng(chunk->x * 0x4F9939F508L + chunk->z * 0x1F38D3E7L + current_world->seed);
-    vec3i block_pos(chunk->x * 16, 0, chunk->z * 16);
+    Vec3i block_pos(chunk->x * 16, 0, chunk->z * 16);
     generate_ores(block_pos, chunk, rng);
     generate_trees(block_pos, chunk, rng);
     generate_flowers(block_pos, chunk, rng);
     if (rng.nextInt(4) == 0)
     {
         javaport::WorldGenLakes lake_gen(BlockID::water);
-        vec3i pos(rng.nextInt(16) + block_pos.x, rng.nextInt(128), rng.nextInt(16) + block_pos.z);
+        Vec3i pos(rng.nextInt(16) + block_pos.x, rng.nextInt(128), rng.nextInt(16) + block_pos.z);
         lake_gen.generate(rng, pos);
     }
 
     if (rng.nextInt(8) == 0)
     {
         javaport::WorldGenLakes lava_lake_gen(BlockID::lava);
-        vec3i pos(rng.nextInt(16) + block_pos.x, rng.nextInt(128), rng.nextInt(16) + block_pos.z);
+        Vec3i pos(rng.nextInt(16) + block_pos.x, rng.nextInt(128), rng.nextInt(16) + block_pos.z);
         if (pos.y < 64 || rng.nextInt(10) == 0)
             lava_lake_gen.generate(rng, pos);
     }
@@ -296,14 +296,14 @@ void chunkprovider_overworld::generate_features(chunk_t *chunk)
     javaport::WorldGenLiquids water_liquid_gen(BlockID::water);
     for (int i = 0; i < 50; i++)
     {
-        vec3i pos(rng.nextInt(16) + 8, rng.nextInt(120) + 8, rng.nextInt(16) + 8);
+        Vec3i pos(rng.nextInt(16) + 8, rng.nextInt(120) + 8, rng.nextInt(16) + 8);
         water_liquid_gen.generate(rng, pos + block_pos);
     }
 
     javaport::WorldGenLiquids lava_gen(BlockID::lava);
     for (int i = 0; i < 20; i++)
     {
-        vec3i pos(rng.nextInt(16) + 8, rng.nextInt(rng.nextInt(rng.nextInt(112) + 8) + 8), rng.nextInt(16) + 8);
+        Vec3i pos(rng.nextInt(16) + 8, rng.nextInt(rng.nextInt(rng.nextInt(112) + 8) + 8), rng.nextInt(16) + 8);
         lava_gen.generate(rng, pos + block_pos);
     }
 }

@@ -10,7 +10,7 @@
 
 #include "debuglog.hpp"
 
-struct configuration_value
+struct ConfigurationValue
 {
 private:
     std::string string_value = "0.0";
@@ -32,7 +32,7 @@ public:
         return static_cast<int>(float_value);
     }
 
-    configuration_value &operator=(const std::string &value)
+    ConfigurationValue &operator=(const std::string &value)
     {
         string_value = value;
         if (value.empty())
@@ -60,14 +60,14 @@ public:
         return *this;
     }
 
-    configuration_value &operator=(float value)
+    ConfigurationValue &operator=(float value)
     {
         float_value = value;
         string_value = std::to_string(value);
         return *this;
     }
 
-    configuration_value &operator=(int value)
+    ConfigurationValue &operator=(int value)
     {
         float_value = static_cast<float>(value);
         string_value = std::to_string(value);
@@ -75,19 +75,19 @@ public:
     }
 };
 
-class configuration
+class Configuration
 {
 private:
-    std::map<std::string, configuration_value> kv_pairs;
+    std::map<std::string, ConfigurationValue> kv_pairs;
 
     // Default config location
     // C++17 doesn't support constexpr for std::string
     constexpr static const char *default_config_location = "/apps/minecraft/config.txt";
 
 public:
-    configuration() {}
+    Configuration() {}
 
-    configuration(std::string filename)
+    Configuration(std::string filename)
     {
         load(filename);
     }
@@ -143,7 +143,7 @@ public:
 
         for (const auto &pair : kv_pairs)
         {
-            configuration_value value = pair.second;
+            ConfigurationValue value = pair.second;
 
             if (std::string(value).empty())
             {
@@ -172,13 +172,13 @@ public:
         }
     }
 
-    configuration_value &operator[](const std::string &key)
+    ConfigurationValue &operator[](const std::string &key)
     {
-        return kv_pairs.count(key) ? kv_pairs[key] : kv_pairs[key] = configuration_value();
+        return kv_pairs.count(key) ? kv_pairs[key] : kv_pairs[key] = ConfigurationValue();
     }
 
     template <typename T>
-    configuration_value &get(const std::string &key, T default_value)
+    ConfigurationValue &get(const std::string &key, T default_value)
     {
         static_assert(std::is_same<T, std::string>::value || std::is_same<T, float>::value || std::is_same<T, int>::value, "Type must be string, float or int");
 

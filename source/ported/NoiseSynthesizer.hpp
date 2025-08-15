@@ -40,7 +40,7 @@ public:
         return noise3(pos);
     }
     template <typename T>
-    typename std::enable_if<std::is_integral<T>::value, void>::type GetNoiseSet(const vec3i &pos, const vec3i &size, float frequency, uint8_t octaves, T *out)
+    typename std::enable_if<std::is_integral<T>::value, void>::type GetNoiseSet(const Vec3i &pos, const Vec3i &size, float frequency, uint8_t octaves, T *out)
     {
         float amplitude = (1 << (sizeof(T) << 3)) - 1;
         float inv_frequency = 1.0f / frequency;
@@ -86,7 +86,7 @@ public:
     }
 
     template <typename T>
-    typename std::enable_if<std::is_floating_point<T>::value, void>::type GetNoiseSet(const vec3f &pos, const vec3i &size, float frequency, uint8_t octaves, T *out)
+    typename std::enable_if<std::is_floating_point<T>::value, void>::type GetNoiseSet(const Vec3f &pos, const Vec3i &size, float frequency, uint8_t octaves, T *out)
     {
         T amplitude = 1.0f;
         T inv_frequency = 1.0f / frequency;

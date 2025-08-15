@@ -8,7 +8,7 @@
 #define TA_DST (1)
 #define TA_SRC (0)
 
-class texanim_t
+class TexAnim
 {
 public:
     void *source = nullptr;
@@ -25,7 +25,7 @@ public:
     void copy_tpl();
 };
 
-class water_texanim_t : public texanim_t
+class WaterTexAnim : public TexAnim
 {
     float data_a[256] = {0};
     float data_b[256] = {0};
@@ -46,7 +46,7 @@ public:
     void update() override;
 };
 
-class lava_texanim_t : public texanim_t
+class LavaTexanim : public TexAnim
 {
     float data_a[256] = {0};
     float data_b[256] = {0};

@@ -2,7 +2,7 @@
 #include "chunk.hpp"
 #include "block.hpp"
 
-void particle::update(float dt)
+void Particle::update(float dt)
 {
     if (!life_time)
         return;
@@ -31,16 +31,16 @@ void particle::update(float dt)
     }
 
     // Used for collision detection
-    vec3i old_pos = vec3i(std::round(position.x), std::round(position.y), std::round(position.z));
+    Vec3i old_pos = Vec3i(std::round(position.x), std::round(position.y), std::round(position.z));
 
     // Update position
     position = position + velocity * dt;
 
     // Check if the particle has moved
-    vec3i new_pos = vec3i(std::round(position.x), std::round(position.y), std::round(position.z));
+    Vec3i new_pos = Vec3i(std::round(position.x), std::round(position.y), std::round(position.z));
 
     // Get the block at the particle's position
-    block_t *block = get_block_at(new_pos);
+    Block *block = get_block_at(new_pos);
     if (block)
     {
         if (old_pos != new_pos)
@@ -49,8 +49,8 @@ void particle::update(float dt)
             if ((physics & PPHYSIC_FLAG_COLLIDE) && block_properties[block->id].m_opacity > 1)
             {
                 // Place the particle on the surface of the block
-                vec3f old_vel = velocity;
-                velocity = vec3f(0, 0, 0);
+                Vec3f old_vel = velocity;
+                velocity = Vec3f(0, 0, 0);
 
                 if (old_pos.x > new_pos.x)
                     position.x = old_pos.x + .5f;
@@ -75,7 +75,7 @@ void particle::update(float dt)
             }
         }
     }
-    new_pos = vec3i(std::round(position.x), std::round(position.y), std::round(position.z));
+    new_pos = Vec3i(std::round(position.x), std::round(position.y), std::round(position.z));
     block = get_block_at(new_pos);
     if (block)
     {
@@ -91,7 +91,7 @@ void particle::update(float dt)
         life_time--;
 }
 
-void particle_system::update(float dt)
+void ParticleSystem::update(float dt)
 {
     for (int i = 0; i < 256; i++)
     {
@@ -99,7 +99,7 @@ void particle_system::update(float dt)
     }
 }
 
-void particle_system::add_particle(particle part)
+void ParticleSystem::add_particle(Particle part)
 {
     for (int i = 0; i < 256; i++)
     {

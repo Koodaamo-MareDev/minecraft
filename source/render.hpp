@@ -20,31 +20,31 @@
 
 extern uint8_t light_map[1024];
 
-struct plane_t
+struct Plane
 {
-    vec3f direction;
+    Vec3f direction;
     vfloat_t distance;
 };
 
-struct frustum_t
+struct Frustum
 {
-    plane_t planes[6]; // Six planes of the frustum
+    Plane planes[6]; // Six planes of the frustum
 };
 
-struct camera_t
+struct Camera
 {
-    vec3f rot;       // Camera rotation (in degrees)
-    vec3f position;  // Camera position
+    Vec3f rot;       // Camera rotation (in degrees)
+    Vec3f position;  // Camera position
     vfloat_t fov;    // Field of view (in degrees)
     vfloat_t aspect; // Aspect ratio
     vfloat_t near;   // Near clipping plane
     vfloat_t far;    // Far clipping plane
 };
 
-inline uint8_t get_face_light_index(vec3i pos, uint8_t face, chunk_t *near, block_t *default_block = nullptr)
+inline uint8_t get_face_light_index(Vec3i pos, uint8_t face, Chunk *near, Block *default_block = nullptr)
 {
-    vec3i other = pos + face_offsets[face];
-    block_t *other_block = get_block_at(other, near);
+    Vec3i other = pos + face_offsets[face];
+    Block *other_block = get_block_at(other, near);
     if (!other_block)
     {
         if (default_block)
@@ -54,7 +54,7 @@ inline uint8_t get_face_light_index(vec3i pos, uint8_t face, chunk_t *near, bloc
     return other_block->light;
 }
 
-camera_t &get_camera();
+Camera &get_camera();
 
 void init_textures();
 
@@ -62,25 +62,25 @@ void update_textures();
 
 void use_texture(GXTexObj &texture);
 
-int render_face(vec3i pos, uint8_t face, uint32_t texture_index, chunk_t *near = nullptr, block_t *block = nullptr, uint8_t min_y = 0, uint8_t max_y = 16);
+int render_face(Vec3i pos, uint8_t face, uint32_t texture_index, Chunk *near = nullptr, Block *block = nullptr, uint8_t min_y = 0, uint8_t max_y = 16);
 
-int render_back_face(vec3i pos, uint8_t face, uint32_t texture_index, chunk_t *near = nullptr, block_t *block = nullptr, uint8_t min_y = 0, uint8_t max_y = 16);
+int render_back_face(Vec3i pos, uint8_t face, uint32_t texture_index, Chunk *near = nullptr, Block *block = nullptr, uint8_t min_y = 0, uint8_t max_y = 16);
 
-void render_single_block(block_t &selected_block, bool transparency);
+void render_single_block(Block &selected_block, bool transparency);
 
-void render_single_block_at(block_t &selected_block, vec3i pos, bool transparency);
+void render_single_block_at(Block &selected_block, Vec3i pos, bool transparency);
 
 void render_single_item(uint32_t texture_index, bool transparency, uint8_t light = 0xFF);
 
 void render_item_pixel(uint32_t texture_index, uint8_t x, uint8_t y, bool x_next, bool y_next, uint8_t light);
 
-vec3f angles_to_vector(float x, float y);
+Vec3f angles_to_vector(float x, float y);
 
-vec3f vector_to_angles(const vec3f &vec);
+Vec3f vector_to_angles(const Vec3f &vec);
 
-bool is_cube_visible(const frustum_t &frustum, const vec3f &center, float size);
+bool is_cube_visible(const Frustum &frustum, const Vec3f &center, float size);
 
-void build_frustum(const camera_t &cam, frustum_t &frustum);
+void build_frustum(const Camera &cam, Frustum &frustum);
 
 void transform_view(gertex::GXMatrix view, guVector world_pos, guVector object_scale = guVector{1, 1, 1}, guVector object_rot = guVector{0, 0, 0}, bool load = true);
 
@@ -92,11 +92,11 @@ GXColor get_sky_color(bool cave_darkness = true);
 
 GXColor get_lightmap_color(uint8_t light);
 
-void draw_particle(camera_t &camera, vec3f pos, uint32_t texture_index, float size, uint8_t brightness);
+void draw_particle(Camera &camera, Vec3f pos, uint32_t texture_index, float size, uint8_t brightness);
 
-void draw_particles(camera_t &camera, particle *particles, int count);
+void draw_particles(Camera &camera, Particle *particles, int count);
 
-void draw_frustum(const camera_t &cam);
+void draw_frustum(const Camera &cam);
 
 void draw_stars();
 

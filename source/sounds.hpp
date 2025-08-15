@@ -12,7 +12,7 @@ extern std::vector<std::string> music_files;
 
 std::string get_random_music();
 
-aiff_container *get_sound(std::string name);
+AiffContainer *get_sound(std::string name);
 
-aiff_container* randomize_sound(std::string name, int count);
+AiffContainer* randomize_sound(std::string name, int count);
 #endif

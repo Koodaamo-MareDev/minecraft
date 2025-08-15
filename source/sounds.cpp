@@ -28,16 +28,16 @@ std::string get_random_music()
     return music_files[random.nextInt(music_files.size())];
 }
 
-std::map<std::string, aiff_container *> sound_map;
+std::map<std::string, AiffContainer *> sound_map;
 
-aiff_container *get_sound(std::string name)
+AiffContainer *get_sound(std::string name)
 {
     auto it = sound_map.find(name);
     if (it != sound_map.end())
     {
         return it->second;
     }
-    std::string path = SOUND_DIR + name + ".aiff";
+    std::string path = SOUND_DIR + name + ".Aiff";
 
     FILE *file = fopen(path.c_str(), "rb");
     if (!file)
@@ -60,7 +60,7 @@ aiff_container *get_sound(std::string name)
 
     fclose(file);
 
-    aiff_container *sound = new aiff_container(data);
+    AiffContainer *sound = new AiffContainer(data);
     if (!sound->data)
     {
         // Aiff validation failed
@@ -73,7 +73,7 @@ aiff_container *get_sound(std::string name)
     return sound;
 }
 
-aiff_container *randomize_sound(std::string name, int count)
+AiffContainer *randomize_sound(std::string name, int count)
 {
     name += std::to_string((rand() % count) + 1);
     return get_sound(name);

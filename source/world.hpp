@@ -11,37 +11,37 @@
 #include "sound.hpp"
 #include "inventory.hpp"
 
-class chunk_t;
-class entity_physical;
-class aabb_t;
-class camera_t;
-class chunkprovider;
-class frustum_t;
+class Chunk;
+class EntityPhysical;
+class AABB;
+class Camera;
+class ChunkProvider;
+class Frustum;
 
-class player_properties
+class PlayerProperties
 {
 public:
-    entity_player_local *m_entity = nullptr;
+    EntityPlayerLocal *m_entity = nullptr;
     BlockID in_fluid = BlockID::air;
-    vec3f view_bob_offset = vec3f(0, 0, 0);
-    vec3f view_bob_screen_offset = vec3f(0, 0, 0);
+    Vec3f view_bob_offset = Vec3f(0, 0, 0);
+    Vec3f view_bob_screen_offset = Vec3f(0, 0, 0);
 
     // Raycast related
-    vec3i raycast_pos = vec3i(0, 0, 0);
-    vec3i raycast_face = vec3i(0, 0, 0);
-    std::vector<aabb_t> block_bounds;
+    Vec3i raycast_pos = Vec3i(0, 0, 0);
+    Vec3i raycast_face = Vec3i(0, 0, 0);
+    std::vector<AABB> block_bounds;
     bool draw_block_outline = false;
     float block_mine_progress = 0.0f;
     int mining_tick = 0;
 
-    inventory::container m_inventory = inventory::container(40, 36); // 4 rows of 9 slots, the rest 4 are the armor slots
-    inventory::item_stack *selected_item = nullptr;
+    inventory::Container m_inventory = inventory::Container(40, 36); // 4 rows of 9 slots, the rest 4 are the armor slots
+    inventory::ItemStack *selected_item = nullptr;
     int selected_hotbar_slot = 0;
 
-    player_properties();
+    PlayerProperties();
 };
 
-enum class section_update_phase : uint8_t
+enum class SectionUpdatePhase : uint8_t
 {
     BLOCK_VISIBILITY = 0,   // Update visibility of blocks in a section
     SECTION_VISIBILITY = 1, // Update visibility of sections in world
@@ -51,26 +51,26 @@ enum class section_update_phase : uint8_t
     COUNT = 5               // Total number of phases
 };
 
-inline section_update_phase operator++(section_update_phase &phase, int)
+inline SectionUpdatePhase operator++(SectionUpdatePhase &phase, int)
 {
-    section_update_phase old_phase = phase;
-    if (uint8_t(old_phase) + 1 >= uint8_t(section_update_phase::COUNT))
-        phase = section_update_phase::BLOCK_VISIBILITY;
+    SectionUpdatePhase old_phase = phase;
+    if (uint8_t(old_phase) + 1 >= uint8_t(SectionUpdatePhase::COUNT))
+        phase = SectionUpdatePhase::BLOCK_VISIBILITY;
     else
-        phase = section_update_phase(uint8_t(old_phase) + 1);
+        phase = SectionUpdatePhase(uint8_t(old_phase) + 1);
     return old_phase;
 };
 
-inline section_update_phase &operator++(section_update_phase &phase)
+inline SectionUpdatePhase &operator++(SectionUpdatePhase &phase)
 {
-    if (uint8_t(phase) + 1 >= uint8_t(section_update_phase::COUNT))
-        phase = section_update_phase::BLOCK_VISIBILITY;
+    if (uint8_t(phase) + 1 >= uint8_t(SectionUpdatePhase::COUNT))
+        phase = SectionUpdatePhase::BLOCK_VISIBILITY;
     else
-        phase = section_update_phase(uint8_t(phase) + 1);
+        phase = SectionUpdatePhase(uint8_t(phase) + 1);
     return phase;
 }
 
-class world
+class World
 {
 public:
     uint32_t ticks = 0;
@@ -81,46 +81,46 @@ public:
     double delta_time = 0.0;
     double partial_ticks = 0.0;
     size_t memory_usage = 0;
-    player_properties player;
+    PlayerProperties player;
     bool loaded = false;
     bool hell = false;
     int64_t seed = 0;
-    chunkprovider *chunk_provider = nullptr;
-    frustum_t *frustum = nullptr;
+    ChunkProvider *chunk_provider = nullptr;
+    Frustum *frustum = nullptr;
     Crapper::MinecraftClient *client = nullptr;
 
     std::string name = "world";
 
-    world();
-    ~world();
+    World();
+    ~World();
 
     bool is_remote();
     void set_remote(bool value);
 
     void tick();
     void update();
-    void update_frustum(camera_t &camera);
+    void update_frustum(Camera &camera);
     void update_chunks();
-    section_update_phase update_sections(section_update_phase phase);
+    SectionUpdatePhase update_sections(SectionUpdatePhase phase);
     void calculate_visibility();
-    void update_fluid_section(chunk_t *chunk, int index);
+    void update_fluid_section(Chunk *chunk, int index);
     void edit_blocks();
 
     int prepare_chunks(int count);
-    void remove_chunk(chunk_t *chunk);
+    void remove_chunk(Chunk *chunk);
     void cleanup_chunks();
 
-    void add_particle(const particle &particle);
-    void play_sound(const sound &sound);
-    void destroy_block(const vec3i pos, block_t *old_block);
-    void place_block(const vec3i pos, const vec3i targeted, block_t *new_block, uint8_t face);
-    void spawn_drop(const vec3i &pos, const block_t *old_block, inventory::item_stack item);
-    void create_explosion(vec3f pos, float power, chunk_t *near);
+    void add_particle(const Particle &particle);
+    void play_sound(const Sound &sound);
+    void destroy_block(const Vec3i pos, Block *old_block);
+    void place_block(const Vec3i pos, const Vec3i targeted, Block *new_block, uint8_t face);
+    void spawn_drop(const Vec3i &pos, const Block *old_block, inventory::ItemStack item);
+    void create_explosion(Vec3f pos, float power, Chunk *near);
 
-    void draw(camera_t &camera);
+    void draw(Camera &camera);
     void draw_scene(bool opaque);
     void draw_selected_block();
-    void draw_bounds(aabb_t *bounds);
+    void draw_bounds(AABB *bounds);
 
     void save();
     bool load();
@@ -128,13 +128,13 @@ public:
     void reset();
 
 private:
-    particle_system m_particle_system;
-    sound_system m_sound_system;
+    ParticleSystem m_particle_system;
+    SoundSystem m_sound_system;
 
     void update_entities();
     void update_player();
 };
 
-extern world *current_world;
+extern World *current_world;
 
 #endif

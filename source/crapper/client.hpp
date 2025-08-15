@@ -10,7 +10,7 @@
 #include <math/vec3i.hpp>
 #include <ported/ByteBuffer.hpp>
 
-class world;
+class World;
 
 namespace Crapper
 {
@@ -135,9 +135,9 @@ namespace Crapper
         bool login_success = false;
         bool on_ground = false;
         ByteBuffer receive_buffer;
-        world *remote_world = nullptr;
+        World *remote_world = nullptr;
 
-        MinecraftClient(world *remote_world);
+        MinecraftClient(World *remote_world);
 
         void joinServer(std::string host, uint16_t port);
         void handleKeepAlive(ByteBuffer &buffer);

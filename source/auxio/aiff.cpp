@@ -4,9 +4,9 @@
 const uint8_t sample_rate_bytes[10]{
     0x40, 0x0C, 0xFA, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
-aiff *validate_aiff(uint8_t *data)
+Aiff *validate_aiff(uint8_t *data)
 {
-    aiff *a = (aiff *)data;
+    Aiff *a = (Aiff *)data;
 
     if (std::strncmp(a->chunk_id, "FORM", 4) != 0)
     {
@@ -51,7 +51,7 @@ aiff *validate_aiff(uint8_t *data)
     return a;
 }
 
-aiff_container::aiff_container(uint8_t *raw_data)
+AiffContainer::AiffContainer(uint8_t *raw_data)
 {
     data = validate_aiff(raw_data);
     if (data == nullptr)
@@ -67,7 +67,7 @@ aiff_container::aiff_container(uint8_t *raw_data)
         uint32_t aligned_address = (data_address + 31) & ~31;
 
         // Move the data to the aligned address
-        this->data = (aiff *)aligned_address;
+        this->data = (Aiff *)aligned_address;
         std::memmove(this->data, data, 8 + data->chunk_size);
 
         // Fix the chunk size

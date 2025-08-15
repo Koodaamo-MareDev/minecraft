@@ -6,10 +6,10 @@
 #include <string>
 #include <vector>
 
-class gui_dirtscreen : public gui
+class GuiDirtscreen : public Gui
 {
 public:
-    gui_dirtscreen(const gertex::GXView &viewport);
+    GuiDirtscreen(const gertex::GXView &viewport);
 
     void draw() override;
     void update() override;

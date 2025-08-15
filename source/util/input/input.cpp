@@ -6,14 +6,14 @@
 
 namespace input
 {
-    std::vector<input::device *> devices;
+    std::vector<input::Device *> devices;
     std::map<std::string, uint8_t> string_joystick_src_mapping;
     std::map<std::string, uint8_t> string_joystick_dst_mapping;
     std::map<std::string, uint32_t> string_button_mapping;
 
     uint8_t cursor_joystick = JOY_LEFT;
 
-    configuration config;
+    Configuration config;
 
     float deadzone = 0.1f;
     float sensitivity = 360.0f;
@@ -79,7 +79,7 @@ namespace input
 
     void deinit()
     {
-        for (device *dev : devices)
+        for (Device *dev : devices)
         {
             delete dev;
         }
@@ -87,7 +87,7 @@ namespace input
         config.save("/apps/minecraft/inputconfig.txt");
     }
 
-    void add_device(device *dev)
+    void add_device(Device *dev)
     {
         devices.push_back(dev);
     }

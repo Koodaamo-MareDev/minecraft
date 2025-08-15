@@ -6,16 +6,16 @@
 
 namespace input
 {
-    wiimote_nunchuk::wiimote_nunchuk()
+    WiimoteNunchuk::WiimoteNunchuk()
     {
         WPAD_SetDataFormat(0, WPAD_FMT_BTNS_ACC_IR);
     }
 
-    wiimote_nunchuk::~wiimote_nunchuk()
+    WiimoteNunchuk::~WiimoteNunchuk()
     {
     }
 
-    void wiimote_nunchuk::scan()
+    void WiimoteNunchuk::scan()
     {
         WPADData *data = WPAD_Data(0);
         if (data->exp.type == WPAD_EXP_NUNCHUK)
@@ -94,7 +94,7 @@ namespace input
         }
     }
 
-    bool wiimote_nunchuk::connected() const
+    bool WiimoteNunchuk::connected() const
     {
         return WPAD_Data(0)->exp.type == WPAD_EXP_NUNCHUK;
     }

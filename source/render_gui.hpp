@@ -16,13 +16,13 @@ int draw_textured_quad(GXTexObj &texture, int32_t x, int32_t y, int32_t w, int32
 
 int draw_colored_quad(int32_t x, int32_t y, int32_t w, int32_t h, uint8_t r, uint8_t g, uint8_t b, uint8_t a, float scale = GUI_DEFAULT_SCALE);
 
-int draw_colored_sprite(GXTexObj &texture, vec2i pos, vec2i size, vfloat_t u1, vfloat_t v1, vfloat_t u2, vfloat_t v2, GXColor color = GXColor{0xFF, 0xFF, 0xFF, 0xFF}, float scale = GUI_DEFAULT_SCALE);
+int draw_colored_sprite(GXTexObj &texture, Vec2i pos, Vec2i size, vfloat_t u1, vfloat_t v1, vfloat_t u2, vfloat_t v2, GXColor color = GXColor{0xFF, 0xFF, 0xFF, 0xFF}, float scale = GUI_DEFAULT_SCALE);
 
-int draw_colored_sprite_3d(GXTexObj &texture, vec3f center, vec3f size, vec3f offset, vec3f right, vec3f up, vfloat_t u1, vfloat_t v1, vfloat_t u2, vfloat_t v2, GXColor color);
+int draw_colored_sprite_3d(GXTexObj &texture, Vec3f center, Vec3f size, Vec3f offset, Vec3f right, Vec3f up, vfloat_t u1, vfloat_t v1, vfloat_t u2, vfloat_t v2, GXColor color);
 
 vfloat_t text_width_3d(std::string str);
 
-void draw_text_3d(vec3f pos, std::string str, GXColor color);
+void draw_text_3d(Vec3f pos, std::string str, GXColor color);
 
 int fill_screen_texture(GXTexObj &texture, gertex::GXView &view, vfloat_t u1, vfloat_t v1, vfloat_t u2, vfloat_t v2, float scale = GUI_DEFAULT_SCALE);
 
