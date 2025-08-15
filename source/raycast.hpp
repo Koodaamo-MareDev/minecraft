@@ -421,7 +421,7 @@ inline bool raycast_precise(
     float dst,
     Vec3i *output,
     Vec3i *output_face,
-    AABB &aabb)
+    AABB &out_aabb)
 {
     // From "A Fast Voxel Traversal Algorithm for Ray Tracing"
     // by John Amanatides and Andrew Woo, 1987
@@ -530,8 +530,8 @@ inline bool raycast_precise(
                                     b_max.z = std::max(bounds.max.z, b_max.z);
                                 }
 
-                                aabb.min = b_min;
-                                aabb.max = b_max;
+                                out_aabb.min = b_min;
+                                out_aabb.max = b_max;
 
                                 return true;
                             }
