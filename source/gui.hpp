@@ -17,12 +17,20 @@ public:
     GuiSlot() = default;
     GuiSlot(int x, int y, inventory::ItemStack item) : x(x), y(y), item(item) {}
 
-    inventory::ItemStack interact(inventory::ItemStack hand, bool right_click);
+    virtual inventory::ItemStack interact(inventory::ItemStack hand, bool right_click);
 
     bool contains(int x, int y)
     {
         return x >= this->x && x < this->x + 32 && y >= this->y && y < this->y + 32;
     }
+};
+
+class GuiResultSlot : public GuiSlot
+{
+public:
+    GuiResultSlot(int x, int y, inventory::ItemStack item) : GuiSlot(x, y, item) {}
+
+    inventory::ItemStack interact(inventory::ItemStack hand, bool right_click) override;
 };
 
 class Gui

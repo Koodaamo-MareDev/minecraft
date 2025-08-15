@@ -46,40 +46,17 @@ namespace inventory
 
     ItemStack Container::add(ItemStack stack)
     {
-        // Search for stacks with the same id and meta
-        for (size_t i = 0; i < size() && i < usable_slots; i++)
+        if (stack.empty())
+            return stack;
+
+        while (stack.count > 0)
         {
-            ItemStack &current = stacks[i];
-            size_t max_stack = current.as_item().max_stack;
+            int slot = find_free_slot_for(stack);
 
-            // Skip full stacks
-            if (current.count == max_stack)
-            {
-                continue;
-            }
+            if (slot == -1)
+                break;
 
-            if (current.id == stack.id && current.meta == stack.meta)
-            {
-                // Add the stack to the current stack
-                current.count += stack.count;
-                if (current.count > max_stack)
-                {
-                    stack.count = current.count - max_stack;
-                    current.count = max_stack;
-                    continue;
-                }
-                return ItemStack();
-            }
-        }
-
-        // Place the stack in the first empty slot
-        for (size_t i = 0; i < size() && i < usable_slots; i++)
-        {
-            if (stacks[i].empty())
-            {
-                stacks[i] = stack;
-                return ItemStack();
-            }
+            stack = place(stack, slot);
         }
 
         // Return the remaining stack if there's no space
@@ -136,6 +113,43 @@ namespace inventory
         return stack;
     }
 
+    int Container::find_free_slot_for(ItemStack stack)
+    {
+        // If the stack is empty, return -1
+        if (stack.empty())
+            return -1;
+
+        // Search for stacks with the same id and meta
+        for (size_t i = 0; i < size() && i < usable_slots; i++)
+        {
+            ItemStack &current = stacks[i];
+            size_t max_stack = current.as_item().max_stack;
+
+            // Skip full stacks
+            if (current.count >= max_stack)
+            {
+                continue;
+            }
+
+            if (current.id == stack.id && current.meta == stack.meta)
+            {
+                return i;
+            }
+        }
+
+        // Place the stack in the first empty slot
+        for (size_t i = 0; i < size() && i < usable_slots; i++)
+        {
+            if (stacks[i].empty())
+            {
+                return i;
+            }
+        }
+
+        // No free slot found
+        return -1;
+    }
+
     float Item::get_efficiency(BlockID block_id, tool_type block_tool_type, tool_tier block_tool_tier) const
     {
         // Swords have a fixed efficiency
@@ -167,5 +181,69 @@ namespace inventory
         }
 
         return 1.0f;
+    }
+
+    int PlayerInventory::find_free_slot_for(ItemStack stack)
+    {
+        // If the stack is empty, return -1
+        if (stack.empty() || size() < 45)
+            return -1;
+
+        // Search hotbar for stacks with the same id and meta (starting at 36 as the hotbar starts there)
+        for (size_t i = 36; i < 45; i++)
+        {
+            ItemStack &current = stacks[i];
+            size_t max_stack = current.as_item().max_stack;
+
+            // Skip full stacks
+            if (current.count >= max_stack)
+            {
+                continue;
+            }
+
+            if (current.id == stack.id && current.meta == stack.meta)
+            {
+                return i;
+            }
+        }
+
+        // Place the stack in the first empty inventory slot (starting at 36)
+        for (size_t i = 36; i < 45; i++)
+        {
+            if (stacks[i].empty())
+            {
+                return i;
+            }
+        }
+
+        // Search inventory for stacks with the same id and meta (starting at 9 as the first 9 slots are reserved for armor and crafting)
+        for (size_t i = 9; i < 36; i++)
+        {
+            ItemStack &current = stacks[i];
+            size_t max_stack = current.as_item().max_stack;
+
+            // Skip full stacks
+            if (current.count >= max_stack)
+            {
+                continue;
+            }
+
+            if (current.id == stack.id && current.meta == stack.meta)
+            {
+                return i;
+            }
+        }
+
+        // Place the stack in the first empty inventory slot (starting at 9)
+        for (size_t i = 9; i < 36; i++)
+        {
+            if (stacks[i].empty())
+            {
+                return i;
+            }
+        }
+
+        // No free slot found
+        return -1;
     }
 } // namespace inventory

@@ -285,7 +285,7 @@ public:
     Vec3i raycast_target_face = Vec3i(0, 0, 0);
     AABB raycast_target_bounds;
 
-    inventory::Container items = inventory::Container(40, 36); // 4 rows of 9 slots, the rest 4 are the armor slots
+    inventory::PlayerInventory items = inventory::PlayerInventory(45); // 9 special slots, 4 rows of 9 slots
     inventory::ItemStack *selected_item = nullptr;
 
     EntityPlayerLocal(const Vec3f &position);

@@ -7,9 +7,10 @@
 class GuiSurvival : public Gui
 {
 public:
-    std::array<GuiSlot, 9> hotbar_slots;
-    std::array<GuiSlot, 27> inventory_slots;
-    std::array<GuiSlot, 4> armor_slots;
+    std::vector<GuiSlot*> slots;
+    const static size_t hotbar_start = 36;
+    const static size_t inventory_start = 9;
+    const static size_t armor_start = 5;
 
     inventory::Container &linked_container;
 

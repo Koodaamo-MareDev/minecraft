@@ -884,7 +884,7 @@ void DrawHUD(gertex::GXView &viewport)
     // Draw the hotbar items
     for (size_t i = 0; i < 9; i++)
     {
-        Gui::draw_item((viewport.width - 364) / 2 + i * 40 + 6, corrected_height - 38, current_world->player.items[i], viewport);
+        Gui::draw_item((viewport.width - 364) / 2 + i * 40 + 6, corrected_height - 38, current_world->player.items[i + 36], viewport);
     }
 
     // Restore the orthogonal position matrix

@@ -96,8 +96,10 @@ namespace inventory
     class Container
     {
     private:
-        std::vector<ItemStack> stacks;
         uint32_t usable_slots;
+
+    protected:
+        std::vector<ItemStack> stacks;
 
     public:
         Container(size_t size, uint32_t usable_slots) : usable_slots(usable_slots)
@@ -140,14 +142,14 @@ namespace inventory
          * @param stack the item_stack to add
          * @return the remaining stack
          */
-        ItemStack add(ItemStack stack);
+        virtual ItemStack add(ItemStack stack);
 
         /**
          * Inserts the item_stack at the specified index
          * @param stack the item_stack to insert
          * @param index the index to insert the item_stack
          */
-        void replace(ItemStack stack, size_t index);
+        virtual void replace(ItemStack stack, size_t index);
 
         /**
          * Places the item at the specified index
@@ -156,7 +158,17 @@ namespace inventory
          * @param item the item to place
          * @param index the index to place the item
          */
-        ItemStack place(ItemStack item, size_t index);
+        virtual ItemStack place(ItemStack item, size_t index);
+
+        virtual int find_free_slot_for(ItemStack stack);
+    };
+
+    class PlayerInventory : public Container
+    {
+    public:
+        PlayerInventory(size_t inventory_size) : Container(inventory_size) {}
+
+        virtual int find_free_slot_for(ItemStack stack) override;
     };
 } // namespace inventory
 #endif

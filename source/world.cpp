@@ -17,6 +17,7 @@
 #include "nbt/nbt.hpp"
 #include "light.hpp"
 #include "gui_dirtscreen.hpp"
+#include "gui_survival.hpp"
 #include "chunkprovider.hpp"
 #include "util/face_pair.hpp"
 #include "util/crashfix.hpp"
@@ -526,13 +527,13 @@ void World::edit_blocks()
     if (!player.selected_item)
         return;
 
-    if (should_place_block && (player.selected_item->empty() || !player.selected_item->as_item().is_block()))
+    if (should_place_block && player.selected_item->empty())
     {
         should_place_block = false;
         should_destroy_block = false;
         return;
     }
-    Block selected_block = Block{uint8_t(player.selected_item->id & 0xFF), 0x7F, uint8_t(player.selected_item->meta & 0xFF)};
+    Block selected_block = player.selected_item->as_item().is_block() ? Block{uint8_t(player.selected_item->id & 0xFF), 0x7F, uint8_t(player.selected_item->meta & 0xFF)} : Block{};
     bool finish_destroying = should_destroy_block && player.mining_progress >= 1.0f;
 
     player.raycast_target_found = raycast_precise(camera.position, angles_to_vector(camera.rot.x, camera.rot.y), 4, &player.raycast_target_pos, &player.raycast_target_face, player.raycast_target_bounds);
@@ -583,7 +584,7 @@ void World::edit_blocks()
                     else
                     {
                         should_place_block &= old_blockid == BlockID::air || properties(old_blockid).m_fluid;
-                        if (!finish_destroying && should_place_block)
+                        if (!finish_destroying && should_place_block && new_blockid != BlockID::air)
                         {
                             editable_block->meta = new_blockid == BlockID::air ? 0 : selected_block.meta;
                             editable_block->set_blockid(new_blockid);
@@ -749,14 +750,17 @@ void World::destroy_block(const Vec3i pos, Block *old_block)
 
 void World::place_block(const Vec3i pos, const Vec3i targeted, Block *new_block, uint8_t face)
 {
-    Sound sound = get_mine_sound(new_block->get_blockid());
-    sound.volume = 0.4f;
-    sound.pitch *= 0.8f;
-    sound.position = Vec3f(pos.x, pos.y, pos.z);
-    m_sound_system.play_sound(sound);
-    player.items[player.selected_hotbar_slot].count--;
-    if (player.items[player.selected_hotbar_slot].count == 0)
-        player.items[player.selected_hotbar_slot] = inventory::ItemStack();
+    if (new_block->id != BlockID::air)
+    {
+        Sound sound = get_mine_sound(new_block->get_blockid());
+        sound.volume = 0.4f;
+        sound.pitch *= 0.8f;
+        sound.position = Vec3f(pos.x, pos.y, pos.z);
+        m_sound_system.play_sound(sound);
+        player.items[player.selected_hotbar_slot + GuiSurvival::hotbar_start].count--;
+        if (player.items[player.selected_hotbar_slot + GuiSurvival::hotbar_start].count == 0)
+            player.items[player.selected_hotbar_slot + GuiSurvival::hotbar_start] = inventory::ItemStack();
+    }
 
     if (is_remote())
         client->sendPlaceBlock(targeted.x, targeted.y, targeted.z, (face + 4) % 6, new_block->id, 1, new_block->meta);
@@ -972,7 +976,7 @@ void World::draw_scene(bool opaque)
 
 void World::draw_selected_block()
 {
-    player.selected_item = &player.items[player.selected_hotbar_slot];
+    player.selected_item = &player.items[player.selected_hotbar_slot + GuiSurvival::hotbar_start];
     if (get_chunks().size() == 0 || !player.selected_item || player.selected_item->empty())
         return;
 

@@ -581,11 +581,21 @@ namespace Crapper
         {
             // Remove the item from the slot
             player->equipment[slot] = inventory::ItemStack(); // Clear the slot
+            EntityPlayerLocal *local_player = dynamic_cast<EntityPlayerLocal *>(player);
+            if (local_player)
+            {
+                local_player->items[slot - 5] = inventory::ItemStack();
+            }
         }
         else
         {
             // Add the item to the slot
             player->equipment[slot] = inventory::ItemStack(item, 1, meta);
+            EntityPlayerLocal *local_player = dynamic_cast<EntityPlayerLocal *>(player);
+            if (local_player)
+            {
+                local_player->items[slot - 5] = inventory::ItemStack(item, 1, meta);
+            }
         }
     }
 
@@ -1480,22 +1490,6 @@ namespace Crapper
         remote_world->create_explosion(Vec3f(x, y, z), radius, nullptr);
     }
 
-    int MinecraftClient::clientToNetworkSlot(int slot_id)
-    {
-        if (slot_id < 9)
-            return slot_id + 36;
-        return slot_id;
-    }
-
-    int MinecraftClient::networkToClientSlot(int slot_id)
-    {
-        if (slot_id >= 36 && slot_id < 45)
-            return slot_id - 36;
-        if (slot_id < 9)
-            return -1; // Crafting and armor slots are not supported
-        return slot_id;
-    }
-
     void MinecraftClient::handleSetSlot(ByteBuffer &buffer)
     {
         // Read slot
@@ -1506,7 +1500,6 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        slot_id = networkToClientSlot(slot_id);
         inventory::ItemStack item(0, 0, 0);
         if (item_id >= 0)
         {
@@ -1516,7 +1509,7 @@ namespace Crapper
         }
         if (buffer.underflow)
             return;
-        if (window_id == 0 && slot_id < 36 && slot_id >= 0)
+        if (window_id == 0 && slot_id >= 0 && (slot_id & 0xFFFF) < remote_world->player.items.size())
         {
             remote_world->player.items[slot_id] = item;
         }
@@ -1558,13 +1551,11 @@ namespace Crapper
 
         if (window_id == 0)
         {
-            for (size_t i = 0; i < items.size(); i++)
+            // Update player inventory
+            inventory::Container &container = remote_world->player.items;
+            for (size_t i = 0; i < items.size() && i < container.size(); i++)
             {
-                int slot_id = networkToClientSlot(i);
-                if (slot_id >= 0 && slot_id < 36)
-                {
-                    remote_world->player.items[slot_id] = items[i];
-                }
+                container[i] = items[i];
             }
         }
     }

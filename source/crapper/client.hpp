@@ -194,9 +194,6 @@ namespace Crapper
         void handleSetSlot(ByteBuffer &buffer);
         void disconnect();
         void tick();
-
-        int clientToNetworkSlot(int slot_id);
-        int networkToClientSlot(int slot_id);
     };
 
 } // namespace Crapper

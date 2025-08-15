@@ -246,3 +246,25 @@ inventory::ItemStack GuiSlot::interact(inventory::ItemStack hand, bool right_cli
     item = hand;
     return temp;
 }
+
+inventory::ItemStack GuiResultSlot::interact(inventory::ItemStack hand, bool right_click)
+{
+    if (!item.empty())
+    {
+        if (hand.empty())
+        {
+            // Take the item from the slot
+            hand = item;
+            item = inventory::ItemStack();
+            return hand;
+        }
+        else if (hand.id == item.id && hand.meta == item.meta && hand.count + item.count <= hand.as_item().max_stack)
+        {
+            // The item fits in the hand so we'll take it
+            hand.count += item.count;
+            item = inventory::ItemStack();
+        }
+    }
+
+    return hand;
+}
