@@ -767,7 +767,8 @@ void remove_entity(int32_t entity_id)
         std::map<int32_t, EntityPhysical *> &world_entities = get_entities();
         if (world_entities.find(entity_id) != world_entities.end())
             world_entities.erase(entity_id);
-        delete entity;
+        if (dynamic_cast<EntityPlayerLocal *>(entity) == nullptr)
+            delete entity;
     }
 }
 
