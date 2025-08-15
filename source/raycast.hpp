@@ -505,6 +505,8 @@ inline bool raycast_precise(
                             *output = block_pos;
                         if (get_block_at(block_pos + face) && output_face)
                             *output_face = face;
+
+                        out_aabb = aabb;
                         return true;
                     }
                     else
