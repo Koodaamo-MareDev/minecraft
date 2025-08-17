@@ -8,6 +8,7 @@
 #include <deque>
 #include <map>
 #include <iostream>
+#include <functional>
 #include <math/vec2i.hpp>
 #include <math/vec3i.hpp>
 #include <math/vec3f.hpp>
@@ -251,6 +252,8 @@ Chunk *get_chunk_from_pos(const Vec3i &pos);
 Chunk *get_chunk(int32_t x, int32_t z);
 Chunk *get_chunk(const Vec2i &pos);
 bool add_chunk(int32_t x, int32_t z);
+void remove_chunk(Chunk *chunk);
+void remove_chunks_if(std::function<bool(Chunk *)> predicate);
 void get_neighbors(const Vec3i &pos, Block **neighbors, Chunk *near = nullptr);
 void update_block_at(const Vec3i &pos);
 void update_neighbors(const Vec3i &pos);

@@ -43,6 +43,7 @@ static lwp_t chunk_manager_thread_handle = LWP_THREAD_NULL;
 static bool run_chunk_manager = false;
 
 std::deque<Chunk *> chunks;
+std::deque<Chunk *> chunk_cache;
 std::deque<Chunk *> pending_chunks;
 
 // Used to set the world to hell
@@ -90,11 +91,74 @@ Chunk *get_chunk(const Vec2i &pos)
 
 Chunk *get_chunk(int32_t x, int32_t z)
 {
-    std::deque<Chunk *>::iterator it = std::find_if(chunks.begin(), chunks.end(), [x, z](Chunk *chunk)
-                                                      { return chunk && chunk->x == x && chunk->z == z; });
-    if (it == chunks.end())
+    auto predicate = [x, z](Chunk *chunk)
+    {
+        return chunk && chunk->x == x && chunk->z == z;
+    };
+    Lock chunk_lock(chunk_mutex);
+
+    std::deque<Chunk *>::iterator it = std::find_if(chunk_cache.begin(), chunk_cache.end(), predicate);
+    if (it == chunk_cache.end())
+    {
+        // In case of a cache miss, try to find the chunk in the active chunks
+        it = std::find_if(chunks.begin(), chunks.end(), predicate);
+        if (it != chunks.end())
+        {
+            // Add it to the cache
+            chunk_cache.push_front(*it);
+            return *it;
+        }
+
+        // Chunk not found
         return nullptr;
-    return *it;
+    }
+
+    Chunk *chunk = *it;
+
+    // Move the chunk to the front of the cache for faster access
+    chunk_cache.erase(it);
+    chunk_cache.push_front(chunk);
+
+    return chunk;
+}
+
+void remove_chunk(Chunk *chunk)
+{
+    if (!chunk)
+        return;
+
+    Lock chunk_lock(chunk_mutex);
+
+    // Remove the chunk from the active list
+    chunks.erase(std::remove(chunks.begin(), chunks.end(), chunk), chunks.end());
+
+    // Remove the chunk from the cache
+    chunk_cache.erase(std::remove(chunk_cache.begin(), chunk_cache.end(), chunk), chunk_cache.end());
+
+    // Delete the chunk
+    delete chunk;
+}
+
+void remove_chunks_if(std::function<bool(Chunk *)> predicate)
+{
+    Lock chunk_lock(chunk_mutex);
+
+    // Get list of chunks to be removed
+    std::vector<Chunk *> chunks_to_remove;
+    for (Chunk *chunk : chunks)
+    {
+        if (predicate(chunk))
+        {
+            chunks_to_remove.push_back(chunk);
+        }
+    }
+
+    chunk_lock.unlock();
+
+    for (Chunk *chunk : chunks_to_remove)
+    {
+        remove_chunk(chunk);
+    }
 }
 
 bool add_chunk(int32_t x, int32_t z)

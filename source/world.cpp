@@ -690,12 +690,12 @@ void World::remove_chunk(Chunk *chunk)
 
 void World::cleanup_chunks()
 {
-    std::deque<Chunk *> &chunks = get_chunks();
-    chunks.erase(
-        std::remove_if(chunks.begin(), chunks.end(),
-                       [](Chunk *&c)
-                       {if(!c) return true; if(c->generation_stage == ChunkGenStage::invalid) {delete c; c = nullptr; return true;} return false; }),
-        chunks.end());
+    auto is_invalid = [](Chunk *c)
+    {
+        return c->generation_stage == ChunkGenStage::invalid;
+    };
+
+    remove_chunks_if(is_invalid);
 }
 
 void World::destroy_block(const Vec3i pos, Block *old_block)
