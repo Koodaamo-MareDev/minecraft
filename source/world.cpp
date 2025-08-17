@@ -1156,9 +1156,10 @@ void World::save()
         NBTTagCompound *level_data = (NBTTagCompound *)level.setTag("Data", new NBTTagCompound());
         player.serialize((NBTTagCompound *)level_data->setTag("Player", new NBTTagCompound));
         level_data->setTag("Time", new NBTTagLong(ticks));
-        level_data->setTag("SpawnX", new NBTTagInt(0));
-        level_data->setTag("SpawnY", new NBTTagInt(skycast(Vec3i(0, 0, 0), nullptr)));
-        level_data->setTag("SpawnZ", new NBTTagInt(0));
+        level_data->setTag("SpawnX", new NBTTagInt(spawn_pos.x));
+        int spawn_y = skycast(Vec3i(0, 0, 0), nullptr);
+        level_data->setTag("SpawnY", new NBTTagInt(spawn_y < 0 ? this->spawn_pos.y : spawn_y));
+        level_data->setTag("SpawnZ", new NBTTagInt(spawn_pos.z));
         level_data->setTag("LastPlayed", new NBTTagLong(time(nullptr) * 1000LL));
         level_data->setTag("LevelName", new NBTTagString("Wii World"));
         level_data->setTag("RandomSeed", new NBTTagLong(seed));
@@ -1218,6 +1219,12 @@ bool World::load()
     last_entity_tick = ticks;
     last_fluid_tick = ticks;
     time_of_day = ticks % 24000;
+
+    spawn_pos.x = level_data->getInt("SpawnX");
+    spawn_pos.y = level_data->getInt("SpawnY");
+    if (spawn_pos.y <= 0)
+        spawn_pos.y = 80; // Default spawn height if not set
+    spawn_pos.z = level_data->getInt("SpawnZ");
     seed = level_data->getLong("RandomSeed");
 
     // Stop the chunk manager

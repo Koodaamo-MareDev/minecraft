@@ -58,6 +58,7 @@ public:
     double delta_time = 0.0;
     double partial_ticks = 0.0;
     size_t memory_usage = 0;
+    Vec3i spawn_pos = Vec3i(0, 64, 0);
     EntityPlayerLocal player = EntityPlayerLocal(Vec3f(0, -999, 0));
     bool loaded = false;
     bool hell = false;
