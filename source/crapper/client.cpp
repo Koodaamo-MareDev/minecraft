@@ -603,6 +603,12 @@ namespace Crapper
     {
         // Read entity health
         int16_t health = buffer.readShort();
+        if (health < remote_world->player.health)
+        {
+            remote_world->player.hurt_ticks = 10;
+        }
+        if (remote_world->player.health != health)
+            remote_world->player.health_update_tick = 10;
         remote_world->player.health = health;
         if (health <= 0)
         {
@@ -661,7 +667,7 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        remote_world->player.rotation = Vec3f(-pitch, -yaw, 0);
+        remote_world->player.rotation = Vec3f(pitch, yaw, 0);
         remote_world->player.on_ground = on_ground;
     }
 
@@ -680,7 +686,7 @@ namespace Crapper
             return;
 
         remote_world->player.teleport(Vec3f(x, y, z));
-        remote_world->player.rotation = Vec3f(-pitch, -yaw, 0);
+        remote_world->player.rotation = Vec3f(pitch, yaw, 0);
         remote_world->player.on_ground = on_ground;
 
         // Mirror the packet back to the server
@@ -1217,7 +1223,6 @@ namespace Crapper
 
         if (mode == 0)
         {
-            Lock chunk_lock(chunk_mutex);
             Chunk *chunk = get_chunk(x, z);
             if (chunk)
             {

@@ -143,16 +143,20 @@ public:
 class EntityLiving : virtual public EntityPhysical
 {
 public:
-    uint16_t health = 20;
-    uint16_t max_health = 20;
+    int16_t hurt_ticks = 0;
+    int16_t health = 20;
+    int16_t max_health = 20;
     uint16_t holding_item = 0;
+    vfloat_t fall_distance = 0;
     vfloat_t last_step_distance = 0;
     vfloat_t accumulated_walk_distance = 0;
     vfloat_t body_rotation_y = 0.0;
 
     EntityLiving() : EntityPhysical() {}
 
-    virtual void hurt(uint16_t damage);
+    virtual void fall(vfloat_t distance);
+
+    virtual void hurt(int16_t damage);
 
     virtual void tick();
 
@@ -266,7 +270,7 @@ public:
 
     EntityPlayer(const Vec3f &position);
 
-    virtual void hurt(uint16_t damage);
+    virtual void hurt(int16_t damage);
 };
 
 class EntityPlayerLocal : public EntityPlayer
@@ -276,6 +280,8 @@ public:
 
     float mining_progress = 0.0f;
     int mining_tick = 0;
+
+    int16_t health_update_tick = 0;
 
     Vec3f view_bob_offset = Vec3f(0, 0, 0);
     Vec3f view_bob_screen_offset = Vec3f(0, 0, 0);
@@ -303,6 +309,8 @@ public:
     virtual bool should_jump();
 
     virtual bool can_remove();
+
+    virtual void hurt(int16_t damage);
 };
 
 class EntityPlayerMp : public EntityPlayer

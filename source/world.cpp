@@ -122,6 +122,31 @@ void World::update()
     }
     edit_blocks();
     m_particle_system.update(delta_time);
+
+    if (player.dead)
+    {
+        save();
+        reset();
+        if (!load())
+            create();
+
+        remove_entity(player.entity_id);
+
+        // Send player to spawn
+        player.teleport(spawn_pos);
+
+        // Reset the player's health
+        player.health = 20;
+
+        // Reset camera rotation
+        get_camera().rot = Vec3f(0, 0, 0);
+
+        // Reset player state
+        player.dead = false;
+
+        // Add the player back to the world
+        add_entity(&player);
+    }
 }
 
 void World::update_frustum(Camera &camera)

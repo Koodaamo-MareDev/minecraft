@@ -13,6 +13,7 @@
 #include "sounds.hpp"
 #include "inventory.hpp"
 #include "gui.hpp"
+#include "gui_dirtscreen.hpp"
 #include "world.hpp"
 #include "util/input/input.hpp"
 
@@ -996,16 +997,60 @@ void EntityExplosive::explode()
     current_world->create_explosion(position + Vec3i(0, y_offset - y_size, 0), power, chunk);
 }
 
-void EntityLiving::hurt(uint16_t damage)
+void EntityLiving::fall(vfloat_t distance)
+{
+    if (current_world->is_remote())
+        return;
+    int damage = std::ceil(distance - 3);
+    if (damage > 0)
+    {
+        hurt(damage);
+
+        Vec3f feet_pos(position.x, aabb.min.y - 0.5, position.z);
+        Vec3i feet_block_pos = Vec3i(std::floor(feet_pos.x), std::floor(feet_pos.y), std::floor(feet_pos.z));
+        BlockID block_at_feet = get_block_id_at(feet_block_pos, BlockID::air, chunk);
+        feet_block_pos.y--;
+        BlockID block_below_feet = get_block_id_at(feet_block_pos, BlockID::air, chunk);
+        if (block_below_feet != BlockID::air)
+        {
+            Sound sound = get_step_sound(block_at_feet);
+            sound.position = feet_pos;
+            current_world->play_sound(sound);
+        }
+    }
+}
+
+void EntityLiving::hurt(int16_t damage)
 {
     health -= damage;
-    if (health >= 0x8000 && !current_world->is_remote())
+    hurt_ticks = 10;
+    if (health < 0)
+        health = 0;
+    if (health == 0 && !current_world->is_remote())
+    {
         dead = true;
+    }
 }
 
 void EntityLiving::tick()
 {
     EntityPhysical::tick();
+    if (hurt_ticks > 0)
+    {
+        hurt_ticks--;
+    }
+    if (on_ground)
+    {
+        if (fall_distance > 0)
+        {
+            fall(fall_distance);
+            fall_distance = 0;
+        }
+    }
+    else if ((position - prev_position).y < 0)
+    {
+        fall_distance -= (position - prev_position).y;
+    }
     if (walk_sound)
     {
         // Play step sound if the entity is moving on the ground or when it jumps
@@ -1143,7 +1188,7 @@ EntityPlayer::EntityPlayer(const Vec3f &position) : EntityLiving()
     teleport(position);
 }
 
-void EntityPlayer::hurt(uint16_t damage)
+void EntityPlayer::hurt(int16_t damage)
 {
     EntityLiving::hurt(damage);
     javaport::Random rng;
@@ -1183,8 +1228,24 @@ void EntityPlayerLocal::deserialize(NBTTagCompound *result)
     // TODO: Deserialize inventory
 }
 
+void EntityPlayerLocal::hurt(int16_t damage)
+{
+    EntityPlayer::hurt(damage);
+    health_update_tick = 10;
+    get_camera().rot.z += 8; // Tilt the camera a bit
+    if (dead && !current_world->is_remote())
+    {
+        GuiDirtscreen* dirt_screen = new GuiDirtscreen(*gertex::GXView::default_view);
+        dirt_screen->set_text("Respawning...");
+        dirt_screen->set_progress(0, 100);
+        Gui::set_gui(dirt_screen);
+    }
+}
+
 void EntityPlayerLocal::tick()
 {
+    if (health_update_tick > 0)
+        health_update_tick--;
     if (!Gui::get_gui())
     {
         Camera &camera = get_camera();

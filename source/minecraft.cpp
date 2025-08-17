@@ -789,7 +789,13 @@ void UpdateCamera()
     current_world->player.view_bob_offset = Vec3f::lerp(current_world->player.view_bob_offset, target_view_bob_offset, 0.035);
     current_world->player.view_bob_screen_offset = Vec3f::lerp(current_world->player.view_bob_screen_offset, target_view_bob_screen_offset, 0.035);
     camera.position = current_world->player.view_bob_offset + player.get_position(std::fmod(current_world->partial_ticks, 1));
-    camera.rot = player.rotation;
+    camera.rot.x = player.rotation.x;
+    camera.rot.y = player.rotation.y;
+    camera.rot.z = lerpf(camera.rot.z, 0, current_world->delta_time * 5);
+    if (camera.rot.z < 0.1)
+    {
+        camera.rot.z = 0;
+    }
 
     current_world->update_frustum(camera);
 }
@@ -897,10 +903,12 @@ void DrawHUD(gertex::GXView &viewport)
     // Draw the player's health above the hotbar. The texture size is 9x9 but they overlap by 1 pixel.
     int health = current_world->player.health;
 
+    int empty_heart_offset = 16 + ((current_world->player.health_update_tick / 3) % 2) * 9;
+
     // Empty hearts
     for (int i = 0; i < 10; i++)
     {
-        draw_textured_quad(icons_texture, (viewport.width - 364) / 2 + i * 16, corrected_height - 64, 18, 18, 16, 0, 25, 9);
+        draw_textured_quad(icons_texture, (viewport.width - 364) / 2 + i * 16, corrected_height - 64, 18, 18, empty_heart_offset, 0, empty_heart_offset + 9, 9);
     }
 
     // Full hearts
