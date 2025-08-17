@@ -706,6 +706,10 @@ void transform_view(gertex::GXMatrix view, guVector world_pos, guVector object_s
     axis.y = 1;
     axis.z = 0;
     guMtxRotAxisDeg(roty, &axis, camera.rot.y);
+    axis.x = 0;
+    axis.y = 0;
+    axis.z = 1;
+    guMtxRotAxisDeg(rotz, &axis, camera.rot.z);
 
     // Apply matrices
     guMtxConcat(objrotz, objroty, objroty);
