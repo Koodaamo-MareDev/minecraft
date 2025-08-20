@@ -667,7 +667,7 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        remote_world->player.rotation = Vec3f(pitch, yaw, 0);
+        remote_world->player.rotation = Vec3f(-pitch, 180 - yaw, 0);
         remote_world->player.on_ground = on_ground;
     }
 
@@ -686,7 +686,7 @@ namespace Crapper
             return;
 
         remote_world->player.teleport(Vec3f(x, y, z));
-        remote_world->player.rotation = Vec3f(pitch, yaw, 0);
+        remote_world->player.rotation = Vec3f(-pitch, 180 - yaw, 0);
         remote_world->player.on_ground = on_ground;
 
         // Mirror the packet back to the server
