@@ -918,7 +918,7 @@ void DrawHUD(gertex::GXView &viewport)
     }
 
     // Half heart (if the player has an odd amount of health)
-    if ((health & 1) == 1)
+    if (health > 0 && (health & 1) == 1)
     {
         draw_textured_quad(icons_texture, (viewport.width - 364) / 2 + (health & ~1) * 8, corrected_height - 64, 18, 18, 61, 0, 70, 9);
     }
