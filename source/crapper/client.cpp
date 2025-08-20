@@ -1383,10 +1383,27 @@ namespace Crapper
         chunk->lit_state = 1;
         chunk->generation_stage = ChunkGenStage::done;
         chunk->recalculate_height_map();
-        // Mark chunk as dirty
-        for (int vbo_index = 0; vbo_index < VERTICAL_SECTION_COUNT; vbo_index++)
+
+        // Update the VBOs
+        for (int32_t x = chunk->x - 1; x <= chunk->x + 1; x++)
         {
-            chunk->sections[vbo_index].dirty = true;
+            for (int32_t z = chunk->z - 1; z <= chunk->z + 1; z++)
+            {
+                // Skip corners
+                if ((x - chunk->x) && (z - chunk->z))
+                    continue;
+
+                // Mark neighbor as dirty
+                Chunk *neighbor = get_chunk(x, z);
+                if (neighbor)
+                {
+                    // Update the VBOs of the neighboring chunks
+                    for (int i = 0; i < VERTICAL_SECTION_COUNT; i++)
+                    {
+                        neighbor->sections[i].dirty = true;
+                    }
+                }
+            }
         }
 
         Lock chunk_lock(chunk_mutex);
