@@ -45,7 +45,7 @@ uint32_t get_face_texture_index(Block *block, int face)
 {
     if (!block)
         return 0;
-    
+
     if (block_texture_index >= 0)
     {
         // If a custom texture index is set, use it for all blocks
@@ -537,50 +537,40 @@ inventory::ItemStack random_drop(const Block &old_block, inventory::ItemStack it
 
 void default_destroy(const Vec3i &pos, const Block &old_block)
 {
-    if (!current_world->is_remote())
+    Block *block = get_block_at(pos + Vec3i(0, 1, 0));
+    if (block && properties(block->get_blockid()).m_needs_support)
     {
-        Block *block = get_block_at(pos + Vec3i(0, 1, 0));
-        if (block && properties(block->get_blockid()).m_needs_support)
-        {
-            // If the neighbor block needs support, destroy it.
-            current_world->destroy_block(pos + Vec3i(0, 1, 0), block);
-        }
+        // If the neighbor block needs support, destroy it.
+        current_world->destroy_block(pos + Vec3i(0, 1, 0), block);
     }
 }
 
 // Turns broken ice into water unless it's floating in the air.
 void melt_destroy(const Vec3i &pos, const Block &old_block)
 {
-    if (!current_world->is_remote())
+    if (pos.y > 0)
     {
-        if (pos.y > 0)
+        if (get_block_id_at(pos - Vec3i(0, 1, 0), BlockID::air) != BlockID::air)
         {
-            if (get_block_id_at(pos - Vec3i(0, 1, 0), BlockID::air) != BlockID::air)
-            {
-                set_block_at(pos, BlockID::water);
-            }
+            set_block_at(pos, BlockID::water);
         }
     }
 }
 
 void snow_layer_destroy(const Vec3i &pos, const Block &old_block)
 {
-    if (!current_world->is_remote())
+    Block *block = get_block_at(pos - Vec3i(0, 1, 0));
+    if (block && block->get_blockid() == BlockID::grass)
     {
-        Block *block = get_block_at(pos - Vec3i(0, 1, 0));
-        if (block && block->get_blockid() == BlockID::grass)
-        {
-            // If the block below is grass, reset the snowy flag.
-            block->meta = 0;
-            update_block_at(pos - Vec3i(0, 1, 0));
-        }
+        // If the block below is grass, reset the snowy flag.
+        block->meta = 0;
+        update_block_at(pos - Vec3i(0, 1, 0));
     }
 }
 
 void spawn_tnt_destroy(const Vec3i &pos, const Block &old_block)
 {
-    if (!current_world->is_remote())
-        add_entity(new EntityExplosiveBlock(old_block, pos, 80));
+    add_entity(new EntityExplosiveBlock(old_block, pos, 80));
 }
 
 void default_aabb(const Vec3i &pos, Block *block, const AABB &other, std::vector<AABB> &aabb_list)
