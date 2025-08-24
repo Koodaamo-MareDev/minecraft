@@ -84,7 +84,7 @@ void World::tick()
                 create();
 
             // Inform the user about the network error
-            GuiDirtscreen *dirtscreen = new GuiDirtscreen(gertex::GXView());
+            GuiDirtscreen *dirtscreen = new GuiDirtscreen;
             dirtscreen->set_text(std::string(e.what()));
             Gui::set_gui(dirtscreen);
         }

@@ -502,7 +502,7 @@ namespace Crapper
         {
             GuiDirtscreen *dirtscreen = dynamic_cast<GuiDirtscreen *>(Gui::get_gui());
             if (!dirtscreen)
-                dirtscreen = new GuiDirtscreen(gertex::GXView());
+                dirtscreen = new GuiDirtscreen;
             dirtscreen->set_text("Loading level\n\n\nDownloading terrain");
             dirtscreen->set_progress(0, 0);
             Gui::set_gui(dirtscreen);

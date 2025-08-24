@@ -1,12 +1,10 @@
 #include "gui_dirtscreen.hpp"
 #include "util/string_utils.hpp"
 
-GuiDirtscreen::GuiDirtscreen(const gertex::GXView &viewport) : Gui(viewport)
-{
-}
-
 void GuiDirtscreen::draw()
 {
+    gertex::GXView viewport = gertex::get_state().view;
+
     // Fill the screen with the dirt texture
     int texture_index = properties(BlockID::dirt).m_texture_index;
     fill_screen_texture(terrain_texture, viewport, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index), TEXTURE_PX(texture_index), TEXTURE_PY(texture_index));

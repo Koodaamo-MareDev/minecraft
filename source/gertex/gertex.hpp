@@ -2,10 +2,12 @@
 #define GERTEX_HPP
 
 #include <ogc/gx.h>
+#include <ogc/conf.h>
 #include <cstdint>
 #include <string>
 #include <stack>
 #include <cstring>
+#include <malloc.h>
 namespace gertex
 {
     constexpr float CAMERA_WIDTH(640.0f);
@@ -35,16 +37,13 @@ namespace gertex
         float far = CAMERA_FAR;
         float aspect = CAMERA_WIDTH / CAMERA_HEIGHT;
         float aspect_correction = 1.0f; // Aspect correction factor for widescreen
-        float yscale = 1.2f;
-        float ystart = 0.0f; // Optional padding for the top of the screen - useful for preventing HUD overscan issues when in widescreen mode
+        float ystart = 0.0f;            // Optional padding for the top of the screen - useful for preventing HUD overscan issues when in widescreen mode
         bool widescreen = false;
-        static GXView *default_view;
 
-        GXView(float width, float height, bool widescreen, float fov, float near, float far, float yscale)
+        GXView(float width, float height, bool widescreen, float fov, float near, float far)
         {
 
             // Aspect ratio correction
-            this->yscale = yscale;
             this->aspect = width / height;
             this->width = width;
             this->height = height;
@@ -54,22 +53,11 @@ namespace gertex
             this->widescreen = widescreen;
             if (widescreen)
                 aspect_correction = 0.75f;
-            ystart = 16;
-            if (!default_view)
-                default_view = this;
+            this->ystart = 16;
         }
 
         GXView()
         {
-            if (!default_view)
-                return;
-            *this = *default_view;
-        }
-
-        ~GXView()
-        {
-            if (default_view == this)
-                default_view = nullptr;
         }
     };
 
@@ -128,6 +116,7 @@ namespace gertex
         std::stack<GXMatrix> matrix_stack;
         GXMatrix mtx;
         GXProjMatrix proj_mtx;
+        GXView view = GXView();
         GXFog fog = {false, GXFogType::none, 0.0f, 0.0f, CAMERA_NEAR, CAMERA_FAR, GXColor{0, 0, 0, 0xFF}};
         GXBlendMode blend_mode = GXBlendMode::none;
         GXColor color_multiply = {0xFF, 0xFF, 0xFF, 0xFF};
@@ -139,6 +128,7 @@ namespace gertex
 
         void apply();
     };
+    void init(GXRModeObj *rmode, float fov = 90, float near = CAMERA_NEAR, float far = CAMERA_FAR, bool apply_defaults = true);
 
     void set_state(const GXState &state);
     const GXState get_state();
@@ -161,7 +151,7 @@ namespace gertex
     GXColor get_color_mul();
     void set_alpha_cutoff(uint8_t cutoff);
     uint8_t get_alpha_cutoff();
-} // namespace gortex
+} // namespace gertex
 
 inline bool operator==(const GXColor &lhs, const GXColor &rhs)
 {

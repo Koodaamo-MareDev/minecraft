@@ -1235,7 +1235,7 @@ void EntityPlayerLocal::hurt(int16_t damage)
     get_camera().rot.z += 8; // Tilt the camera a bit
     if (dead && !current_world->is_remote())
     {
-        GuiDirtscreen* dirt_screen = new GuiDirtscreen(*gertex::GXView::default_view);
+        GuiDirtscreen* dirt_screen = new GuiDirtscreen;
         dirt_screen->set_text("Respawning...");
         dirt_screen->set_progress(0, 100);
         Gui::set_gui(dirt_screen);

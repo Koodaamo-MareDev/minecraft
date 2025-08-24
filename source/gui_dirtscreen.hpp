@@ -9,8 +9,6 @@
 class GuiDirtscreen : public Gui
 {
 public:
-    GuiDirtscreen(const gertex::GXView &viewport);
-
     void draw() override;
     void update() override;
     bool contains(int x, int y) override;

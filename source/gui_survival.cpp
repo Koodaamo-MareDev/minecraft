@@ -3,8 +3,10 @@
 #include "world.hpp"
 #include "util/input/input.hpp"
 
-GuiSurvival::GuiSurvival(const gertex::GXView &viewport, inventory::Container &Container) : Gui(viewport), linked_container(Container)
+GuiSurvival::GuiSurvival(inventory::Container &Container) : linked_container(Container)
 {
+    gertex::GXView viewport = gertex::get_state().view;
+
     int start_x = (viewport.width - width) / 2;
     int start_y = (viewport.aspect_correction * viewport.height - height) / 2;
 
@@ -39,6 +41,8 @@ GuiSurvival::GuiSurvival(const gertex::GXView &viewport, inventory::Container &C
 
 void GuiSurvival::draw()
 {
+    gertex::GXView viewport = gertex::get_state().view;
+
     draw_colored_quad(0, 0, viewport.width, viewport.height, 0, 0, 0, 128);
 
     int start_x = (viewport.width - width) / 2;
@@ -180,5 +184,7 @@ void GuiSurvival::refresh()
 
 bool GuiSurvival::contains(int x, int y)
 {
+    gertex::GXView viewport = gertex::get_state().view;
+
     return x >= (viewport.width - width) / 2 && x < (viewport.width + width) / 2 && y >= (viewport.height - height) / 2 && y < (viewport.height + height) / 2;
 }

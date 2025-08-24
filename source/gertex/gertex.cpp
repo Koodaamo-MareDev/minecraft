@@ -211,5 +211,157 @@ namespace gertex
         load_pos_matrix();
         load_proj_matrix();
     }
-    GXView *GXView::default_view = nullptr;
+
+    // We don't want this to be touched directly
+    // So we'll keep it in an anonymous namespace
+    namespace
+    {
+        constexpr size_t DEFAULT_FIFO_SIZE = 256 * 1024;
+
+        void *gp_fifo = nullptr;
+
+        // These are the default universal rendering settings.
+        // Feel free to change them directly via the GX APIs.
+        void tev_init()
+        {
+            GX_SetNumChans(2);
+            GX_SetNumTexGens(1);
+
+            GX_SetNumTevStages(4);
+            GX_SetTexCoordGen(GX_TEXCOORD0, GX_TG_MTX2x4, GX_TG_TEX0, GX_IDENTITY);
+
+            // Stage 0: Texture * CLR0
+
+            GX_SetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
+
+            GX_SetTevColorIn(GX_TEVSTAGE0, GX_CC_ZERO, GX_CC_TEXC, GX_CC_RASC, GX_CC_ZERO);
+            GX_SetTevColorOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
+
+            GX_SetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_TEXA, GX_CA_RASA, GX_CA_ZERO);
+            GX_SetTevAlphaOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
+
+            // Stage 1: PREV * CLR1
+
+            GX_SetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD0, GX_TEXMAP_DISABLE, GX_COLOR1A1);
+
+            GX_SetTevColorIn(GX_TEVSTAGE1, GX_CC_ZERO, GX_CC_CPREV, GX_CC_RASC, GX_CC_ZERO);
+            GX_SetTevColorOp(GX_TEVSTAGE1, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
+
+            GX_SetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_APREV, GX_CA_RASA, GX_CA_ZERO);
+            GX_SetTevAlphaOp(GX_TEVSTAGE1, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
+
+            // Stage 2: Add Konst0
+
+            GX_SetTevOrder(GX_TEVSTAGE2, GX_TEXCOORD0, GX_TEXMAP_DISABLE, GX_COLOR0A0);
+
+            GX_SetTevKColor(GX_KCOLOR0, (GXColor){0, 0, 0, 255}); // Default to black (i.e. no effect)
+            GX_SetTevKColorSel(GX_TEVSTAGE2, GX_TEV_KCSEL_K0);
+
+            GX_SetTevColorIn(GX_TEVSTAGE2, GX_CC_CPREV, GX_CC_ZERO, GX_CC_ZERO, GX_CC_KONST);
+            GX_SetTevColorOp(GX_TEVSTAGE2, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
+
+            GX_SetTevAlphaIn(GX_TEVSTAGE2, GX_CA_APREV, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO);
+            GX_SetTevAlphaOp(GX_TEVSTAGE2, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
+
+            // Stage 3: Multiply by Konst1
+
+            GX_SetTevOrder(GX_TEVSTAGE3, GX_TEXCOORD0, GX_TEXMAP_DISABLE, GX_COLOR0A0);
+
+            GX_SetTevKColor(GX_KCOLOR1, (GXColor){255, 255, 255, 255}); // White by default
+            GX_SetTevKColorSel(GX_TEVSTAGE3, GX_TEV_KCSEL_K1);
+
+            GX_SetTevColorIn(GX_TEVSTAGE3, GX_CC_ZERO, GX_CC_CPREV, GX_CC_KONST, GX_CC_ZERO);
+            GX_SetTevColorOp(GX_TEVSTAGE3, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
+
+            GX_SetTevAlphaIn(GX_TEVSTAGE3, GX_CA_APREV, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO);
+            GX_SetTevAlphaOp(GX_TEVSTAGE3, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
+        }
+
+        void use_defaults()
+        {
+
+            /**
+             * The default vertex format is as follows: POS, COLA, COLB, UV
+             * POS: 3D coordinates (X, Y, Z), float
+             * COLA: Primary color (RGBA), unsigned char, 8 bits per channel
+             * COLB: Secondary color (RGBA), unsigned char, 8 bits per channel
+             * UV: Texture coordinates (U, V), float
+             *
+             * The data should be provided in the above order unless manually
+             * modified. Indirect lookup is not enabled by default but can be
+             * specified later if needed.
+             *
+             * See tev_init() to see how colors are combined.
+             */
+
+            GX_ClearVtxDesc();
+            GX_SetVtxDesc(GX_VA_POS, GX_DIRECT);
+            GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
+            GX_SetVtxDesc(GX_VA_CLR1, GX_DIRECT);
+            GX_SetVtxDesc(GX_VA_TEX0, GX_DIRECT);
+
+            GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_F32, 0);
+            GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_CLR0, GX_CLR_RGBA, GX_RGBA8, 0);
+            GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_CLR1, GX_CLR_RGBA, GX_RGBA8, 0);
+            GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_TEX0, GX_TEX_ST, GX_F32, 0);
+
+            tev_init();
+            GX_SetZCompLoc(GX_FALSE);
+        }
+
+        // Initializes the graphics subsystem
+        bool gx_init(GXRModeObj *rmode)
+        {
+            // (Re)allocate the FIFO buffer
+            if (gp_fifo)
+            {
+                free(gp_fifo);
+            }
+            gp_fifo = memalign(32, DEFAULT_FIFO_SIZE);
+            if (!gp_fifo)
+            {
+                return false;
+            }
+
+            // Now let's get the boring stuff out of the way...
+            GX_Init(gp_fifo, DEFAULT_FIFO_SIZE);
+
+            // Initialize frame buffer copy params
+            rmode->xfbHeight = GX_SetDispCopyYScale(GX_GetYScaleFactor(rmode->efbHeight, rmode->xfbHeight));
+            GX_SetViewport(0, 0, rmode->fbWidth, rmode->efbHeight, 0, 1);
+            GX_SetScissor(0, 0, rmode->fbWidth, rmode->efbHeight);
+            GX_SetDispCopySrc(0, 0, rmode->fbWidth, rmode->efbHeight);
+            GX_SetDispCopyDst(rmode->fbWidth, rmode->xfbHeight);
+            GX_SetCopyFilter(rmode->aa, rmode->sample_pattern, GX_TRUE, rmode->vfilter);
+            GX_SetFieldMode(rmode->field_rendering, ((rmode->viHeight == 2 * rmode->xfbHeight) ? GX_ENABLE : GX_DISABLE));
+            GX_SetDispCopyGamma(GX_GM_1_0);
+
+            // FIXME: I feel like this should be a setting.
+            if (rmode->aa)
+            {
+                GX_SetPixelFmt(GX_PF_RGB565_Z16, GX_ZC_LINEAR);
+            }
+            else
+            {
+                GX_SetPixelFmt(GX_PF_RGBA6_Z24, GX_ZC_LINEAR);
+            }
+
+            return true;
+        }
+    }
+
+    void init(GXRModeObj *rmode, float fov, float near, float far, bool apply_defaults)
+    {
+        gx_init(rmode);
+
+        if (apply_defaults)
+        {
+            use_defaults();
+        }
+
+        GXState initial_state;
+        initial_state.view = GXView(rmode->fbWidth, rmode->efbHeight, CONF_GetAspectRatio(), fov, near, far);
+
+        set_state(initial_state);
+    }
 } // namespace gertex

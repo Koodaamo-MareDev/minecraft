@@ -17,7 +17,7 @@ public:
     int width = 352;
     int height = 332;
 
-    GuiSurvival(const gertex::GXView &viewport, inventory::Container &Container);
+    GuiSurvival(inventory::Container &Container);
 
     void draw() override;
     void update() override;

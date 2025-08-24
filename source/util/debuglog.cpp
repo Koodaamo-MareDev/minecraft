@@ -17,6 +17,9 @@ namespace debug
         if (!frame_buffer)
             return;
 
+        GX_SetScissor(0, 0, rmode->fbWidth - 224, rmode->efbHeight);
+        GX_SetDispCopySrc(0, 0, rmode->fbWidth - 224, rmode->efbHeight);
+
         // Initialize the console with the framebuffer and video mode
         CON_Init(frame_buffer, 0, 0, rmode->fbWidth, rmode->xfbHeight, rmode->fbWidth * VI_DISPLAY_PIX_SZ);
 

@@ -28,8 +28,6 @@
 #include "light_day_rgba.h"
 #include "light_night_rgba.h"
 
-#define DEFAULT_FIFO_SIZE (256 * 1024)
-
 void *frameBuffer[2] = {NULL, NULL};
 static GXRModeObj *rmode = NULL;
 
@@ -101,7 +99,6 @@ void DrawGUI(gertex::GXView &viewport);
 void DrawHUD(gertex::GXView &viewport);
 void DrawDebugInfo(gertex::GXView &viewport);
 void UpdateCamera();
-void PrepareTEV();
 void GetInput();
 //---------------------------------------------------------------------------------
 bool isExiting = false;
@@ -167,9 +164,6 @@ void init_fail(std::string message)
 int main(int argc, char **argv)
 {
     u32 fb = 0;
-    f32 yscale;
-    u32 xfbHeight;
-    void *gpfifo = NULL;
     GXColor background = GXColor{0, 0, 0, 0xFF};
 
     VIDEO_Init();
@@ -190,9 +184,6 @@ int main(int argc, char **argv)
     {
         printf("Using config defaults. %s\n", e.what());
     }
-    // Allocate the fifo buffer
-    gpfifo = memalign(32, DEFAULT_FIFO_SIZE);
-    memset(gpfifo, 0, DEFAULT_FIFO_SIZE);
 
     // Allocate 2 framebuffers for double buffering
     frameBuffer[0] = MEM_K0_TO_K1(SYS_AllocateFramebuffer(rmode));
@@ -205,71 +196,35 @@ int main(int argc, char **argv)
     VIDEO_SetBlack(FALSE);
     VIDEO_Flush();
     VIDEO_WaitVSync();
-#ifdef DEBUG
-    debug::init(rmode);
-#endif
-    // Init the GPU
-    GX_Init(gpfifo, DEFAULT_FIFO_SIZE);
 
-    // other gx setup
-    GX_SetViewport(0, 0, rmode->fbWidth, rmode->efbHeight, 0, 1);
-    yscale = GX_GetYScaleFactor(rmode->efbHeight, rmode->xfbHeight);
-    xfbHeight = GX_SetDispCopyYScale(yscale);
-#ifdef DEBUG
-    GX_SetScissor(0, 0, rmode->fbWidth - 224, rmode->efbHeight);
-    GX_SetDispCopySrc(0, 0, rmode->fbWidth - 224, rmode->efbHeight);
-#else
-    GX_SetScissor(0, 0, rmode->fbWidth, rmode->efbHeight);
-    GX_SetDispCopySrc(0, 0, rmode->fbWidth, rmode->efbHeight);
-#endif
-    GX_SetDispCopyDst(rmode->fbWidth, xfbHeight);
-    GX_SetCopyFilter(rmode->aa, rmode->sample_pattern, GX_TRUE, rmode->vfilter);
-    GX_SetFieldMode(rmode->field_rendering, ((rmode->viHeight == 2 * rmode->xfbHeight) ? GX_ENABLE : GX_DISABLE));
-    if (rmode->aa)
-    {
-        GX_SetPixelFmt(GX_PF_RGB565_Z16, GX_ZC_LINEAR);
-    }
-    else
-    {
-        GX_SetPixelFmt(GX_PF_RGBA6_Z24, GX_ZC_LINEAR);
-    }
-    GX_SetDispCopyGamma(GX_GM_1_0);
+    gertex::init(rmode);
 
-    // Setup the default vertex attribute table
-    GX_ClearVtxDesc();
-    GX_SetVtxDesc(GX_VA_POS, GX_DIRECT);
+    GX_SetLineWidth(16, GX_VTXFMT0);
+
+    // Use indexed colors for both channels
     GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
     GX_SetVtxDesc(GX_VA_CLR1, GX_INDEX8);
-    GX_SetVtxDesc(GX_VA_TEX0, GX_DIRECT);
-    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, BASE3D_POS_FRAC_BITS);
-    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_CLR0, GX_CLR_RGBA, GX_RGBA8, 0);
-    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_CLR1, GX_CLR_RGBA, GX_RGBA8, 0);
-    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_TEX0, GX_TEX_ST, GX_F32, 0);
 
-    // Prepare TEV
-    GX_SetNumChans(2);
-    GX_SetNumTexGens(1);
-
+    init_face_normals();
     init_textures();
     update_textures();
-    // Init viewport params
-    gertex::GXView viewport = gertex::GXView(rmode->fbWidth, rmode->efbHeight, CONF_GetAspectRatio(), 90, gertex::CAMERA_NEAR, gertex::CAMERA_FAR, yscale);
+
+    gertex::GXState state = gertex::get_state();
 
     // Set the inventory cursor to the center of the screen
-    cursor_x = viewport.width / 2;
-    cursor_y = viewport.height * viewport.aspect_correction / 2;
+    cursor_x = state.view.width / 2;
+    cursor_y = state.view.height * state.view.aspect_correction / 2;
 
+    // Initialize rendering settings
     bool mono_lighting = ((int)config.get("mono_lighting", 0) != 0);
-
     bool vsync = ((int)config.get("vsync", 0) != 0);
-
     f32 FOV = config.get<float>("fov", 90.0f);
 
     Camera &camera = get_camera();
     camera.fov = FOV;
-    camera.aspect = viewport.aspect / viewport.aspect_correction;
-    camera.near = viewport.near;
-    camera.far = viewport.far;
+    camera.aspect = state.view.aspect / state.view.aspect_correction;
+    camera.near = state.view.near;
+    camera.far = state.view.far;
 
     input::init();
     input::add_device(new input::KeyboardMouse);
@@ -293,18 +248,13 @@ int main(int argc, char **argv)
     current_world->reset();
     current_world->seed = gettime();
 
-    GX_SetZCompLoc(GX_FALSE);
-    GX_SetLineWidth(16, GX_VTXFMT0);
-    init_face_normals();
-    PrepareTEV();
-
     inventory::init_items();
-    Gui::init_matrices(viewport.aspect_correction);
+    Gui::init_matrices(state.view.aspect_correction);
 
-    gertex::GXFog fog = gertex::GXFog{true, gertex::GXFogType::linear, viewport.near, viewport.far, viewport.near, viewport.far, background};
+    gertex::GXFog fog = gertex::GXFog{true, gertex::GXFogType::linear, state.view.near, state.view.far, state.view.near, state.view.far, background};
 
     // Setup the loading screen
-    GuiDirtscreen *dirtscreen = new GuiDirtscreen(viewport);
+    GuiDirtscreen *dirtscreen = new GuiDirtscreen;
     dirtscreen->set_text("Loading level\n\n\nBuilding terrain");
     Gui::set_gui(dirtscreen);
 
@@ -341,21 +291,14 @@ int main(int argc, char **argv)
     while (!isExiting)
     {
         u64 frame_start = time_get();
-        float sky_multiplier = get_sky_multiplier();
         if (HWButton != -1)
         {
-            GuiDirtscreen *dirtscreen = new GuiDirtscreen(viewport);
+            GuiDirtscreen *dirtscreen = new GuiDirtscreen;
             dirtscreen->set_text("Saving level...");
             Gui::set_gui(dirtscreen);
             isExiting = true;
         }
 
-        if (!current_world->hell)
-        {
-            LightMapBlend(mono_lighting ? light_day_mono_rgba : light_day_rgba, mono_lighting ? light_night_mono_rgba : light_night_rgba, light_map, 255 - uint8_t(sky_multiplier * 255));
-        }
-        GX_SetArray(GX_VA_CLR0, light_map, 4 * sizeof(u8));
-        GX_InvVtxCache();
         background = get_sky_color();
 
         Block *block = get_block_at(current_world->player.get_head_blockpos());
@@ -398,7 +341,15 @@ int main(int argc, char **argv)
 
         UpdateLoadingStatus();
 
-        gertex::perspective(viewport);
+        gertex::perspective(state.view);
+
+        // Update the indirect light map
+        if (!current_world->hell)
+        {
+            LightMapBlend(mono_lighting ? light_day_mono_rgba : light_day_rgba, mono_lighting ? light_night_mono_rgba : light_night_rgba, light_map, 255 - uint8_t(get_sky_multiplier() * 255));
+        }
+        GX_SetArray(GX_VA_CLR0, light_map, 4 * sizeof(u8));
+        GX_InvVtxCache();
 
         // Set fog near and far distances
         fog.start = fog_multiplier * fog_depth_multiplier * FOG_DISTANCE * 0.5f;
@@ -421,7 +372,7 @@ int main(int argc, char **argv)
             current_world->draw_selected_block();
         }
 
-        gertex::ortho(viewport);
+        gertex::ortho(state.view);
         // Use 0 fractional bits for the position data, because we're drawing in pixel space.
         GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, 0);
 
@@ -436,7 +387,7 @@ int main(int argc, char **argv)
         gertex::set_blending(gertex::GXBlendMode::normal);
         GX_SetAlphaUpdate(GX_TRUE);
 
-        HandleGUI(viewport);
+        HandleGUI(state.view);
         GX_DrawDone();
 
         GX_CopyDisp(frameBuffer[fb], GX_TRUE);
@@ -653,7 +604,7 @@ void HandleGUI(gertex::GXView &viewport)
                 }
                 else
                 {
-                    Gui::set_gui(new GuiSurvival(viewport, current_world->player.items));
+                    Gui::set_gui(new GuiSurvival(current_world->player.items));
                 }
             }
         }
@@ -942,7 +893,6 @@ void DrawGUI(gertex::GXView &viewport)
     gertex::push_matrix();
 
     // Draw the GUI elements
-    m_gui->viewport = viewport;
     Gui::get_gui()->draw();
 
     // Restore the orthogonal position matrix
@@ -972,55 +922,4 @@ void DrawGUI(gertex::GXView &viewport)
         draw_textured_quad(icons_texture, cursor_x - 7, cursor_y - 3, 32, 48, 32, 32, 48, 56);
     else
         draw_textured_quad(icons_texture, cursor_x - 16, cursor_y - 16, 32, 32, 0, 32, 32, 64);
-}
-void PrepareTEV()
-{
-    GX_SetNumTevStages(4);
-    GX_SetTexCoordGen(GX_TEXCOORD0, GX_TG_MTX2x4, GX_TG_TEX0, GX_IDENTITY);
-
-    // -------- Stage 0: Texture * CLR0 --------
-
-    GX_SetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD0, GX_TEXMAP0, GX_COLOR0A0);
-
-    GX_SetTevColorIn(GX_TEVSTAGE0, GX_CC_ZERO, GX_CC_TEXC, GX_CC_RASC, GX_CC_ZERO);
-    GX_SetTevColorOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
-
-    GX_SetTevAlphaIn(GX_TEVSTAGE0, GX_CA_ZERO, GX_CA_TEXA, GX_CA_RASA, GX_CA_ZERO);
-    GX_SetTevAlphaOp(GX_TEVSTAGE0, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
-
-    // -------- Stage 1: PREV * CLR1 --------
-
-    GX_SetTevOrder(GX_TEVSTAGE1, GX_TEXCOORD0, GX_TEXMAP_DISABLE, GX_COLOR1A1);
-
-    GX_SetTevColorIn(GX_TEVSTAGE1, GX_CC_ZERO, GX_CC_CPREV, GX_CC_RASC, GX_CC_ZERO);
-    GX_SetTevColorOp(GX_TEVSTAGE1, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
-
-    GX_SetTevAlphaIn(GX_TEVSTAGE1, GX_CA_ZERO, GX_CA_APREV, GX_CA_RASA, GX_CA_ZERO);
-    GX_SetTevAlphaOp(GX_TEVSTAGE1, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
-
-    // -------- Stage 2: Add Konst0 --------
-
-    GX_SetTevOrder(GX_TEVSTAGE2, GX_TEXCOORD0, GX_TEXMAP_DISABLE, GX_COLOR0A0);
-
-    GX_SetTevKColor(GX_KCOLOR0, (GXColor){0, 0, 0, 255}); // Default to black (i.e. no effect)
-    GX_SetTevKColorSel(GX_TEVSTAGE2, GX_TEV_KCSEL_K0);
-
-    GX_SetTevColorIn(GX_TEVSTAGE2, GX_CC_CPREV, GX_CC_ZERO, GX_CC_ZERO, GX_CC_KONST);
-    GX_SetTevColorOp(GX_TEVSTAGE2, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
-
-    GX_SetTevAlphaIn(GX_TEVSTAGE2, GX_CA_APREV, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO);
-    GX_SetTevAlphaOp(GX_TEVSTAGE2, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
-
-    // -------- Stage 3: Multiply by Konst1 --------
-
-    GX_SetTevOrder(GX_TEVSTAGE3, GX_TEXCOORD0, GX_TEXMAP_DISABLE, GX_COLOR0A0);
-
-    GX_SetTevKColor(GX_KCOLOR1, (GXColor){255, 255, 255, 255}); // White by default
-    GX_SetTevKColorSel(GX_TEVSTAGE3, GX_TEV_KCSEL_K1);
-
-    GX_SetTevColorIn(GX_TEVSTAGE3, GX_CC_ZERO, GX_CC_CPREV, GX_CC_KONST, GX_CC_ZERO);
-    GX_SetTevColorOp(GX_TEVSTAGE3, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
-
-    GX_SetTevAlphaIn(GX_TEVSTAGE3, GX_CA_APREV, GX_CA_ZERO, GX_CA_ZERO, GX_CA_ZERO);
-    GX_SetTevAlphaOp(GX_TEVSTAGE3, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
 }

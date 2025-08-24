@@ -36,10 +36,8 @@ public:
 class Gui
 {
 public:
-    gertex::GXView viewport;
-    Gui() = delete;
     inventory::ItemStack item_in_hand;
-    Gui(const gertex::GXView &viewport) : viewport(viewport)
+    Gui()
     {
     }
     virtual ~Gui() = default;
