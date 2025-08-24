@@ -17,6 +17,8 @@ public:
     GuiSlot() = default;
     GuiSlot(int x, int y, inventory::ItemStack item) : x(x), y(y), item(item) {}
 
+    virtual ~GuiSlot() = default;
+
     virtual inventory::ItemStack interact(inventory::ItemStack hand, bool right_click);
 
     bool contains(int x, int y)
