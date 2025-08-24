@@ -18,6 +18,7 @@ public:
     int height = 332;
 
     GuiSurvival(inventory::Container &Container);
+    ~GuiSurvival();
 
     void draw() override;
     void update() override;

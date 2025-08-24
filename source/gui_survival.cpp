@@ -39,6 +39,14 @@ GuiSurvival::GuiSurvival(inventory::Container &Container) : linked_container(Con
     refresh();
 }
 
+GuiSurvival::~GuiSurvival()
+{
+    for (GuiSlot *slot : slots)
+    {
+        delete slot;
+    }
+}
+
 void GuiSurvival::draw()
 {
     gertex::GXView viewport = gertex::get_state().view;
