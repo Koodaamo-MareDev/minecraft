@@ -582,7 +582,7 @@ int get_chest_texture_index(Chunk &chunk, Block *block, const Vec3i &pos, uint8_
     }
 
     if (std::none_of(neighbors, neighbors + 4, [](Block *block)
-                     { return block->get_blockid() == BlockID::chest; }))
+                     { return block && block->get_blockid() == BlockID::chest; }))
     {
         // Single chest
         uint8_t direction = FACE_PZ;
