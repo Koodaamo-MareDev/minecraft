@@ -552,12 +552,6 @@ void World::edit_blocks()
     if (!player.selected_item)
         return;
 
-    if (should_place_block && player.selected_item->empty())
-    {
-        should_place_block = false;
-        should_destroy_block = false;
-        return;
-    }
     Block selected_block = player.selected_item->as_item().is_block() ? Block{uint8_t(player.selected_item->id & 0xFF), 0x7F, uint8_t(player.selected_item->meta & 0xFF)} : Block{};
     bool finish_destroying = should_destroy_block && player.mining_progress >= 1.0f;
 
