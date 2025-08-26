@@ -775,7 +775,26 @@ void World::destroy_block(const Vec3i pos, Block *old_block)
 
 void World::place_block(const Vec3i pos, const Vec3i targeted, Block *new_block, uint8_t face)
 {
-    if (new_block->id != BlockID::air)
+    // Ensure no entities are in the way
+    bool intersects_entity = false;
+    for (int x = -1; !intersects_entity && x <= 1; x++)
+        for (int z = -1; !intersects_entity && z <= 1; z++)
+        {
+            Chunk *chunk = get_chunk_from_pos(pos + Vec3i(x, 0, z));
+            if (!chunk)
+                continue;
+            for (EntityPhysical *&entity : chunk->entities)
+            {
+                // Blocks can be placed on items. For other entities, check for intersection.
+                if (dynamic_cast<EntityItem *>(entity) == nullptr && new_block->intersects(entity->aabb, pos))
+                {
+                    intersects_entity = true;
+                    break;
+                }
+            }
+        }
+
+    if (!intersects_entity && new_block->id != BlockID::air)
     {
         Sound sound = get_mine_sound(new_block->get_blockid());
         sound.volume = 0.4f;
