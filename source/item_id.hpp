@@ -3,7 +3,7 @@
 
 #include <cstdint>
 
-enum ItemID : int16_t
+enum class ItemID : int16_t
 {
     iron_shovel = 256,
     iron_pickaxe,
@@ -109,5 +109,10 @@ enum ItemID : int16_t
     record_13 = 2256,
     record_cat = 2257
 };
+
+constexpr int16_t operator+(ItemID e) noexcept
+{
+    return static_cast<int16_t>(e);
+}
 
 #endif
