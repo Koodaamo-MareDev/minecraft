@@ -917,7 +917,7 @@ void EntityItem::render(float partial_ticks, bool transparency)
             transform_view(gertex::get_view_matrix(), entity_position + anim_offset + dupe_offset * i + Vec3f(0, 0.125, 0), Vec3f(0.5), item_rot, true);
 
             if (transparency)
-                render_single_item(item.texture_index, true, light_level);
+                render_single_item(item_stack.get_texture_index(), true, light_level);
         }
     }
 }

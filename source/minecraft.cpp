@@ -604,7 +604,7 @@ void HandleGUI(gertex::GXView &viewport)
                 }
                 else
                 {
-                    Gui::set_gui(new GuiSurvival(current_world->player.items));
+                    Gui::set_gui(new GuiSurvival(&current_world->player.items));
                 }
             }
         }

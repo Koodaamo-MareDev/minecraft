@@ -147,7 +147,7 @@ void Gui::draw_item(int x, int y, inventory::ItemStack stack, gertex::GXView &vi
         guMtxTransApply(tmp_matrix, tmp_matrix, x + 16, (y + 16) / viewport.aspect_correction, 0.0f);
         GX_LoadPosMtxImm(tmp_matrix, GX_PNMTX0);
 
-        int texture_index = item.texture_index;
+        int texture_index = stack.get_texture_index();
         render_single_item(texture_index, false);
         render_single_item(texture_index, true);
     }
@@ -249,21 +249,17 @@ inventory::ItemStack GuiSlot::interact(inventory::ItemStack hand, bool right_cli
 
 inventory::ItemStack GuiResultSlot::interact(inventory::ItemStack hand, bool right_click)
 {
-    if (!item.empty())
+    if (hand.empty())
     {
-        if (hand.empty())
-        {
-            // Take the item from the slot
-            hand = item;
-            item = inventory::ItemStack();
-            return hand;
-        }
-        else if (hand.id == item.id && hand.meta == item.meta && hand.count + item.count <= hand.as_item().max_stack)
-        {
-            // The item fits in the hand so we'll take it
-            hand.count += item.count;
-            item = inventory::ItemStack();
-        }
+        // Take the item from the slot
+        hand = item;
+        taken = true;
+    }
+    else if (hand.id == item.id && hand.meta == item.meta && hand.count + item.count <= hand.as_item().max_stack)
+    {
+        // The item fits in the hand so we'll take it
+        hand.count += item.count;
+        taken = true;
     }
 
     return hand;

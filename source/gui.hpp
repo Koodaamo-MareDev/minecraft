@@ -30,6 +30,8 @@ public:
 class GuiResultSlot : public GuiSlot
 {
 public:
+    bool taken = false;
+
     GuiResultSlot(int x, int y, inventory::ItemStack item) : GuiSlot(x, y, item) {}
 
     inventory::ItemStack interact(inventory::ItemStack hand, bool right_click) override;
@@ -39,6 +41,8 @@ class Gui
 {
 public:
     inventory::ItemStack item_in_hand;
+    uint8_t window_id = 0;
+    int16_t transaction_id = 1;
     Gui()
     {
     }

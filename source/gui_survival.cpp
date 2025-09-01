@@ -3,7 +3,7 @@
 #include "world.hpp"
 #include "util/input/input.hpp"
 
-GuiSurvival::GuiSurvival(inventory::Container &Container) : linked_container(Container)
+GuiSurvival::GuiSurvival(inventory::Container *container) : GuiGenericContainer(container, 45, 0, "Inventory")
 {
     gertex::GXView viewport = gertex::get_state().view;
 
@@ -31,20 +31,12 @@ GuiSurvival::GuiSurvival(inventory::Container &Container) : linked_container(Con
     }
 
     // Hotbar
-    for (size_t i = 0; slot_index < linked_container.size(); slot_index++, i++)
+    for (size_t i = 0; slot_index < linked_container->size(); slot_index++, i++)
     {
         slots.push_back(new GuiSlot(start_x + 16 + i * 36, start_y + 284, inventory::ItemStack()));
     }
 
     refresh();
-}
-
-GuiSurvival::~GuiSurvival()
-{
-    for (GuiSlot *slot : slots)
-    {
-        delete slot;
-    }
 }
 
 void GuiSurvival::draw()
@@ -112,87 +104,31 @@ void GuiSurvival::draw()
     }
 }
 
-void GuiSurvival::update()
-{
-    bool clicked = false;
-    bool is_right_click = false;
-    for (input::Device *dev : input::devices)
-    {
-        if (!dev->connected())
-            continue;
-        uint32_t btn_down = dev->get_buttons_down();
-        if (btn_down != 0)
-        {
-            if ((btn_down & input::BUTTON_CANCEL) || (btn_down & input::BUTTON_CONFIRM))
-            {
-                clicked = true;
-                if ((btn_down & input::BUTTON_CANCEL))
-                    is_right_click = true;
-            }
-            break;
-        }
-    }
-    if (clicked)
-    {
-        // Get the slot that the cursor is hovering over
-        GuiSlot *slot = nullptr;
-        for (GuiSlot *s : slots)
-        {
-            if (s->contains(cursor_x, cursor_y))
-            {
-                slot = s;
-                break;
-            }
-        }
-
-        // If the slot is valid, interact with it
-        if (slot)
-        {
-            item_in_hand = slot->interact(item_in_hand, is_right_click);
-
-            // Copy the GUI slots to the Container after interaction
-            for (size_t i = 0; i < linked_container.size() && i < slots.size(); i++)
-            {
-                linked_container[i] = slots[i]->item;
-            }
-        }
-    }
-}
-
-void GuiSurvival::close()
-{
-    // Copy the GUI slots to the Container
-    for (size_t i = 0; i < linked_container.size() && i < slots.size(); i++)
-    {
-        linked_container[i] = slots[i]->item;
-    }
-
-    if (current_world->is_remote())
-        return;
-
-    // Drop the item in hand
-    if (!item_in_hand.empty())
-    {
-        EntityPhysical &player = current_world->player;
-        EntityItem *item_entity = new EntityItem(player.get_position(0), item_in_hand);
-        item_entity->velocity = angles_to_vector(player.rotation.x, player.rotation.y) * 0.5;
-        item_entity->chunk = get_chunk_from_pos(Vec3i(std::floor(player.position.x), std::floor(player.position.y), std::floor(player.position.z)));
-        add_entity(item_entity);
-    }
-}
-
-void GuiSurvival::refresh()
-{
-    // Copy the Container to the GUI slots
-    for (size_t i = 0; i < linked_container.size() && i < slots.size(); i++)
-    {
-        slots[i]->item = linked_container[i];
-    }
-}
-
 bool GuiSurvival::contains(int x, int y)
 {
     gertex::GXView viewport = gertex::get_state().view;
 
     return x >= (viewport.width - width) / 2 && x < (viewport.width + width) / 2 && y >= (viewport.height - height) / 2 && y < (viewport.height + height) / 2;
+}
+
+void GuiSurvival::on_result_taken()
+{
+    for (size_t i = 1; i <= 4; i++)
+    {
+        inventory::ItemStack ingredient = slots[i]->item;
+        if (ingredient.empty())
+            continue;
+
+        // Handle milk bucket conversion or reduce the item count
+        if (ingredient.id == 335)
+            ingredient.id = 325;
+        else
+            ingredient.count--;
+
+        // Clear the slot if the item count is zero
+        if (ingredient.empty())
+            slots[0]->item = inventory::ItemStack();
+
+        slots[i]->item = ingredient;
+    }
 }

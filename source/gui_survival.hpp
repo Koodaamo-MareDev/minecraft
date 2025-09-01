@@ -2,28 +2,22 @@
 #define GUI_SURVIVAL_HPP
 
 #include <array>
-#include "gui.hpp"
+#include "gui_container.hpp"
 
-class GuiSurvival : public Gui
+class GuiSurvival : public GuiGenericContainer
 {
 public:
-    std::vector<GuiSlot*> slots;
     const static size_t hotbar_start = 36;
     const static size_t inventory_start = 9;
     const static size_t armor_start = 5;
 
-    inventory::Container &linked_container;
-
     int width = 352;
     int height = 332;
 
-    GuiSurvival(inventory::Container &Container);
-    ~GuiSurvival();
+    GuiSurvival(inventory::Container *Container);
 
     void draw() override;
-    void update() override;
     bool contains(int x, int y) override;
-    void close() override;
-    void refresh() override;
+    void on_result_taken() override;
 };
 #endif

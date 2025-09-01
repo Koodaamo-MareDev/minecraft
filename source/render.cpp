@@ -78,7 +78,7 @@ void init_textures()
     init_png_texture(particles_texture, "particles.png");
     init_png_texture(terrain_texture, "terrain.png", 3);
     init_png_texture(icons_texture, "gui/icons.png");
-    init_png_texture(container_texture, "gui/Container.png");
+    init_png_texture(container_texture, "gui/container.png");
     init_png_texture(underwater_texture, "misc/water.png");
     init_png_texture(vignette_texture, "misc/vignette.png");
     init_png_texture(creeper_texture, "mob/creeper.png");

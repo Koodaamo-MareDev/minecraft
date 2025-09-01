@@ -151,6 +151,8 @@ namespace Crapper
         void sendPlaceBlock(int32_t x, int32_t y, int32_t z, uint8_t face, uint16_t item_id, uint8_t item_count, uint8_t item_meta);
         void sendAnimation(uint8_t animation_id);
         void sendBlockItemSwitch(uint16_t item_id);
+        void sendWindowClose(uint8_t window_id);
+        void sendWindowClick(uint8_t window_id, int16_t slot, uint8_t button, int16_t action, int16_t id, uint8_t item_count, int16_t item_meta);
         void sendKeepAlive();
 
         bool handlePacket(ByteBuffer &buffer);
@@ -191,6 +193,9 @@ namespace Crapper
         void handleWindowItems(ByteBuffer &buffer);
         void handleUpdateSign(ByteBuffer &buffer);
         void handleKick(ByteBuffer &buffer);
+        void handleOpenWindow(ByteBuffer &buffer);
+        void handleCloseWindow(ByteBuffer &buffer);
+        void handleTransaction(ByteBuffer &buffer);
         void handleSetSlot(ByteBuffer &buffer);
         void disconnect();
         void tick();

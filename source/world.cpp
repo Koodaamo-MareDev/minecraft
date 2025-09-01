@@ -1079,7 +1079,7 @@ void World::draw_selected_block()
         // Setup item properties
 
         // Get the texture index of the selected item
-        texture_index = player.selected_item->as_item().texture_index;
+        texture_index = player.selected_item->get_texture_index();
 
         // Use the item texture
         use_texture(items_texture);

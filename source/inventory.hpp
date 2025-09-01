@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "block_id.hpp"
+#include "item_id.hpp"
 
 class EntityPhysical;
 
@@ -44,36 +45,43 @@ namespace inventory
     class Item
     {
     public:
-        uint16_t id = 0;
+        int16_t id = 0;
         uint8_t max_stack = 64;
         uint8_t texture_index = 0;
         tool_type tool = none;
         tool_tier tier = wood;
-        float efficiency = 1.0f;
         int32_t damage = 0;
         std::function<void(Item &, Vec3i, Vec3i, EntityPhysical *)> on_use = default_on_use;
 
-        Item(uint16_t id = 0, uint8_t max_stack = 64, std::function<void(Item &, Vec3i, Vec3i, EntityPhysical *)> on_use = default_on_use) : id(id), max_stack(max_stack), on_use(on_use) {}
+        Item(int16_t id = 0, uint8_t texture_index = 0, uint8_t max_stack = 64, std::function<void(Item &, Vec3i, Vec3i, EntityPhysical *)> on_use = default_on_use) : id(id), max_stack(max_stack), texture_index(texture_index), on_use(on_use) {}
 
         bool is_block() const
         {
             return id < 0x100;
         }
 
+        Item set_tool_properties(tool_type type, tool_tier tier, int32_t damage)
+        {
+            this->tool = type;
+            this->tier = tier;
+            this->damage = damage;
+            return *this;
+        }
+
         float get_efficiency(BlockID block_id, tool_type type, tool_tier tier) const;
     };
 
-    extern Item item_list[512];
+    extern Item item_list[2560];
 
     class ItemStack
     {
     public:
-        uint16_t id;
+        int16_t id;
         uint8_t count;
-        uint16_t meta;
+        int16_t meta;
 
-        ItemStack(uint16_t id = 0, uint8_t count = 0, uint16_t meta = 0) : id(id), count(count), meta(meta) {}
-        ItemStack(BlockID id, uint8_t count = 0, uint16_t meta = 0) : id(uint8_t(id)), count(count), meta(meta) {}
+        ItemStack(int16_t id = 0, uint8_t count = 0, int16_t meta = 0) : id(id), count(count), meta(meta) {}
+        ItemStack(BlockID id, uint8_t count = 0, int16_t meta = 0) : id(uint8_t(id)), count(count), meta(meta) {}
 
         Item &as_item() const
         {
@@ -90,6 +98,18 @@ namespace inventory
                 return true;
             }
             return id == 0;
+        }
+
+        uint8_t get_texture_index() const
+        {
+            if (this->id == +ItemID::dye)
+            {
+                // Remap color index to the 2x8 portion in the texture atlas
+                uint8_t base_index = as_item().texture_index;
+                uint8_t color_index = (this->meta >> 3) | ((this->meta & 0x7) << 4);
+                return base_index + color_index;
+            }
+            return as_item().texture_index;
         }
     };
 

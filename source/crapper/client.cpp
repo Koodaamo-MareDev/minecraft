@@ -11,6 +11,7 @@
 #include "../sound.hpp"
 #include "../world.hpp"
 #include "../gui_dirtscreen.hpp"
+#include "../gui_container.hpp"
 #include "../util/debuglog.hpp"
 
 namespace Crapper
@@ -584,7 +585,7 @@ namespace Crapper
             EntityPlayerLocal *local_player = dynamic_cast<EntityPlayerLocal *>(player);
             if (local_player)
             {
-                local_player->items[slot - 5] = inventory::ItemStack();
+                local_player->items[slot + 5] = inventory::ItemStack();
             }
         }
         else
@@ -594,7 +595,7 @@ namespace Crapper
             EntityPlayerLocal *local_player = dynamic_cast<EntityPlayerLocal *>(player);
             if (local_player)
             {
-                local_player->items[slot - 5] = inventory::ItemStack(item, 1, meta);
+                local_player->items[slot + 5] = inventory::ItemStack(item, 1, meta);
             }
         }
     }
@@ -817,6 +818,33 @@ namespace Crapper
         ByteBuffer buffer;
         buffer.writeByte(0x10); // Packet ID
         buffer.writeShort(item_id);
+        send(buffer);
+    }
+
+    void MinecraftClient::sendWindowClose(uint8_t window_id)
+    {
+        // Send window close packet
+        ByteBuffer buffer;
+        buffer.writeByte(0x65); // Packet ID
+        buffer.writeByte(window_id);
+        send(buffer);
+    }
+
+    void MinecraftClient::sendWindowClick(uint8_t window_id, int16_t slot, uint8_t button, int16_t action, int16_t id, uint8_t item_count, int16_t item_meta)
+    {
+        // Send window click packet
+        ByteBuffer buffer;
+        buffer.writeByte(0x66); // Packet ID
+        buffer.writeByte(window_id);
+        buffer.writeShort(slot);
+        buffer.writeByte(button);
+        buffer.writeShort(action);
+        buffer.writeShort(id);
+        if (id >= 0)
+        {
+            buffer.writeByte(item_count);
+            buffer.writeShort(item_meta);
+        }
         send(buffer);
     }
 
@@ -1512,6 +1540,52 @@ namespace Crapper
         remote_world->create_explosion(Vec3f(x, y, z), radius, nullptr);
     }
 
+    void MinecraftClient::handleOpenWindow(ByteBuffer &buffer)
+    {
+        // Read open window
+        uint8_t window_id = buffer.readByte();
+        uint8_t inventory_type = buffer.readByte();
+        std::string window_title = buffer.readString();
+        uint8_t slot_count = buffer.readByte();
+
+        if (buffer.underflow)
+            return;
+
+        switch (inventory_type)
+        {
+        case 0:
+        {
+            // Chest
+            GuiContainer *gui = new GuiContainer(nullptr, slot_count, window_id, window_title);
+            Gui::set_gui(gui);
+            break;
+        }
+        default:
+            throw std::runtime_error("Received invalid inventory type " + std::to_string(inventory_type));
+        }
+    }
+
+    void MinecraftClient::handleCloseWindow(ByteBuffer &buffer)
+    {
+        // Read close window
+        uint8_t window_id = buffer.readByte();
+        if (buffer.underflow)
+            return;
+        Gui *current_gui = Gui::get_gui();
+        if (current_gui && current_gui->window_id == window_id)
+        {
+            Gui::set_gui(nullptr);
+        }
+    }
+
+    void MinecraftClient::handleTransaction(ByteBuffer &buffer)
+    {
+        // Not used, just skip
+        buffer.readByte();
+        buffer.readShort();
+        buffer.readBool();
+    }
+
     void MinecraftClient::handleSetSlot(ByteBuffer &buffer)
     {
         // Read slot
@@ -1531,9 +1605,24 @@ namespace Crapper
         }
         if (buffer.underflow)
             return;
-        if (window_id == 0 && slot_id >= 0 && (slot_id & 0xFFFF) < remote_world->player.items.size())
+        if (window_id == 0)
         {
-            remote_world->player.items[slot_id] = item;
+            if (slot_id >= 0 && (slot_id & 0xFFFF) < remote_world->player.items.size())
+            {
+                remote_world->player.items[slot_id] = item;
+            }
+        }
+        else if (window_id != 0)
+        {
+            GuiGenericContainer *container_gui = dynamic_cast<GuiGenericContainer *>(Gui::get_gui());
+            if (container_gui)
+            {
+                if (slot_id == -1 && window_id == 0xFF)
+                    container_gui->item_in_hand = item;
+                else if (container_gui->window_id == window_id)
+                    container_gui->set_slot(slot_id, item);
+            }
+            debug::print("[0] Set slot %d in window %d to item %d\n", slot_id, window_id, item.id);
         }
     }
 
@@ -1554,11 +1643,11 @@ namespace Crapper
         std::vector<inventory::ItemStack> items;
 
         uint8_t window_id = buffer.readByte();
-        uint16_t count = buffer.readShort();
+        int16_t count = buffer.readShort();
         if (buffer.underflow)
             return;
 
-        for (uint16_t i = 0; i < count; i++)
+        for (int16_t i = 0; i < count; i++)
         {
             int16_t item_id = buffer.readShort();
             if (item_id >= 0)
@@ -1566,6 +1655,10 @@ namespace Crapper
                 uint8_t count = buffer.readByte();
                 uint16_t meta = buffer.readShort() & 0xFFFF;
                 items.push_back(inventory::ItemStack(item_id, count, meta));
+            }
+            else
+            {
+                items.push_back(inventory::ItemStack());
             }
             if (buffer.underflow)
                 return;
@@ -1579,6 +1672,19 @@ namespace Crapper
             {
                 container[i] = items[i];
             }
+        }
+        else
+        {
+            GuiGenericContainer *container_gui = dynamic_cast<GuiGenericContainer *>(Gui::get_gui());
+            if (container_gui && container_gui->window_id == window_id)
+            {
+                for (size_t i = 0; i < items.size(); i++)
+                {
+                    container_gui->set_slot(i, items[i]);
+                }
+            }
+            for (size_t i = 0; i < items.size(); i++)
+                debug::print("[1] Set slot %d in window %d to item %d\n", i, window_id, items[i].id);
         }
     }
 
@@ -1864,6 +1970,16 @@ namespace Crapper
             handleExplosion(buffer);
             break;
         }
+        case 0x64:
+        {
+            handleOpenWindow(buffer);
+            break;
+        }
+        case 0x65:
+        {
+            handleCloseWindow(buffer);
+            break;
+        }
         case 0x67:
         {
             // Handle packet 0x67 (set slot)
@@ -1874,6 +1990,12 @@ namespace Crapper
         {
             // Handle packet 0x68 (inventory)
             handleWindowItems(buffer);
+            break;
+        }
+        case 0x6A:
+        {
+            // Handle packet 0x6A (container transaction)
+            handleTransaction(buffer);
             break;
         }
         case 0x82:

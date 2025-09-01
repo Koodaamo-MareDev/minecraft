@@ -227,7 +227,7 @@ void Model::render_handitem(ModelBox *box, inventory::ItemStack &item, Vec3f off
         // Setup item properties
 
         // Get the texture index of the selected item
-        texture_index = item.as_item().texture_index;
+        texture_index = item.get_texture_index();
 
         // Use the item texture
         use_texture(items_texture);
