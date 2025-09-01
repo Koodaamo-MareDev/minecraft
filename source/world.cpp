@@ -646,7 +646,9 @@ void World::edit_blocks()
                     {
                         if (player.raycast_target_face == face_offsets[face_num])
                         {
-                            place_block(editable_pos, player.raycast_target_pos, &selected_block, face_num);
+                            bool success = place_block(editable_pos, player.raycast_target_pos, &selected_block, face_num);
+                            if (!success)
+                                *editable_block = old_block;
                             break;
                         }
                     }
@@ -768,7 +770,7 @@ void World::destroy_block(const Vec3i pos, Block *old_block)
         spawn_drop(pos, old_block, properties(old_blockid).m_drops(*old_block));
 }
 
-void World::place_block(const Vec3i pos, const Vec3i targeted, Block *new_block, uint8_t face)
+bool World::place_block(const Vec3i pos, const Vec3i targeted, Block *new_block, uint8_t face)
 {
     // Ensure no entities are in the way
     bool intersects_entity = false;
@@ -803,6 +805,8 @@ void World::place_block(const Vec3i pos, const Vec3i targeted, Block *new_block,
 
     if (is_remote())
         client->sendPlaceBlock(targeted.x, targeted.y, targeted.z, (face + 4) % 6, new_block->id, 1, new_block->meta);
+
+    return !intersects_entity;
 }
 
 void World::spawn_drop(const Vec3i &pos, const Block *old_block, inventory::ItemStack item)
