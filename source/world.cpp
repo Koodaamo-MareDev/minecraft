@@ -764,7 +764,8 @@ void World::destroy_block(const Vec3i pos, Block *old_block)
     // Client side block destruction - only for local play
     update_neighbors(pos);
     properties(old_blockid).m_destroy(pos, *old_block);
-    spawn_drop(pos, old_block, properties(old_blockid).m_drops(*old_block));
+    if (properties(old_blockid).can_be_broken_with(*player.selected_item))
+        spawn_drop(pos, old_block, properties(old_blockid).m_drops(*old_block));
 }
 
 void World::place_block(const Vec3i pos, const Vec3i targeted, Block *new_block, uint8_t face)
