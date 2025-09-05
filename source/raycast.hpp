@@ -511,7 +511,6 @@ inline bool raycast_precise(
                     }
                     else
                     {
-                        block->get_aabb(block_pos, aabb, aabbs);
                         for (AABB m_aabb : aabbs)
                         {
                             if (raycast_aabb(origin, direction, dst, output, output_face, m_aabb))
