@@ -552,105 +552,89 @@ void World::edit_blocks()
     if (!player.selected_item)
         return;
 
-    Block selected_block = player.selected_item->as_item().is_block() ? Block{uint8_t(player.selected_item->id & 0xFF), 0x7F, uint8_t(player.selected_item->meta & 0xFF)} : Block{};
+    Block held_block = player.selected_item->as_item().is_block() ? Block{uint8_t(player.selected_item->id & 0xFF), 0x7F, uint8_t(player.selected_item->meta & 0xFF)} : Block{};
     bool finish_destroying = should_destroy_block && player.mining_progress >= 1.0f;
 
     player.raycast_target_found = raycast_precise(camera.position, angles_to_vector(camera.rot.x, camera.rot.y), 4, &player.raycast_target_pos, &player.raycast_target_face, player.raycast_target_bounds);
-    if (player.raycast_target_found)
+    if (player.raycast_target_found && (finish_destroying || should_place_block))
     {
-        BlockID new_blockid = finish_destroying ? BlockID::air : selected_block.get_blockid();
-        if (finish_destroying || should_place_block)
+        BlockID new_blockid = finish_destroying ? BlockID::air : held_block.get_blockid();
+
+        // The block that the result of the action will be stored in temporarily.
+        Block result_block = held_block;
+
+        // If destroying, the result block is air.
+        if (finish_destroying)
         {
-            Block *targeted_block = get_block_at(player.raycast_target_pos);
-            Vec3i editable_pos = finish_destroying ? (player.raycast_target_pos) : (player.raycast_target_pos + player.raycast_target_face);
-            Block *editable_block = get_block_at(editable_pos);
-            if (editable_block)
+            result_block.set_blockid(BlockID::air);
+            result_block.meta = 0;
+        }
+
+        // The position of the targeted block.
+        Vec3i result_pos = player.raycast_target_pos;
+
+        // If placing a block, the result position is the block at the face we are targeting.
+        if (!finish_destroying)
+            result_pos = result_pos + player.raycast_target_face;
+
+        Block *editable_block = get_block_at(result_pos);
+        if (editable_block)
+        {
+            if (!is_remote())
             {
-                Block old_block = *editable_block;
-                BlockID old_blockid = editable_block->get_blockid();
-                BlockID targeted_blockid = targeted_block->get_blockid();
-                if (!is_remote())
+                // Handle slab corner case
+                if (new_blockid == BlockID::stone_slab && editable_block->get_blockid() == BlockID::stone_slab && player.raycast_target_face.y == 1)
                 {
-                    // Handle slab placement
-                    if (properties(new_blockid).m_render_type == RenderType::slab)
-                    {
-                        bool same_as_target = targeted_block->get_blockid() == new_blockid;
+                    // Adjust position to the block being targeted
+                    result_pos = player.raycast_target_pos;
 
-                        uint8_t new_meta = player.raycast_target_face.y == -1 ? 8 : 0;
-                        new_meta ^= same_as_target;
-
-                        if (player.raycast_target_face.y != 0 && (new_meta ^ 8) == (targeted_block->meta & 8) && same_as_target)
-                        {
-                            targeted_block->set_blockid(BlockID(uint8_t(new_blockid) - 1));
-                            targeted_block->meta = 0;
-                        }
-                        else if (old_blockid == new_blockid)
-                        {
-                            editable_block->set_blockid(BlockID(uint8_t(new_blockid) - 1));
-                            editable_block->meta = 0;
-                        }
-                        else
-                        {
-                            editable_block->set_blockid(new_blockid);
-                            if (player.raycast_target_face.y == 0 && properties(targeted_blockid).m_render_type == RenderType::slab)
-                                editable_block->meta = targeted_block->meta;
-                            else if (player.raycast_target_face.y == 0)
-                                editable_block->meta = new_meta;
-                            else
-                                editable_block->meta = new_meta ^ same_as_target;
-                        }
-                    }
-                    else
-                    {
-                        should_place_block &= old_blockid == BlockID::air || properties(old_blockid).m_fluid;
-                        if (!finish_destroying && should_place_block && new_blockid != BlockID::air)
-                        {
-                            editable_block->meta = new_blockid == BlockID::air ? 0 : selected_block.meta;
-                            editable_block->set_blockid(new_blockid);
-                        }
-                    }
-                    if (finish_destroying)
-                    {
-                        editable_block->meta = new_blockid == BlockID::air ? 0 : selected_block.meta;
-                        editable_block->set_blockid(new_blockid);
-                    }
+                    // Turn bottom slab into double slab
+                    result_block.set_blockid(BlockID::double_stone_slab);
                 }
+            }
 
-                if (finish_destroying)
-                {
-                    destroy_block(editable_pos, &old_block);
-                    if (is_remote())
-                    {
-                        // Restore the old block - server will handle the destruction
-                        set_block_at(editable_pos, old_blockid);
+            if (finish_destroying)
+            {
+                // For restoring the state
 
-                        // Send block destruction packet to the server
-                        for (uint8_t face_num = 0; face_num < 6; face_num++)
-                        {
-                            if (player.raycast_target_face == face_offsets[face_num])
-                            {
-                                client->sendBlockDig(2, editable_pos.x, editable_pos.y, editable_pos.z, (face_num + 4) % 6);
-                                break;
-                            }
-                        }
-                    }
-                }
-                else if (should_place_block)
+                Block old_editable_block = *editable_block;
+
+                destroy_block(result_pos, &old_editable_block);
+                if (is_remote())
                 {
-                    if (!is_remote())
-                    {
-                        update_block_at(editable_pos);
-                        update_neighbors(editable_pos);
-                    }
+                    // Restore the old block as the server will handle the destruction.
+                    // This is required to prevent desync caused by spawn protection.
+                    *editable_block = old_editable_block;
+
+                    // Send block destruction packet to the server
                     for (uint8_t face_num = 0; face_num < 6; face_num++)
                     {
                         if (player.raycast_target_face == face_offsets[face_num])
                         {
-                            bool success = place_block(editable_pos, player.raycast_target_pos, &selected_block, face_num);
-                            if (!success)
-                                *editable_block = old_block;
+                            client->sendBlockDig(2, result_pos.x, result_pos.y, result_pos.z, (face_num + 4) % 6);
                             break;
                         }
+                    }
+                }
+            }
+            else if (should_place_block)
+            {
+                // Look up the face number we are targeting
+                uint8_t face_num = 0;
+                for (face_num = 0; face_num < 6; face_num++)
+                {
+                    if (player.raycast_target_face == face_offsets[face_num])
+                        break;
+                }
+                // Try to place the block
+                bool success = place_block(result_pos, player.raycast_target_pos, &held_block, face_num);
+                if (success)
+                {
+                    *editable_block = result_block;
+                    if (!is_remote())
+                    {
+                        update_block_at(result_pos);
+                        update_neighbors(result_pos);
                     }
                 }
             }
