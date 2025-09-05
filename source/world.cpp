@@ -772,24 +772,31 @@ void World::destroy_block(const Vec3i pos, Block *old_block)
 
 bool World::place_block(const Vec3i pos, const Vec3i targeted, Block *new_block, uint8_t face)
 {
-    // Ensure no entities are in the way
+
+    // Check if the block has collision
     bool intersects_entity = false;
-    for (int x = -1; !intersects_entity && x <= 1; x++)
-        for (int z = -1; !intersects_entity && z <= 1; z++)
+    if (properties(new_block->get_blockid()).m_solid)
+    {
+        // Ensure no entities are in the way
+        for (int x = -1; !intersects_entity && x <= 1; x++)
         {
-            Chunk *chunk = get_chunk_from_pos(pos + Vec3i(x, 0, z));
-            if (!chunk)
-                continue;
-            for (EntityPhysical *&entity : chunk->entities)
+            for (int z = -1; !intersects_entity && z <= 1; z++)
             {
-                // Blocks can be placed on items. For other entities, check for intersection.
-                if (dynamic_cast<EntityItem *>(entity) == nullptr && new_block->intersects(entity->aabb, pos))
+                Chunk *chunk = get_chunk_from_pos(pos + Vec3i(x, 0, z));
+                if (!chunk)
+                    continue;
+                for (EntityPhysical *&entity : chunk->entities)
                 {
-                    intersects_entity = true;
-                    break;
+                    // Blocks can be placed on items. For other entities, check for intersection.
+                    if (dynamic_cast<EntityItem *>(entity) == nullptr && new_block->intersects(entity->aabb, pos))
+                    {
+                        intersects_entity = true;
+                        break;
+                    }
                 }
             }
         }
+    }
 
     if (!intersects_entity && new_block->id != BlockID::air)
     {
