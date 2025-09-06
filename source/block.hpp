@@ -309,10 +309,7 @@ struct BlockProperties
         if (!this->can_be_broken_with(item))
             return 0.01f / this->m_hardness; // Cannot break with this item, use default speed
 
-        if (item.as_item().tool == inventory::tool_type::none || (item.as_item().tool == this->m_tool_type && item.as_item().tier >= this->m_tool_tier))
-            return item.as_item().get_efficiency(m_id, this->m_tool_type, this->m_tool_tier) * (on_ground ? 1.0f : 0.2f) * (in_water ? 0.2f : 1.0f) / this->m_hardness / 30.0f;
-
-        return 1.0f; // Instant break with hands or any item
+        return item.as_item().get_efficiency(m_id, this->m_tool_type, this->m_tool_tier) * (on_ground ? 1.0f : 0.2f) * (in_water ? 0.2f : 1.0f) / this->m_hardness / 30.0f;
     }
 };
 
