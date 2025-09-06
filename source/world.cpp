@@ -630,7 +630,8 @@ void World::edit_blocks()
                 bool success = place_block(result_pos, player.raycast_target_pos, &held_block, face_num);
                 if (success)
                 {
-                    *editable_block = result_block;
+                    if (result_block.get_blockid() != BlockID::air)
+                        *editable_block = result_block;
                     if (!is_remote())
                     {
                         update_block_at(result_pos);
