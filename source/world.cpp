@@ -582,14 +582,28 @@ void World::edit_blocks()
         {
             if (!is_remote())
             {
-                // Handle slab corner case
-                if (new_blockid == BlockID::stone_slab && editable_block->get_blockid() == BlockID::stone_slab && player.raycast_target_face.y == 1)
-                {
-                    // Adjust position to the block being targeted
-                    result_pos = player.raycast_target_pos;
+                // Handle slab corner cases
 
+                Block *targeted_block = get_block_at(player.raycast_target_pos);
+                if (player.raycast_target_face.y == 1 && new_blockid == BlockID::stone_slab && targeted_block->get_blockid() == BlockID::stone_slab && held_block.meta == targeted_block->meta)
+                {
+                    // Adjust position to the block being targeted if we're facing the top face of a bottom slab
+                    result_pos = player.raycast_target_pos;
+                    editable_block = targeted_block;
+                }
+
+                // Conditions for turning a bottom slab into a double slab:
+                // 1. Both the held block and the editable block are slabs of the same type.
+                // 2. The block being placed is on the same vertical level as the targeted block.
+                // This prevents the off-by-one issue when placing the top half between two bottom slabs.
+                if (new_blockid == BlockID::stone_slab && editable_block->get_blockid() == BlockID::stone_slab && held_block.meta == editable_block->meta && (result_pos.y - player.raycast_target_pos.y) == 0)
+                {
                     // Turn bottom slab into double slab
                     result_block.set_blockid(BlockID::double_stone_slab);
+                }
+                else if (editable_block->get_blockid() != BlockID::air)
+                {
+                    should_place_block = false;
                 }
             }
 
