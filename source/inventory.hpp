@@ -10,6 +10,7 @@
 
 #include "block_id.hpp"
 #include "item_id.hpp"
+#include "nbt/nbt.hpp"
 
 class EntityPhysical;
 
@@ -82,6 +83,21 @@ namespace inventory
 
         ItemStack(int16_t id = 0, uint8_t count = 0, int16_t meta = 0) : id(id), count(count), meta(meta) {}
         ItemStack(BlockID id, uint8_t count = 0, int16_t meta = 0) : id(uint8_t(id)), count(count), meta(meta) {}
+        ItemStack(NBTTagCompound *nbt)
+        {
+            if (nbt)
+            {
+                this->id = nbt->getShort("id");
+                this->count = nbt->getByte("Count");
+                this->meta = nbt->getShort("Damage");
+            }
+            else
+            {
+                this->id = 0;
+                this->count = 0;
+                this->meta = 0;
+            }
+        }
 
         Item &as_item() const
         {
@@ -110,6 +126,20 @@ namespace inventory
                 return base_index + color_index;
             }
             return as_item().texture_index;
+        }
+
+        /**
+         * Converts the item_stack to an NBT compound tag
+         * @return NBTTagCompound* the NBT compound tag
+         * @note The returned NBTTagCompound* must be deleted by the caller
+         */
+        NBTTagCompound *serialize()
+        {
+            NBTTagCompound *nbt = new NBTTagCompound;
+            nbt->setTag("id", new NBTTagShort(id));
+            nbt->setTag("Count", new NBTTagByte(count));
+            nbt->setTag("Damage", new NBTTagShort(meta));
+            return nbt;
         }
     };
 
@@ -180,7 +210,28 @@ namespace inventory
          */
         virtual ItemStack place(ItemStack item, size_t index);
 
+        /**
+         * Finds a free slot for the item_stack
+         * It will first try to find a stack with the same id and meta that isn't full
+         * If it can't find one, it will return the first empty slot
+         * If there's no space, it will return -1
+         * @param stack the item_stack to find a free slot for
+         * @return the index of the free slot, or -1 if there's no space
+         */
         virtual int find_free_slot_for(ItemStack stack);
+
+        /**
+         * Converts the Container to an NBT list tag
+         * @return NBTTagList* the NBT list tag
+         * @note The returned NBTTagList* must be deleted by the caller
+         */
+        virtual NBTTagList *serialize();
+
+        /**
+         * Loads the Container from an NBT list tag
+         * @param nbt the NBT list tag
+         */
+        virtual void deserialize(NBTTagList *nbt);
     };
 
     class PlayerInventory : public Container
@@ -189,6 +240,10 @@ namespace inventory
         PlayerInventory(size_t inventory_size) : Container(inventory_size) {}
 
         virtual int find_free_slot_for(ItemStack stack) override;
+
+        virtual NBTTagList *serialize() override;
+
+        virtual void deserialize(NBTTagList *nbt) override;
     };
 } // namespace inventory
 #endif

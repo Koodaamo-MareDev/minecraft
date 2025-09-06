@@ -351,4 +351,93 @@ namespace inventory
         // No free slot found
         return -1;
     }
+
+    NBTTagList *Container::serialize()
+    {
+        NBTTagList *nbt = new NBTTagList();
+
+        for (size_t i = 0; i < size(); i++)
+        {
+            ItemStack &stack = stacks[i];
+            if (!stack.empty())
+            {
+                NBTTagCompound *item_nbt = stack.serialize();
+                item_nbt->setTag("Slot", new NBTTagByte(i));
+                nbt->addTag(item_nbt);
+            }
+        }
+
+        return nbt;
+    }
+
+    void Container::deserialize(NBTTagList *nbt)
+    {
+        clear();
+
+        for (size_t i = 0; i < nbt->value.size() && i < stacks.size(); i++)
+        {
+            NBTTagCompound *item_nbt = dynamic_cast<NBTTagCompound *>(nbt->value[i]);
+            if (item_nbt)
+            {
+                size_t slot = item_nbt->getByte("Slot") & 0xFF;
+                if (slot < stacks.size())
+                {
+                    stacks[slot] = ItemStack(item_nbt);
+                }
+            }
+        }
+    }
+
+    NBTTagList *PlayerInventory::serialize()
+    {
+        NBTTagList *nbt = new NBTTagList();
+
+        // Inventory slots 9-44
+        for (size_t i = 0; i < 36; i++)
+        {
+            ItemStack &stack = stacks[i + 9];
+            if (!stack.empty())
+            {
+                NBTTagCompound *item_nbt = stack.serialize();
+                item_nbt->setTag("Slot", new NBTTagByte(i));
+                nbt->addTag(item_nbt);
+            }
+        }
+
+        // Armor slots 5-8
+        for (size_t i = 0; i < 4; i++)
+        {
+            ItemStack &stack = stacks[i + 5];
+            if (!stack.empty())
+            {
+                NBTTagCompound *item_nbt = stack.serialize();
+                item_nbt->setTag("Slot", new NBTTagByte(i + 100));
+                nbt->addTag(item_nbt);
+            }
+        }
+
+        return nbt;
+    }
+
+    void PlayerInventory::deserialize(NBTTagList *nbt)
+    {
+        clear();
+
+        for (size_t i = 0; i < nbt->value.size() && i < stacks.size(); i++)
+        {
+            NBTTagCompound *item_nbt = dynamic_cast<NBTTagCompound *>(nbt->value[i]);
+            if (item_nbt)
+            {
+                int slot = item_nbt->getByte("Slot");
+                if (slot >= 0 && slot < 36)
+                {
+                    stacks[slot + 9] = ItemStack(item_nbt);
+                }
+                else if (slot >= 100 && slot < 104)
+                {
+                    stacks[slot - 95] = ItemStack(item_nbt);
+                }
+            }
+        }
+    }
 } // namespace inventory

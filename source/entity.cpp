@@ -1214,8 +1214,7 @@ void EntityPlayerLocal::serialize(NBTTagCompound *result)
     result->setTag("Score", new NBTTagInt(0));
     result->setTag("Sleeping", new NBTTagByte(in_bed));
     result->setTag("SleepTimer", new NBTTagShort(0));
-
-    // TODO: Serialize inventory
+    result->setTag("Inventory", this->items.serialize());
 }
 
 void EntityPlayerLocal::deserialize(NBTTagCompound *result)
@@ -1224,8 +1223,9 @@ void EntityPlayerLocal::deserialize(NBTTagCompound *result)
 
     set_world_hell(result->getInt("Dimension") == -1);
     in_bed = result->getByte("Sleeping");
-
-    // TODO: Deserialize inventory
+    NBTTagList *inv = dynamic_cast<NBTTagList *>(result->getTag("Inventory"));
+    if (inv)
+        this->items.deserialize(inv);
 }
 
 void EntityPlayerLocal::hurt(int16_t damage)
@@ -1235,7 +1235,7 @@ void EntityPlayerLocal::hurt(int16_t damage)
     get_camera().rot.z += 8; // Tilt the camera a bit
     if (dead && !current_world->is_remote())
     {
-        GuiDirtscreen* dirt_screen = new GuiDirtscreen;
+        GuiDirtscreen *dirt_screen = new GuiDirtscreen;
         dirt_screen->set_text("Respawning...");
         dirt_screen->set_progress(0, 100);
         Gui::set_gui(dirt_screen);
