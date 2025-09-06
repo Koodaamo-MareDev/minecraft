@@ -143,9 +143,30 @@ uint32_t get_face_texture_index(Block *block, int face)
     }
     case BlockID::double_stone_slab:
     {
-        if (face == FACE_NY || face == FACE_PY)
+        int variant = block->meta & 0x03;
+        switch (variant)
+        {
+        case 0: // Stone
+        {
+            if (face == FACE_NY || face == FACE_PY)
+                return 6;
+            return 5;
+        }
+        case 1: // Sandstone
+        {
+            if (face == FACE_NY)
+                return 208;
+            if (face == FACE_PY)
+                return 176;
+            return 192;
+        }
+        case 2: // Wooden
+            return 4;
+        case 3: // Cobblestone
+            return 16;
+        default:
             return 6;
-        return 5;
+        }
     }
     case BlockID::crafting_table:
     {
