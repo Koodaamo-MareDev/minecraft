@@ -125,10 +125,11 @@ void LightEngine::update(const Coord &update)
         if (!thread_active)
             return;
         Coord current = light_updates.back();
+        light_updates.pop_back();
+
         Chunk *chunk = current.chunk;
         if (std::find(chunks.begin(), chunks.end(), chunk) == chunks.end()) // FIXME: This is a hacky way
             return;                                                         // to check if the chunk is valid
-        light_updates.pop_back();
 
         if (!chunk || current.coords.y < 0)
             continue;
