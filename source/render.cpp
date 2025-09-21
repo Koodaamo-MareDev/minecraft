@@ -1275,7 +1275,7 @@ void draw_sunrise()
     gertex::set_state(state);
 }
 
-void draw_sky(GXColor background)
+void draw_sky()
 {
     // Disable fog
     gertex::use_fog(false);

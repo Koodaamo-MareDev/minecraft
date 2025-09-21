@@ -363,7 +363,7 @@ int main(int argc, char **argv)
         {
             // Draw sky
             if (current_world->player.in_fluid == BlockID::air && !current_world->hell)
-                draw_sky(background);
+                draw_sky();
 
             GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, BASE3D_POS_FRAC_BITS);
             current_world->draw(camera);

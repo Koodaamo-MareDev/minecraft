@@ -86,7 +86,7 @@ void transform_view(gertex::GXMatrix view, guVector world_pos, guVector object_s
 
 void transform_view_screen(gertex::GXMatrix view, guVector screen_pos, guVector object_scale = guVector{1, 1, 1}, guVector object_rot = guVector{0, 0, 0}, bool load = true);
 
-void draw_sky(GXColor background);
+void draw_sky();
 
 GXColor get_sky_color(bool cave_darkness = true);
 
