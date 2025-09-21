@@ -129,7 +129,7 @@ void LightMapBlend(const uint8_t *src0, const uint8_t *src1, uint8_t *dst, uint8
     }
 }
 
-void init_fail(std::string message)
+void InitFailure(std::string message)
 {
     if (frameBuffer[0])
         free(frameBuffer[0]);
@@ -174,7 +174,7 @@ int main(int argc, char **argv)
     WPAD_SetPowerButtonCallback(WiimotePowerPressed);
 
     if (!fatInitDefault())
-        init_fail("Failed to initialize FAT filesystem");
+        InitFailure("Failed to initialize FAT filesystem");
     try
     {
         // Attempt to load the Configuration file from the default location
