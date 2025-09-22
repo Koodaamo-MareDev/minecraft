@@ -67,6 +67,19 @@ void Gui::init_matrices(float aspect_correction)
     guMtxTransApply(gui_item_matrix.mtx, gui_item_matrix.mtx, 0.0f, 0.0f, -10.0f);
 }
 
+void Gui::fill_rect(int x, int y, int width, int height, GXColor color)
+{
+    draw_colored_quad(x, y, width, height, color.r, color.g, color.b, color.a);
+}
+
+void Gui::draw_rect(int x, int y, int width, int height, int border_size, GXColor color)
+{
+    fill_rect(x, y, width, border_size, color);                                                        // Top
+    fill_rect(x, y + height - border_size, width, border_size, color);                                 // Bottom
+    fill_rect(x, y + border_size, border_size, height - 2 * border_size, color);                       // Left
+    fill_rect(x + width - border_size, y + border_size, border_size, height - 2 * border_size, color); // Right
+}
+
 int Gui::text_width(std::string str)
 {
     int width = 0;
