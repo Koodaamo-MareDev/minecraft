@@ -33,6 +33,8 @@ int draw_colored_sprite(GXTexObj &texture, Vec2i pos, Vec2i size, vfloat_t u1, v
     u2 *= scale_u;
     v1 *= scale_v;
     v2 *= scale_v;
+    pos.x = (pos.x + 1) & ~1;
+    pos.y = (pos.y + 1) & ~1;
     GX_BeginGroup(GX_QUADS, 4);
     GX_Vertex(Vertex(scale * Vec3f(pos.x, pos.y, 0), u1, v1, r, g, b, a));
     GX_Vertex(Vertex(scale * Vec3f(pos.x + size.x, pos.y, 0), u2, v1, r, g, b, a));
