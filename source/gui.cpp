@@ -1,6 +1,8 @@
 #include "gui.hpp"
 #include "blocks.hpp"
 #include "font_tile_widths.hpp"
+#include "ported/Random.hpp"
+#include "ported/SystemTime.hpp"
 
 gertex::GXMatrix gui_block_matrix;
 gertex::GXMatrix gui_item_matrix;
@@ -72,7 +74,11 @@ int Gui::text_width(std::string str)
     for (size_t i = 0; i < str.size(); i++)
     {
         uint8_t c = str[i] & 0xFF;
-        if (c == '§' && i + 1 < str.size())
+        // This is poor handling of multibyte UTF-8 characters but it works for the characters we need
+        if ((c == 0xC2 || c == 0xC3) && i + 1 < str.size())
+            c = str[++i] & 0xFF;
+
+        if (c == 0xA7 && i + 1 < str.size())
         {
             i++; // Skip the color code character
             continue;
@@ -104,13 +110,28 @@ void Gui::draw_text(int x, int y, std::string str, GXColor color)
 
     int x_offset = 0;
     int y_offset = 0;
+
+    bool obfuscated = false;
+
+    GXColor original_color = color;
+
+    // Change the obfuscation seed every 10ms - this needs to be slow enough for shadows to display properly
+    // but fast enough to look like it's constantly changing
+    javaport::Random rng(javaport::System::currentTimeMillis() / 10);
+
     for (size_t i = 0; i < str.size(); i++)
     {
         uint8_t c = str[i] & 0xFF;
-        if (c == '§' && i + 1 < str.size())
+
+        // This is poor handling of multibyte UTF-8 characters but it works for the characters we need
+        if ((c == 0xC2 || c == 0xC3) && i + 1 < str.size())
+            c = str[++i] & 0xFF;
+
+        if (c == 0xA7 && i + 1 < str.size())
         {
             i++; // Skip the color code character
-            color = get_text_color(str[i]);
+            obfuscated = str[i] == 'k';
+            color = original_color * get_text_color(str[i]);
             continue;
         }
         if (c == ' ')
@@ -123,6 +144,31 @@ void Gui::draw_text(int x, int y, std::string str, GXColor color)
             x_offset = 0;
             y_offset += 16;
             continue;
+        }
+        if (obfuscated)
+        {
+            uint8_t orig_width = font_tile_widths[c];
+
+            // Find a random character with the same width
+            uint8_t attempt = rng.nextInt(122) + 33;
+            uint8_t total_attempts = 0;
+            while (font_tile_widths[attempt] != orig_width)
+            {
+                attempt = (attempt + 1) & 0xFF;
+                // Skip control characters and space
+                if (attempt < 33)
+                    attempt = 33;
+                // Skip unsupported characters
+                if (attempt >= 155 && attempt <= 159)
+                    attempt = 160;
+                // Wrap around to the start of the printable ASCII range
+                if (attempt > 165)
+                    attempt = 33;
+                // Prevent infinite loop
+                if (++total_attempts == 255)
+                    break;
+            }
+            c = attempt;
         }
 
         uint16_t cx = uint16_t(c & 15) << 3;
