@@ -169,8 +169,8 @@ int fill_screen_texture(GXTexObj &texture, gertex::GXView &view, vfloat_t u1, vf
     u2 *= scale_u;
     v1 *= scale_v;
     v2 *= scale_v;
-    int w = 48;
-    int h = 48;
+    int w = 64;
+    int h = 64;
     int cols = std::ceil(view.width / w);
     int rows = std::ceil(view.height / h);
 
