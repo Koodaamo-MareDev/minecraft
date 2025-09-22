@@ -163,4 +163,8 @@ inline GXColor operator*(const GXColor &lhs, const float &rhs)
 {
     return GXColor{uint8_t(lhs.r * rhs), uint8_t(lhs.g * rhs), uint8_t(lhs.b * rhs), uint8_t(lhs.a * rhs)};
 }
+inline GXColor operator*(const GXColor &lhs, const GXColor &rhs)
+{
+    return GXColor{uint8_t((lhs.r * rhs.r) / 255), uint8_t((lhs.g * rhs.g) / 255), uint8_t((lhs.b * rhs.b) / 255), uint8_t((lhs.a * rhs.a) / 255)};
+}
 #endif
