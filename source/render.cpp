@@ -545,9 +545,6 @@ void render_single_block(Block &selected_block, bool transparency)
 
 void render_single_block_at(Block &selected_block, Vec3i pos, bool transparency)
 {
-    Chunk *chunk = get_chunk_from_pos(pos);
-    if (!chunk)
-        return;
     // Precalculate the vertex count. Set position to Y = -16 to render "outside the world"
     int vertexCount = render_block(&selected_block, pos, transparency);
 
