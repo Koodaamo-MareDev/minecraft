@@ -217,21 +217,6 @@ void MainGameLoop(Configuration &config)
             current_world->draw_selected_block();
         }
 
-        gertex::ortho(state.view);
-        // Use 0 fractional bits for the position data, because we're drawing in pixel space.
-        GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, 0);
-
-        // Disable fog
-        gertex::use_fog(false);
-
-        // Enable direct colors
-        GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
-
-        // Draw GUI elements
-        GX_SetZMode(GX_TRUE, GX_ALWAYS, GX_TRUE);
-        gertex::set_blending(gertex::GXBlendMode::normal);
-        GX_SetAlphaUpdate(GX_TRUE);
-
         HandleGUI(state.view);
         GX_DrawDone();
 
