@@ -48,50 +48,6 @@ int cursor_y = 0;
 float fog_depth_multiplier = 1.0f;
 float fog_light_multiplier = 1.0f;
 
-// Function to create the full directory path
-int mkpath(const char *path, mode_t mode)
-{
-    char tmp[256]; // Temporary buffer to construct directories
-    char *p = NULL;
-    size_t len;
-
-    // Copy the path to a temporary buffer
-    strncpy(tmp, path, sizeof(tmp) - 1);
-    len = strlen(tmp);
-
-    // Remove the trailing slash if it exists
-    if (tmp[len - 1] == '/')
-    {
-        tmp[len - 1] = '\0';
-    }
-
-    // Create directories step by step
-    for (p = tmp + 1; *p; p++)
-    {
-        if (*p == '/')
-        {
-            *p = '\0'; // Temporarily end the string to isolate the directory
-
-            // Try to create the directory, ignore error if it already exists
-            if (mkdir(tmp, mode) != 0 && errno != EEXIST)
-            {
-                printf("Error creating directory %s: %s\n", tmp, strerror(errno));
-                return -1;
-            }
-
-            *p = '/'; // Restore the slash
-        }
-    }
-
-    // Finally, create the full path
-    if (mkdir(tmp, mode) != 0 && errno != EEXIST)
-    {
-        printf("Error creating directory %s: %s\n", tmp, strerror(errno));
-        return -1;
-    }
-
-    return 0;
-}
 void UpdateLoadingStatus();
 void HandleGUI(gertex::GXView &viewport);
 void UpdateGUI(gertex::GXView &viewport);

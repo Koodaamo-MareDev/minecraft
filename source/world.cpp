@@ -2,6 +2,7 @@
 #include <unistd.h>
 #include <ported/Random.hpp>
 #include <crapper/client.hpp>
+#include <filesystem>
 
 #include "timers.hpp"
 #include "world.hpp"
@@ -26,15 +27,15 @@
 extern bool should_destroy_block;
 extern bool should_place_block;
 extern Gui *current_gui;
-extern int mkpath(const char *path, mode_t mode);
 
 World::World()
 {
+    namespace fs = std::filesystem;
+
     std::string save_path = "/apps/minecraft/saves/" + name;
     std::string region_path = save_path + "/region";
-    mkpath(region_path.c_str(), 0777);
-    chdir(save_path.c_str());
-
+    fs::create_directories(region_path);
+    fs::current_path(save_path);
     LightEngine::init();
 }
 
