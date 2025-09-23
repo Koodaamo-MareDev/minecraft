@@ -1540,7 +1540,7 @@ namespace Crapper
             return;
 
         // Create explosion effect
-        remote_world->create_explosion(Vec3f(x, y, z), radius, nullptr);
+        remote_world->create_explosion(Vec3f(x, y, z), radius);
     }
 
     void MinecraftClient::handleOpenWindow(ByteBuffer &buffer)

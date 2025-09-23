@@ -246,7 +246,7 @@ void World::update_fluid_section(Chunk *chunk, int index)
             if (!block)
                 continue;
             if ((basefluid(block->get_blockid()) != BlockID::lava || fluid_update_count % 6 == 0))
-                update_fluid(block, Vec3i(chunkX, 0, chunkZ) + int_to_blockpos(block - chunk->blockstates), chunk);
+                update_fluid(block, Vec3i(chunkX, 0, chunkZ) + int_to_blockpos(block - chunk->blockstates));
             curr_fluid_count++;
             block = nullptr;
         }
@@ -837,7 +837,7 @@ void World::spawn_drop(const Vec3i &pos, const Block *old_block, inventory::Item
     add_entity(entity);
 }
 
-void World::create_explosion(Vec3f pos, float power, Chunk *near)
+void World::create_explosion(Vec3f pos, float power)
 {
     javaport::Random rng;
 
@@ -871,7 +871,7 @@ void World::create_explosion(Vec3f pos, float power, Chunk *near)
         m_particle_system.add_particle(particle);
     }
     if (!is_remote())
-        explode(pos, power * 0.75f, near);
+        explode(pos, power * 0.75f);
 }
 
 void World::draw(Camera &camera)
@@ -1440,7 +1440,7 @@ void World::update_player()
 #endif
     Vec3i block_pos = player.get_head_blockpos();
     Block *block = get_block_at(block_pos);
-    if (block && properties(block->id).m_fluid && block_pos.y + 2 - get_fluid_height(block_pos, block->get_blockid(), player.chunk) >= player.aabb.min.y + player.y_offset)
+    if (block && properties(block->id).m_fluid && block_pos.y + 2 - get_fluid_height(block_pos, block->get_blockid()) >= player.aabb.min.y + player.y_offset)
     {
         player.in_fluid = properties(block->id).m_base_fluid;
     }

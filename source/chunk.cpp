@@ -261,35 +261,33 @@ void init_chunk_manager(ChunkProvider *chunk_provider)
                      50);
 }
 
-BlockID get_block_id_at(const Vec3i &position, BlockID default_id, Chunk *near)
+BlockID get_block_id_at(const Vec3i &position, BlockID default_id)
 {
-    Block *block = get_block_at(position, near);
+    Block *block = get_block_at(position);
     if (!block)
         return default_id;
     return block->get_blockid();
 }
-Block *get_block_at(const Vec3i &position, Chunk *near)
+Block *get_block_at(const Vec3i &position)
 {
     if (position.y < 0 || position.y > MAX_WORLD_Y)
         return nullptr;
-    if (near && near->x == (position.x >> 4) && near->z == (position.z >> 4))
-        return near->get_block(position);
     Chunk *chunk = get_chunk_from_pos(position);
     if (!chunk)
         return nullptr;
     return chunk->get_block(position);
 }
 
-void set_block_at(const Vec3i &pos, BlockID id, Chunk *near)
+void set_block_at(const Vec3i &pos, BlockID id)
 {
-    Block *block = get_block_at(pos, near);
+    Block *block = get_block_at(pos);
     if (block)
         block->set_blockid(id);
 }
 
-void replace_air_at(Vec3i pos, BlockID id, Chunk *near)
+void replace_air_at(Vec3i pos, BlockID id)
 {
-    Block *block = get_block_at(pos, near);
+    Block *block = get_block_at(pos);
     if (block && block->get_blockid() == BlockID::air)
         block->set_blockid(id);
 }
@@ -343,7 +341,7 @@ void update_block_at(const Vec3i &pos)
         }
         if (prop.m_fall)
         {
-            BlockID block_below = get_block_id_at(pos + Vec3i(0, -1, 0), BlockID::stone, chunk);
+            BlockID block_below = get_block_id_at(pos + Vec3i(0, -1, 0), BlockID::stone);
             if (block_below == BlockID::air || properties(block_below).m_fluid)
             {
                 add_entity(new EntityFallingBlock(*block, pos));
@@ -426,7 +424,7 @@ void Chunk::recalculate_height_map()
 void Chunk::recalculate_visibility(Block *block, Vec3i pos)
 {
     Block *neighbors[6];
-    get_neighbors(pos, neighbors, this);
+    get_neighbors(pos, neighbors);
     uint8_t visibility = 0x40;
     for (int i = 0; i < 6; i++)
     {
@@ -751,18 +749,13 @@ int Chunk::build_vbo(int index, bool transparent)
     return (0);
 }
 
-void get_neighbors(const Vec3i &pos, Block **neighbors, Chunk *near)
+void get_neighbors(const Vec3i &pos, Block **neighbors)
 {
-
-    if (((pos.x + 1) & 15) <= 1 || ((pos.z + 1) & 15) <= 1 || ((pos.y + 1) & 255) <= 1 || !near)
-        for (int x = 0; x < 6; x++)
-            neighbors[x] = get_block_at(pos + face_offsets[x], near);
-    else
-        for (int x = 0; x < 6; x++)
-            neighbors[x] = near->get_block(pos + face_offsets[x]);
+    for (int x = 0; x < 6; x++)
+        neighbors[x] = get_block_at(pos + face_offsets[x]);
 }
 
-Vec3f get_fluid_direction(Block *block, Vec3i pos, Chunk *chunk)
+Vec3f get_fluid_direction(Block *block, Vec3i pos)
 {
 
     uint8_t fluid_level = get_fluid_meta_level(block);

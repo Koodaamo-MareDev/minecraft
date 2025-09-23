@@ -606,7 +606,7 @@ inline bool raycast_precise(
     }
     return false;
 }
-inline void explode_raycast(Vec3f origin, Vec3f direction, float intensity, Chunk *near)
+inline void explode_raycast(Vec3f origin, Vec3f direction, float intensity)
 {
     // Avoids an infinite loop.
     if (direction.sqr_magnitude() < 0.001)
@@ -621,7 +621,7 @@ inline void explode_raycast(Vec3f origin, Vec3f direction, float intensity, Chun
     while (true)
     {
         Vec3i block_pos = Vec3i(int(pos.x), int(pos.y), int(pos.z));
-        Block *block = get_block_at(block_pos, near);
+        Block *block = get_block_at(block_pos);
         if (block)
         {
             if (block->get_blockid() != BlockID::air)
@@ -650,10 +650,10 @@ inline void explode_raycast(Vec3f origin, Vec3f direction, float intensity, Chun
     }
 }
 
-inline void explode(Vec3f position, float power, Chunk *near)
+inline void explode(Vec3f position, float power)
 {
     Vec3f dir;
-    Block *center_block = get_block_at(Vec3i(int(position.x), int(position.y), int(position.z)), near);
+    Block *center_block = get_block_at(Vec3i(int(position.x), int(position.y), int(position.z)));
     power -= (properties(center_block->id).m_blast_resistance + 0.3) * 0.3;
     if (power <= 0)
         return;
@@ -668,11 +668,11 @@ inline void explode(Vec3f position, float power, Chunk *near)
             for (int y = -8; y <= 8; y += 16)
             {
                 dir = Vec3f(x, y, z);
-                explode_raycast(position, dir, power * (rng.nextFloat() * 0.6 + 0.7), near);
+                explode_raycast(position, dir, power * (rng.nextFloat() * 0.6 + 0.7));
                 dir = Vec3f(x, z, y);
-                explode_raycast(position, dir, power * (rng.nextFloat() * 0.6 + 0.7), near);
+                explode_raycast(position, dir, power * (rng.nextFloat() * 0.6 + 0.7));
                 dir = Vec3f(y, z, x);
-                explode_raycast(position, dir, power * (rng.nextFloat() * 0.6 + 0.7), near);
+                explode_raycast(position, dir, power * (rng.nextFloat() * 0.6 + 0.7));
             }
         }
     }

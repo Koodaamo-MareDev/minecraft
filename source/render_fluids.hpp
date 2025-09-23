@@ -6,6 +6,6 @@
 
 class Chunk;
 class Block;
-int render_fluid(Chunk &chunk, Block *block, const Vec3i &pos);
+int render_fluid(Block *block, const Vec3i &pos);
 int render_section_fluids(Chunk &chunk, int index, bool transparent, int vertexCount);
 #endif

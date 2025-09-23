@@ -23,14 +23,14 @@ uint32_t get_default_texture_index(BlockID blockid);
 uint32_t get_face_texture_index(Block *block, int face);
 
 bool is_solid(BlockID block_id);
-void update_fluid(Block *block, Vec3i pos, Chunk *near = nullptr);
+void update_fluid(Block *block, Vec3i pos);
 void set_fluid_level(Block *block, uint8_t level);
 uint8_t get_fluid_meta_level(Block *block);
-uint8_t get_fluid_visual_level(Vec3i pos, BlockID block_id, Chunk *near = nullptr);
+uint8_t get_fluid_visual_level(Vec3i pos, BlockID block_id);
 
 bool is_fluid_overridable(BlockID id);
 float get_percent_air(int fluid_level);
-float get_fluid_height(Vec3i pos, BlockID block_type, Chunk *near = nullptr);
+float get_fluid_height(Vec3i pos, BlockID block_type);
 
 Sound get_step_sound(BlockID block_id);
 Sound get_mine_sound(BlockID block_id);

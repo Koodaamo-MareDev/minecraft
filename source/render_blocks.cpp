@@ -17,7 +17,7 @@ int render_section_blocks(Chunk &chunk, int index, bool transparent, int vertexC
             for (int _x = 0; _x < 16; _x++, block++)
             {
                 Vec3i blockpos = Vec3i(_x, _y, _z) + chunk_offset;
-                vertexCount += render_block(chunk, block, blockpos, transparent);
+                vertexCount += render_block(block, blockpos, transparent);
             }
         }
     }
@@ -27,7 +27,7 @@ int render_section_blocks(Chunk &chunk, int index, bool transparent, int vertexC
     return vertexCount;
 }
 
-int render_block(Chunk &chunk, Block *block, const Vec3i &pos, bool transparent)
+int render_block(Block *block, const Vec3i &pos, bool transparent)
 {
     if (!block->get_visibility() || properties(block->id).m_fluid || transparent != properties(block->id).m_transparent)
         return 0;
@@ -36,13 +36,13 @@ int render_block(Chunk &chunk, Block *block, const Vec3i &pos, bool transparent)
         switch (properties(block->id).m_render_type)
         {
         case RenderType::cross:
-            return render_cross(chunk, block, pos);
+            return render_cross(block, pos);
         case RenderType::special:
-            return render_special(chunk, block, pos);
+            return render_special(block, pos);
         case RenderType::flat_ground:
-            return render_flat_ground(chunk, block, pos);
+            return render_flat_ground(block, pos);
         case RenderType::slab:
-            return render_slab(chunk, block, pos);
+            return render_slab(block, pos);
         default:
             break;
         }
@@ -52,65 +52,65 @@ int render_block(Chunk &chunk, Block *block, const Vec3i &pos, bool transparent)
         switch (block->get_blockid())
         {
         case BlockID::chest:
-            return render_chest(chunk, block, pos);
+            return render_chest(block, pos);
         case BlockID::snow_layer:
-            return render_snow_layer(chunk, block, pos);
+            return render_snow_layer(block, pos);
         default:
             break;
         }
     }
     if (properties(block->id).m_render_type == RenderType::full_special)
     {
-        return render_cube_special(chunk, block, pos, transparent);
+        return render_cube_special(block, pos, transparent);
     }
-    return render_cube(chunk, block, pos, transparent);
+    return render_cube(block, pos, transparent);
 }
 
-int render_cube(Chunk &chunk, Block *block, const Vec3i &pos, bool transparent)
+int render_cube(Block *block, const Vec3i &pos, bool transparent)
 {
     int vertexCount = 0;
     for (uint8_t face = 0; face < 6; face++)
     {
         if (block->get_opacity(face))
-            vertexCount += render_face(pos, face, get_default_texture_index(block->get_blockid()), &chunk, block);
+            vertexCount += render_face(pos, face, get_default_texture_index(block->get_blockid()), block);
     }
     return vertexCount;
 }
 
-int render_inverted_cube(Chunk &chunk, Block *block, const Vec3i &pos, bool transparent)
+int render_inverted_cube(Block *block, const Vec3i &pos, bool transparent)
 {
     int vertexCount = 0;
     for (uint8_t face = 0; face < 6; face++)
     {
         if (block->get_opacity(face))
-            vertexCount += render_back_face(pos, face, get_default_texture_index(block->get_blockid()), &chunk, block);
+            vertexCount += render_back_face(pos, face, get_default_texture_index(block->get_blockid()), block);
     }
     return vertexCount;
 }
 
-int render_inverted_cube_special(Chunk &chunk, Block *block, const Vec3i &pos, bool transparent)
+int render_inverted_cube_special(Block *block, const Vec3i &pos, bool transparent)
 {
     int vertexCount = 0;
     for (uint8_t face = 0; face < 6; face++)
     {
         if (block->get_opacity(face))
-            vertexCount += render_back_face(pos, face, get_face_texture_index(block, face), &chunk, block);
+            vertexCount += render_back_face(pos, face, get_face_texture_index(block, face), block);
     }
     return vertexCount;
 }
 
-int render_cube_special(Chunk &chunk, Block *block, const Vec3i &pos, bool transparent)
+int render_cube_special(Block *block, const Vec3i &pos, bool transparent)
 {
     int vertexCount = 0;
     for (uint8_t face = 0; face < 6; face++)
     {
         if (block->get_opacity(face))
-            vertexCount += render_face(pos, face, get_face_texture_index(block, face), &chunk, block);
+            vertexCount += render_face(pos, face, get_face_texture_index(block, face), block);
     }
     return vertexCount;
 }
 
-int render_special(Chunk &chunk, Block *block, const Vec3i &pos)
+int render_special(Block *block, const Vec3i &pos)
 {
     switch (block->get_blockid())
     {
@@ -118,20 +118,20 @@ int render_special(Chunk &chunk, Block *block, const Vec3i &pos)
     case BlockID::unlit_redstone_torch:
     case BlockID::redstone_torch:
     case BlockID::lever:
-        return render_torch(chunk, block, pos);
+        return render_torch(block, pos);
     case BlockID::wooden_door:
     case BlockID::iron_door:
-        return render_door(chunk, block, pos);
+        return render_door(block, pos);
     case BlockID::cactus:
-        return render_cactus(chunk, block, pos);
+        return render_cactus(block, pos);
     case BlockID::leaves:
-        return render_leaves(chunk, block, pos);
+        return render_leaves(block, pos);
     default:
         return 0;
     }
 }
 
-int render_flat_ground(Chunk &chunk, Block *block, const Vec3i &pos)
+int render_flat_ground(Block *block, const Vec3i &pos)
 {
     uint8_t lighting = block->light;
     Vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
@@ -144,7 +144,7 @@ int render_flat_ground(Chunk &chunk, Block *block, const Vec3i &pos)
     return 4;
 }
 
-int render_snow_layer(Chunk &chunk, Block *block, const Vec3i &pos)
+int render_snow_layer(Block *block, const Vec3i &pos)
 {
     Vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
     Vec3f vertex_pos(local_pos.x, local_pos.y, local_pos.z);
@@ -152,12 +152,12 @@ int render_snow_layer(Chunk &chunk, Block *block, const Vec3i &pos)
     int vertexCount = 4;
 
     // Top
-    render_face(pos, FACE_PY, texture_index, &chunk, block, 0, 2);
+    render_face(pos, FACE_PY, texture_index, block, 0, 2);
 
     BlockID neighbor_ids[6];
     {
         Block *neighbors[6];
-        get_neighbors(pos, neighbors, &chunk);
+        get_neighbors(pos, neighbors);
         for (int i = 0; i < 6; i++)
         {
             neighbor_ids[i] = neighbors[i] ? neighbors[i]->get_blockid() : BlockID::air;
@@ -167,42 +167,42 @@ int render_snow_layer(Chunk &chunk, Block *block, const Vec3i &pos)
     if (block->get_opacity(FACE_NX) && neighbor_ids[FACE_NX] != BlockID::snow_layer)
     {
         // Negative X
-        render_face(pos, FACE_NX, texture_index, &chunk, block, 0, 2);
+        render_face(pos, FACE_NX, texture_index, block, 0, 2);
         vertexCount += 4;
     }
     if (block->get_opacity(FACE_PX) && neighbor_ids[FACE_PX] != BlockID::snow_layer)
     {
         // Positive X
-        render_face(pos, FACE_PX, texture_index, &chunk, block, 0, 2);
+        render_face(pos, FACE_PX, texture_index, block, 0, 2);
         vertexCount += 4;
     }
     if (block->get_opacity(FACE_NZ) && neighbor_ids[FACE_NZ] != BlockID::snow_layer)
     {
         // Negative Z
-        render_face(pos, FACE_NZ, texture_index, &chunk, block, 0, 2);
+        render_face(pos, FACE_NZ, texture_index, block, 0, 2);
         vertexCount += 4;
     }
     if (block->get_opacity(FACE_PZ) && neighbor_ids[FACE_PZ] != BlockID::snow_layer)
     {
         // Positive Z
-        render_face(pos, FACE_PZ, texture_index, &chunk, block, 0, 2);
+        render_face(pos, FACE_PZ, texture_index, block, 0, 2);
         vertexCount += 4;
     }
     return vertexCount;
 }
 
-int render_chest(Chunk &chunk, Block *block, const Vec3i &pos)
+int render_chest(Block *block, const Vec3i &pos)
 {
     int vertexCount = 0;
     for (uint8_t face = 0; face < 6; face++)
     {
         if (block->get_opacity(face))
-            vertexCount += render_face(pos, face, get_chest_texture_index(chunk, block, pos, face), &chunk, block);
+            vertexCount += render_face(pos, face, get_chest_texture_index(block, pos, face), block);
     }
     return vertexCount;
 }
 
-int render_torch(Chunk &chunk, Block *block, const Vec3i &pos)
+int render_torch(Block *block, const Vec3i &pos)
 {
     Vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
     Vec3f vertex_pos(local_pos.x, local_pos.y + 0.1875, local_pos.z);
@@ -210,23 +210,23 @@ int render_torch(Chunk &chunk, Block *block, const Vec3i &pos)
     {
     case 1: // Facing east
         vertex_pos.x -= 0.125;
-        return render_torch_with_angle(chunk, block, vertex_pos, -0.4, 0);
+        return render_torch_with_angle( block, vertex_pos, -0.4, 0);
     case 2: // Facing west
         vertex_pos.x += 0.125;
-        return render_torch_with_angle(chunk, block, vertex_pos, 0.4, 0);
+        return render_torch_with_angle( block, vertex_pos, 0.4, 0);
     case 3: // Facing south
         vertex_pos.z -= 0.125;
-        return render_torch_with_angle(chunk, block, vertex_pos, 0, -0.4);
+        return render_torch_with_angle( block, vertex_pos, 0, -0.4);
     case 4: // Facing north
         vertex_pos.z += 0.125;
-        return render_torch_with_angle(chunk, block, vertex_pos, 0, 0.4);
+        return render_torch_with_angle( block, vertex_pos, 0, 0.4);
     default: // Facing up
         vertex_pos.y -= 0.1875;
-        return render_torch_with_angle(chunk, block, vertex_pos, 0, 0);
+        return render_torch_with_angle( block, vertex_pos, 0, 0);
     }
 }
 
-int render_torch_with_angle(Chunk &chunk, Block *block, const Vec3f &vertex_pos, float ax, float az)
+int render_torch_with_angle(Block *block, const Vec3f &vertex_pos, float ax, float az)
 {
     uint8_t lighting = block->light;
     uint32_t texture_index = get_default_texture_index(block->get_blockid());
@@ -260,7 +260,7 @@ int render_torch_with_angle(Chunk &chunk, Block *block, const Vec3f &vertex_pos,
     return 20;
 }
 
-int render_door(Chunk &chunk, Block *block, const Vec3i &pos)
+int render_door(Block *block, const Vec3i &pos)
 {
     uint8_t lighting = block->light;
     Vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
@@ -385,7 +385,7 @@ int render_door(Chunk &chunk, Block *block, const Vec3i &pos)
     return 20;
 }
 
-int render_cactus(Chunk &chunk, Block *block, const Vec3i &pos)
+int render_cactus(Block *block, const Vec3i &pos)
 {
     uint8_t lighting = block->light;
     Vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
@@ -439,14 +439,14 @@ int render_cactus(Chunk &chunk, Block *block, const Vec3i &pos)
 
     return vertexCount;
 }
-int render_leaves(Chunk &chunk, Block *block, const Vec3i &pos)
+int render_leaves(Block *block, const Vec3i &pos)
 {
     int vertexCount = 0;
-    vertexCount += render_inverted_cube_special(chunk, block, pos, true);
-    vertexCount += render_cube_special(chunk, block, pos, true);
+    vertexCount += render_inverted_cube_special(block, pos, true);
+    vertexCount += render_cube_special(block, pos, true);
     return vertexCount;
 }
-int render_cross(Chunk &chunk, Block *block, const Vec3i &pos)
+int render_cross(Block *block, const Vec3i &pos)
 {
     uint8_t lighting = block->light;
     Vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
@@ -483,7 +483,7 @@ int render_cross(Chunk &chunk, Block *block, const Vec3i &pos)
     return 16;
 }
 
-int render_slab(Chunk &chunk, Block *block, const Vec3i &pos)
+int render_slab(Block *block, const Vec3i &pos)
 {
     Vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
     Vec3f vertex_pos(local_pos.x, local_pos.y, local_pos.z);
@@ -554,13 +554,13 @@ int render_slab(Chunk &chunk, Block *block, const Vec3i &pos)
                 face_texture_index = bottom_index;
             else if (i == FACE_PY)
                 face_texture_index = top_index;
-            vertexCount += render_face(pos, i, face_texture_index, &chunk, block, min_y, max_y);
+            vertexCount += render_face(pos, i, face_texture_index, block, min_y, max_y);
         }
     }
     return vertexCount;
 }
 
-int get_chest_texture_index(Chunk &chunk, Block *block, const Vec3i &pos, uint8_t face)
+int get_chest_texture_index(Block *block, const Vec3i &pos, uint8_t face)
 {
     // Check for texture overrides
     uint32_t texture_index = get_default_texture_index(block->get_blockid());
@@ -574,7 +574,7 @@ int get_chest_texture_index(Chunk &chunk, Block *block, const Vec3i &pos, uint8_
     Block *neighbors[4];
     {
         Block *tmp_neighbors[6];
-        get_neighbors(pos, tmp_neighbors, &chunk);
+        get_neighbors(pos, tmp_neighbors);
         neighbors[0] = tmp_neighbors[0];
         neighbors[1] = tmp_neighbors[1];
         neighbors[2] = tmp_neighbors[4];

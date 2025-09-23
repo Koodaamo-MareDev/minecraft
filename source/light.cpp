@@ -143,7 +143,7 @@ void LightEngine::update(const Coord &update)
             new_skylight = 0xF;
 
         Block *neighbors[6];
-        get_neighbors(Vec3i(current), neighbors, chunk);
+        get_neighbors(Vec3i(current), neighbors);
         int8_t opacity = get_block_opacity(block->get_blockid());
         if (opacity != 15)
         {

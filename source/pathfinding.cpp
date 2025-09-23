@@ -29,11 +29,11 @@ bool PathFinding::a_star_search(Vec3i start, Vec3i goal, std::deque<Vec3i> &path
         Vec3i{0, -1, 0},
         Vec3i{0, 1, 0},
     };
-    auto is_valid = [](Vec3i position, Chunk *chunk) -> bool
+    auto is_valid = [](Vec3i position) -> bool
     {
-        Block *block = get_block_at(position, nullptr);
-        Block *block_above = get_block_at(position + Vec3i(0, 1, 0), nullptr);
-        int y_below = checkbelow(position, nullptr);
+        Block *block = get_block_at(position);
+        Block *block_above = get_block_at(position + Vec3i(0, 1, 0));
+        int y_below = checkbelow(position);
         if (position.y - y_below >= 10)
             return false;
         return block && block_above &&
@@ -62,7 +62,7 @@ bool PathFinding::a_star_search(Vec3i start, Vec3i goal, std::deque<Vec3i> &path
             Vec3i next = current.pos + new_pos;
             if (!cost_so_far.count(next) || new_cost < cost_so_far[next])
             {
-                if (!is_valid(next, nullptr))
+                if (!is_valid(next))
                     continue;
                 Block *block = get_block_at(next - Vec3i(0, 1, 0));
                 bool next_in_air = !block || properties(block->id).m_collision == CollisionType::none;
@@ -98,9 +98,9 @@ Vec3f PathFinding::simple_pathfind(Vec3f start, Vec3f goal, std::deque<Vec3i> &p
 
     auto is_valid = [](Vec3i position) -> bool
     {
-        Block *block = get_block_at(position, nullptr);
-        Block *block_above = get_block_at(position + Vec3i(0, 1, 0), nullptr);
-        int y_below = checkbelow(position, nullptr);
+        Block *block = get_block_at(position);
+        Block *block_above = get_block_at(position + Vec3i(0, 1, 0));
+        int y_below = checkbelow(position);
         if (position.y - y_below >= 10)
             return false;
         return block && block_above &&

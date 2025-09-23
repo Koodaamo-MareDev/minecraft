@@ -109,9 +109,9 @@ void ChunkProviderOverworld::populate_chunk(Chunk *chunk)
     chunk->generation_stage = ChunkGenStage::done;
 }
 
-void ChunkProviderOverworld::plant_tree(Vec3i pos, int height, Chunk *chunk)
+void ChunkProviderOverworld::plant_tree(Vec3i pos, int height)
 {
-    Block *base_block = get_block_at(pos - Vec3i(0, 1, 0), chunk);
+    Block *base_block = get_block_at(pos - Vec3i(0, 1, 0));
     if (!base_block)
         return;
     BlockID base_id = base_block->get_blockid();
@@ -128,7 +128,7 @@ void ChunkProviderOverworld::plant_tree(Vec3i pos, int height, Chunk *chunk)
             for (int z = -2; z <= 2; z++)
             {
                 Vec3i leaves_pos = pos + Vec3i(x, y, z);
-                replace_air_at(leaves_pos, BlockID::leaves, chunk);
+                replace_air_at(leaves_pos, BlockID::leaves);
             }
     }
     // Place narrow part of leaves
@@ -142,20 +142,21 @@ void ChunkProviderOverworld::plant_tree(Vec3i pos, int height, Chunk *chunk)
                 // Place the leaves in a "+" pattern at the top.
                 if (y == height && (x | z) && std::abs(x) == std::abs(z))
                     continue;
-                replace_air_at(pos + leaves_off, BlockID::leaves, chunk);
+                replace_air_at(pos + leaves_off, BlockID::leaves);
             }
         }
     }
     // Place tree logs
     for (int y = 0; y < height; y++)
     {
-        set_block_at(pos, BlockID::wood, chunk);
+        set_block_at(pos, BlockID::wood);
         ++pos.y;
     }
 }
 
-void ChunkProviderOverworld::generate_trees(Vec3i pos, Chunk *chunk, javaport::Random &rng)
+void ChunkProviderOverworld::generate_trees(Vec3i pos, javaport::Random &rng)
 {
+    Chunk *chunk = get_chunk_from_pos(pos);
     constexpr size_t tree_count = 8;
     uint32_t tree_positions[tree_count];
     for (size_t i = 0; i < tree_count; i++)
@@ -176,13 +177,14 @@ void ChunkProviderOverworld::generate_trees(Vec3i pos, Chunk *chunk, javaport::R
         if (tree_pos.y >= 64)
         {
             int tree_height = (tree_value >> 28) & 3;
-            plant_tree(tree_pos, 3 + tree_height, chunk);
+            plant_tree(tree_pos, 3 + tree_height);
         }
     }
 }
 
-void ChunkProviderOverworld::generate_flowers(Vec3i pos, Chunk *chunk, javaport::Random &rng)
+void ChunkProviderOverworld::generate_flowers(Vec3i pos, javaport::Random &rng)
 {
+    Chunk *chunk = get_chunk_from_pos(pos);
     constexpr size_t flower_count = 16;
     uint32_t flower_positions[flower_count];
     for (size_t i = 0; i < flower_count; i++)
@@ -213,7 +215,7 @@ void ChunkProviderOverworld::generate_flowers(Vec3i pos, Chunk *chunk, javaport:
     }
 }
 
-void ChunkProviderOverworld::generate_vein(Vec3i pos, BlockID id, Chunk *chunk, javaport::Random &rng)
+void ChunkProviderOverworld::generate_vein(Vec3i pos, BlockID id, javaport::Random &rng)
 {
     for (int x = pos.x; x < pos.x + 2; x++)
     {
@@ -224,7 +226,7 @@ void ChunkProviderOverworld::generate_vein(Vec3i pos, BlockID id, Chunk *chunk, 
                 if (rng.nextInt(2) == 0)
                 {
                     Vec3i pos(x, y, z);
-                    Block *block = get_block_at(pos, chunk);
+                    Block *block = get_block_at(pos);
                     if (block && block->get_blockid() == BlockID::stone)
                     {
                         block->set_blockid(id);
@@ -235,7 +237,7 @@ void ChunkProviderOverworld::generate_vein(Vec3i pos, BlockID id, Chunk *chunk, 
     }
 }
 
-void ChunkProviderOverworld::generate_ore_type(Vec3i pos, BlockID id, int count, int max_height, Chunk *chunk, javaport::Random &rng)
+void ChunkProviderOverworld::generate_ore_type(Vec3i pos, BlockID id, int count, int max_height, javaport::Random &rng)
 {
     for (int i = 0; i < count; i++)
     {
@@ -245,39 +247,39 @@ void ChunkProviderOverworld::generate_ore_type(Vec3i pos, BlockID id, int count,
         Vec3i offset_pos(x + pos.x, y, z + pos.z);
         if (y > max_height)
             continue;
-        generate_vein(offset_pos, id, chunk, rng);
-        Block *block = get_block_at(offset_pos, chunk);
+        generate_vein(offset_pos, id, rng);
+        Block *block = get_block_at(offset_pos);
         x = rng.nextInt(3) - 1;
         y = rng.nextInt(3) - 1;
         z = rng.nextInt(3) - 1;
         if (block && block->get_blockid() == id && (x | y | z) != 0)
         {
             offset_pos = Vec3i(x + offset_pos.x, y + offset_pos.y, z + offset_pos.z);
-            generate_vein(offset_pos, id, chunk, rng);
+            generate_vein(offset_pos, id, rng);
         }
     }
 }
 
-void ChunkProviderOverworld::generate_ores(Vec3i pos, Chunk *chunk, javaport::Random &rng)
+void ChunkProviderOverworld::generate_ores(Vec3i pos, javaport::Random &rng)
 {
     int coal_count = rng.nextInt(8) + 16;
     int iron_count = rng.nextInt(4) + 8;
     int gold_count = rng.nextInt(4) + 8;
     int diamond_count = rng.nextInt(4) + 8;
 
-    generate_ore_type(pos, BlockID::coal_ore, coal_count, 80, chunk, rng);
-    generate_ore_type(pos, BlockID::iron_ore, iron_count, 56, chunk, rng);
-    generate_ore_type(pos, BlockID::gold_ore, gold_count, 32, chunk, rng);
-    generate_ore_type(pos, BlockID::diamond_ore, diamond_count, 12, chunk, rng);
+    generate_ore_type(pos, BlockID::coal_ore, coal_count, 80, rng);
+    generate_ore_type(pos, BlockID::iron_ore, iron_count, 56, rng);
+    generate_ore_type(pos, BlockID::gold_ore, gold_count, 32, rng);
+    generate_ore_type(pos, BlockID::diamond_ore, diamond_count, 12, rng);
 }
 
 void ChunkProviderOverworld::generate_features(Chunk *chunk)
 {
     javaport::Random rng(chunk->x * 0x4F9939F508L + chunk->z * 0x1F38D3E7L + current_world->seed);
     Vec3i block_pos(chunk->x * 16, 0, chunk->z * 16);
-    generate_ores(block_pos, chunk, rng);
-    generate_trees(block_pos, chunk, rng);
-    generate_flowers(block_pos, chunk, rng);
+    generate_ores(block_pos, rng);
+    generate_trees(block_pos, rng);
+    generate_flowers(block_pos, rng);
     if (rng.nextInt(4) == 0)
     {
         javaport::WorldGenLakes lake_gen(BlockID::water);

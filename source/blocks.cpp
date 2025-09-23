@@ -245,7 +245,7 @@ BlockID fluid_collision_result(BlockID original, BlockID target)
     return BlockID::air;
 }
 
-void update_fluid(Block *block, Vec3i pos, Chunk *near)
+void update_fluid(Block *block, Vec3i pos)
 {
     if (!(block->meta & FLUID_UPDATE_REQUIRED_FLAG))
         return;
@@ -257,12 +257,12 @@ void update_fluid(Block *block, Vec3i pos, Chunk *near)
     uint8_t old_level = get_fluid_meta_level(block);
     uint8_t level = 0;
     // All directions except +Y because of gravity.
-    Block *nx = get_block_at(pos + face_offsets[FACE_NX], near);
-    Block *px = get_block_at(pos + face_offsets[FACE_PX], near);
-    Block *ny = get_block_at(pos + face_offsets[FACE_NY], near);
-    Block *py = get_block_at(pos + face_offsets[FACE_PY], near);
-    Block *nz = get_block_at(pos + face_offsets[FACE_NZ], near);
-    Block *pz = get_block_at(pos + face_offsets[FACE_PZ], near);
+    Block *nx = get_block_at(pos + face_offsets[FACE_NX]);
+    Block *px = get_block_at(pos + face_offsets[FACE_PX]);
+    Block *ny = get_block_at(pos + face_offsets[FACE_NY]);
+    Block *py = get_block_at(pos + face_offsets[FACE_PY]);
+    Block *nz = get_block_at(pos + face_offsets[FACE_NZ]);
+    Block *pz = get_block_at(pos + face_offsets[FACE_PZ]);
     Block *surroundings[6] = {ny, nx, px, nz, pz, py};
     int surrounding_dirs[6] = {FACE_NY, FACE_NX, FACE_PX, FACE_NZ, FACE_PZ, FACE_PY};
 
@@ -331,12 +331,12 @@ void update_fluid(Block *block, Vec3i pos, Chunk *near)
             for (int j = 1; j <= max_fluid_level * 3 / 4; j++)
             {
                 Vec3i other_pos = pos + (j * offset);
-                BlockID other_id = get_block_id_at(other_pos, BlockID::stone, near);
+                BlockID other_id = get_block_id_at(other_pos, BlockID::stone);
                 if (other_id != BlockID::air)
                     break;
 
                 other_pos = other_pos + Vec3i(0, -1, 0);
-                other_id = get_block_id_at(other_pos, BlockID::air, near);
+                other_id = get_block_id_at(other_pos, BlockID::air);
                 if (is_same_fluid(other_id, block_id) || is_fluid_overridable(other_id))
                 {
                     flow_weights[i] = j;
@@ -463,7 +463,7 @@ float get_percent_air(int fluid_level)
 // All I did was make it human readable and
 // converted it into suitable C++ code.
 // - Marcus
-float get_fluid_height(Vec3i pos, BlockID block_type, Chunk *near)
+float get_fluid_height(Vec3i pos, BlockID block_type)
 {
     int block_x = pos.x, block_y = pos.y, block_z = pos.z;
     int surrounding_water = 0;
@@ -473,12 +473,12 @@ float get_fluid_height(Vec3i pos, BlockID block_type, Chunk *near)
     {
         int check_x = block_x - (i & 1);
         int check_z = block_z - (i >> 1 & 1);
-        if (is_same_fluid(get_block_id_at(Vec3i(check_x, block_y + 1, check_z), BlockID::air, near), block_type))
+        if (is_same_fluid(get_block_id_at(Vec3i(check_x, block_y + 1, check_z), BlockID::air), block_type))
         {
             return 1.0F;
         }
 
-        BlockID check_block_type = get_block_id_at(Vec3i(check_x, block_y, check_z), BlockID::air, near);
+        BlockID check_block_type = get_block_id_at(Vec3i(check_x, block_y, check_z), BlockID::air);
         if (!is_same_fluid(check_block_type, block_type))
         {
             if (!is_solid(check_block_type))
@@ -489,7 +489,7 @@ float get_fluid_height(Vec3i pos, BlockID block_type, Chunk *near)
         }
         else
         {
-            int fluid_level = get_fluid_meta_level(get_block_at(Vec3i(check_x, block_y, check_z), near));
+            int fluid_level = get_fluid_meta_level(get_block_at(Vec3i(check_x, block_y, check_z)));
             if (fluid_level >= 8 || fluid_level == 0)
             {
                 water_percentage += get_percent_air(fluid_level) * 10.0F;
@@ -515,9 +515,9 @@ uint8_t get_fluid_meta_level(Block *block)
     return 8;
 }
 
-uint8_t get_fluid_visual_level(Vec3i pos, BlockID block_id, Chunk *near)
+uint8_t get_fluid_visual_level(Vec3i pos, BlockID block_id)
 {
-    return FLOAT_TO_FLUIDMETA(get_fluid_height(pos, block_id, near));
+    return FLOAT_TO_FLUIDMETA(get_fluid_height(pos, block_id));
 }
 bool is_fluid_overridable(BlockID id)
 {

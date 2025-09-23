@@ -132,13 +132,13 @@ void use_texture(GXTexObj &texture)
     GX_LoadTexObj(&texture, GX_TEXMAP0);
 }
 
-void smooth_light(const Vec3i &pos, uint8_t face_index, const Vec3i &vertex_off, Chunk *near, Block *block, uint8_t &lighting, uint8_t &amb_occ)
+void smooth_light(const Vec3i &pos, uint8_t face_index, const Vec3i &vertex_off, Block *block, uint8_t &lighting, uint8_t &amb_occ)
 {
     if (pos.y < 0 || pos.y > 255)
         return;
     Vec3i face = pos + face_offsets[face_index];
     uint8_t total = 1;
-    Block *face_block = get_block_at(face, near);
+    Block *face_block = get_block_at(face);
     if (!face_block)
         face_block = block;
     uint8_t block_light = face_block->block_light;
@@ -174,8 +174,8 @@ void smooth_light(const Vec3i &pos, uint8_t face_index, const Vec3i &vertex_off,
     default:
         break;
     }
-    Block *blockA = get_block_at(face + vertex_offA, near);
-    Block *blockB = get_block_at(face + vertex_offB, near);
+    Block *blockA = get_block_at(face + vertex_offA);
+    Block *blockB = get_block_at(face + vertex_offB);
     if (blockA)
     {
         if (properties(blockA->id).m_opacity == 15)
@@ -202,7 +202,7 @@ void smooth_light(const Vec3i &pos, uint8_t face_index, const Vec3i &vertex_off,
             sky_light += blockB->sky_light;
         }
     }
-    Block *blockC = get_block_at(face + vertex_off, near);
+    Block *blockC = get_block_at(face + vertex_off);
     if (blockC)
     {
         if (properties(blockC->id).m_opacity == 15)
@@ -364,18 +364,18 @@ Vec3i vertical_add(const Vec3i &a, uint8_t b)
     return Vec3i(a.x * 16, a.y - 17 + b * 2, a.z * 16);
 }
 
-void get_face(Vec3i pos, uint8_t face, uint32_t texture_index, Chunk *near, Block *block, uint8_t min_y, uint8_t max_y, Vertex16 *out_vertices, uint8_t *out_lighting, uint8_t *out_ao)
+void get_face(Vec3i pos, uint8_t face, uint32_t texture_index, Block *block, uint8_t min_y, uint8_t max_y, Vertex16 *out_vertices, uint8_t *out_lighting, uint8_t *out_ao)
 {
     Vec3i vertex_pos((pos.x & 0xF) << BASE3D_POS_FRAC_BITS, (pos.y & 0xF) << BASE3D_POS_FRAC_BITS, (pos.z & 0xF) << BASE3D_POS_FRAC_BITS);
     if (!block)
-        block = get_block_at(pos, near);
-    uint8_t light_val = get_face_light_index(pos, face, near, block);
+        block = get_block_at(pos);
+    uint8_t light_val = get_face_light_index(pos, face, block);
     uint8_t ao[4] = {0, 0, 0, 0};
     uint8_t ao_no_op[4] = {0, 0, 0, 0};
     uint8_t lighting[4] = {light_val, light_val, light_val, light_val};
     Vertex16 vertices[4];
     uint8_t index = 0;
-#define SMOOTH(ao_tgt) smooth_light(pos, face, cube_vertex_offsets[face][index], near, block, lighting[index], ao_tgt[index])
+#define SMOOTH(ao_tgt) smooth_light(pos, face, cube_vertex_offsets[face][index], block, lighting[index], ao_tgt[index])
     if ((face & ~1) != FACE_NY)
     {
         // Side faces
@@ -457,7 +457,7 @@ void get_face(Vec3i pos, uint8_t face, uint32_t texture_index, Chunk *near, Bloc
     }
 }
 
-int render_face(Vec3i pos, uint8_t face, uint32_t texture_index, Chunk *near, Block *block, uint8_t min_y, uint8_t max_y)
+int render_face(Vec3i pos, uint8_t face, uint32_t texture_index, Block *block, uint8_t min_y, uint8_t max_y)
 {
     if (!base3d_is_drawing || face >= 6)
     {
@@ -471,7 +471,7 @@ int render_face(Vec3i pos, uint8_t face, uint32_t texture_index, Chunk *near, Bl
     uint8_t lighting[4] = {0, 0, 0, 0};
     Vertex16 vertices[4];
     uint8_t index = 0;
-    get_face(pos, face, texture_index, near, block, min_y, max_y, vertices, lighting, ao);
+    get_face(pos, face, texture_index, block, min_y, max_y, vertices, lighting, ao);
     if (texture_index >= 240 && texture_index < 250)
     {
         // Force full brightness for breaking block override
@@ -492,7 +492,7 @@ int render_face(Vec3i pos, uint8_t face, uint32_t texture_index, Chunk *near, Bl
     return 4;
 }
 
-int render_back_face(Vec3i pos, uint8_t face, uint32_t texture_index, Chunk *near, Block *block, uint8_t min_y, uint8_t max_y)
+int render_back_face(Vec3i pos, uint8_t face, uint32_t texture_index, Block *block, uint8_t min_y, uint8_t max_y)
 {
     if (!base3d_is_drawing || face >= 6)
     {
@@ -506,7 +506,7 @@ int render_back_face(Vec3i pos, uint8_t face, uint32_t texture_index, Chunk *nea
     uint8_t lighting[4] = {0, 0, 0, 0};
     Vertex16 vertices[4];
     uint8_t index = 0;
-    get_face(pos, face, texture_index, near, block, min_y, max_y, vertices, lighting, ao);
+    get_face(pos, face, texture_index, block, min_y, max_y, vertices, lighting, ao);
     if (texture_index >= 240 && texture_index < 250)
     {
         // Force full brightness for breaking block override
@@ -530,18 +530,14 @@ int render_back_face(Vec3i pos, uint8_t face, uint32_t texture_index, Chunk *nea
 
 void render_single_block(Block &selected_block, bool transparency)
 {
-    std::deque<Chunk *> &chunks = get_chunks();
-    if (chunks.size() == 0)
-        return;
-
     // Precalculate the vertex count. Set position to Y = -16 to render "outside the world"
-    int vertexCount = render_block(*chunks[0], &selected_block, Vec3i(0, -16, 0), transparency);
+    int vertexCount = render_block(&selected_block, Vec3i(0, -16, 0), transparency);
 
     // Start drawing the block
     GX_BeginGroup(GX_QUADS, vertexCount);
 
     // Render the block. Set position to Y = -16 to render "outside the world"
-    render_block(*chunks[0], &selected_block, Vec3i(0, -16, 0), transparency);
+    render_block(&selected_block, Vec3i(0, -16, 0), transparency);
 
     // End the group
     GX_EndGroup();
@@ -553,13 +549,13 @@ void render_single_block_at(Block &selected_block, Vec3i pos, bool transparency)
     if (!chunk)
         return;
     // Precalculate the vertex count. Set position to Y = -16 to render "outside the world"
-    int vertexCount = render_block(*chunk, &selected_block, pos, transparency);
+    int vertexCount = render_block(&selected_block, pos, transparency);
 
     // Start drawing the block
     GX_BeginGroup(GX_QUADS, vertexCount);
 
     // Render the block. Set position to Y = -16 to render "outside the world"
-    render_block(*chunk, &selected_block, pos, transparency);
+    render_block(&selected_block, pos, transparency);
 
     // End the group
     GX_EndGroup();

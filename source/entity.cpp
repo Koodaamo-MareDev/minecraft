@@ -107,7 +107,7 @@ void EntityPhysical::tick()
             for (int z = min.z; z < max.z; z++)
             {
                 Vec3i block_pos = Vec3i(x, y, z);
-                Block *block = get_block_at(block_pos, chunk);
+                Block *block = get_block_at(block_pos);
                 if (!block)
                     continue;
                 if (!block->intersects(fluid_aabb, block_pos))
@@ -116,7 +116,7 @@ void EntityPhysical::tick()
                     cobweb_movement = true;
                 if (!is_fluid(block->get_blockid()))
                     continue;
-                if (y + 1 - get_fluid_height(block_pos, block->get_blockid(), chunk) >= max.y)
+                if (y + 1 - get_fluid_height(block_pos, block->get_blockid()) >= max.y)
                     continue;
                 fluid_velocity = fluid_velocity + get_fluid_direction(block, block_pos);
                 BlockID base_fluid = basefluid(block->get_blockid());
@@ -224,7 +224,7 @@ void EntityPhysical::tick()
     }
     else
     {
-        BlockID block_at_feet = get_block_id_at(Vec3i(std::floor(position.x), std::floor(aabb.min.y) - 1, std::floor(position.z)), BlockID::air, chunk);
+        BlockID block_at_feet = get_block_id_at(Vec3i(std::floor(position.x), std::floor(aabb.min.y) - 1, std::floor(position.z)), BlockID::air);
         vfloat_t h_friction = 0.91;
         if (on_ground)
         {
@@ -372,7 +372,7 @@ std::vector<AABB> EntityPhysical::get_colliding_aabbs(const AABB &aabb)
             for (int z = min.z; z < max.z; z++)
             {
                 Vec3i block_pos = Vec3i(x, y, z);
-                Block *block = get_block_at(block_pos, chunk);
+                Block *block = get_block_at(block_pos);
                 if (!block)
                     continue;
                 if (properties(block->id).m_collision == CollisionType::solid)
@@ -400,7 +400,7 @@ bool EntityPhysical::is_colliding_fluid(const AABB &aabb)
             for (int z = min.z; z < max.z; z++)
             {
                 Vec3i block_pos = Vec3i(x, y, z);
-                Block *block = get_block_at(block_pos, chunk);
+                Block *block = get_block_at(block_pos);
                 if (block && properties(block->id).m_collision == CollisionType::fluid && block->intersects(aabb, block_pos))
                     return true;
             }
@@ -478,7 +478,7 @@ void EntityFallingBlock::tick()
     if (on_ground)
     {
         Vec3i int_pos = get_foot_blockpos();
-        Block *block = get_block_at(int_pos, chunk);
+        Block *block = get_block_at(int_pos);
         if (block && block->get_blockid() == BlockID::air)
         {
             // Update the block
@@ -735,7 +735,7 @@ void EntityCreeper::render(float partial_ticks, bool transparency)
     Vec3f entity_rotation = get_rotation(partial_ticks);
 
     Vec3i block_pos = entity_position.round();
-    Block *block = get_block_at(block_pos, chunk);
+    Block *block = get_block_at(block_pos);
     if (block && !properties(block->id).m_solid)
     {
         light_level = block->light;
@@ -856,7 +856,7 @@ void EntityItem::render(float partial_ticks, bool transparency)
     }
 
     Vec3i block_pos = entity_position.round();
-    Block *light_block = get_block_at(block_pos, chunk);
+    Block *light_block = get_block_at(block_pos);
     if (light_block && !properties(light_block->id).m_solid)
     {
         light_level = light_block->light;
@@ -994,7 +994,7 @@ void EntityExplosive::tick()
 void EntityExplosive::explode()
 {
     dead = true;
-    current_world->create_explosion(position + Vec3i(0, y_offset - y_size, 0), power, chunk);
+    current_world->create_explosion(position + Vec3i(0, y_offset - y_size, 0), power);
 }
 
 void EntityLiving::fall(vfloat_t distance)
@@ -1008,9 +1008,9 @@ void EntityLiving::fall(vfloat_t distance)
 
         Vec3f feet_pos(position.x, aabb.min.y - 0.5, position.z);
         Vec3i feet_block_pos = Vec3i(std::floor(feet_pos.x), std::floor(feet_pos.y), std::floor(feet_pos.z));
-        BlockID block_at_feet = get_block_id_at(feet_block_pos, BlockID::air, chunk);
+        BlockID block_at_feet = get_block_id_at(feet_block_pos, BlockID::air);
         feet_block_pos.y--;
-        BlockID block_below_feet = get_block_id_at(feet_block_pos, BlockID::air, chunk);
+        BlockID block_below_feet = get_block_id_at(feet_block_pos, BlockID::air);
         if (block_below_feet != BlockID::air)
         {
             Sound sound = get_step_sound(block_at_feet);
@@ -1060,9 +1060,9 @@ void EntityLiving::tick()
         {
             Vec3f feet_pos(position.x, aabb.min.y - 0.5, position.z);
             Vec3i feet_block_pos = Vec3i(std::floor(feet_pos.x), std::floor(feet_pos.y), std::floor(feet_pos.z));
-            BlockID block_at_feet = get_block_id_at(feet_block_pos, BlockID::air, chunk);
+            BlockID block_at_feet = get_block_id_at(feet_block_pos, BlockID::air);
             feet_block_pos.y--;
-            BlockID block_below_feet = get_block_id_at(feet_block_pos, BlockID::air, chunk);
+            BlockID block_below_feet = get_block_id_at(feet_block_pos, BlockID::air);
             if (block_below_feet != BlockID::air)
             {
                 if (!properties(block_at_feet).m_fluid)
@@ -1089,7 +1089,7 @@ void EntityLiving::render(float partial_ticks, bool transparency)
     Vec3f entity_position = get_position(partial_ticks);
     Vec3f entity_rotation = get_rotation(partial_ticks);
     Vec3i block_pos = entity_position.round();
-    Block *block = get_block_at(block_pos, nullptr);
+    Block *block = get_block_at(block_pos);
     if (block && !properties(block->id).m_solid)
     {
         light_level = block->light;

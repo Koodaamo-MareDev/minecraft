@@ -38,14 +38,14 @@ public:
     virtual void populate_chunk(Chunk *chunk);
 
 protected: 
-    void plant_tree(Vec3i pos, int height, Chunk *chunk);
-    void generate_trees(Vec3i pos, Chunk *chunk, javaport::Random &rng);
+    void plant_tree(Vec3i pos, int height);
+    void generate_trees(Vec3i pos, javaport::Random &rng);
     
-    void generate_flowers(Vec3i pos, Chunk *chunk, javaport::Random &rng);
+    void generate_flowers(Vec3i pos, javaport::Random &rng);
     
-    void generate_vein(Vec3i pos, BlockID id, Chunk *chunk, javaport::Random &rng);
-    void generate_ore_type(Vec3i pos, BlockID id, int count, int max_height, Chunk *chunk, javaport::Random &rng);
-    void generate_ores(Vec3i pos, Chunk *chunk, javaport::Random &rng);
+    void generate_vein(Vec3i pos, BlockID id, javaport::Random &rng);
+    void generate_ore_type(Vec3i pos, BlockID id, int count, int max_height, javaport::Random &rng);
+    void generate_ores(Vec3i pos, javaport::Random &rng);
     
     void generate_features(Chunk *chunk);
 };
