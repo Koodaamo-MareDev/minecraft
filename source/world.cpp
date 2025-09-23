@@ -28,7 +28,8 @@ extern bool should_destroy_block;
 extern bool should_place_block;
 extern Gui *current_gui;
 
-World::World()
+World::World(std::string name)
+    : name(name)
 {
     namespace fs = std::filesystem;
 
@@ -39,9 +40,23 @@ World::World()
     LightEngine::init();
 }
 
+World::World()
+{
+    LightEngine::init();
+}
+
 World::~World()
 {
     LightEngine::deinit();
+
+    for (Chunk *chunk : get_chunks())
+    {
+        if (chunk)
+            remove_chunk(chunk);
+    }
+    cleanup_chunks();
+    mcr::cleanup();
+
     if (chunk_provider)
         delete chunk_provider;
     if (frustum)
@@ -67,7 +82,7 @@ void World::set_remote(bool value)
     }
 }
 
-void World::tick()
+bool World::tick()
 {
     if (client)
     {
@@ -79,15 +94,12 @@ void World::tick()
         {
             debug::print("Network error: %s\n", e.what());
 
-            // Go back to singleplayer
-            reset();
-            if (!load())
-                create();
-
             // Inform the user about the network error
             GuiDirtscreen *dirtscreen = new GuiDirtscreen;
             dirtscreen->set_text(std::string(e.what()));
             Gui::set_gui(dirtscreen);
+
+            return false;
         }
     }
     update_entities();
@@ -105,6 +117,27 @@ void World::tick()
     m_sound_system.update(angles_to_vector(0, get_camera().rot.y + 90), player.get_position(std::fmod(partial_ticks, 1)));
 
     current_world->last_entity_tick = current_world->ticks;
+
+    if (player.dead)
+    {
+        remove_entity(player.entity_id);
+
+        // Send player to spawn
+        player.teleport(spawn_pos);
+
+        // Reset the player's health
+        player.health = 20;
+
+        // Reset camera rotation
+        get_camera().rot = Vec3f(0, 0, 0);
+
+        // Reset player state
+        player.dead = false;
+
+        return false;
+    }
+
+    return true;
 }
 
 void World::update()
@@ -123,31 +156,6 @@ void World::update()
     }
     edit_blocks();
     m_particle_system.update(delta_time);
-
-    if (player.dead)
-    {
-        save();
-        reset();
-        if (!load())
-            create();
-
-        remove_entity(player.entity_id);
-
-        // Send player to spawn
-        player.teleport(spawn_pos);
-
-        // Reset the player's health
-        player.health = 20;
-
-        // Reset camera rotation
-        get_camera().rot = Vec3f(0, 0, 0);
-
-        // Reset player state
-        player.dead = false;
-
-        // Add the player back to the world
-        add_entity(&player);
-    }
 }
 
 void World::update_frustum(Camera &camera)
@@ -1193,6 +1201,7 @@ void World::save()
     // Save the world to disk if in singleplayer
     if (!is_remote())
     {
+        namespace fs = std::filesystem;
         try
         {
             for (Chunk *c : get_chunks())
@@ -1202,6 +1211,15 @@ void World::save()
         {
             printf("Failed to save chunk: %s\n", e.what());
         }
+
+        int64_t dir_size = 0;
+
+        for (auto &file : fs::recursive_directory_iterator(fs::current_path()))
+        {
+            if (file.is_regular_file())
+                dir_size += fs::file_size(file);
+        }
+
         NBTTagCompound level;
         NBTTagCompound *level_data = (NBTTagCompound *)level.setTag("Data", new NBTTagCompound());
         player.serialize((NBTTagCompound *)level_data->setTag("Player", new NBTTagCompound));
@@ -1214,6 +1232,7 @@ void World::save()
         level_data->setTag("LevelName", new NBTTagString("Wii World"));
         level_data->setTag("RandomSeed", new NBTTagLong(seed));
         level_data->setTag("version", new NBTTagInt(19132));
+        level_data->setTag("SizeOnDisk", new NBTTagLong(dir_size));
 
         std::ofstream file("level.dat", std::ios::binary);
         if (file.is_open())
@@ -1321,33 +1340,6 @@ void World::create()
 
     // Start the chunk manager using the chunk provider
     init_chunk_manager(chunk_provider);
-}
-
-void World::reset()
-{
-    // Stop the chunk manager
-    deinit_chunk_manager();
-
-    LightEngine::deinit();
-    loaded = false;
-    time_of_day = 0;
-    ticks = 0;
-    last_entity_tick = 0;
-    last_fluid_tick = 0;
-    hell = false;
-    set_remote(false);
-    player = EntityPlayerLocal(Vec3f(0, -999, 0));
-    for (Chunk *chunk : get_chunks())
-    {
-        if (chunk)
-            remove_chunk(chunk);
-    }
-    cleanup_chunks();
-    mcr::cleanup();
-
-    // Start the chunk manager without a chunk provider
-    LightEngine::init();
-    init_chunk_manager(nullptr);
 }
 
 void World::update_entities()

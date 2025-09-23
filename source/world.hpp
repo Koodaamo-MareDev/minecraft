@@ -69,13 +69,14 @@ public:
 
     std::string name = "world";
 
+    World(std::string name);
     World();
     ~World();
 
     bool is_remote();
     void set_remote(bool value);
 
-    void tick();
+    bool tick();
     void update();
     void update_frustum(Camera &camera);
     void update_chunks();

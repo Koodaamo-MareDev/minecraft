@@ -3,6 +3,7 @@
 
 #include "render_gui.hpp"
 #include "inventory.hpp"
+#include <functional>
 
 extern int cursor_x;
 extern int cursor_y;
@@ -89,6 +90,28 @@ public:
 
 protected:
     static Gui *current_gui;
+};
+
+class GuiButton
+{
+public:
+    int x = 0;
+    int y = 0;
+    int width = 0;
+    int height = 0;
+    std::string text;
+    bool enabled = true;
+
+    std::function<void()> on_click;
+    GuiButton(int x, int y, int width, int height, std::string text, std::function<void()> on_click) : x(x), y(y), width(width), height(height), text(text), on_click(on_click) {}
+    virtual ~GuiButton() = default;
+
+    void draw(bool selected);
+
+    bool contains(int mx, int my)
+    {
+        return mx >= x && mx < x + width && my >= y && my < y + height;
+    }
 };
 
 extern gertex::GXMatrix gui_block_matrix;

@@ -371,3 +371,36 @@ inventory::ItemStack GuiResultSlot::interact(inventory::ItemStack hand, bool rig
 
     return hand;
 }
+
+void GuiButton::draw(bool selected)
+{
+    GXColor text_color = {0xA0, 0xA0, 0xA0, 0xFF};
+    int v_offset = 46;
+    if (enabled)
+    {
+        v_offset += 20;
+        text_color = {0xFF, 0xFF, 0xFF, 0xFF};
+        if (selected)
+        {
+            v_offset += 20;
+            text_color = {0xFF, 0xFF, 0xA0, 0xFF};
+        }
+    }
+    int draw_width = std::min(width, 400) - 40;
+
+    // Draw the left edge
+    draw_textured_quad(gui_texture, x, y, draw_width / 2, height, 0, v_offset, draw_width / 4, v_offset + 20);
+
+    // Keep drawing the right edge until the button is fully drawn
+    for (int i = draw_width / 2; i < width; i += 200)
+    {
+        int section_width = std::min(200, width - i);
+        draw_textured_quad(gui_texture, x + i, y, section_width, height, 180 - (section_width / 2), v_offset, 180, v_offset + 20);
+    }
+    draw_textured_quad(gui_texture, x + width - 40, y, 40, height, 180, v_offset, 200, v_offset + 20);
+
+    Gui::draw_text_with_shadow(x + (width - Gui::text_width(text)) / 2, y + (height - 16) / 2, text, text_color);
+
+    // DEBUG: Resize the button based on sin(time)
+    // this->width = 300 + (std::sin(javaport::System::currentTimeMillis() / 250.0) + 1.0) * 100;
+}

@@ -16,6 +16,7 @@
 #include "inventory.hpp"
 #include "gui_survival.hpp"
 #include "gui_dirtscreen.hpp"
+#include "gui_titlescreen.hpp"
 #include "world.hpp"
 #include "util/input/keyboard_mouse.hpp"
 #include "util/input/wiimote_nunchuk.hpp"
@@ -55,7 +56,9 @@ void DrawGUI(gertex::GXView &viewport);
 void DrawHUD(gertex::GXView &viewport);
 void DrawDebugInfo(gertex::GXView &viewport);
 void UpdateCamera();
+void UpdateFog();
 void GetInput();
+void MainGameLoop(Configuration &config);
 //---------------------------------------------------------------------------------
 bool isExiting = false;
 s8 HWButton = -1;
@@ -117,11 +120,157 @@ void InitFailure(std::string message)
     }
 }
 
+void MainGameLoop(Configuration &config)
+{
+    if (!current_world)
+        return;
+
+    // Initialize rendering settings from config
+    bool mono_lighting = ((int)config.get("mono_lighting", 0) != 0);
+    bool vsync = ((int)config.get("vsync", 0) != 0);
+
+    // Generate a "unique" username based on the device ID
+    uint32_t dev_id = 0;
+    ES_GetDeviceID(&dev_id);
+
+    add_entity(&current_world->player);
+
+    current_world->seed = gettime();
+
+    // Use the username from the config or generate a default one
+    current_world->player.player_name = std::string(config.get<std::string>("username", "Wii_" + std::to_string(dev_id)));
+
+    // Setup the loading screen
+    GuiDirtscreen *dirtscreen = new GuiDirtscreen;
+    dirtscreen->set_text("Loading level\n\n\nBuilding terrain");
+    Gui::set_gui(dirtscreen);
+
+    // Fall back to local world if not connected to a server
+    if (!current_world->is_remote())
+    {
+        if (!current_world->load())
+        {
+            current_world->create();
+        }
+    }
+
+    uint32_t fb = 0;
+
+    bool in_game = true;
+
+    // Begin the main loop
+    while (!isExiting && in_game)
+    {
+        if (HWButton != -1)
+        {
+            GuiDirtscreen *dirtscreen = new GuiDirtscreen;
+            dirtscreen->set_text("Saving level...");
+            Gui::set_gui(dirtscreen);
+            isExiting = true;
+        }
+
+        uint64_t frame_start = time_get();
+
+        // Update the light map
+        if (!current_world->hell)
+        {
+            LightMapBlend(mono_lighting ? light_day_mono_rgba : light_day_rgba, mono_lighting ? light_night_mono_rgba : light_night_rgba, light_map, 255 - uint8_t(get_sky_multiplier() * 255));
+        }
+        GX_SetArray(GX_VA_CLR0, light_map, 4 * sizeof(u8));
+        GX_InvVtxCache();
+
+        GetInput();
+
+        for (uint32_t i = current_world->last_entity_tick, count = 0; i < current_world->ticks && count < 10; i++, count++)
+        {
+            update_textures();
+
+            if (!current_world->tick())
+            {
+                // If the world tick fails (e.g. due to an error), exit the main loop
+                in_game = false;
+                break;
+            }
+        }
+
+        UpdateCamera();
+
+        current_world->update();
+
+        UpdateLoadingStatus();
+
+        gertex::GXState state = gertex::get_state();
+        gertex::perspective(state.view);
+        // Draw the scene
+        if (current_world->loaded)
+        {
+            UpdateFog();
+
+            // Draw sky
+            if (current_world->player.in_fluid == BlockID::air && !current_world->hell)
+                draw_sky();
+
+            GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, BASE3D_POS_FRAC_BITS);
+            current_world->draw(get_camera());
+
+            use_texture(terrain_texture);
+            current_world->draw_selected_block();
+        }
+
+        gertex::ortho(state.view);
+        // Use 0 fractional bits for the position data, because we're drawing in pixel space.
+        GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, 0);
+
+        // Disable fog
+        gertex::use_fog(false);
+
+        // Enable direct colors
+        GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
+
+        // Draw GUI elements
+        GX_SetZMode(GX_TRUE, GX_ALWAYS, GX_TRUE);
+        gertex::set_blending(gertex::GXBlendMode::normal);
+        GX_SetAlphaUpdate(GX_TRUE);
+
+        HandleGUI(state.view);
+        GX_DrawDone();
+
+        GX_CopyDisp(frameBuffer[fb], GX_TRUE);
+#ifdef DEBUG
+        debug::copy_to(frameBuffer[fb]);
+#endif
+        VIDEO_SetNextFramebuffer(frameBuffer[fb]);
+        VIDEO_Flush();
+        if (vsync)
+            VIDEO_WaitVSync(); // Wait for vertical sync - if the frame lasts too long (which it often does) it will kill the frame rate
+        else
+            usleep(1000); // Give other tasks a chance to run - 1 ms seems sufficient
+
+        // Swap buffers
+        fb ^= 1;
+
+        // Update time counters
+
+        frameCounter++;
+        current_world->delta_time = time_diff_s(frame_start, time_get());
+
+        // Ensure that the delta time is not too large to prevent issues
+        if (current_world->delta_time > 0.05)
+            current_world->delta_time = 0.05;
+
+        current_world->partial_ticks += current_world->delta_time * 20.0;
+        current_world->time_of_day += int(current_world->partial_ticks);
+        current_world->time_of_day %= 24000;
+        current_world->ticks += int(current_world->partial_ticks);
+        current_world->partial_ticks -= int(current_world->partial_ticks);
+    }
+    remove_entity(current_world->player.entity_id);
+    current_world->save();
+    delete current_world;
+}
+
 int main(int argc, char **argv)
 {
-    u32 fb = 0;
-    GXColor background = GXColor{0, 0, 0, 0xFF};
-
     VIDEO_Init();
     WPAD_Init();
     rmode = VIDEO_GetPreferredMode(NULL);
@@ -172,8 +321,6 @@ int main(int argc, char **argv)
     cursor_y = state.view.height * state.view.aspect_correction / 2;
 
     // Initialize rendering settings
-    bool mono_lighting = ((int)config.get("mono_lighting", 0) != 0);
-    bool vsync = ((int)config.get("vsync", 0) != 0);
     f32 FOV = config.get<float>("fov", 90.0f);
 
     Camera &camera = get_camera();
@@ -187,196 +334,43 @@ int main(int argc, char **argv)
     input::add_device(new input::WiimoteNunchuk);
     input::add_device(new input::WiimoteClassic);
 
-    current_world = new World;
-
-    // Generate a "unique" username based on the device ID
-    uint32_t dev_id = 0;
-    ES_GetDeviceID(&dev_id);
-
-    EntityPlayerLocal &player_entity = current_world->player;
-
-    // Use the username from the config or generate a default one
-    player_entity.player_name = std::string(config.get<std::string>("username", "Wii_" + std::to_string(dev_id)));
-
-    // Add the player to the world - it should persist until the game is closed
-    add_entity(&player_entity);
-
-    current_world->reset();
-    current_world->seed = gettime();
-
     inventory::init_items();
     Gui::init_matrices(state.view.aspect_correction);
 
-    gertex::GXFog fog = gertex::GXFog{true, gertex::GXFogType::linear, state.view.near, state.view.far, state.view.near, state.view.far, background};
-
-    // Setup the loading screen
-    GuiDirtscreen *dirtscreen = new GuiDirtscreen;
-    dirtscreen->set_text("Loading level\n\n\nBuilding terrain");
-    Gui::set_gui(dirtscreen);
-
-    // Optionally join a server if the Configuration specifies one
-    std::string server_ip = config.get<std::string>("server", "");
-
-    if (!server_ip.empty() && Crapper::initNetwork())
-    {
-        int32_t server_port = config.get<int32_t>("port", 25565);
-
-        try
-        {
-            // Attempt to connect to the server
-            current_world->set_remote(true);
-            current_world->client->joinServer(server_ip, server_port);
-        }
-        catch (std::runtime_error &e)
-        {
-            // If connection fails, set the world to local
-            current_world->set_remote(false);
-            printf("Failed to connect to server: %s\n", e.what());
-        }
-    }
-
-    // Fall back to local world if not connected to a server
-    if (!current_world->is_remote())
-    {
-        if (!current_world->load())
-        {
-            current_world->create();
-        }
-    }
-
     while (!isExiting)
     {
-        u64 frame_start = time_get();
-        if (HWButton != -1)
+        int fb = 0;
+        current_world = nullptr;
+        Gui::set_gui(new GuiTitleScreen);
+        while (!isExiting && Gui::get_gui() && !current_world)
         {
-            GuiDirtscreen *dirtscreen = new GuiDirtscreen;
-            dirtscreen->set_text("Saving level...");
-            Gui::set_gui(dirtscreen);
-            isExiting = true;
-        }
+            GetInput();
+            HandleGUI(state.view);
+            GX_DrawDone();
 
-        background = get_sky_color();
-
-        Block *block = get_block_at(current_world->player.get_head_blockpos());
-        if (block)
-            fog_light_multiplier = lerpf(fog_light_multiplier, std::pow(0.9f, (15.0f - block->sky_light)), 0.05f);
-
-        fog_depth_multiplier = lerpf(fog_depth_multiplier, std::min(std::max(camera.position.y, 24.) / 36., 1.0), 0.05f);
-
-        float fog_multiplier = current_world->hell ? 0.5f : 1.0f;
-        if (current_world->player.in_fluid == BlockID::lava)
-        {
-            background = GXColor{0xFF, 0, 0, 0xFF};
-            fog_multiplier = 0.05f;
-        }
-        else if (current_world->player.in_fluid == BlockID::water)
-        {
-            background = GXColor{0, 0, 0xFF, 0xFF};
-            fog_multiplier = 0.6f;
-        }
-
-        // Apply the fog light multiplier
-        background = background * fog_light_multiplier;
-
-        // Set the background color
-        GX_SetCopyClear(background, 0x00FFFFFF);
-        fog.color = background;
-
-        GetInput();
-
-        for (uint32_t i = current_world->last_entity_tick, count = 0; i < current_world->ticks && count < 10; i++, count++)
-        {
-            update_textures();
-
-            current_world->tick();
-        }
-
-        UpdateCamera();
-
-        current_world->update();
-
-        UpdateLoadingStatus();
-
-        gertex::perspective(state.view);
-
-        // Update the indirect light map
-        if (!current_world->hell)
-        {
-            LightMapBlend(mono_lighting ? light_day_mono_rgba : light_day_rgba, mono_lighting ? light_night_mono_rgba : light_night_rgba, light_map, 255 - uint8_t(get_sky_multiplier() * 255));
-        }
-        GX_SetArray(GX_VA_CLR0, light_map, 4 * sizeof(u8));
-        GX_InvVtxCache();
-
-        // Set fog near and far distances
-        fog.start = fog_multiplier * fog_depth_multiplier * FOG_DISTANCE * 0.5f;
-        fog.end = fog.start * 2.0f;
-
-        // Enable fog
-        gertex::set_fog(fog);
-
-        // Draw the scene
-        if (current_world->loaded)
-        {
-            // Draw sky
-            if (current_world->player.in_fluid == BlockID::air && !current_world->hell)
-                draw_sky();
-
-            GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, BASE3D_POS_FRAC_BITS);
-            current_world->draw(camera);
-
-            use_texture(terrain_texture);
-            current_world->draw_selected_block();
-        }
-
-        gertex::ortho(state.view);
-        // Use 0 fractional bits for the position data, because we're drawing in pixel space.
-        GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, 0);
-
-        // Disable fog
-        gertex::use_fog(false);
-
-        // Enable direct colors
-        GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
-
-        // Draw GUI elements
-        GX_SetZMode(GX_TRUE, GX_ALWAYS, GX_TRUE);
-        gertex::set_blending(gertex::GXBlendMode::normal);
-        GX_SetAlphaUpdate(GX_TRUE);
-
-        HandleGUI(state.view);
-        GX_DrawDone();
-
-        GX_CopyDisp(frameBuffer[fb], GX_TRUE);
+            GX_CopyDisp(frameBuffer[fb], GX_TRUE);
 #ifdef DEBUG
-        debug::copy_to(frameBuffer[fb]);
+            debug::copy_to(frameBuffer[fb]);
 #endif
-        VIDEO_SetNextFramebuffer(frameBuffer[fb]);
-        VIDEO_Flush();
-        if (vsync)
-            VIDEO_WaitVSync(); // Wait for vertical sync - if the frame lasts too long (which it often does) it will kill the frame rate
-        else
-            usleep(1000); // Give other tasks a chance to run - 1 ms seems sufficient
-        frameCounter++;
-        current_world->delta_time = time_diff_s(frame_start, time_get());
+            VIDEO_SetNextFramebuffer(frameBuffer[fb]);
+            VIDEO_Flush();
+            VIDEO_WaitVSync();
 
-        // Ensure that the delta time is not too large to prevent issues
-        if (current_world->delta_time > 0.05)
-            current_world->delta_time = 0.05;
+            // Swap buffers
+            fb ^= 1;
+            if (HWButton != -1)
+            {
+                isExiting = true;
+            }
+        }
+        if (current_world)
+            MainGameLoop(config);
 
-        current_world->partial_ticks += current_world->delta_time * 20.0;
-        current_world->time_of_day += int(current_world->partial_ticks);
-        current_world->time_of_day %= 24000;
-        current_world->ticks += int(current_world->partial_ticks);
-        current_world->partial_ticks -= int(current_world->partial_ticks);
-
-        fb ^= 1;
+        isExiting |= !Gui::get_gui();
     }
-    current_world->save();
-    current_world->reset();
     Crapper::deinitNetwork();
     input::deinit();
     WPAD_Shutdown();
-    delete current_world;
     config.save();
     VIDEO_Flush();
     VIDEO_WaitVSync();
@@ -545,6 +539,21 @@ void GetInput()
 
 void HandleGUI(gertex::GXView &viewport)
 {
+    gertex::ortho(viewport);
+    // Use 0 fractional bits for the position data, because we're drawing in pixel space.
+    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, 0);
+
+    // Disable fog
+    gertex::use_fog(false);
+
+    // Enable direct colors
+    GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
+
+    // Draw GUI elements
+    GX_SetZMode(GX_TRUE, GX_ALWAYS, GX_TRUE);
+    gertex::set_blending(gertex::GXBlendMode::normal);
+    GX_SetAlphaUpdate(GX_TRUE);
+
     for (input::Device *dev : input::devices)
     {
         if (!dev->connected())
@@ -552,7 +561,7 @@ void HandleGUI(gertex::GXView &viewport)
 
         if ((dev->get_buttons_down() & input::BUTTON_INVENTORY) != 0)
         {
-            if (current_world->loaded)
+            if (current_world && current_world->loaded)
             {
                 if (Gui::get_gui())
                 {
@@ -565,7 +574,7 @@ void HandleGUI(gertex::GXView &viewport)
             }
         }
     }
-    if (current_world->loaded)
+    if (current_world && current_world->loaded)
     {
         // Draw the underwater overlay
         static Vec3f pan_underwater_texture(0, 0, 0);
@@ -594,8 +603,8 @@ void HandleGUI(gertex::GXView &viewport)
     }
     UpdateGUI(viewport);
     DrawGUI(viewport);
-
-    DrawDebugInfo(viewport);
+    if (current_world)
+        DrawDebugInfo(viewport);
 }
 
 GXColor fps_color(int fps)
@@ -650,7 +659,7 @@ void DrawDebugInfo(gertex::GXView &viewport)
     std::string memory_usage_str = "Chunk Memory Usage: ";
 
     // Get the current memory usage in bytes
-    size_t memory_usage = current_world->memory_usage;
+    size_t memory_usage = current_world ? current_world->memory_usage : 0;
     if (memory_usage > 1024 * 1024)
     {
         // Convert to megabytes
@@ -705,6 +714,48 @@ void UpdateCamera()
     }
 
     current_world->update_frustum(camera);
+}
+
+void UpdateFog()
+{
+    Camera &camera = get_camera();
+    GXColor background = GXColor{0, 0, 0, 0xFF};
+    gertex::GXState state = gertex::get_state();
+    gertex::GXFog fog = gertex::GXFog{true, gertex::GXFogType::linear, state.view.near, state.view.far, state.view.near, state.view.far, background};
+
+    background = get_sky_color();
+
+    Block *block = get_block_at(current_world->player.get_head_blockpos());
+    if (block)
+        fog_light_multiplier = lerpf(fog_light_multiplier, std::pow(0.9f, (15.0f - block->sky_light)), 0.05f);
+
+    fog_depth_multiplier = lerpf(fog_depth_multiplier, std::min(std::max(camera.position.y, 24.) / 36., 1.0), 0.05f);
+
+    float fog_multiplier = current_world->hell ? 0.5f : 1.0f;
+    if (current_world->player.in_fluid == BlockID::lava)
+    {
+        background = GXColor{0xFF, 0, 0, 0xFF};
+        fog_multiplier = 0.05f;
+    }
+    else if (current_world->player.in_fluid == BlockID::water)
+    {
+        background = GXColor{0, 0, 0xFF, 0xFF};
+        fog_multiplier = 0.6f;
+    }
+
+    // Apply the fog light multiplier
+    background = background * fog_light_multiplier;
+
+    // Set the background color
+    GX_SetCopyClear(background, 0x00FFFFFF);
+    fog.color = background;
+
+    // Set fog near and far distances
+    fog.start = fog_multiplier * fog_depth_multiplier * FOG_DISTANCE * 0.5f;
+    fog.end = fog.start * 2.0f;
+
+    // Enable fog
+    gertex::set_fog(fog);
 }
 
 void UpdateGUI(gertex::GXView &viewport)
