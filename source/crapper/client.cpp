@@ -491,12 +491,15 @@ namespace Crapper
             return;
         }
 
+        std::string player_name = remote_world->player.player_name;
+
         // Remove the old player entity
         remove_entity(remote_world->player.entity_id);
 
         // Create a new player entity
         remote_world->player = EntityPlayerLocal(Vec3f(0.5, -999, 0.5));
         remote_world->player.entity_id = entity_id;
+        remote_world->player.player_name = player_name;
         add_entity(&remote_world->player);
 
         if (!remote_world->loaded)
