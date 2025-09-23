@@ -831,10 +831,10 @@ void DrawHUD(gertex::GXView &viewport)
     GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
 
     // Draw the hotbar background
-    draw_textured_quad(icons_texture, (viewport.width - 364) / 2, corrected_height - 44, 364, 44, 56, 9, 238, 31);
+    draw_textured_quad(gui_texture, (viewport.width - 364) / 2, corrected_height - 44, 364, 44, 0, 0, 182, 22);
 
     // Draw the hotbar selection
-    draw_textured_quad(icons_texture, (viewport.width - 364) / 2 + current_world->player.selected_hotbar_slot * 40 - 2, corrected_height - 46, 48, 48, 56, 31, 80, 55);
+    draw_textured_quad(gui_texture, (viewport.width - 364) / 2 + current_world->player.selected_hotbar_slot * 40 - 2, corrected_height - 46, 48, 48, 0, 22, 24, 46);
     // Push the orthogonal position matrix onto the stack
     gertex::push_matrix();
 
