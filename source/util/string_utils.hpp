@@ -67,7 +67,15 @@ namespace str
         }
 
         std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> convert;
-        std::u32string u32_str = convert.from_bytes(utf8_str);
+        std::u32string u32_str;
+        try
+        {
+            u32_str = convert.from_bytes(utf8_str);
+        }
+        catch (const std::range_error &e)
+        {
+            return utf8_str; // Fallback to original string on error
+        }
         std::string eascii_str;
 
         for (char32_t ch : u32_str)
