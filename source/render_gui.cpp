@@ -233,3 +233,29 @@ int draw_simple_textured_quad(GXTexObj &texture, int32_t x, int32_t y, int32_t w
 {
     return draw_textured_quad(texture, x, y, w, h, 0, 0, GX_GetTexObjWidth(&texture), GX_GetTexObjHeight(&texture), scale);
 }
+
+char obfuscate_char(javaport::Random &rng, char original)
+{
+    uint8_t orig_width = font_tile_widths[static_cast<uint8_t>(original)];
+
+    // Find a random character with the same width
+    uint8_t attempt = rng.nextInt(122) + 33;
+    uint8_t total_attempts = 0;
+    while (font_tile_widths[attempt] != orig_width)
+    {
+        attempt = (attempt + 1) & 0xFF;
+        // Skip control characters and space
+        if (attempt < 33)
+            attempt = 33;
+        // Skip unsupported characters
+        if (attempt >= 155 && attempt <= 159)
+            attempt = 160;
+        // Wrap around to the start of the printable ASCII range
+        if (attempt > 165)
+            attempt = 33;
+        // Prevent infinite loop
+        if (++total_attempts == 255)
+            break;
+    }
+    return attempt;
+}

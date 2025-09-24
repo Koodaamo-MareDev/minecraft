@@ -121,28 +121,7 @@ void Gui::draw_text(int x, int y, std::string text, GXColor color)
         }
         if (obfuscated)
         {
-            uint8_t orig_width = font_tile_widths[c];
-
-            // Find a random character with the same width
-            uint8_t attempt = rng.nextInt(122) + 33;
-            uint8_t total_attempts = 0;
-            while (font_tile_widths[attempt] != orig_width)
-            {
-                attempt = (attempt + 1) & 0xFF;
-                // Skip control characters and space
-                if (attempt < 33)
-                    attempt = 33;
-                // Skip unsupported characters
-                if (attempt >= 155 && attempt <= 159)
-                    attempt = 160;
-                // Wrap around to the start of the printable ASCII range
-                if (attempt > 165)
-                    attempt = 33;
-                // Prevent infinite loop
-                if (++total_attempts == 255)
-                    break;
-            }
-            c = attempt;
+            c = obfuscate_char(rng, c);
         }
 
         uint16_t cx = uint16_t(c & 15) << 3;

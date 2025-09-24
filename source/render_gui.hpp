@@ -8,6 +8,7 @@
 #include "texturedefs.h"
 #include "render.hpp"
 #include "base3d.hpp"
+#include "ported/Random.hpp"
 #include <string>
 
 constexpr float GUI_DEFAULT_SCALE = 1.0f / BASE3D_POS_FRAC;
@@ -31,5 +32,7 @@ void draw_text_3d(Vec3f pos, std::string str, GXColor color);
 int fill_screen_texture(GXTexObj &texture, gertex::GXView &view, vfloat_t u1, vfloat_t v1, vfloat_t u2, vfloat_t v2, float scale = GUI_DEFAULT_SCALE);
 
 int draw_simple_textured_quad(GXTexObj &texture, int32_t x, int32_t y, int32_t w, int32_t h, float scale = GUI_DEFAULT_SCALE);
+
+char obfuscate_char(javaport::Random &rng, char original);
 
 #endif
