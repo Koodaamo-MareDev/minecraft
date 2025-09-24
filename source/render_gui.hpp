@@ -12,6 +12,10 @@
 
 constexpr float GUI_DEFAULT_SCALE = 1.0f / BASE3D_POS_FRAC;
 
+GXColor get_text_color(char c);
+
+GXColor get_text_color_at(int index);
+
 int draw_textured_quad(GXTexObj &texture, int32_t x, int32_t y, int32_t w, int32_t h, vfloat_t u1, vfloat_t v1, vfloat_t u2, vfloat_t v2, float scale = GUI_DEFAULT_SCALE);
 
 int draw_colored_quad(int32_t x, int32_t y, int32_t w, int32_t h, uint8_t r, uint8_t g, uint8_t b, uint8_t a, float scale = GUI_DEFAULT_SCALE);

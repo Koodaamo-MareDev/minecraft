@@ -58,8 +58,6 @@ public:
     static void init_matrices(float aspect_correction);
     static void fill_rect(int x, int y, int width, int height, GXColor color = {255, 255, 255, 255});
     static void draw_rect(int x, int y, int width, int height, int border_size, GXColor color = {255, 255, 255, 255});
-    static GXColor get_text_color(char c);
-    static GXColor get_text_color_at(int index);
     static int text_width(std::string str);
     static void draw_text(int x, int y, std::string str, GXColor color = {255, 255, 255, 255});
     static void draw_text_with_shadow(int x, int y, std::string str, GXColor color = {255, 255, 255, 255});

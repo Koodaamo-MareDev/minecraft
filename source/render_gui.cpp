@@ -1,6 +1,43 @@
 #include "render_gui.hpp"
 #include <math/vec2i.hpp>
 #include "font_tile_widths.hpp"
+static GXColor text_colors[16] = {
+    {0x00, 0x00, 0x00, 0xFF}, // Black
+    {0x00, 0x00, 0xAA, 0xFF}, // Dark Blue
+    {0x00, 0xAA, 0x00, 0xFF}, // Dark Green
+    {0x00, 0xAA, 0xAA, 0xFF}, // Dark Aqua
+    {0xAA, 0x00, 0x00, 0xFF}, // Dark Red
+    {0xAA, 0x00, 0xAA, 0xFF}, // Dark Purple
+    {0xFF, 0xAA, 0x00, 0xFF}, // Gold
+    {0xAA, 0xAA, 0xAA, 0xFF}, // Gray
+    {0x55, 0x55, 0x55, 0xFF}, // Dark Gray
+    {0x55, 0x55, 0xFF, 0xFF}, // Blue
+    {0x55, 0xFF, 0x55, 0xFF}, // Green
+    {0x55, 0xFF, 0xFF, 0xFF}, // Aqua
+    {0xFF, 0x55, 0x55, 0xFF}, // Red
+    {0xFF, 0x55, 0xFF, 0xFF}, // Light Purple
+    {0xFF, 0xFF, 0x55, 0xFF}, // Yellow
+    {0xFF, 0xFF, 0xFF, 0xFF}  // White
+};
+
+GXColor get_text_color(char c)
+{
+    if (c >= '0' && c <= '9')
+        return text_colors[c - '0'];
+    if (c >= 'a' && c <= 'f')
+        return text_colors[c - 'a' + 10];
+    if (c >= 'A' && c <= 'F')
+        return text_colors[c - 'A' + 10];
+    return text_colors[15]; // Default to white
+}
+
+GXColor get_text_color_at(int index)
+{
+    if (index < 0 || index >= 16)
+        return text_colors[15]; // Default to white
+    return text_colors[index];
+}
+
 int draw_textured_quad(GXTexObj &texture, int32_t x, int32_t y, int32_t w, int32_t h, vfloat_t u1, vfloat_t v1, vfloat_t u2, vfloat_t v2, float scale)
 {
     use_texture(texture);
