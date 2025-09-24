@@ -1,7 +1,6 @@
 #include "render_gui.hpp"
 #include <math/vec2i.hpp>
 #include "font_tile_widths.hpp"
-#include "util/crashfix.hpp"
 int draw_textured_quad(GXTexObj &texture, int32_t x, int32_t y, int32_t w, int32_t h, vfloat_t u1, vfloat_t v1, vfloat_t u2, vfloat_t v2, float scale)
 {
     use_texture(texture);
@@ -47,7 +46,6 @@ int draw_colored_sprite(GXTexObj &texture, Vec2i pos, Vec2i size, vfloat_t u1, v
 // NOTE: This function doesn't load the texture automatically because it's used by font rendering. Make sure to call use_texture before calling this function.
 int draw_colored_sprite_3d(GXTexObj &texture, Vec3f center, Vec3f size, Vec3f offset, Vec3f right, Vec3f up, vfloat_t u1, vfloat_t v1, vfloat_t u2, vfloat_t v2, GXColor color)
 {
-    NOP_FIX;
     uint8_t r = color.r;
     uint8_t g = color.g;
     uint8_t b = color.b;
@@ -73,7 +71,6 @@ int draw_colored_sprite_3d(GXTexObj &texture, Vec3f center, Vec3f size, Vec3f of
 
 vfloat_t text_width_3d(std::string str)
 {
-    NOP_FIX;
     vfloat_t width = 0;
     vfloat_t max_width = 0;
     for (size_t i = 0; i < str.size(); i++)
