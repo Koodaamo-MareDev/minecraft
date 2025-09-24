@@ -497,7 +497,6 @@ void World::calculate_visibility()
 
         auto visit = [&](Vec3i pos, int8_t through)
         {
-            NOP_FIX;
             // Don't revisit directions we have already visited
             if (node.dirs[through ^ 1])
                 return;
