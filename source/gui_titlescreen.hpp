@@ -7,6 +7,8 @@
 class GuiTitleScreen : public Gui
 {
 public:
+    std::string splash_text = "§ePorted by Myntti!";
+
     GuiTitleScreen();
 
     void draw() override;
@@ -16,6 +18,7 @@ public:
     bool use_cursor() override { return false; }
 
 private:
+    std::vector<float> logo_block_z;
     std::vector<GuiButton> buttons;
     size_t selected_button = 0;
     bool joystick_pressed = true;

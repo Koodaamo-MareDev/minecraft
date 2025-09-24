@@ -3,6 +3,16 @@
 #include "gui_worldselect.hpp"
 #include "gui_dirtscreen.hpp"
 #include "world.hpp"
+#include "render.hpp"
+#include "util/string_utils.hpp"
+#include "ported/Random.hpp"
+#include "ported/SystemTime.hpp"
+
+static std::string logo = " *   * * *   * *** *** *** *** *** ***"
+                          " ** ** * **  * *   *   * * * * *    * "
+                          " * * * * * * * **  *   **  *** **   * "
+                          " *   * * *  ** *   *   * * * * *    * "
+                          " *   * * *   * *** *** * * * * *    * ";
 
 GuiTitleScreen::GuiTitleScreen()
 {
@@ -16,11 +26,43 @@ GuiTitleScreen::GuiTitleScreen()
     buttons.push_back(GuiButton((view.width - 400) / 2, view_height / 2 + 96, 196, 40, "Options", []() {}));
     buttons.push_back(GuiButton((view.width - 400) / 2 + 204, view_height / 2 + 96, 196, 40, "Quit Game", quit_game));
     buttons[2].enabled = false;
+
+    // Randomize the initial Z positions of the logo blocks
+    javaport::Random rng;
+    logo_block_z.resize(logo.size());
+    for (size_t i = 0; i < logo.size(); i++)
+    {
+        logo_block_z[i] = rng.nextFloat() * 10.0f;
+    }
+
+    // Select a splash text from splashes.txt
+    std::ifstream file("/apps/minecraft/resources/title/splashes.txt");
+    if (file.is_open())
+    {
+        std::vector<std::string> splashes;
+        std::string line;
+        while (std::getline(file, line))
+        {
+            // Remove any newline characters
+            auto is_newline = [](char c)
+            { return c == '\r' || c == '\n'; };
+            line.erase(std::remove_if(line.begin(), line.end(), is_newline), line.end());
+
+            splashes.push_back(line);
+        }
+        file.close();
+
+        if (splashes.size() > 0)
+            splash_text = "§e" + splashes[rng.nextInt(splashes.size())];
+    }
 }
 
 void GuiTitleScreen::draw()
 {
     gertex::GXView viewport = gertex::get_state().view;
+
+    // Disable depth write
+    GX_SetZMode(GX_FALSE, GX_LEQUAL, GX_FALSE);
 
     // Fill the screen with the dirt texture
     int texture_index = properties(BlockID::dirt).m_texture_index;
@@ -30,6 +72,64 @@ void GuiTitleScreen::draw()
     {
         buttons[i].draw(i == selected_button);
     }
+
+    gertex::GXState state = gertex::get_state();
+    GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
+    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, BASE3D_POS_FRAC_BITS);
+
+    // We want to render the blocks in perspective mode
+    gertex::perspective(state.view);
+
+    // Enable backface culling for terrain
+    GX_SetCullMode(GX_CULL_BACK);
+
+    // Prepare opaque rendering parameters
+    GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
+    gertex::set_blending(gertex::GXBlendMode::overwrite);
+    GX_SetAlphaUpdate(GX_TRUE);
+
+    gertex::set_alpha_cutoff(0);
+    Block block = {.id = uint8_t(BlockID::stone), .visibility_flags = 0x7F, .meta = 0, .light = 0xFF};
+
+    // Render the logo blocks
+    use_texture(terrain_texture);
+    for (size_t i = 0; i < logo.size(); i++)
+    {
+        if (logo[i] != '*')
+            continue;
+        logo_block_z[i] -= 0.3f;
+        if (logo_block_z[i] < 0)
+            logo_block_z[i] = 0;
+        Vec3f logo_block_pos = Vec3f((int(i) % 38) - 19, 14 - (int(i) / 38), logo_block_z[i] - 16);
+        Camera &camera = get_camera();
+        camera.fov = 70.0f;
+        camera.rot = Vec3f(10, 0, 0);
+        camera.position = Vec3f(0);
+        transform_view(gertex::get_view_matrix(), logo_block_pos, Vec3f(1.0f), Vec3f(90, 0, 0));
+        render_single_block(block, false);
+    }
+
+    // Return back to GUI rendering
+    GX_SetZMode(GX_TRUE, GX_ALWAYS, GX_TRUE);
+    GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
+    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, 0);
+    gertex::set_state(state);
+
+    float sintime = std::sin(M_PI * (javaport::System::currentTimeMillis() % 2000) / 500.0f);
+
+    float scale = 144.0f / std::max(text_width(splash_text), 72);
+
+    // Prepare the splash text matrix
+    transform_view_screen(gertex::get_view_matrix(), Vec3f((viewport.width - 128), viewport.height * 0.25f, 0), Vec3f(scale * (1 + std::abs(sintime) * 0.125f)), Vec3f(0, 0, 22.5f));
+
+    gertex::GXMatrix old_item_matrix;
+    guMtxCopy(gui_item_matrix.mtx, old_item_matrix.mtx);
+    guMtxCopy(gertex::get_matrix().mtx, gui_item_matrix.mtx);
+
+    // Draw splash text
+    draw_text_with_shadow(-text_width(splash_text) / 2, 0, splash_text, GXColor{255, 255, 255, 255});
+
+    guMtxCopy(old_item_matrix.mtx, gui_item_matrix.mtx);
 }
 
 void GuiTitleScreen::update()
