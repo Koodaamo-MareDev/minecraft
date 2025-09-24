@@ -91,7 +91,7 @@ int Gui::text_width(std::string text)
     {
         uint8_t c = static_cast<uint8_t>(text[i]);
 
-        if (c == 0xA7 && i + 1 < text.size())
+        if (c == U'§' && i + 1 < text.size())
         {
             i++; // Skip the color code character
             continue;
@@ -138,7 +138,7 @@ void Gui::draw_text(int x, int y, std::string text, GXColor color)
     {
         uint8_t c = static_cast<uint8_t>(text[i]);
 
-        if (c == 0xA7 && i + 1 < text.size())
+        if (c == U'§' && i + 1 < text.size())
         {
             i++; // Skip the color code character
             obfuscated = text[i] == 'k';
