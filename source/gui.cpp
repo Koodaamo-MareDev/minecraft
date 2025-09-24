@@ -3,6 +3,7 @@
 #include "font_tile_widths.hpp"
 #include "ported/Random.hpp"
 #include "ported/SystemTime.hpp"
+#include "util/string_utils.hpp"
 
 gertex::GXMatrix gui_block_matrix;
 gertex::GXMatrix gui_item_matrix;
@@ -80,18 +81,23 @@ void Gui::draw_rect(int x, int y, int width, int height, int border_size, GXColo
     fill_rect(x + width - border_size, y + border_size, border_size, height - 2 * border_size, color); // Right
 }
 
-int Gui::text_width(std::string str)
+int Gui::text_width(std::string text)
 {
+    if (std::find_if(text.begin(), text.end(), [](char c)
+                     { return (c & 0x80) != 0; }) != text.end())
+    {
+        // String contains non-ASCII characters, so we can't measure it properly.
+        // For now, just convert it to CP437 and hope for the best.
+        text = str::utf8_to_cp437(text);
+    }
+
     int width = 0;
     int max_width = 0;
-    for (size_t i = 0; i < str.size(); i++)
+    for (size_t i = 0; i < text.size(); i++)
     {
-        uint8_t c = str[i] & 0xFF;
-        // This is poor handling of multibyte UTF-8 characters but it works for the characters we need
-        if ((c == 0xC2 || c == 0xC3) && i + 1 < str.size())
-            c = str[++i] & 0xFF;
+        uint8_t c = static_cast<uint8_t>(text[i]);
 
-        if (c == 0xA7 && i + 1 < str.size())
+        if (c == 0xA7 && i + 1 < text.size())
         {
             i++; // Skip the color code character
             continue;
@@ -112,8 +118,16 @@ int Gui::text_width(std::string str)
     return std::max(max_width, width);
 }
 
-void Gui::draw_text(int x, int y, std::string str, GXColor color)
+void Gui::draw_text(int x, int y, std::string text, GXColor color)
 {
+    if (std::find_if(text.begin(), text.end(), [](char c)
+                     { return (c & 0x80) != 0; }) != text.end())
+    {
+        // String contains non-ASCII characters, so we can't measure it properly.
+        // For now, just convert it to CP437 and hope for the best.
+        text = str::utf8_to_cp437(text);
+    }
+
     // Enable direct colors
     GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
 
@@ -132,19 +146,15 @@ void Gui::draw_text(int x, int y, std::string str, GXColor color)
     // but fast enough to look like it's constantly changing
     javaport::Random rng(javaport::System::currentTimeMillis() / 10);
 
-    for (size_t i = 0; i < str.size(); i++)
+    for (size_t i = 0; i < text.size(); i++)
     {
-        uint8_t c = str[i] & 0xFF;
+        uint8_t c = static_cast<uint8_t>(text[i]);
 
-        // This is poor handling of multibyte UTF-8 characters but it works for the characters we need
-        if ((c == 0xC2 || c == 0xC3) && i + 1 < str.size())
-            c = str[++i] & 0xFF;
-
-        if (c == 0xA7 && i + 1 < str.size())
+        if (c == 0xA7 && i + 1 < text.size())
         {
             i++; // Skip the color code character
-            obfuscated = str[i] == 'k';
-            color = original_color * get_text_color(str[i]);
+            obfuscated = text[i] == 'k';
+            color = original_color * get_text_color(text[i]);
             continue;
         }
         if (c == ' ')
