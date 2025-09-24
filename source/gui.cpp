@@ -104,8 +104,15 @@ void Gui::draw_text(int x, int y, std::string text, GXColor color)
         if (c == U'§' && i + 1 < text.size())
         {
             i++; // Skip the color code character
-            obfuscated = text[i] == 'k';
-            color = original_color * get_text_color(text[i]);
+            if (text[i] == 'k')
+            {
+                obfuscated = true;
+            }
+            else
+            {
+                obfuscated = false;
+                color = original_color * get_text_color(text[i]);
+            }
             continue;
         }
         if (c == ' ')
