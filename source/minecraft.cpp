@@ -327,6 +327,13 @@ int main(int argc, char **argv)
     {
         int fb = 0;
         Gui::set_gui(new GuiTitleScreen);
+
+        // Initialize the light map for block rendering
+        std::memcpy(light_map, light_day_mono_rgba, 1024);
+        GX_SetArray(GX_VA_CLR0, light_map, 4 * sizeof(u8));
+        GX_InvVtxCache();
+
+        // Enter the main menu loop
         while (!isExiting && Gui::get_gui() && !current_world)
         {
             GetInput();
