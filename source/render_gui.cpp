@@ -234,9 +234,9 @@ int draw_simple_textured_quad(GXTexObj &texture, int32_t x, int32_t y, int32_t w
     return draw_textured_quad(texture, x, y, w, h, 0, 0, GX_GetTexObjWidth(&texture), GX_GetTexObjHeight(&texture), scale);
 }
 
-char obfuscate_char(javaport::Random &rng, char original)
+uint8_t obfuscate_char(javaport::Random &rng, uint8_t original)
 {
-    uint8_t orig_width = font_tile_widths[static_cast<uint8_t>(original)];
+    uint8_t orig_width = font_tile_widths[original];
 
     // Find a random character with the same width
     uint8_t attempt = rng.nextInt(122) + 33;

@@ -33,6 +33,6 @@ int fill_screen_texture(GXTexObj &texture, gertex::GXView &view, vfloat_t u1, vf
 
 int draw_simple_textured_quad(GXTexObj &texture, int32_t x, int32_t y, int32_t w, int32_t h, float scale = GUI_DEFAULT_SCALE);
 
-char obfuscate_char(javaport::Random &rng, char original);
+uint8_t obfuscate_char(javaport::Random &rng, uint8_t original);
 
 #endif
