@@ -34,8 +34,6 @@ static GXRModeObj *rmode = NULL;
 
 World *current_world = nullptr;
 
-Configuration config;
-
 int frameCounter = 0;
 
 u32 raw_wiimote_down = 0;
@@ -58,7 +56,7 @@ void DrawDebugInfo(gertex::GXView &viewport);
 void UpdateCamera();
 void UpdateFog();
 void GetInput();
-void MainGameLoop(Configuration &config);
+void MainGameLoop();
 //---------------------------------------------------------------------------------
 bool isExiting = false;
 s8 HWButton = -1;
@@ -120,12 +118,30 @@ void InitFailure(std::string message)
     }
 }
 
-void MainGameLoop(Configuration &config)
+void MainGameLoop()
 {
     if (!current_world)
         return;
 
+    Configuration config;
+    try
+    {
+        // Attempt to load the Configuration file from the default location
+        config.load();
+    }
+    catch (std::runtime_error &e)
+    {
+        debug::print("Using config defaults. %s\n", e.what());
+    }
+
     // Initialize rendering settings from config
+    f32 FOV = config.get<float>("fov", 90.0f);
+    gertex::GXState state = gertex::get_state();
+    Camera &camera = get_camera();
+    camera.fov = FOV;
+    camera.aspect = state.view.aspect / state.view.aspect_correction;
+    camera.near = state.view.near;
+    camera.far = state.view.far;
     bool mono_lighting = ((int)config.get("mono_lighting", 0) != 0);
     bool vsync = ((int)config.get("vsync", 0) != 0);
 
@@ -199,7 +215,7 @@ void MainGameLoop(Configuration &config)
 
         UpdateLoadingStatus();
 
-        gertex::GXState state = gertex::get_state();
+        state = gertex::get_state();
         gertex::perspective(state.view);
         // Draw the scene
         if (current_world->loaded)
@@ -253,6 +269,8 @@ void MainGameLoop(Configuration &config)
     current_world->save();
     delete current_world;
     current_world = nullptr;
+
+    config.save();
 }
 
 int main(int argc, char **argv)
@@ -266,15 +284,6 @@ int main(int argc, char **argv)
 
     if (!fatInitDefault())
         InitFailure("Failed to initialize FAT filesystem");
-    try
-    {
-        // Attempt to load the Configuration file from the default location
-        config.load();
-    }
-    catch (std::runtime_error &e)
-    {
-        printf("Using config defaults. %s\n", e.what());
-    }
 
     // Allocate 2 framebuffers for double buffering
     frameBuffer[0] = MEM_K0_TO_K1(SYS_AllocateFramebuffer(rmode));
@@ -305,15 +314,6 @@ int main(int argc, char **argv)
     // Set the inventory cursor to the center of the screen
     cursor_x = state.view.width / 2;
     cursor_y = state.view.height * state.view.aspect_correction / 2;
-
-    // Initialize rendering settings
-    f32 FOV = config.get<float>("fov", 90.0f);
-
-    Camera &camera = get_camera();
-    camera.fov = FOV;
-    camera.aspect = state.view.aspect / state.view.aspect_correction;
-    camera.near = state.view.near;
-    camera.far = state.view.far;
 
     input::init();
     input::add_device(new input::KeyboardMouse);
@@ -349,14 +349,13 @@ int main(int argc, char **argv)
             }
         }
         if (current_world)
-            MainGameLoop(config);
+            MainGameLoop();
 
         isExiting |= !Gui::get_gui();
     }
     Crapper::deinitNetwork();
     input::deinit();
     WPAD_Shutdown();
-    config.save();
     VIDEO_Flush();
     VIDEO_WaitVSync();
     if (HWButton != -1)
