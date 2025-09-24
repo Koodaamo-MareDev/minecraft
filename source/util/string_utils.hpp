@@ -55,6 +55,17 @@ namespace str
             {U'°', 0xF8}, {U'∙', 0xF9}, {U'·', 0xFA}, {U'√', 0xFB}, {U'ⁿ', 0xFC}, {U'²', 0xFD}, {U'■', 0xFE}, {U' ', 0xFF}
         };
 
+        auto is_extended = [](char c)
+        {
+            return (c & 0x80) != 0;
+        };
+
+        if (std::find_if(utf8_str.begin(), utf8_str.end(), is_extended) == utf8_str.end())
+        {
+            // String contains only standard ASCII characters
+            return utf8_str;
+        }
+
         std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> convert;
         std::u32string u32_str = convert.from_bytes(utf8_str);
         std::string eascii_str;

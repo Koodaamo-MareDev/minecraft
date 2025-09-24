@@ -83,13 +83,7 @@ void Gui::draw_rect(int x, int y, int width, int height, int border_size, GXColo
 
 int Gui::text_width(std::string text)
 {
-    if (std::find_if(text.begin(), text.end(), [](char c)
-                     { return (c & 0x80) != 0; }) != text.end())
-    {
-        // String contains non-ASCII characters, so we can't measure it properly.
-        // For now, just convert it to CP437 and hope for the best.
-        text = str::utf8_to_cp437(text);
-    }
+    text = str::utf8_to_cp437(text);
 
     int width = 0;
     int max_width = 0;
@@ -120,13 +114,7 @@ int Gui::text_width(std::string text)
 
 void Gui::draw_text(int x, int y, std::string text, GXColor color)
 {
-    if (std::find_if(text.begin(), text.end(), [](char c)
-                     { return (c & 0x80) != 0; }) != text.end())
-    {
-        // String contains non-ASCII characters, so we can't measure it properly.
-        // For now, just convert it to CP437 and hope for the best.
-        text = str::utf8_to_cp437(text);
-    }
+    text = str::utf8_to_cp437(text);
 
     // Enable direct colors
     GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
