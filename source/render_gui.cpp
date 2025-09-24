@@ -1,6 +1,9 @@
 #include "render_gui.hpp"
 #include <math/vec2i.hpp>
 #include "font_tile_widths.hpp"
+#include "util/string_utils.hpp"
+#include "ported/SystemTime.hpp"
+
 static GXColor text_colors[16] = {
     {0x00, 0x00, 0x00, 0xFF}, // Black
     {0x00, 0x00, 0xAA, 0xFF}, // Dark Blue
@@ -106,13 +109,20 @@ int draw_colored_sprite_3d(GXTexObj &texture, Vec3f center, Vec3f size, Vec3f of
     return 4;
 }
 
-vfloat_t text_width_3d(std::string str)
+vfloat_t text_width_3d(std::string text)
 {
+    text = str::utf8_to_cp437(text);
     vfloat_t width = 0;
     vfloat_t max_width = 0;
-    for (size_t i = 0; i < str.size(); i++)
+    for (size_t i = 0; i < text.size(); i++)
     {
-        uint8_t c = str[i] & 0xFF;
+        uint8_t c = static_cast<uint8_t>(text[i]);
+
+        if (c == U'§' && i + 1 < text.size())
+        {
+            i++; // Skip the color code character
+            continue;
+        }
         if (c == '\n')
         {
             max_width = std::max(max_width, width);
@@ -129,10 +139,11 @@ vfloat_t text_width_3d(std::string str)
     return std::max(max_width, width);
 }
 
-void draw_text_3d(Vec3f pos, std::string str, GXColor color)
+void draw_text_3d(Vec3f pos, std::string text, GXColor color)
 {
-    Camera& camera = get_camera();
-    
+    text = str::utf8_to_cp437(text);
+    Camera &camera = get_camera();
+
     Vec3f char_size = Vec3f(0.25);
     Vec3f right_vec = -angles_to_vector(0, camera.rot.y + 90);
     Vec3f up_vec = -angles_to_vector(camera.rot.x + 90, camera.rot.y);
@@ -145,13 +156,36 @@ void draw_text_3d(Vec3f pos, std::string str, GXColor color)
 
     use_texture(font_texture);
 
-    vfloat_t half_width = text_width_3d(str) / 2.0;
+    vfloat_t half_width = text_width_3d(text) / 2.0;
 
     int x_offset = 0;
     int y_offset = 0;
-    for (size_t i = 0; i < str.size(); i++)
+
+    bool obfuscated = false;
+
+    GXColor original_color = color;
+
+    // Change the obfuscation seed every 10ms - this needs to be slow enough for shadows to display properly
+    // but fast enough to look like it's constantly changing
+    javaport::Random rng(javaport::System::currentTimeMillis() / 10);
+
+    for (size_t i = 0; i < text.size(); i++)
     {
-        uint8_t c = str[i] & 0xFF;
+        uint8_t c = static_cast<uint8_t>(text[i]);
+        if (c == U'§' && i + 1 < text.size())
+        {
+            i++; // Skip the color code character
+            if (text[i] == 'k')
+            {
+                obfuscated = true;
+            }
+            else
+            {
+                obfuscated = false;
+                color = original_color * get_text_color(text[i]);
+            }
+            continue;
+        }
         if (c == ' ')
         {
             x_offset += 3;
@@ -162,6 +196,10 @@ void draw_text_3d(Vec3f pos, std::string str, GXColor color)
             x_offset = 0;
             y_offset += 8;
             continue;
+        }
+        if (obfuscated)
+        {
+            c = obfuscate_char(rng, c);
         }
 
         uint16_t cx = uint16_t(c & 15) << 3;
