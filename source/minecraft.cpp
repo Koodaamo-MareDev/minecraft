@@ -252,6 +252,7 @@ void MainGameLoop(Configuration &config)
     remove_entity(current_world->player.entity_id);
     current_world->save();
     delete current_world;
+    current_world = nullptr;
 }
 
 int main(int argc, char **argv)
@@ -325,7 +326,6 @@ int main(int argc, char **argv)
     while (!isExiting)
     {
         int fb = 0;
-        current_world = nullptr;
         Gui::set_gui(new GuiTitleScreen);
         while (!isExiting && Gui::get_gui() && !current_world)
         {
