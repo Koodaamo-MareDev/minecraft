@@ -104,7 +104,6 @@ public:
     void save();
     bool load();
     void create();
-    void reset();
 
 private:
     ParticleSystem m_particle_system;
