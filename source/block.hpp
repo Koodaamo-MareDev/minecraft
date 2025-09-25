@@ -91,9 +91,11 @@ struct BlockProperties
         uint8_t m_flags;
     };
 
-    std::function<void(const Vec3i &, Block *, const AABB &, std::vector<AABB> &)> m_aabb;
+    std::function<void(const Vec3i &, Block *, const AABB &, std::vector<AABB> &)> m_aabb = default_aabb;
 
-    std::function<void(const Vec3i &, const Block &)> m_destroy;
+    std::function<void(const Vec3i &, const Block &)> m_destroy = default_destroy;
+
+    std::function<inventory::ItemStack(const Block &)> m_drops = default_drop;
 
     std::function<inventory::ItemStack(const Block &)> m_drops;
 
@@ -113,11 +115,8 @@ struct BlockProperties
         m_fluid = 0;
         m_valid_item = 1;
         m_needs_support = 0;
-        m_aabb = default_aabb;
-        m_destroy = default_destroy;
-        m_drops = default_drop;
     }
-    
+
     // Have setters for each property
     BlockProperties &id(BlockID value)
     {
