@@ -117,24 +117,7 @@ struct BlockProperties
         m_destroy = default_destroy;
         m_drops = default_drop;
     }
-
-    // FIXME: This is a temporary constructor replacement as the inlay hints are otherwise not visible.
-    BlockProperties &set(uint8_t default_state, uint8_t texture_index, uint8_t opacity, uint8_t transparent, uint8_t luminance, uint8_t is_solid, uint8_t is_fluid, uint8_t fluid_decay, BlockID base_fluid, BlockID flow_fluid, SoundType sound)
-    {
-        this->state(default_state);
-        this->texture(texture_index);
-        this->opacity(opacity);
-        this->transparent(transparent);
-        this->luminance(luminance);
-        this->solid(is_solid);
-        this->fluid(is_fluid);
-        this->fluid_decay(fluid_decay);
-        this->base_fluid(base_fluid);
-        this->flow_fluid(flow_fluid);
-        this->sound(sound);
-        return *this;
-    }
-
+    
     // Have setters for each property
     BlockProperties &id(BlockID value)
     {
