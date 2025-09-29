@@ -14,9 +14,9 @@ public:
 
     bool intersects(AABB other)
     {
-        return (this->min.x <= other.max.x && this->max.x >= other.min.x) &&
-               (this->min.y <= other.max.y && this->max.y >= other.min.y) &&
-               (this->min.z <= other.max.z && this->max.z >= other.min.z);
+        return (this->min.x < other.max.x && this->max.x > other.min.x) &&
+               (this->min.y < other.max.y && this->max.y > other.min.y) &&
+               (this->min.z < other.max.z && this->max.z > other.min.z);
     }
 
     bool contains(Vec3f point)
