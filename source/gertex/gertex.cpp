@@ -277,38 +277,6 @@ namespace gertex
             GX_SetTevAlphaOp(GX_TEVSTAGE3, GX_TEV_ADD, GX_TB_ZERO, GX_CS_SCALE_1, GX_TRUE, GX_TEVPREV);
         }
 
-        void use_defaults()
-        {
-
-            /**
-             * The default vertex format is as follows: POS, COLA, COLB, UV
-             * POS: 3D coordinates (X, Y, Z), float
-             * COLA: Primary color (RGBA), unsigned char, 8 bits per channel
-             * COLB: Secondary color (RGBA), unsigned char, 8 bits per channel
-             * UV: Texture coordinates (U, V), float
-             *
-             * The data should be provided in the above order unless manually
-             * modified. Indirect lookup is not enabled by default but can be
-             * specified later if needed.
-             *
-             * See tev_init() to see how colors are combined.
-             */
-
-            GX_ClearVtxDesc();
-            GX_SetVtxDesc(GX_VA_POS, GX_DIRECT);
-            GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
-            GX_SetVtxDesc(GX_VA_CLR1, GX_DIRECT);
-            GX_SetVtxDesc(GX_VA_TEX0, GX_DIRECT);
-
-            GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_F32, 0);
-            GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_CLR0, GX_CLR_RGBA, GX_RGBA8, 0);
-            GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_CLR1, GX_CLR_RGBA, GX_RGBA8, 0);
-            GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_TEX0, GX_TEX_ST, GX_F32, 0);
-
-            tev_init();
-            GX_SetZCompLoc(GX_FALSE);
-        }
-
         // Initializes the graphics subsystem
         bool gx_init(GXRModeObj *rmode)
         {
@@ -348,6 +316,39 @@ namespace gertex
 
             return true;
         }
+    }
+
+    void use_defaults()
+    {
+
+        /**
+         * The default vertex format is as follows: POS, COLA, COLB, UV
+         * POS: 3D coordinates (X, Y, Z), float
+         * COLA: Primary color (RGBA), unsigned char, 8 bits per channel
+         * COLB: Secondary color (RGBA), unsigned char, 8 bits per channel
+         * UV: Texture coordinates (U, V), float
+         *
+         * The data should be provided in the above order unless manually
+         * modified. Indirect lookup is not enabled by default but can be
+         * specified later if needed.
+         *
+         * See tev_init() to see how colors are combined.
+         */
+
+        GX_ClearVtxDesc();
+        GX_SetVtxDesc(GX_VA_POS, GX_DIRECT);
+        GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
+        GX_SetVtxDesc(GX_VA_CLR1, GX_INDEX8);
+        GX_SetVtxDesc(GX_VA_TEX0, GX_DIRECT);
+
+        GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_F32, 0);
+        GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_CLR0, GX_CLR_RGBA, GX_RGBA8, 0);
+        GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_CLR1, GX_CLR_RGBA, GX_RGBA8, 0);
+        GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_TEX0, GX_TEX_ST, GX_F32, 0);
+
+        tev_init();
+        GX_SetZCompLoc(GX_FALSE);
+        GX_SetLineWidth(16, GX_VTXFMT0);
     }
 
     void init(GXRModeObj *rmode, float fov, float near, float far, bool apply_defaults)

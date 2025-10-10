@@ -129,6 +129,7 @@ namespace gertex
         void apply();
     };
     void init(GXRModeObj *rmode, float fov = 90, float near = CAMERA_NEAR, float far = CAMERA_FAR, bool apply_defaults = true);
+    void use_defaults();
 
     void set_state(const GXState &state);
     const GXState get_state();

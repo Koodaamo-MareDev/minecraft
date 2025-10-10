@@ -299,12 +299,6 @@ int main(int argc, char **argv)
 
     gertex::init(rmode);
 
-    GX_SetLineWidth(16, GX_VTXFMT0);
-
-    // Use indexed colors for both channels
-    GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
-    GX_SetVtxDesc(GX_VA_CLR1, GX_INDEX8);
-
     init_face_normals();
     init_textures();
     update_textures();
