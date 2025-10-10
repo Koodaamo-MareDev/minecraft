@@ -474,18 +474,24 @@ void EntityFallingBlock::tick()
     EntityPhysical::tick();
     if (current_world->is_remote())
         return;
+    if (dead)
+        return;
 
     if (on_ground)
     {
         Vec3i int_pos = get_foot_blockpos();
         Block *block = get_block_at(int_pos);
-        if (block && block->get_blockid() == BlockID::air)
+        if (block && (block->get_blockid() == BlockID::air || properties(block->id).m_fluid))
         {
             // Update the block
-            *block = this->block_state;
-            block->set_blockid(block->get_blockid());
-            update_block_at(int_pos);
-            update_neighbors(int_pos);
+            set_block_and_meta_at(int_pos, block_state.get_blockid(), block_state.meta);
+            notify_at(int_pos);
+            dead = true;
+        }
+        else
+        {
+            // Skip to the dead state
+            fall_time = 601;
         }
     }
 

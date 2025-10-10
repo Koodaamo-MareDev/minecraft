@@ -37,7 +37,6 @@ namespace javaport
         if (stone_count == 3)
         {
             set_block_at(pos, liquid);
-            update_block_at(pos);
             return true;
         }
         return false;

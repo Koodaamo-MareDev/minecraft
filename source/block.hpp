@@ -64,7 +64,8 @@ struct BlockProperties
     uint8_t m_texture_index = 0;
     uint8_t m_opacity = 15;
     uint8_t m_luminance = 0;
-    uint8_t m_fluid_decay = 0;
+    uint8_t m_drain_rate = 0;
+    uint8_t m_tick_rate = 0;
     BlockID m_base_fluid = BlockID::air;
     BlockID m_flow_fluid = BlockID::air;
     SoundType m_sound_type = SoundType::none;
@@ -80,13 +81,13 @@ struct BlockProperties
     {
         struct
         {
-            uint8_t m_fall : 1;
             uint8_t m_transparent : 1;
             uint8_t m_solid : 1;
             uint8_t m_fluid : 1;
             uint8_t m_valid_item : 1;
             uint8_t m_needs_support : 1;
             uint8_t m_nonflat : 1;
+            uint8_t m_tick_on_load : 1;
         };
         uint8_t m_flags;
     };
@@ -97,7 +98,11 @@ struct BlockProperties
 
     std::function<inventory::ItemStack(const Block &)> m_drops = default_drop;
 
-    std::function<inventory::ItemStack(const Block &)> m_drops;
+    std::function<void(const Vec3i &, Block &)> m_tick = nullptr;
+
+    std::function<void(const Vec3i &, Block &)> m_added = nullptr;
+
+    std::function<void(const Vec3i &, Block &)> m_neighbor_changed = nullptr;
 
     bool intersects(const Vec3i &pos, Block *block, const AABB &other)
     {
@@ -109,12 +114,13 @@ struct BlockProperties
     BlockProperties()
     {
         // Set bit fields to default values
-        m_fall = 0;
         m_transparent = 0;
         m_solid = 1;
         m_fluid = 0;
         m_valid_item = 1;
         m_needs_support = 0;
+        m_nonflat = 0;
+        m_tick_on_load = 0;
     }
 
     // Have setters for each property
@@ -166,9 +172,15 @@ struct BlockProperties
         return *this;
     }
 
-    BlockProperties &fluid_decay(uint8_t value) // Probably going to be removed
+    BlockProperties &drain_rate(uint8_t value)
     {
-        this->m_fluid_decay = value;
+        this->m_drain_rate = value;
+        return *this;
+    }
+
+    BlockProperties &tick_rate(uint8_t value)
+    {
+        this->m_tick_rate = value;
         return *this;
     }
 
@@ -187,12 +199,6 @@ struct BlockProperties
     BlockProperties &sound(SoundType value)
     {
         this->m_sound_type = value;
-        return *this;
-    }
-
-    BlockProperties &fall(bool value)
-    {
-        this->m_fall = value;
         return *this;
     }
 
@@ -217,6 +223,12 @@ struct BlockProperties
     BlockProperties &nonflat(bool value)
     {
         this->m_nonflat = value;
+        return *this;
+    }
+
+    BlockProperties &tick_on_load(bool value)
+    {
+        this->m_tick_on_load = value;
         return *this;
     }
 
@@ -253,6 +265,24 @@ struct BlockProperties
     BlockProperties &drops(std::function<inventory::ItemStack(const Block &)> drops_func)
     {
         this->m_drops = drops_func;
+        return *this;
+    }
+
+    BlockProperties &tick(std::function<void(const Vec3i &, Block &)> tick_func)
+    {
+        this->m_tick = tick_func;
+        return *this;
+    }
+
+    BlockProperties &added(std::function<void(const Vec3i &, Block &)> added_func)
+    {
+        this->m_added = added_func;
+        return *this;
+    }
+
+    BlockProperties &neighbor_changed(std::function<void(const Vec3i &, Block &)> neighbor_changed_func)
+    {
+        this->m_neighbor_changed = neighbor_changed_func;
         return *this;
     }
 

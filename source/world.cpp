@@ -167,12 +167,11 @@ void World::update_frustum(Camera &camera)
 void World::update_chunks()
 {
     int light_up_calls = 0;
-    float ypos = get_camera().position.y;
     for (Chunk *&chunk : get_chunks())
     {
         if (chunk)
         {
-            float hdistance = chunk->player_taxicab_distance();
+            int hdistance = chunk->player_taxicab_distance();
             if (hdistance > CHUNK_DISTANCE * 24 + 24 && !is_remote())
             {
                 remove_chunk(chunk);
@@ -182,13 +181,6 @@ void World::update_chunks()
             if (chunk->generation_stage != ChunkGenStage::done)
                 continue;
 
-            // Tick chunks
-            for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
-            {
-                float vdistance = std::abs(j * 16 - ypos);
-                if (!is_remote() && chunk->has_fluid_updates[j] && vdistance <= SIMULATION_DISTANCE * 16 && ticks - last_fluid_tick >= 5)
-                    update_fluid_section(chunk, j);
-            }
             if (!chunk->lit_state && light_up_calls < 5)
             {
                 light_up_calls++;
@@ -196,61 +188,43 @@ void World::update_chunks()
             }
         }
     }
-    if (ticks - last_fluid_tick >= 5)
-    {
-        last_fluid_tick = ticks;
-        fluid_update_count++;
-        fluid_update_count %= 30;
-    }
     if (!is_remote())
     {
+        tick_blocks();
         prepare_chunks(1);
     }
 }
 
-void World::update_fluid_section(Chunk *chunk, int index)
+void World::tick_blocks()
 {
-    auto int_to_blockpos = [](ptrdiff_t x) -> Vec3i
+    Lock lock(tick_mutex);
+    while (!scheduled_updates.empty())
     {
-        return Vec3i(x & 0xF, (x >> 8) & MAX_WORLD_Y, (x >> 4) & 0xF);
-    };
-
-    static std::vector<std::vector<Block *>> fluid_levels(8);
-    static bool init = false;
-    if (!init)
-    {
-        for (size_t i = 0; i < fluid_levels.size(); i++)
+        BlockTick block_tick = *scheduled_updates.begin();
+        if ((block_tick.ticks & 0x7FFFFFFF) > this->ticks)
+            break;
+        Block *block = get_block_at(block_tick.pos);
+        if (block && block->get_blockid() == block_tick.block_id)
         {
-            fluid_levels[i].resize(4096);
+            BlockProperties &props = properties(block->id);
+            if (props.m_tick)
+            {
+                props.m_tick(block_tick.pos, *block);
+            }
         }
-        init = true;
+        scheduled_updates.erase(block_tick);
     }
+}
 
-    int chunkX = (chunk->x * 16);
-    int chunkZ = (chunk->z * 16);
+void World::schedule_block_update(const Vec3i &pos, BlockID id, int ticks)
+{
+    if (is_remote())
+        return;
 
-    for (size_t i = 0; i < 4096; i++)
-    {
-        Block *block = &chunk->blockstates[i | (index << 12)];
-        if ((block->meta & FLUID_UPDATE_REQUIRED_FLAG))
-            fluid_levels[get_fluid_meta_level(block) & 7][i] = block;
-    }
-
-    uint16_t curr_fluid_count = 0;
-    for (size_t i = 0; i < fluid_levels.size(); i++)
-    {
-        std::vector<Block *> &blocks = fluid_levels[i];
-        for (Block *&block : blocks)
-        {
-            if (!block)
-                continue;
-            if ((basefluid(block->get_blockid()) != BlockID::lava || fluid_update_count % 6 == 0))
-                update_fluid(block, Vec3i(chunkX, 0, chunkZ) + int_to_blockpos(block - chunk->blockstates));
-            curr_fluid_count++;
-            block = nullptr;
-        }
-    }
-    chunk->has_fluid_updates[index] = (curr_fluid_count != 0);
+    BlockTick block_tick(id, pos, this->ticks + std::max(0, ticks));
+    if (scheduled_updates.find(block_tick) != scheduled_updates.end())
+        return;
+    scheduled_updates.insert(block_tick);
 }
 
 SectionUpdatePhase World::update_sections(SectionUpdatePhase phase)
@@ -652,11 +626,12 @@ void World::edit_blocks()
                 if (success)
                 {
                     if (result_block.get_blockid() != BlockID::air)
-                        *editable_block = result_block;
+                    {
+                        set_block_and_meta_at(result_pos, result_block.get_blockid(), result_block.meta);
+                    }
                     if (!is_remote())
                     {
-                        update_block_at(result_pos);
-                        update_neighbors(result_pos);
+                        notify_at(result_pos);
                     }
                 }
             }
@@ -729,7 +704,7 @@ void World::destroy_block(const Vec3i pos, Block *old_block)
 {
     BlockID old_blockid = old_block->get_blockid();
     set_block_at(pos, BlockID::air);
-    update_block_at(pos);
+    notify_at(pos);
 
     // Add block particles
     javaport::Random rng;
@@ -770,7 +745,6 @@ void World::destroy_block(const Vec3i pos, Block *old_block)
         return;
 
     // Client side block destruction - only for local play
-    update_neighbors(pos);
     properties(old_blockid).m_destroy(pos, *old_block);
     if (properties(old_blockid).can_be_broken_with(*player.selected_item))
         spawn_drop(pos, old_block, properties(old_blockid).m_drops(*old_block));

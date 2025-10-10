@@ -6,10 +6,12 @@
 #include <math/vec3f.hpp>
 #include <math/math_utils.h>
 #include <crapper/client.hpp>
+#include <set>
 
 #include "particle.hpp"
 #include "sound.hpp"
 #include "inventory.hpp"
+#include "block_tick.hpp"
 
 class Chunk;
 class EntityPhysical;
@@ -66,6 +68,8 @@ public:
     ChunkProvider *chunk_provider = nullptr;
     Frustum *frustum = nullptr;
     Crapper::MinecraftClient *client = nullptr;
+    std::set<BlockTick> scheduled_updates;
+    mutex_t tick_mutex = LWP_MUTEX_NULL;
 
     std::string name = "world";
 
@@ -82,7 +86,8 @@ public:
     void update_chunks();
     SectionUpdatePhase update_sections(SectionUpdatePhase phase);
     void calculate_visibility();
-    void update_fluid_section(Chunk *chunk, int index);
+    void tick_blocks();
+    void schedule_block_update(const Vec3i &pos, BlockID id, int ticks);
     void edit_blocks();
 
     int prepare_chunks(int count);

@@ -268,6 +268,7 @@ BlockID get_block_id_at(const Vec3i &position, BlockID default_id)
         return default_id;
     return block->get_blockid();
 }
+
 Block *get_block_at(const Vec3i &position)
 {
     if (position.y < 0 || position.y > MAX_WORLD_Y)
@@ -278,18 +279,64 @@ Block *get_block_at(const Vec3i &position)
     return chunk->get_block(position);
 }
 
+uint8_t get_meta_at(const Vec3i &position)
+{
+    Block *block = get_block_at(position);
+    if (!block)
+        return 0;
+    return block->meta;
+}
+
 void set_block_at(const Vec3i &pos, BlockID id)
 {
     Block *block = get_block_at(pos);
     if (block)
+    {
+        if (block->get_blockid() == id)
+            return;
         block->set_blockid(id);
+        block->meta = 0;
+        BlockProperties &prop = properties(id);
+        if (id != BlockID::air && prop.m_added)
+            prop.m_added(pos, *block);
+        mark_block_dirty(pos);
+    }
+}
+
+void set_meta_at(const Vec3i &pos, uint8_t meta)
+{
+    Block *block = get_block_at(pos);
+    if (block)
+    {
+        if (block->meta == meta)
+            return;
+
+        block->meta = meta;
+        mark_block_dirty(pos);
+    }
+}
+
+void set_block_and_meta_at(const Vec3i &pos, BlockID id, uint8_t meta)
+{
+    Block *block = get_block_at(pos);
+    if (block)
+    {
+        if (block->get_blockid() == id && block->meta == meta)
+            return;
+        block->set_blockid(id);
+        block->meta = meta;
+        BlockProperties &prop = properties(id);
+        if (id != BlockID::air && prop.m_added)
+            prop.m_added(pos, *block);
+        mark_block_dirty(pos);
+    }
 }
 
 void replace_air_at(Vec3i pos, BlockID id)
 {
-    Block *block = get_block_at(pos);
-    if (block && block->get_blockid() == BlockID::air)
-        block->set_blockid(id);
+    if (get_block_id_at(pos) != BlockID::air)
+        return;
+    set_block_at(pos, id);
 }
 
 int32_t Chunk::player_taxicab_distance()
@@ -323,54 +370,37 @@ void Chunk::update_height_map(Vec3i pos)
     }
 }
 
-void update_block_at(const Vec3i &pos)
+void notify_at(const Vec3i &pos)
 {
-    if (pos.y > 255 || pos.y < 0)
+    if (!current_world->is_remote())
+        notify_neighbors(pos);
+}
+
+void mark_block_dirty(const Vec3i &pos)
+{
+    if (pos.y > MAX_WORLD_Y || pos.y < 0)
         return;
     Chunk *chunk = get_chunk_from_pos(pos);
     if (!chunk)
         return;
-    if (!current_world->is_remote())
-    {
-        Block *block = chunk->get_block(pos);
-        BlockProperties prop = properties(block->id);
-        if (prop.m_fluid)
-        {
-            block->meta |= FLUID_UPDATE_REQUIRED_FLAG;
-            chunk->has_fluid_updates[pos.y >> 4] = 1;
-        }
-        if (prop.m_fall)
-        {
-            BlockID block_below = get_block_id_at(pos + Vec3i(0, -1, 0), BlockID::stone);
-            if (block_below == BlockID::air || properties(block_below).m_fluid)
-            {
-                add_entity(new EntityFallingBlock(*block, pos));
-                block->set_blockid(BlockID::air);
-                block->meta = 0;
-
-                update_neighbors(pos);
-            }
-        }
-        if (block->get_blockid() == BlockID::snow_layer)
-        {
-            Block *block_below = chunk->get_block(pos + Vec3i(0, -1, 0));
-            if (block_below && block_below->get_blockid() == BlockID::grass)
-            {
-                block_below->meta = 1; // Set the snowy flag
-                update_block_at(pos + Vec3i(0, -1, 0));
-            }
-        }
-    }
     chunk->update_height_map(pos);
     LightEngine::post(Coord(pos, chunk));
 }
 
-void update_neighbors(const Vec3i &pos)
+void notify_neighbors(const Vec3i &pos)
 {
     for (int i = 0; i < 6; i++)
     {
         Vec3i neighbour = pos + face_offsets[i];
-        update_block_at(neighbour);
+        Block *block = get_block_at(neighbour);
+        if (block)
+        {
+            BlockProperties &prop = properties(block->id);
+            if (prop.m_neighbor_changed)
+            {
+                prop.m_neighbor_changed(neighbour, *block);
+            }
+        }
     }
 }
 
@@ -1233,6 +1263,19 @@ void Chunk::read()
 
     lit_state = 1;
     generation_stage = ChunkGenStage::done;
+
+    Vec3i pos(this->x * 16, 0, this->z * 16);
+    Lock lock(current_world->tick_mutex);
+    for (int i = 0; i < 32768; i++)
+    {
+        Block *block = &this->blockstates[i];
+        if (!block->id)
+            continue;
+        Vec3i block_pos = pos + Vec3i(i & 0xF, (i >> 8) & 0x7F, (i >> 4) & 0xF);
+        BlockProperties &prop = properties(block->id);
+        if (prop.m_tick_on_load)
+            current_world->schedule_block_update(block_pos, block->get_blockid(), 0);
+    }
 
     // Mark chunk as dirty
     for (int vbo_index = 0; vbo_index < VERTICAL_SECTION_COUNT; vbo_index++)

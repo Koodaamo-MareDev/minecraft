@@ -1464,7 +1464,7 @@ namespace Crapper
         }
         chunk->set_block(pos, BlockID(block_id));
         chunk->get_block(pos)->meta = block_meta;
-        update_block_at(pos);
+        mark_block_dirty(pos);
     }
 
     void MinecraftClient::handleMultiBlockChange(ByteBuffer &buffer)
@@ -1512,7 +1512,7 @@ namespace Crapper
             Block *block = chunk->get_block(pos);
             block->set_blockid(BlockID(types[i]));
             block->meta = metas[i];
-            update_block_at(pos);
+            mark_block_dirty(pos);
         }
     }
 
