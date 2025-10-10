@@ -1,7 +1,7 @@
 #include "sound.hpp"
-#include "timers.hpp"
 #include "sounds.hpp"
-#include "util/constants.hpp"
+#include <util/timers.hpp>
+#include <util/constants.hpp>
 Sound::Sound(AiffContainer &aiff_data)
 {
     set_aiff_data(aiff_data);

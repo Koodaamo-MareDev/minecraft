@@ -3,16 +3,16 @@
 #include <network.h> // Wii network library
 #include <miniz/miniz.h>
 
-#include "../inventory.hpp"
-#include "../entity.hpp"
-#include "../chunk.hpp"
-#include "../lock.hpp"
-#include "../sounds.hpp"
-#include "../sound.hpp"
-#include "../world.hpp"
-#include "../gui_dirtscreen.hpp"
-#include "../gui_container.hpp"
-#include "../util/debuglog.hpp"
+#include <item/inventory.hpp>
+#include <world/entity.hpp>
+#include <world/chunk.hpp>
+#include <util/lock.hpp>
+#include <sounds.hpp>
+#include <sound.hpp>
+#include <world/world.hpp>
+#include <gui/gui_dirtscreen.hpp>
+#include <gui/gui_container.hpp>
+#include <util/debuglog.hpp>
 
 namespace Crapper
 {

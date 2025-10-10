@@ -1,6 +1,7 @@
 #include "MapGenSurface.hpp"
-#include "NoiseSynthesizer.hpp"
-#include "../raycast.hpp"
+
+#include <ported/NoiseSynthesizer.hpp>
+#include <world/util/raycast.hpp>
 
 void javaport::MapGenSurface::populate(int32_t chunkX, int32_t chunkZ, int32_t x, int32_t z, BlockID *out_ids)
 {

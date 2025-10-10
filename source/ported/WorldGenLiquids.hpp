@@ -1,8 +1,8 @@
 #ifndef WORLD_GEN_LIQUIDS_HPP
 #define WORLD_GEN_LIQUIDS_HPP
 
-#include "WorldGenerator.hpp"
-#include "../block_id.hpp"
+#include <block/block_id.hpp>
+#include <ported/WorldGenerator.hpp>
 namespace javaport
 {
     class WorldGenLiquids : public WorldGenerator

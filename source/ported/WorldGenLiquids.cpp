@@ -1,5 +1,6 @@
 #include "WorldGenLiquids.hpp"
-#include "../chunk.hpp"
+
+#include <world/chunk.hpp>
 namespace javaport
 {
     bool WorldGenLiquids::generate(Random &rng, Vec3i pos)
