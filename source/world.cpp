@@ -582,7 +582,7 @@ void World::edit_blocks()
                     // Turn bottom slab into double slab
                     result_block.set_blockid(BlockID::double_stone_slab);
                 }
-                else if (editable_block->get_blockid() != BlockID::air)
+                else if (editable_block->get_blockid() != BlockID::air && !properties(editable_block->id).m_fluid)
                 {
                     should_place_block = false;
                 }
