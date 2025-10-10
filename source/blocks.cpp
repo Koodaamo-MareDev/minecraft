@@ -690,12 +690,30 @@ void fluid_harden(const Vec3i &pos, Block &block)
     }
 }
 
-void stationary_fluid_neighbor_update(const Vec3i &pos, Block &block)
+void fluid_neighbor_update(const Vec3i &pos, Block &block)
 {
     fluid_harden(pos, block);
-    if (get_block_id_at(pos) != block.get_blockid())
-        return;
-    flow_fluid_later(pos);
+}
+
+void stationary_fluid_neighbor_update(const Vec3i &pos, Block &block)
+{
+    BlockID old_id = block.get_blockid();
+    fluid_neighbor_update(pos, block);
+    if (block.id == old_id)
+        flow_fluid_later(pos);
+}
+
+void fluid_added(const Vec3i &pos, Block &block)
+{
+    fluid_harden(pos, block);
+}
+
+void flowing_fluid_added(const Vec3i &pos, Block &block)
+{
+    BlockID old_id = block.get_blockid();
+    fluid_added(pos, block);
+    if (block.id == old_id)
+        schedule_update(pos, block);
 }
 
 void falling_block_tick(const Vec3i &pos, Block &block)
@@ -908,10 +926,10 @@ BlockProperties block_properties[256] = {
     BlockProperties().id(BlockID::planks).tool(inventory::tool_type::axe, inventory::tool_tier::no_tier).hardness(2.0f).texture(4).sound(SoundType::wood),
     BlockProperties().id(BlockID::sapling).tool(inventory::tool_type::none, inventory::tool_tier::no_tier).hardness(0.0f).texture(15).sound(SoundType::grass).opacity(0).solid(false).transparent(true).render_type(RenderType::cross).collision(CollisionType::none),
     BlockProperties().id(BlockID::bedrock).tool(inventory::tool_type::pickaxe, inventory::tool_tier::diamond).hardness(-1.0f).texture(17).sound(SoundType::stone).blast_resistance(-1),
-    BlockProperties().id(BlockID::flowing_water).hardness(100.0f).texture(206).fluid(true).base_fluid(BlockID::water).flow_fluid(BlockID::flowing_water).drain_rate(1).tick_on_load(true).tick_rate(5).tick(flowing_fluid_tick).added(schedule_update).opacity(1).solid(false).transparent(true).render_type(RenderType::special).collision(CollisionType::fluid).blast_resistance(500),
-    BlockProperties().id(BlockID::water).hardness(100.0f).texture(205).fluid(true).base_fluid(BlockID::water).flow_fluid(BlockID::flowing_water).drain_rate(1).neighbor_changed(stationary_fluid_neighbor_update).opacity(1).solid(false).transparent(true).render_type(RenderType::special).collision(CollisionType::fluid).blast_resistance(500),
-    BlockProperties().id(BlockID::flowing_lava).hardness(0.0f).texture(238).fluid(true).base_fluid(BlockID::lava).flow_fluid(BlockID::flowing_lava).drain_rate(2).neighbor_changed(fluid_harden).tick_on_load(true).tick_rate(30).tick(flowing_fluid_tick).added(schedule_update).opacity(1).luminance(15).solid(false).render_type(RenderType::special).collision(CollisionType::fluid).blast_resistance(500),
-    BlockProperties().id(BlockID::lava).hardness(100.0f).texture(237).fluid(true).base_fluid(BlockID::lava).flow_fluid(BlockID::flowing_lava).drain_rate(2).neighbor_changed(stationary_fluid_neighbor_update).tick_on_load(true).opacity(1).luminance(15).solid(false).render_type(RenderType::special).collision(CollisionType::fluid).blast_resistance(500),
+    BlockProperties().id(BlockID::flowing_water).hardness(100.0f).texture(206).fluid(true).base_fluid(BlockID::water).flow_fluid(BlockID::flowing_water).drain_rate(1).neighbor_changed(fluid_neighbor_update).added(flowing_fluid_added).tick_on_load(true).tick_rate(5).tick(flowing_fluid_tick).opacity(1).solid(false).transparent(true).render_type(RenderType::special).collision(CollisionType::fluid).blast_resistance(500),
+    BlockProperties().id(BlockID::water).hardness(100.0f).texture(205).fluid(true).base_fluid(BlockID::water).flow_fluid(BlockID::flowing_water).drain_rate(1).neighbor_changed(stationary_fluid_neighbor_update).added(fluid_added).opacity(1).solid(false).transparent(true).render_type(RenderType::special).collision(CollisionType::fluid).blast_resistance(500),
+    BlockProperties().id(BlockID::flowing_lava).hardness(0.0f).texture(238).fluid(true).base_fluid(BlockID::lava).flow_fluid(BlockID::flowing_lava).drain_rate(2).neighbor_changed(fluid_neighbor_update).added(flowing_fluid_added).tick_on_load(true).tick_rate(30).tick(flowing_fluid_tick).opacity(1).luminance(15).solid(false).render_type(RenderType::special).collision(CollisionType::fluid).blast_resistance(500),
+    BlockProperties().id(BlockID::lava).hardness(100.0f).texture(237).fluid(true).base_fluid(BlockID::lava).flow_fluid(BlockID::flowing_lava).drain_rate(2).neighbor_changed(stationary_fluid_neighbor_update).added(fluid_added).tick_on_load(true).opacity(1).luminance(15).solid(false).render_type(RenderType::special).collision(CollisionType::fluid).blast_resistance(500),
     BlockProperties().id(BlockID::sand).tool(inventory::tool_type::shovel, inventory::tool_tier::no_tier).hardness(0.5f).texture(18).sound(SoundType::sand).tick_rate(3).tick(falling_block_tick).added(schedule_update).neighbor_changed(schedule_update),
     BlockProperties().id(BlockID::gravel).tool(inventory::tool_type::shovel, inventory::tool_tier::no_tier).hardness(0.6f).texture(19).sound(SoundType::dirt).tick_rate(3).tick(falling_block_tick).added(schedule_update).neighbor_changed(schedule_update),
     BlockProperties().id(BlockID::gold_ore).tool(inventory::tool_type::pickaxe, inventory::tool_tier::stone).hardness(3.0f).texture(32).sound(SoundType::stone),
