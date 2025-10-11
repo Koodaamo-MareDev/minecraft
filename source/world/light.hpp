@@ -6,6 +6,7 @@
 #include <world/util/coord.hpp>
 #include <cstdint>
 #include <ogc/gu.h>
+class World;
 class LightEngine
 {
 private:
@@ -15,9 +16,10 @@ private:
     static bool thread_active;
     static bool use_skylight;
     static std::deque<Coord> pending_updates;
+    static World *current_world;
 
 public:
-    static void init();
+    static void init(World *world);
     static void deinit();
     static void loop();
     static void reset();

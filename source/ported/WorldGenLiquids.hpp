@@ -9,7 +9,7 @@ namespace javaport
     {
     public:
         BlockID liquid;
-        WorldGenLiquids(BlockID liquid) : liquid(liquid) {}
+        WorldGenLiquids(World *world, BlockID liquid) : liquid(liquid) { this->world = world; }
         bool generate(Random &rng, Vec3i pos);
     };
 }

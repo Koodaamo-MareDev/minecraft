@@ -9,6 +9,7 @@
 #include <ported/NoiseSynthesizer.hpp>
 
 class Chunk;
+class World;
 
 class ChunkProvider
 {
@@ -25,6 +26,7 @@ public:
     }
 
 protected:
+    World *world;
     NoiseSynthesizer noiser;
     BlockID blocks[16 * 16 * WORLD_HEIGHT];
 };
@@ -32,21 +34,21 @@ protected:
 class ChunkProviderOverworld : public ChunkProvider
 {
 public:
-    ChunkProviderOverworld(uint64_t seed);
+    ChunkProviderOverworld(World *world);
 
     virtual void provide_chunk(Chunk *chunk);
     virtual void populate_chunk(Chunk *chunk);
 
-protected: 
+protected:
     void plant_tree(Vec3i pos, int height);
     void generate_trees(Vec3i pos, javaport::Random &rng);
-    
+
     void generate_flowers(Vec3i pos, javaport::Random &rng);
-    
+
     void generate_vein(Vec3i pos, BlockID id, javaport::Random &rng);
     void generate_ore_type(Vec3i pos, BlockID id, int count, int max_height, javaport::Random &rng);
     void generate_ores(Vec3i pos, javaport::Random &rng);
-    
+
     void generate_features(Chunk *chunk);
 };
 

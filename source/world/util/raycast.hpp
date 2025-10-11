@@ -37,10 +37,10 @@ inline double intbound(double s, double ds)
         return (1 - s) / ds;
     }
 }
-inline int checkabove(Vec3i pos, Chunk *chunk = nullptr)
+inline int checkabove(Vec3i pos, Chunk *chunk = nullptr, World *world = nullptr)
 {
     Block *block = nullptr;
-    chunk = chunk ? chunk : get_chunk_from_pos(pos);
+    chunk = chunk ? chunk : (world ? world->get_chunk_from_pos(pos) : nullptr);
     if (!chunk)
         return pos.y;
     // Starting from the y coordinate, cast a ray up that stops at the first (partially) opaque block.
@@ -50,10 +50,10 @@ inline int checkabove(Vec3i pos, Chunk *chunk = nullptr)
     // This should return MAX_WORLD_Y at most which means the ray hit the world height limit
     return pos.y;
 }
-inline int checkbelow(Vec3i pos, Chunk *chunk = nullptr)
+inline int checkbelow(Vec3i pos, Chunk *chunk = nullptr, World *world = nullptr)
 {
     Block *block = nullptr;
-    chunk = chunk ? chunk : get_chunk_from_pos(pos);
+    chunk = chunk ? chunk : (world ? world->get_chunk_from_pos(pos) : nullptr);
     if (!chunk)
         return pos.y;
     // Starting from the y coordinate, cast a ray down that stops at the first (partially) opaque block.
@@ -63,10 +63,10 @@ inline int checkbelow(Vec3i pos, Chunk *chunk = nullptr)
     // This should return 0 at most which means the ray hit the bedrock
     return pos.y;
 }
-inline int skycast(Vec3i pos, Chunk *chunk = nullptr)
+inline int skycast(Vec3i pos, Chunk *chunk = nullptr, World *world = nullptr)
 {
     Block *block = nullptr;
-    chunk = chunk ? chunk : get_chunk_from_pos(pos);
+    chunk = chunk ? chunk : (world ? world->get_chunk_from_pos(pos) : nullptr);
     if (!chunk)
         return -9999;
     // Starting from world height limit, cast a ray down that stops at the first (partially) opaque block.
@@ -99,7 +99,7 @@ inline bool raycast(
     Vec3f direction,
     float dst,
     Vec3i *output,
-    Vec3i *output_face)
+    Vec3i *output_face, World *world)
 {
     // From "A Fast Voxel Traversal Algorithm for Ray Tracing"
     // by John Amanatides and Andrew Woo, 1987
@@ -165,7 +165,7 @@ inline bool raycast(
         if (!(x < minvec.x || y < minvec.y || z < minvec.z || x >= maxvec.x || y >= maxvec.y || z >= maxvec.z))
         {
             Vec3i block_pos = Vec3i(int(x), int(y), int(z));
-            Block *block = get_block_at(block_pos);
+            Block *block = world->get_block_at(block_pos);
             if (block)
             {
                 BlockID blockid = block->get_blockid();
@@ -173,7 +173,7 @@ inline bool raycast(
                 {
                     if (output)
                         *output = Vec3i(int(x), int(y), int(z));
-                    if (get_block_at(block_pos + face) && output_face)
+                    if (world->get_block_at(block_pos + face) && output_face)
                         *output_face = face;
                     return true;
                 }
@@ -244,7 +244,7 @@ inline bool raycast_inverse(
     Vec3f direction,
     float dst,
     Vec3i *output,
-    Vec3i *output_face)
+    Vec3i *output_face, World *world)
 {
     // Cube containing origin point.
     double x = std::floor(origin.x);
@@ -291,7 +291,7 @@ inline bool raycast_inverse(
         if (!(x < minvec.x || y < minvec.y || z < minvec.z || x >= maxvec.x || y >= maxvec.y || z >= maxvec.z))
         {
             Vec3i block_pos = Vec3i(int(x), int(y), int(z));
-            Block *block = get_block_at(block_pos);
+            Block *block = world->get_block_at(block_pos);
             if (block)
             {
                 BlockID blockid = block->get_blockid();
@@ -299,7 +299,7 @@ inline bool raycast_inverse(
                 {
                     if (output)
                         *output = Vec3i(int(x), int(y), int(z));
-                    if (get_block_at(block_pos + face) && output_face)
+                    if (world->get_block_at(block_pos + face) && output_face)
                         *output_face = face;
                     return true;
                 }
@@ -421,7 +421,7 @@ inline bool raycast_precise(
     float dst,
     Vec3i *output,
     Vec3i *output_face,
-    AABB &out_aabb)
+    AABB &out_aabb, World *world)
 {
     // From "A Fast Voxel Traversal Algorithm for Ray Tracing"
     // by John Amanatides and Andrew Woo, 1987
@@ -489,7 +489,7 @@ inline bool raycast_precise(
         if (!(x < minvec.x || y < minvec.y || z < minvec.z || x >= maxvec.x || y >= maxvec.y || z >= maxvec.z))
         {
             Vec3i block_pos = Vec3i(x, y, z);
-            Block *block = get_block_at(block_pos);
+            Block *block = world->get_block_at(block_pos);
             if (block)
             {
                 BlockID blockid = block->get_blockid();
@@ -503,7 +503,7 @@ inline bool raycast_precise(
                     {
                         if (output)
                             *output = block_pos;
-                        if (get_block_at(block_pos + face) && output_face)
+                        if (world->get_block_at(block_pos + face) && output_face)
                             *output_face = face;
 
                         out_aabb = aabb;
@@ -606,7 +606,7 @@ inline bool raycast_precise(
     }
     return false;
 }
-inline void explode_raycast(Vec3f origin, Vec3f direction, float intensity)
+inline void explode_raycast(Vec3f origin, Vec3f direction, float intensity, World *world)
 {
     // Avoids an infinite loop.
     if (direction.sqr_magnitude() < 0.001)
@@ -621,7 +621,7 @@ inline void explode_raycast(Vec3f origin, Vec3f direction, float intensity)
     while (true)
     {
         Vec3i block_pos = Vec3i(int(pos.x), int(pos.y), int(pos.z));
-        Block *block = get_block_at(block_pos);
+        Block *block = world->get_block_at(block_pos);
         if (block)
         {
             if (block->get_blockid() != BlockID::air)
@@ -634,10 +634,10 @@ inline void explode_raycast(Vec3f origin, Vec3f direction, float intensity)
                     break;
                 if (block->get_blockid() == BlockID::tnt)
                 {
-                    add_entity(new EntityExplosiveBlock(*block, block_pos, rand() % 20 + 10));
+                    world->add_entity(new EntityExplosiveBlock(*block, block_pos, rand() % 20 + 10));
                 }
                 Block old_block = *block;
-                current_world->destroy_block(block_pos, &old_block);
+                world->destroy_block(block_pos, &old_block);
             }
             intensity -= 0.225;
             if (intensity <= 0)
@@ -650,10 +650,10 @@ inline void explode_raycast(Vec3f origin, Vec3f direction, float intensity)
     }
 }
 
-inline void explode(Vec3f position, float power)
+inline void explode(Vec3f position, float power, World *world)
 {
     Vec3f dir;
-    Block *center_block = get_block_at(Vec3i(int(position.x), int(position.y), int(position.z)));
+    Block *center_block = world->get_block_at(Vec3i(int(position.x), int(position.y), int(position.z)));
     power -= (properties(center_block->id).m_blast_resistance + 0.3) * 0.3;
     if (power <= 0)
         return;
@@ -668,11 +668,11 @@ inline void explode(Vec3f position, float power)
             for (int y = -8; y <= 8; y += 16)
             {
                 dir = Vec3f(x, y, z);
-                explode_raycast(position, dir, power * (rng.nextFloat() * 0.6 + 0.7));
+                explode_raycast(position, dir, power * (rng.nextFloat() * 0.6 + 0.7), world);
                 dir = Vec3f(x, z, y);
-                explode_raycast(position, dir, power * (rng.nextFloat() * 0.6 + 0.7));
+                explode_raycast(position, dir, power * (rng.nextFloat() * 0.6 + 0.7), world);
                 dir = Vec3f(y, z, x);
-                explode_raycast(position, dir, power * (rng.nextFloat() * 0.6 + 0.7));
+                explode_raycast(position, dir, power * (rng.nextFloat() * 0.6 + 0.7), world);
             }
         }
     }

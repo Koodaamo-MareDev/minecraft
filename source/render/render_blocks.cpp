@@ -1,5 +1,6 @@
 #include "render_blocks.hpp"
 
+#include <world/world.hpp>
 #include <world/chunk.hpp>
 #include <block/blocks.hpp>
 #include <render/render.hpp>
@@ -158,7 +159,8 @@ int render_snow_layer(Block *block, const Vec3i &pos)
     BlockID neighbor_ids[6];
     {
         Block *neighbors[6];
-        get_neighbors(pos, neighbors);
+        if (render_world)
+            render_world->get_neighbors(pos, neighbors);
         for (int i = 0; i < 6; i++)
         {
             neighbor_ids[i] = neighbors[i] ? neighbors[i]->get_blockid() : BlockID::air;
@@ -211,19 +213,19 @@ int render_torch(Block *block, const Vec3i &pos)
     {
     case 1: // Facing east
         vertex_pos.x -= 0.125;
-        return render_torch_with_angle( block, vertex_pos, -0.4, 0);
+        return render_torch_with_angle(block, vertex_pos, -0.4, 0);
     case 2: // Facing west
         vertex_pos.x += 0.125;
-        return render_torch_with_angle( block, vertex_pos, 0.4, 0);
+        return render_torch_with_angle(block, vertex_pos, 0.4, 0);
     case 3: // Facing south
         vertex_pos.z -= 0.125;
-        return render_torch_with_angle( block, vertex_pos, 0, -0.4);
+        return render_torch_with_angle(block, vertex_pos, 0, -0.4);
     case 4: // Facing north
         vertex_pos.z += 0.125;
-        return render_torch_with_angle( block, vertex_pos, 0, 0.4);
+        return render_torch_with_angle(block, vertex_pos, 0, 0.4);
     default: // Facing up
         vertex_pos.y -= 0.1875;
-        return render_torch_with_angle( block, vertex_pos, 0, 0);
+        return render_torch_with_angle(block, vertex_pos, 0, 0);
     }
 }
 
@@ -575,7 +577,8 @@ int get_chest_texture_index(Block *block, const Vec3i &pos, uint8_t face)
     Block *neighbors[4];
     {
         Block *tmp_neighbors[6];
-        get_neighbors(pos, tmp_neighbors);
+        if (render_world)
+            render_world->get_neighbors(pos, tmp_neighbors);
         neighbors[0] = tmp_neighbors[0];
         neighbors[1] = tmp_neighbors[1];
         neighbors[2] = tmp_neighbors[4];

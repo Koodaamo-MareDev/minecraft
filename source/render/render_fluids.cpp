@@ -1,5 +1,6 @@
 #include "render_fluids.hpp"
 
+#include <world/world.hpp>
 #include <world/chunk.hpp>
 #include <block/blocks.hpp>
 #include <render/render.hpp>
@@ -57,7 +58,43 @@ inline static int DrawVerticalQuad(Vertex p0, Vertex p1, Vertex p2, Vertex p3, u
     return faceCount;
 }
 
-int render_fluid(Block *block, const Vec3i &pos)
+Vec3f get_fluid_direction(World *world, Block *block, Vec3i pos)
+{
+
+    uint8_t fluid_level = get_fluid_meta_level(block);
+    if ((fluid_level & 7) == 0)
+        return Vec3f(0.0, -1.0, 0.0);
+
+    BlockID block_id = block->get_blockid();
+
+    // Used to check block types around the fluid
+    Block *neighbors[6];
+    world->get_neighbors(pos, neighbors);
+
+    Vec3f direction = Vec3f(0.0, 0.0, 0.0);
+
+    bool direction_set = false;
+    for (int i = 0; i < 6; i++)
+    {
+        if (i == FACE_NY || i == FACE_PY)
+            continue;
+        if (neighbors[i] && is_same_fluid(neighbors[i]->get_blockid(), block_id))
+        {
+            direction_set = true;
+            if (get_fluid_meta_level(neighbors[i]) < fluid_level)
+                direction = direction - Vec3f(face_offsets[i].x, 0, face_offsets[i].z);
+            else if (get_fluid_meta_level(neighbors[i]) > fluid_level)
+                direction = direction + Vec3f(face_offsets[i].x, 0, face_offsets[i].z);
+            else
+                direction_set = false;
+        }
+    }
+    if (!direction_set)
+        direction.y = -1.0;
+    return direction.fast_normalize();
+}
+
+int render_fluid(Block *block, const Vec3i &pos, World *world)
 {
     BlockID block_id = block->get_blockid();
 
@@ -76,7 +113,8 @@ int render_fluid(Block *block, const Vec3i &pos)
     float corner_bottoms[4];
     float corner_tops[4];
 
-    get_neighbors(pos, neighbors);
+    if (world)
+        world->get_neighbors(pos, neighbors);
     for (int x = 0; x < 6; x++)
     {
         neighbor_ids[x] = neighbors[x] ? neighbors[x]->get_blockid() : BlockID::air;
@@ -107,7 +145,7 @@ int render_fluid(Block *block, const Vec3i &pos)
     };
     for (int i = 0; i < 4; i++)
     {
-        corner_max[i] = (get_fluid_visual_level(pos + corner_offsets[i], block_id) << 1);
+        corner_max[i] = (get_fluid_visual_level(world, pos + corner_offsets[i], block_id) << 1);
         if (!corner_max[i])
             corner_max[i] = 1;
         corner_min[i] = 0;
@@ -140,7 +178,7 @@ int render_fluid(Block *block, const Vec3i &pos)
     if (!is_same_fluid(block_id, neighbor_ids[FACE_NY]) && (!is_solid(neighbor_ids[FACE_NY]) || properties(neighbor_ids[FACE_NY]).m_transparent))
         faceCount += DrawHorizontalQuad(bottomPlaneCoords[0], bottomPlaneCoords[1], bottomPlaneCoords[2], bottomPlaneCoords[3], neighbors[FACE_NY] ? neighbors[FACE_NY]->light : light);
 
-    Vec3f direction = get_fluid_direction(block, pos);
+    Vec3f direction = get_fluid_direction(world, block, pos);
     float angle = -1000;
     float cos_angle = 8 * BASE3D_PIXEL_UV_SCALE;
     float sin_angle = 0;
@@ -241,7 +279,7 @@ int render_section_fluids(Chunk &chunk, int index, bool transparent, int vertexC
             {
                 Vec3i blockpos = Vec3i(_x, _y, _z) + chunk_offset;
                 if (properties(block->id).m_fluid && transparent == properties(block->id).m_transparent)
-                    vertexCount += render_fluid(block, blockpos);
+                    vertexCount += render_fluid(block, blockpos, chunk.world);
             }
         }
     }

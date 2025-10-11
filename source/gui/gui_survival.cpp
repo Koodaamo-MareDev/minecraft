@@ -4,7 +4,7 @@
 #include <world/world.hpp>
 #include <util/input/input.hpp>
 
-GuiSurvival::GuiSurvival(inventory::Container *container) : GuiGenericContainer(container, 45, 0, "Inventory")
+GuiSurvival::GuiSurvival(EntityPhysical *owner, inventory::Container *container) : GuiGenericContainer(owner, container, 45, 0, "Inventory")
 {
     gertex::GXView viewport = gertex::get_state().view;
 

@@ -2,7 +2,7 @@
 #include <world/world.hpp>
 #include <util/input/input.hpp>
 
-GuiContainer::GuiContainer(inventory::Container *container, uint8_t slots, uint8_t window_id, std::string title) : GuiGenericContainer(container, slots, window_id, title)
+GuiContainer::GuiContainer(EntityPhysical *owner, inventory::Container *container, uint8_t slots, uint8_t window_id, std::string title) : GuiGenericContainer(owner, container, slots, window_id, title)
 {
     int inventory_height = 192;
     int container_height = 36 + ((slots + 8) / 9) * 36;
@@ -163,10 +163,10 @@ void GuiGenericContainer::update()
                 }
             }
 
-            if (current_world->is_remote())
+            if (owner->world->is_remote())
             {
                 // Send the interaction to the server
-                current_world->client->sendWindowClick(window_id, index, is_right_click, this->transaction_id++, prev_item.id <= 0 ? -1 : prev_item.id, prev_item.count, prev_item.meta);
+                owner->world->client->sendWindowClick(window_id, index, is_right_click, this->transaction_id++, prev_item.id <= 0 ? -1 : prev_item.id, prev_item.count, prev_item.meta);
             }
         }
     }
@@ -181,10 +181,10 @@ bool GuiContainer::contains(int x, int y)
 
 void GuiGenericContainer::close()
 {
-    if (current_world->is_remote())
+    if (owner->world->is_remote())
     {
         // Notify the server about the closed GUI
-        current_world->client->sendWindowClose(window_id);
+        owner->world->client->sendWindowClose(window_id);
 
         return;
     }
@@ -192,11 +192,10 @@ void GuiGenericContainer::close()
     // Drop the item in hand
     if (!item_in_hand.empty())
     {
-        EntityPhysical &player = current_world->player;
-        EntityItem *item_entity = new EntityItem(player.get_position(0), item_in_hand);
-        item_entity->velocity = angles_to_vector(player.rotation.x, player.rotation.y) * 0.5;
-        item_entity->chunk = get_chunk_from_pos(Vec3i(std::floor(player.position.x), std::floor(player.position.y), std::floor(player.position.z)));
-        add_entity(item_entity);
+        EntityItem *item_entity = new EntityItem(owner->get_position(0), item_in_hand);
+        item_entity->velocity = angles_to_vector(owner->rotation.x, owner->rotation.y) * 0.5;
+        item_entity->chunk = owner->world->get_chunk_from_pos(Vec3i(std::floor(owner->position.x), std::floor(owner->position.y), std::floor(owner->position.z)));
+        owner->world->add_entity(item_entity);
     }
 }
 
@@ -248,7 +247,7 @@ void GuiGenericContainer::refresh()
      * TL;DR: We copy from the end of the inventory to the end of the slots.
      */
 
-    inventory::PlayerInventory &inventory = current_world->player.items;
+    inventory::PlayerInventory &inventory = owner->world->player.items;
 
     for (; i < 36; i++)
     {

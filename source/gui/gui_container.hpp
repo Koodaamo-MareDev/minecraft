@@ -11,7 +11,7 @@ public:
     int width = 352;
     int height = 444;
 
-    GuiGenericContainer(inventory::Container *container, uint8_t slots, uint8_t window_id, std::string title) : Gui(), title(title), linked_container(container)
+    GuiGenericContainer(EntityPhysical *owner, inventory::Container *container, uint8_t slots, uint8_t window_id, std::string title) : Gui(), title(title), owner(owner), linked_container(container)
     {
         this->window_id = window_id;
     }
@@ -25,6 +25,7 @@ public:
     ~GuiGenericContainer();
 
 protected:
+    EntityPhysical *owner;
     inventory::Container *linked_container;
     std::vector<GuiSlot *> slots;
 };
@@ -32,7 +33,7 @@ protected:
 class GuiContainer : public GuiGenericContainer
 {
 public:
-    GuiContainer(inventory::Container *container, uint8_t slots, uint8_t window_id = 1, std::string title = "Chest");
+    GuiContainer(EntityPhysical *owner, inventory::Container *container, uint8_t slots, uint8_t window_id = 1, std::string title = "Chest");
 
     void draw() override;
     bool contains(int x, int y) override;

@@ -14,7 +14,7 @@ public:
     int width = 352;
     int height = 332;
 
-    GuiSurvival(inventory::Container *Container);
+    GuiSurvival(EntityPhysical *owner, inventory::Container *Container);
 
     void draw() override;
     bool contains(int x, int y) override;

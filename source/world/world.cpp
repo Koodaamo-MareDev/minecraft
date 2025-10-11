@@ -22,6 +22,7 @@
 #include <world/chunkprovider.hpp>
 #include <util/face_pair.hpp>
 #include <util/debuglog.hpp>
+#include <light_nether_rgba.h>
 
 extern bool should_destroy_block;
 extern bool should_place_block;
@@ -36,25 +37,32 @@ World::World(std::string name)
     std::string region_path = save_path + "/region";
     fs::create_directories(region_path);
     fs::current_path(save_path);
-    LightEngine::init();
+    LightEngine::init(this);
+    set_render_world(this);
 }
 
 World::World()
 {
-    LightEngine::init();
+    LightEngine::init(this);
 }
 
 World::~World()
 {
     LightEngine::deinit();
 
-    for (Chunk *chunk : get_chunks())
+    for (Chunk *chunk : chunks)
     {
         if (chunk)
             remove_chunk(chunk);
     }
     cleanup_chunks();
     mcr::cleanup();
+    set_remote(false);
+    deinit_chunk_manager();
+    if (tick_mutex != LWP_MUTEX_NULL)
+        LWP_MutexDestroy(tick_mutex);
+    if (chunk_mutex != LWP_MUTEX_NULL)
+        LWP_MutexDestroy(chunk_mutex);
 
     if (chunk_provider)
         delete chunk_provider;
@@ -108,14 +116,14 @@ bool World::tick()
 
     // Calculate chunk memory usage
     memory_usage = 0;
-    for (Chunk *&chunk : get_chunks())
+    for (Chunk *&chunk : chunks)
     {
         memory_usage += chunk ? chunk->size() : 0;
     }
 
     m_sound_system.update(angles_to_vector(0, get_camera().rot.y + 90), player.get_position(std::fmod(partial_ticks, 1)));
 
-    current_world->last_entity_tick = current_world->ticks;
+    last_entity_tick = ticks;
 
     if (player.dead)
     {
@@ -167,7 +175,7 @@ void World::update_frustum(Camera &camera)
 void World::update_chunks()
 {
     int light_up_calls = 0;
-    for (Chunk *&chunk : get_chunks())
+    for (Chunk *&chunk : chunks)
     {
         if (chunk)
         {
@@ -209,7 +217,7 @@ void World::tick_blocks()
             BlockProperties &props = properties(block->id);
             if (props.m_tick)
             {
-                props.m_tick(block_tick.pos, *block);
+                props.m_tick(this, block_tick.pos, *block);
             }
         }
         scheduled_updates.erase(block_tick);
@@ -236,7 +244,7 @@ SectionUpdatePhase World::update_sections(SectionUpdatePhase phase)
     static Section *curr_section = nullptr;
 
     // Gets the VBO at the given position
-    auto section_at = [](const Vec3i &pos) -> Section *
+    auto section_at = [this](const Vec3i &pos) -> Section *
     {
         // Out of bounds check for Y coordinate
         if (pos.y < 0 || pos.y >= WORLD_HEIGHT)
@@ -257,7 +265,7 @@ SectionUpdatePhase World::update_sections(SectionUpdatePhase phase)
     {
     case SectionUpdatePhase::BLOCK_VISIBILITY:
     {
-        for (Chunk *&chunk : get_chunks())
+        for (Chunk *&chunk : chunks)
         {
             if (chunk && chunk->generation_stage == ChunkGenStage::done && !chunk->light_update_count)
             {
@@ -415,7 +423,7 @@ void World::calculate_visibility()
 {
     init_face_pairs();
     // Reset visibility status for all VBOs
-    for (Chunk *&chunk : get_chunks())
+    for (Chunk *&chunk : chunks)
     {
         if (chunk)
         {
@@ -427,7 +435,7 @@ void World::calculate_visibility()
     }
 
     // Gets the VBO at the given position
-    auto section_at = [](const Vec3i &pos) -> Section *
+    auto section_at = [this](const Vec3i &pos) -> Section *
     {
         // Out of bounds check for Y coordinate
         if (pos.y < 0 || pos.y >= WORLD_HEIGHT)
@@ -536,7 +544,7 @@ void World::edit_blocks()
     Block held_block = player.selected_item->as_item().is_block() ? Block{uint8_t(player.selected_item->id & 0xFF), 0x7F, uint8_t(player.selected_item->meta & 0xFF)} : Block{};
     bool finish_destroying = should_destroy_block && player.mining_progress >= 1.0f;
 
-    player.raycast_target_found = raycast_precise(camera.position, angles_to_vector(camera.rot.x, camera.rot.y), 4, &player.raycast_target_pos, &player.raycast_target_face, player.raycast_target_bounds);
+    player.raycast_target_found = raycast_precise(camera.position, angles_to_vector(camera.rot.x, camera.rot.y), 4, &player.raycast_target_pos, &player.raycast_target_face, player.raycast_target_bounds, this);
     if (player.raycast_target_found && (finish_destroying || should_place_block))
     {
         BlockID new_blockid = finish_destroying ? BlockID::air : held_block.get_blockid();
@@ -697,7 +705,7 @@ void World::cleanup_chunks()
         return c->generation_stage == ChunkGenStage::invalid;
     };
 
-    remove_chunks_if(is_invalid);
+    delete_chunks_if(is_invalid);
 }
 
 void World::destroy_block(const Vec3i pos, Block *old_block)
@@ -745,7 +753,7 @@ void World::destroy_block(const Vec3i pos, Block *old_block)
         return;
 
     // Client side block destruction - only for local play
-    properties(old_blockid).m_destroy(pos, *old_block);
+    properties(old_blockid).m_destroy(this, pos, *old_block);
     if (properties(old_blockid).can_be_broken_with(*player.selected_item))
         spawn_drop(pos, old_block, properties(old_blockid).m_drops(*old_block));
 }
@@ -843,7 +851,7 @@ void World::create_explosion(Vec3f pos, float power)
         m_particle_system.add_particle(particle);
     }
     if (!is_remote())
-        explode(pos, power * 0.75f);
+        explode(pos, power * 0.75f, this);
 }
 
 void World::draw(Camera &camera)
@@ -879,7 +887,6 @@ void World::draw(Camera &camera)
 
 void World::draw_scene(bool opaque)
 {
-    std::deque<Chunk *> &chunks = get_chunks();
     // Use terrain texture
     use_texture(terrain_texture);
 
@@ -1007,12 +1014,12 @@ void World::draw_scene(bool opaque)
 void World::draw_selected_block()
 {
     player.selected_item = &player.items[player.selected_hotbar_slot + GuiSurvival::hotbar_start];
-    if (get_chunks().size() == 0 || !player.selected_item || player.selected_item->empty())
+    if (chunks.size() == 0 || !player.selected_item || player.selected_item->empty())
         return;
 
     uint8_t light_value = 0;
     // Get the block at the player's position
-    Block *view_block = get_block_at(current_world->player.get_foot_blockpos());
+    Block *view_block = get_block_at(player.get_foot_blockpos());
     if (view_block)
     {
         // Set the light level of the selected block
@@ -1176,7 +1183,7 @@ void World::save()
         namespace fs = std::filesystem;
         try
         {
-            for (Chunk *c : get_chunks())
+            for (Chunk *c : chunks)
                 c->write();
         }
         catch (std::runtime_error &e)
@@ -1274,7 +1281,7 @@ bool World::load()
     // Re-initialize the chunk provider
     if (chunk_provider)
         delete chunk_provider;
-    chunk_provider = new ChunkProviderOverworld(seed);
+    chunk_provider = new ChunkProviderOverworld(this);
 
     // Start the chunk manager using the chunk provider
     init_chunk_manager(chunk_provider);
@@ -1308,7 +1315,7 @@ void World::create()
     // Re-initialize the chunk provider
     if (chunk_provider)
         delete chunk_provider;
-    chunk_provider = new ChunkProviderOverworld(seed);
+    chunk_provider = new ChunkProviderOverworld(this);
 
     // Start the chunk manager using the chunk provider
     init_chunk_manager(chunk_provider);
@@ -1318,7 +1325,6 @@ void World::update_entities()
 {
 
     // Find a chunk for any lingering entities
-    std::map<int32_t, EntityPhysical *> &world_entities = get_entities();
     for (auto &&e : world_entities)
     {
         EntityPhysical *entity = e.second;
@@ -1347,7 +1353,7 @@ void World::update_entities()
         }
 
         // Update the entities of the world
-        for (Chunk *&chunk : get_chunks())
+        for (Chunk *&chunk : chunks)
         {
             // Update the entities in the chunk
             chunk->update_entities();
@@ -1412,7 +1418,7 @@ void World::update_player()
 #endif
     Vec3i block_pos = player.get_head_blockpos();
     Block *block = get_block_at(block_pos);
-    if (block && properties(block->id).m_fluid && block_pos.y + 2 - get_fluid_height(block_pos, block->get_blockid()) >= player.aabb.min.y + player.y_offset)
+    if (block && properties(block->id).m_fluid && block_pos.y + 2 - get_fluid_height(this, block_pos, block->get_blockid()) >= player.aabb.min.y + player.y_offset)
     {
         player.in_fluid = properties(block->id).m_base_fluid;
     }
@@ -1541,6 +1547,377 @@ void World::update_player()
             player.mining_tick++;
         else
             player.mining_tick = 0;
+    }
+}
+
+// Used to set the world to hell
+void World::set_hell(bool hell)
+{
+    if (this->hell == hell)
+        return;
+
+    // Stop processing any light updates
+    LightEngine::reset();
+    if (hell)
+    {
+        // Set the light map to the nether light map
+        memcpy(light_map, light_nether_rgba, 1024); // 256 * 4
+        GX_SetArray(GX_VA_CLR0, light_map, 4 * sizeof(u8));
+        GX_InvVtxCache();
+    }
+
+    // Disable sky light in hell
+    LightEngine::enable_skylight(!hell);
+
+    this->hell = hell;
+}
+
+Chunk *World::get_chunk_from_pos(const Vec3i &pos)
+{
+    return get_chunk(block_to_chunk_pos(pos));
+}
+
+Chunk *World::get_chunk(const Vec2i &pos)
+{
+    return get_chunk(pos.x, pos.y);
+}
+
+Chunk *World::get_chunk(int32_t x, int32_t z)
+{
+    auto predicate = [x, z](Chunk *chunk)
+    {
+        return chunk && chunk->x == x && chunk->z == z;
+    };
+    Lock chunk_lock(chunk_mutex);
+
+    std::deque<Chunk *>::iterator it = std::find_if(chunk_cache.begin(), chunk_cache.end(), predicate);
+    if (it == chunk_cache.end())
+    {
+        // In case of a cache miss, try to find the chunk in the active chunks
+        it = std::find_if(chunks.begin(), chunks.end(), predicate);
+        if (it != chunks.end())
+        {
+            // Add it to the cache
+            chunk_cache.push_front(*it);
+            return *it;
+        }
+
+        // Chunk not found
+        return nullptr;
+    }
+
+    Chunk *chunk = *it;
+
+    // Move the chunk to the front of the cache for faster access
+    chunk_cache.erase(it);
+    chunk_cache.push_front(chunk);
+
+    return chunk;
+}
+
+void World::delete_chunk(Chunk *chunk)
+{
+    if (!chunk)
+        return;
+
+    Lock chunk_lock(chunk_mutex);
+
+    // Remove the chunk from the active list
+    chunks.erase(std::remove(chunks.begin(), chunks.end(), chunk), chunks.end());
+
+    // Remove the chunk from the cache
+    chunk_cache.erase(std::remove(chunk_cache.begin(), chunk_cache.end(), chunk), chunk_cache.end());
+
+    // Delete the chunk
+    delete chunk;
+}
+
+void World::delete_chunks_if(std::function<bool(Chunk *)> predicate)
+{
+    Lock chunk_lock(chunk_mutex);
+
+    // Get list of chunks to be removed
+    std::vector<Chunk *> chunks_to_remove;
+    for (Chunk *chunk : chunks)
+    {
+        if (predicate(chunk))
+        {
+            chunks_to_remove.push_back(chunk);
+        }
+    }
+
+    chunk_lock.unlock();
+
+    for (Chunk *chunk : chunks_to_remove)
+    {
+        delete_chunk(chunk);
+    }
+}
+
+bool World::add_chunk(int32_t x, int32_t z)
+{
+    if (!run_chunk_manager || pending_chunks.size() + chunks.size() >= CHUNK_COUNT)
+        return false;
+    Lock chunk_lock(chunk_mutex);
+
+    // Function to find a chunk with the given coordinates
+    auto find_chunk = [x, z](Chunk *chunk)
+    {
+        return chunk && chunk->x == x && chunk->z == z;
+    };
+
+    // Check if the chunk already exists
+    if (std::find_if(pending_chunks.begin(), pending_chunks.end(), find_chunk) != pending_chunks.end())
+        return false;
+    if (std::find_if(chunks.begin(), chunks.end(), find_chunk) != chunks.end())
+        return false;
+
+    Chunk *chunk = new Chunk(x, z, this);
+
+    // Check if the chunk exists in the region file
+    mcr::Region *region = mcr::get_region(x >> 5, z >> 5);
+    if (region->locations[(x & 31) | ((z & 31) << 5)] != 0)
+        chunk->generation_stage = ChunkGenStage::loading;
+
+    // Add the chunk to the pending chunks
+    pending_chunks.push_back(chunk);
+    std::sort(pending_chunks.begin(), pending_chunks.end());
+
+    return true;
+}
+
+void World::deinit_chunk_manager()
+{
+    if (chunk_manager_thread_handle == LWP_THREAD_NULL)
+        return;
+
+    // Tell the chunk manager thread to stop
+    run_chunk_manager = false;
+
+    LWP_JoinThread(chunk_manager_thread_handle, NULL);
+    chunk_manager_thread_handle = LWP_THREAD_NULL;
+
+    // Cleanup the chunk mutex
+    Lock::destroy(chunk_mutex);
+}
+
+void World::init_chunk_manager(ChunkProvider *chunk_provider)
+{
+    if (chunk_manager_thread_handle != LWP_THREAD_NULL)
+        return;
+
+    // Chunk provider can be null if something else will be providing the chunks.
+    // This should only happen when in a remote world which means that chunks are
+    // provided via the network code. In such a case, don't start the thread.
+    if (!chunk_provider)
+    {
+        return;
+    }
+    auto chunk_manager_thread = [](void *arg) -> void *
+    {
+        World *world = (World *)arg;
+        ChunkProvider *provider = world->chunk_provider;
+        world->run_chunk_manager = true;
+        while (world->run_chunk_manager)
+        {
+            while (world->pending_chunks.empty())
+            {
+                LWP_YieldThread();
+                if (!world->run_chunk_manager)
+                {
+                    return NULL;
+                }
+            }
+            Chunk *chunk = world->pending_chunks.back();
+
+            // Generate the base terrain for the chunk
+            provider->provide_chunk(chunk);
+
+            // Move the chunk to the active list
+            Lock chunk_lock(world->chunk_mutex);
+            world->chunks.push_back(chunk);
+            world->pending_chunks.erase(std::find(world->pending_chunks.begin(), world->pending_chunks.end(), chunk));
+            chunk_lock.unlock();
+
+            // Finish the chunk with features
+            provider->populate_chunk(chunk);
+
+            usleep(100);
+        }
+        return NULL;
+    };
+
+    LWP_CreateThread(&chunk_manager_thread_handle,
+                     chunk_manager_thread,
+                     this,
+                     NULL,
+                     0,
+                     50);
+}
+
+BlockID World::get_block_id_at(const Vec3i &position, BlockID default_id)
+{
+    Block *block = get_block_at(position);
+    if (!block)
+        return default_id;
+    return block->get_blockid();
+}
+
+Block *World::get_block_at(const Vec3i &position)
+{
+    if (position.y < 0 || position.y > MAX_WORLD_Y)
+        return nullptr;
+    Chunk *chunk = get_chunk_from_pos(position);
+    if (!chunk)
+        return nullptr;
+    return chunk->get_block(position);
+}
+
+uint8_t World::get_meta_at(const Vec3i &position)
+{
+    Block *block = get_block_at(position);
+    if (!block)
+        return 0;
+    return block->meta;
+}
+
+void World::get_neighbors(const Vec3i &pos, Block **neighbors)
+{
+    for (int x = 0; x < 6; x++)
+        neighbors[x] = get_block_at(pos + face_offsets[x]);
+}
+
+void World::set_block_at(const Vec3i &pos, BlockID id)
+{
+    Block *block = get_block_at(pos);
+    if (block)
+    {
+        if (block->get_blockid() == id)
+            return;
+        block->set_blockid(id);
+        block->meta = 0;
+        BlockProperties &prop = properties(id);
+        if (id != BlockID::air && prop.m_added)
+            prop.m_added(this, pos, *block);
+        mark_block_dirty(pos);
+    }
+}
+
+void World::set_meta_at(const Vec3i &pos, uint8_t meta)
+{
+    Block *block = get_block_at(pos);
+    if (block)
+    {
+        if (block->meta == meta)
+            return;
+
+        block->meta = meta;
+        mark_block_dirty(pos);
+    }
+}
+
+void World::set_block_and_meta_at(const Vec3i &pos, BlockID id, uint8_t meta)
+{
+    Block *block = get_block_at(pos);
+    if (block)
+    {
+        if (block->get_blockid() == id && block->meta == meta)
+            return;
+        block->set_blockid(id);
+        block->meta = meta;
+        BlockProperties &prop = properties(id);
+        if (id != BlockID::air && prop.m_added)
+            prop.m_added(this, pos, *block);
+        mark_block_dirty(pos);
+    }
+}
+
+void World::replace_air_at(Vec3i pos, BlockID id)
+{
+    if (get_block_id_at(pos) != BlockID::air)
+        return;
+    set_block_at(pos, id);
+}
+
+void World::notify_at(const Vec3i &pos)
+{
+    if (!is_remote())
+        notify_neighbors(pos);
+}
+
+void World::notify_neighbors(const Vec3i &pos)
+{
+    for (int i = 0; i < 6; i++)
+    {
+        Vec3i neighbour = pos + face_offsets[i];
+        Block *block = get_block_at(neighbour);
+        if (block)
+        {
+            BlockProperties &prop = properties(block->id);
+            if (prop.m_neighbor_changed)
+            {
+                prop.m_neighbor_changed(this, neighbour, *block);
+            }
+        }
+    }
+}
+
+void World::mark_block_dirty(const Vec3i &pos)
+{
+    if (pos.y > MAX_WORLD_Y || pos.y < 0)
+        return;
+    Chunk *chunk = get_chunk_from_pos(pos);
+    if (!chunk)
+        return;
+    chunk->update_height_map(pos);
+    LightEngine::post(Coord(pos, chunk));
+}
+
+void World::add_entity(EntityPhysical *entity)
+{
+    // If the world is local, assign a unique entity ID to prevent conflicts
+    if (!is_remote())
+    {
+        while (world_entities.find(entity->entity_id) != world_entities.end())
+        {
+            entity->entity_id++;
+        }
+    }
+    world_entities[entity->entity_id] = entity;
+    Vec3i entity_pos = Vec3i(int(std::floor(entity->position.x)), int(std::floor(entity->position.y)), int(std::floor(entity->position.z)));
+    entity->chunk = get_chunk_from_pos(entity_pos);
+    if (entity->chunk)
+        entity->chunk->entities.push_back(entity);
+    entity->world = this;
+}
+
+void World::remove_entity(int32_t entity_id)
+{
+    EntityPhysical *entity = get_entity_by_id(entity_id);
+    if (!entity)
+    {
+        debug::print("Removing unknown entity %d\n", entity_id);
+        return;
+    }
+    entity->dead = true;
+    if (!entity->chunk)
+    {
+        if (world_entities.find(entity_id) != world_entities.end())
+            world_entities.erase(entity_id);
+        if (dynamic_cast<EntityPlayerLocal *>(entity) == nullptr)
+            delete entity;
+    }
+}
+
+EntityPhysical *World::get_entity_by_id(int32_t entity_id)
+{
+    try
+    {
+        return world_entities.at(entity_id);
+    }
+    catch (std::out_of_range &)
+    {
+        return nullptr;
     }
 }
 

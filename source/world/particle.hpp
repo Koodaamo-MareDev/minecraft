@@ -46,24 +46,29 @@ public:
             uint16_t v;
         };
     };
+    World *world = nullptr;
 
-    Particle() : EntityBase(), life_time(0), physics(0), type(0), size(64), brightness(255), u(0), v(0) {}
+    Particle() {}
+    Particle(World *world) : EntityBase(), life_time(0), physics(0), type(0), size(64), brightness(255), u(0), v(0), world(world) {}
 
     ~Particle() {}
 
     void update(float dt);
+
 };
 
 class ParticleSystem
 {
 public:
     Particle particles[256];
+    World *world = nullptr;
 
-    ParticleSystem()
+    ParticleSystem(World *world)
     {
+        this->world = world;
         for (int i = 0; i < 256; i++)
         {
-            particles[i] = Particle();
+            particles[i] = Particle(world);
         }
     }
 

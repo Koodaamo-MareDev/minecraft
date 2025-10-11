@@ -15,17 +15,18 @@ static std::string logo = " *   * * *   * *** *** *** *** *** ***"
                           " *   * * *  ** *   *   * * * * *    * "
                           " *   * * *   * *** *** * * * * *    * ";
 
-GuiTitleScreen::GuiTitleScreen()
+GuiTitleScreen::GuiTitleScreen(World **current_world)
+    : current_world(current_world)
 {
     gertex::GXView view = gertex::get_state().view;
 
     int view_height = view.aspect_correction * view.height;
 
-    buttons.push_back(GuiButton((view.width - 400) / 2, view_height / 2 - 48, 400, 40, "Singleplayer", join_singleplayer));
-    buttons.push_back(GuiButton((view.width - 400) / 2, view_height / 2, 400, 40, "Multiplayer", join_multiplayer));
-    buttons.push_back(GuiButton((view.width - 400) / 2, view_height / 2 + 48, 400, 40, "Mods and Texture Packs", join_multiplayer));
+    buttons.push_back(GuiButton((view.width - 400) / 2, view_height / 2 - 48, 400, 40, "Singleplayer", std::bind(&GuiTitleScreen::join_singleplayer, this)));
+    buttons.push_back(GuiButton((view.width - 400) / 2, view_height / 2, 400, 40, "Multiplayer", std::bind(&GuiTitleScreen::join_multiplayer, this)));
+    buttons.push_back(GuiButton((view.width - 400) / 2, view_height / 2 + 48, 400, 40, "Mods and Texture Packs", std::bind(&GuiTitleScreen::join_multiplayer, this)));
     buttons.push_back(GuiButton((view.width - 400) / 2, view_height / 2 + 96, 196, 40, "Options", []() {}));
-    buttons.push_back(GuiButton((view.width - 400) / 2 + 204, view_height / 2 + 96, 196, 40, "Quit Game", quit_game));
+    buttons.push_back(GuiButton((view.width - 400) / 2 + 204, view_height / 2 + 96, 196, 40, "Quit Game", std::bind(&GuiTitleScreen::quit_game, this)));
     buttons[2].enabled = false;
 
     // Randomize the initial Z positions of the logo blocks
@@ -221,7 +222,7 @@ void GuiTitleScreen::navigate(bool left, bool right, bool up, bool down)
 
 void GuiTitleScreen::join_singleplayer()
 {
-    Gui::set_gui(new GuiWorldSelect);
+    Gui::set_gui(new GuiWorldSelect(current_world));
 }
 
 void GuiTitleScreen::join_multiplayer()
@@ -237,20 +238,21 @@ void GuiTitleScreen::join_multiplayer()
     {
         int32_t server_port = config.get<int32_t>("port", 25565);
 
-        current_world = new World;
+        World *new_world = new World;
         try
         {
             Gui::set_gui(new GuiDirtscreen);
 
             // Attempt to connect to the server
-            current_world->set_remote(true);
-            current_world->client->joinServer(server_ip, server_port);
+            new_world->set_remote(true);
+            new_world->client->joinServer(server_ip, server_port);
+            *current_world = new_world;
         }
         catch (std::runtime_error &e)
         {
             // If connection fails, set the world to local
-            current_world->set_remote(false);
-            delete current_world;
+            new_world->set_remote(false);
+            delete new_world;
             printf("Failed to connect to server: %s\n", e.what());
         }
     }

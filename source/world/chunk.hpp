@@ -102,12 +102,14 @@ public:
 };
 
 class NBTTagCompound;
+class World;
 
 class Chunk
 {
 public:
     int x = 0;
     int z = 0;
+    World *world = nullptr;
     ChunkGenStage generation_stage = ChunkGenStage::empty;
     uint8_t lit_state = 0;
     Block blockstates[16 * 16 * WORLD_HEIGHT] = {0};
@@ -217,7 +219,7 @@ public:
     void render_entities(float partial_ticks, bool transparency);
 
     uint32_t size();
-    Chunk(int32_t x, int32_t z) : x(x), z(z)
+    Chunk(int32_t x, int32_t z, World *world) : x(x), z(z), world(world)
     {
         for (int y = 0; y < VERTICAL_SECTION_COUNT; y++)
         {
@@ -239,31 +241,4 @@ private:
 class ChunkProvider;
 
 extern const Vec3i face_offsets[];
-extern mutex_t chunk_mutex;
-std::deque<Chunk *> &get_chunks();
-void init_chunk_manager(ChunkProvider *chunk_provider);
-void deinit_chunk_manager();
-void set_world_hell(bool hell);
-BlockID get_block_id_at(const Vec3i &position, BlockID default_id = BlockID::air);
-Block *get_block_at(const Vec3i &vec);
-uint8_t get_meta_at(const Vec3i &position);
-void set_block_at(const Vec3i &pos, BlockID id);
-void set_meta_at(const Vec3i &pos, uint8_t meta);
-void set_block_and_meta_at(const Vec3i &pos, BlockID id, uint8_t meta);
-void replace_air_at(Vec3i pos, BlockID id);
-Chunk *get_chunk_from_pos(const Vec3i &pos);
-Chunk *get_chunk(int32_t x, int32_t z);
-Chunk *get_chunk(const Vec2i &pos);
-bool add_chunk(int32_t x, int32_t z);
-void remove_chunk(Chunk *chunk);
-void remove_chunks_if(std::function<bool(Chunk *)> predicate);
-void get_neighbors(const Vec3i &pos, Block **neighbors);
-void notify_at(const Vec3i &pos);
-void mark_block_dirty(const Vec3i &pos);
-void notify_neighbors(const Vec3i &pos);
-Vec3f get_fluid_direction(Block *block, Vec3i pos);
-std::map<int32_t, EntityPhysical *> &get_entities();
-void add_entity(EntityPhysical *entity);
-void remove_entity(int32_t entity_id);
-EntityPhysical *get_entity_by_id(int32_t entity_id);
 #endif

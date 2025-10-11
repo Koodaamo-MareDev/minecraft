@@ -4,6 +4,7 @@
 #include <block/blocks.hpp>
 #include <block/block_properties.hpp>
 #include <world/util/raycast.hpp>
+#include <world/world.hpp>
 #include <util/lock.hpp>
 #include <util/timers.hpp>
 #include <cmath>
@@ -17,13 +18,15 @@
 lwp_t LightEngine::thread_handle = 0;
 bool LightEngine::thread_active = false;
 bool LightEngine::use_skylight = true;
+World *LightEngine::current_world = nullptr;
 std::deque<Coord> LightEngine::pending_updates;
 
-void LightEngine::init()
+void LightEngine::init(World *world)
 {
     if (thread_active)
         return;
     thread_active = true;
+    current_world = world;
     auto light_engine_thread = [](void *) -> void *
     {
         while (thread_active)
@@ -117,7 +120,7 @@ static inline int8_t MAX_I8(int8_t a, int8_t b)
 void LightEngine::update(const Coord &update)
 {
     std::deque<Coord> light_updates;
-    std::deque<Chunk *> &chunks = get_chunks();
+    std::deque<Chunk *> &chunks = current_world->chunks;
     Coord origin = update;
     light_updates.push_back(origin);
     while (light_updates.size() > 0)
@@ -143,7 +146,7 @@ void LightEngine::update(const Coord &update)
             new_skylight = 0xF;
 
         Block *neighbors[6];
-        get_neighbors(Vec3i(current), neighbors);
+        current_world->get_neighbors(Vec3i(current), neighbors);
         int8_t opacity = get_block_opacity(block->get_blockid());
         if (opacity != 15)
         {
@@ -172,7 +175,7 @@ void LightEngine::update(const Coord &update)
                     // If the new position is outside the chunk, get the correct chunk from the position
                     if (chunk->x != (new_pos.x >> 4) || chunk->z != (new_pos.z >> 4))
                     {
-                        coord_chunk = get_chunk_from_pos(new_pos);
+                        coord_chunk = current_world->get_chunk_from_pos(new_pos);
                     }
                     light_updates.push_back(Coord(new_pos, coord_chunk));
                 }

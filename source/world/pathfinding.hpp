@@ -30,6 +30,7 @@ public:
     std::map<Vec3i, Vec3i> came_from;
     std::map<Vec3i, int> cost_so_far;
     std::priority_queue<Node> frontier;
+    World *current_world = nullptr;
 
     PathFinding() {}
 

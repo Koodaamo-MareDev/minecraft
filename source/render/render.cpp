@@ -31,6 +31,13 @@ GXTexObj gui_texture;
 WaterTexAnim water_still_anim;
 LavaTexanim lava_still_anim;
 
+World *render_world = nullptr;
+
+void set_render_world(World *world)
+{
+    render_world = world;
+}
+
 Camera &get_camera()
 {
     static Camera camera = {
@@ -138,7 +145,7 @@ void smooth_light(const Vec3i &pos, uint8_t face_index, const Vec3i &vertex_off,
         return;
     Vec3i face = pos + face_offsets[face_index];
     uint8_t total = 1;
-    Block *face_block = get_block_at(face);
+    Block *face_block = render_world ? render_world->get_block_at(face) : nullptr;
     if (!face_block)
         face_block = block;
     uint8_t block_light = face_block->block_light;
@@ -174,8 +181,8 @@ void smooth_light(const Vec3i &pos, uint8_t face_index, const Vec3i &vertex_off,
     default:
         break;
     }
-    Block *blockA = get_block_at(face + vertex_offA);
-    Block *blockB = get_block_at(face + vertex_offB);
+    Block *blockA = render_world ? render_world->get_block_at(face + vertex_offA) : nullptr;
+    Block *blockB = render_world ? render_world->get_block_at(face + vertex_offB) : nullptr;
     if (blockA)
     {
         if (properties(blockA->id).m_opacity == 15)
@@ -202,7 +209,7 @@ void smooth_light(const Vec3i &pos, uint8_t face_index, const Vec3i &vertex_off,
             sky_light += blockB->sky_light;
         }
     }
-    Block *blockC = get_block_at(face + vertex_off);
+    Block *blockC = render_world ? render_world->get_block_at(face + vertex_off) : nullptr;
     if (blockC)
     {
         if (properties(blockC->id).m_opacity == 15)
@@ -364,11 +371,22 @@ Vec3i vertical_add(const Vec3i &a, uint8_t b)
     return Vec3i(a.x * 16, a.y - 17 + b * 2, a.z * 16);
 }
 
+inline uint8_t get_face_light_index(Vec3i pos, uint8_t face, Block *default_block = nullptr)
+{
+    Vec3i other = pos + face_offsets[face];
+    Block *other_block = render_world ? render_world->get_block_at(other) : nullptr;
+    if (!other_block)
+    {
+        if (default_block)
+            return default_block->light;
+        return 255;
+    }
+    return other_block->light;
+}
+
 void get_face(Vec3i pos, uint8_t face, uint32_t texture_index, Block *block, uint8_t min_y, uint8_t max_y, Vertex16 *out_vertices, uint8_t *out_lighting, uint8_t *out_ao)
 {
     Vec3i vertex_pos((pos.x & 0xF) << BASE3D_POS_FRAC_BITS, (pos.y & 0xF) << BASE3D_POS_FRAC_BITS, (pos.z & 0xF) << BASE3D_POS_FRAC_BITS);
-    if (!block)
-        block = get_block_at(pos);
     uint8_t light_val = get_face_light_index(pos, face, block);
     uint8_t ao[4] = {0, 0, 0, 0};
     uint8_t ao_no_op[4] = {0, 0, 0, 0};
@@ -1104,8 +1122,8 @@ void draw_stars()
 
 float get_celestial_angle()
 {
-    int daytime_ticks = (current_world->time_of_day % 24000);
-    float normalized_daytime = ((float)daytime_ticks + current_world->partial_ticks) / 24000.0F - 0.25F;
+    int daytime_ticks = (render_world->time_of_day % 24000);
+    float normalized_daytime = ((float)daytime_ticks + render_world->partial_ticks) / 24000.0F - 0.25F;
     if (normalized_daytime < 0.0F)
     {
         ++normalized_daytime;
@@ -1152,7 +1170,7 @@ float get_sky_multiplier()
 }
 GXColor get_sky_color(bool cave_darkness)
 {
-    if (current_world && current_world->hell)
+    if (render_world && render_world->hell)
         return GXColor{0x20, 0, 0, 0xFF};
 
     Camera &camera = get_camera();
@@ -1272,6 +1290,8 @@ void draw_sunrise()
 
 void draw_sky()
 {
+    if (!render_world)
+        return;
     // Disable fog
     gertex::use_fog(false);
 
@@ -1342,7 +1362,7 @@ void draw_sky()
     transform_view(gertex::get_view_matrix(), guVector{0, 0, 0});
 
     // Clouds are moving at a speed of 0.05 blocks per tick.
-    float uv_offset = (current_world->ticks % 40960 + current_world->partial_ticks) * 0.05f / 2048.0f;
+    float uv_offset = (render_world->ticks % 40960 + render_world->partial_ticks) * 0.05f / 2048.0f;
 
     // Clouds are a bit yellowish white. They are also affected by the time
     float sky_multiplier = get_sky_multiplier();

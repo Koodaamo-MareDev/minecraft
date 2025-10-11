@@ -6,6 +6,7 @@
 #include <world/chunk.hpp>
 #include <render/render.hpp>
 #include <render/render_gui.hpp>
+#include <render/render_fluids.hpp> // For fluid direction
 #include <block/blocks.hpp>
 #include <world/light.hpp>
 #include <world/particle.hpp>
@@ -40,7 +41,7 @@ bool EntityPhysical::can_remove()
     if (entity_pos.y > 255)
         return false;
     Vec3i int_pos = entity_pos.round();
-    Chunk *curr_chunk = get_chunk_from_pos(int_pos);
+    Chunk *curr_chunk = world->get_chunk_from_pos(int_pos);
     if (!curr_chunk)
         return true;
     if (int_pos.y < 0 || int_pos.y >= 256)
@@ -87,7 +88,7 @@ void EntityPhysical::tick()
 {
     prev_rotation = rotation;
     prev_position = position;
-    if (current_world->is_remote() && !simulate_offline)
+    if (world->is_remote() && !simulate_offline)
     {
         return;
     }
@@ -107,7 +108,7 @@ void EntityPhysical::tick()
             for (int z = min.z; z < max.z; z++)
             {
                 Vec3i block_pos = Vec3i(x, y, z);
-                Block *block = get_block_at(block_pos);
+                Block *block = world->get_block_at(block_pos);
                 if (!block)
                     continue;
                 if (!block->intersects(fluid_aabb, block_pos))
@@ -116,9 +117,9 @@ void EntityPhysical::tick()
                     cobweb_movement = true;
                 if (!is_fluid(block->get_blockid()))
                     continue;
-                if (y + 1 - get_fluid_height(block_pos, block->get_blockid()) >= max.y)
+                if (y + 1 - get_fluid_height(world, block_pos, block->get_blockid()) >= max.y)
                     continue;
-                fluid_velocity = fluid_velocity + get_fluid_direction(block, block_pos);
+                fluid_velocity = fluid_velocity + get_fluid_direction(world, block, block_pos);
                 BlockID base_fluid = basefluid(block->get_blockid());
                 if (base_fluid == BlockID::water)
                     water_movement = true;
@@ -139,7 +140,7 @@ void EntityPhysical::tick()
             sound.position = position;
             sound.pitch = 0.6 + rng.nextFloat() * 0.8;
             sound.volume = impact;
-            current_world->play_sound(sound);
+            world->play_sound(sound);
 
             Particle particle;
             particle.life_time = particle.max_life_time = 80;
@@ -163,7 +164,7 @@ void EntityPhysical::tick()
                 // Randomize life time
                 particle.life_time = particle.max_life_time - (rand() % 20);
 
-                current_world->add_particle(particle);
+                world->add_particle(particle);
             }
             particle.physics |= PPHYSIC_FLAG_GRAVITY;
             particle.v = 16;
@@ -179,7 +180,7 @@ void EntityPhysical::tick()
                 // Randomize life time
                 particle.life_time = particle.max_life_time - (rand() % 20);
 
-                current_world->add_particle(particle);
+                world->add_particle(particle);
             }
         }
         in_water = true;
@@ -224,7 +225,7 @@ void EntityPhysical::tick()
     }
     else
     {
-        BlockID block_at_feet = get_block_id_at(Vec3i(std::floor(position.x), std::floor(aabb.min.y) - 1, std::floor(position.z)), BlockID::air);
+        BlockID block_at_feet = world->get_block_id_at(Vec3i(std::floor(position.x), std::floor(aabb.min.y) - 1, std::floor(position.z)), BlockID::air);
         vfloat_t h_friction = 0.91;
         if (on_ground)
         {
@@ -372,7 +373,7 @@ std::vector<AABB> EntityPhysical::get_colliding_aabbs(const AABB &aabb)
             for (int z = min.z; z < max.z; z++)
             {
                 Vec3i block_pos = Vec3i(x, y, z);
-                Block *block = get_block_at(block_pos);
+                Block *block = world->get_block_at(block_pos);
                 if (!block)
                     continue;
                 if (properties(block->id).m_collision == CollisionType::solid)
@@ -400,7 +401,7 @@ bool EntityPhysical::is_colliding_fluid(const AABB &aabb)
             for (int z = min.z; z < max.z; z++)
             {
                 Vec3i block_pos = Vec3i(x, y, z);
-                Block *block = get_block_at(block_pos);
+                Block *block = world->get_block_at(block_pos);
                 if (block && properties(block->id).m_collision == CollisionType::fluid && block->intersects(aabb, block_pos))
                     return true;
             }
@@ -455,6 +456,7 @@ void EntityPhysical::move_and_check_collisions()
 
 Vec3f EntityPathfinder::simple_pathfind(Vec3f target)
 {
+    pathfinder.current_world = world;
     return pathfinder.simple_pathfind(Vec3f(position.x, aabb.min.y, position.z), target, path);
 }
 
@@ -472,7 +474,7 @@ void EntityFallingBlock::tick()
 {
     fall_time++;
     EntityPhysical::tick();
-    if (current_world->is_remote())
+    if (world->is_remote())
         return;
     if (dead)
         return;
@@ -480,12 +482,12 @@ void EntityFallingBlock::tick()
     if (on_ground)
     {
         Vec3i int_pos = get_foot_blockpos();
-        Block *block = get_block_at(int_pos);
+        Block *block = world->get_block_at(int_pos);
         if (block && (block->get_blockid() == BlockID::air || properties(block->id).m_fluid))
         {
             // Update the block
-            set_block_and_meta_at(int_pos, block_state.get_blockid(), block_state.meta);
-            notify_at(int_pos);
+            world->set_block_and_meta_at(int_pos, block_state.get_blockid(), block_state.meta);
+            world->notify_at(int_pos);
             dead = true;
         }
         else
@@ -501,17 +503,17 @@ void EntityFallingBlock::tick()
         dead = true;
 
         // Drop the block as an item
-        if (current_world && !current_world->is_remote())
+        if (world && !world->is_remote())
         {
             inventory::ItemStack item = properties(block_state.id).m_drops(block_state);
-            current_world->spawn_drop(get_foot_blockpos(), &block_state, item);
+            world->spawn_drop(get_foot_blockpos(), &block_state, item);
         }
     }
 }
 
 bool EntityFallingBlock::can_remove()
 {
-    if (current_world->is_remote())
+    if (world->is_remote())
         return false;
     // This flag is prioritized
     if (dead)
@@ -581,7 +583,7 @@ EntityExplosiveBlock::EntityExplosiveBlock(Block block_state, const Vec3i &posit
         sound.position = get_position(0);
         sound.volume = 0.5;
         sound.pitch = 1.0;
-        current_world->play_sound(sound);
+        world->play_sound(sound);
     }
 }
 
@@ -632,7 +634,7 @@ EntityCreeper::EntityCreeper(const Vec3f &position) : EntityExplosive(), EntityL
 
 void EntityCreeper::tick()
 {
-    if (current_world->is_remote())
+    if (world->is_remote())
     {
         EntityPhysical::tick();
         return;
@@ -644,7 +646,7 @@ void EntityCreeper::tick()
         {
             for (int z = position.z - 16; z <= position.z + 16 && !follow_entity; z += 16)
             {
-                Chunk *curr_chunk = get_chunk_from_pos(Vec3i(x, 0, z));
+                Chunk *curr_chunk = world->get_chunk_from_pos(Vec3i(x, 0, z));
                 if (!curr_chunk)
                     continue;
                 for (EntityPhysical *entity : curr_chunk->entities)
@@ -699,7 +701,7 @@ void EntityCreeper::tick()
                 sound.position = position;
                 sound.volume = 0.5;
                 sound.pitch = 1.0;
-                current_world->play_sound(sound);
+                world->play_sound(sound);
             }
 
             EntityExplosive::tick();
@@ -741,7 +743,7 @@ void EntityCreeper::render(float partial_ticks, bool transparency)
     Vec3f entity_rotation = get_rotation(partial_ticks);
 
     Vec3i block_pos = entity_position.round();
-    Block *block = get_block_at(block_pos);
+    Block *block = world->get_block_at(block_pos);
     if (block && !properties(block->id).m_solid)
     {
         light_level = block->light;
@@ -836,7 +838,7 @@ void EntityItem::tick()
 {
     EntityPhysical::tick();
 
-    if (current_world->is_remote())
+    if (world->is_remote())
         return;
 
     if (ticks_existed >= 6000)
@@ -862,7 +864,7 @@ void EntityItem::render(float partial_ticks, bool transparency)
     }
 
     Vec3i block_pos = entity_position.round();
-    Block *light_block = get_block_at(block_pos);
+    Block *light_block = world->get_block_at(block_pos);
     if (light_block && !properties(light_block->id).m_solid)
     {
         light_level = light_block->light;
@@ -872,7 +874,7 @@ void EntityItem::render(float partial_ticks, bool transparency)
     Vec3f item_rot = Vec3f(0, 0, 0);
 
     // Get the direction towards the player
-    item_rot.y = current_world->player.rotation.y + 180;
+    item_rot.y = world->player.rotation.y + 180;
 
     // Lock the item rotation to the y-axis
     item_rot.x = 0;
@@ -930,7 +932,7 @@ void EntityItem::render(float partial_ticks, bool transparency)
 
 void EntityItem::resolve_collision(EntityPhysical *b)
 {
-    if (current_world->is_remote())
+    if (world->is_remote())
         return;
     if (dead || picked_up || ticks_existed < 20)
         return;
@@ -939,7 +941,7 @@ void EntityItem::resolve_collision(EntityPhysical *b)
     if (!player)
         return;
 
-    inventory::ItemStack left_over = current_world->player.items.add(item_stack);
+    inventory::ItemStack left_over = world->player.items.add(item_stack);
     if (left_over.count)
     {
         if (left_over.count != item_stack.count)
@@ -950,7 +952,7 @@ void EntityItem::resolve_collision(EntityPhysical *b)
             sound.position = position;
             sound.volume = 0.5;
             sound.pitch = rng.nextFloat() * 0.8 + 0.6;
-            current_world->play_sound(sound);
+            world->play_sound(sound);
             if (Gui::get_gui())
                 Gui::get_gui()->refresh();
         }
@@ -979,7 +981,7 @@ void EntityItem::pickup(Vec3f pos)
     sound.position = position;
     sound.volume = 0.5;
     sound.pitch = rng.nextFloat() * 0.8 + 0.6;
-    current_world->play_sound(sound);
+    world->play_sound(sound);
 
     // Mark the item as picked up
     picked_up = true;
@@ -1000,12 +1002,12 @@ void EntityExplosive::tick()
 void EntityExplosive::explode()
 {
     dead = true;
-    current_world->create_explosion(position + Vec3i(0, y_offset - y_size, 0), power);
+    world->create_explosion(position + Vec3i(0, y_offset - y_size, 0), power);
 }
 
 void EntityLiving::fall(vfloat_t distance)
 {
-    if (current_world->is_remote())
+    if (world->is_remote())
         return;
     int damage = std::ceil(distance - 3);
     if (damage > 0)
@@ -1014,14 +1016,14 @@ void EntityLiving::fall(vfloat_t distance)
 
         Vec3f feet_pos(position.x, aabb.min.y - 0.5, position.z);
         Vec3i feet_block_pos = Vec3i(std::floor(feet_pos.x), std::floor(feet_pos.y), std::floor(feet_pos.z));
-        BlockID block_at_feet = get_block_id_at(feet_block_pos, BlockID::air);
+        BlockID block_at_feet = world->get_block_id_at(feet_block_pos, BlockID::air);
         feet_block_pos.y--;
-        BlockID block_below_feet = get_block_id_at(feet_block_pos, BlockID::air);
+        BlockID block_below_feet = world->get_block_id_at(feet_block_pos, BlockID::air);
         if (block_below_feet != BlockID::air)
         {
             Sound sound = get_step_sound(block_at_feet);
             sound.position = feet_pos;
-            current_world->play_sound(sound);
+            world->play_sound(sound);
         }
     }
 }
@@ -1032,7 +1034,7 @@ void EntityLiving::hurt(int16_t damage)
     hurt_ticks = 10;
     if (health < 0)
         health = 0;
-    if (health == 0 && !current_world->is_remote())
+    if (health == 0 && !world->is_remote())
     {
         dead = true;
     }
@@ -1066,16 +1068,16 @@ void EntityLiving::tick()
         {
             Vec3f feet_pos(position.x, aabb.min.y - 0.5, position.z);
             Vec3i feet_block_pos = Vec3i(std::floor(feet_pos.x), std::floor(feet_pos.y), std::floor(feet_pos.z));
-            BlockID block_at_feet = get_block_id_at(feet_block_pos, BlockID::air);
+            BlockID block_at_feet = world->get_block_id_at(feet_block_pos, BlockID::air);
             feet_block_pos.y--;
-            BlockID block_below_feet = get_block_id_at(feet_block_pos, BlockID::air);
+            BlockID block_below_feet = world->get_block_id_at(feet_block_pos, BlockID::air);
             if (block_below_feet != BlockID::air)
             {
                 if (!properties(block_at_feet).m_fluid)
                 {
                     Sound sound = get_step_sound(block_at_feet);
                     sound.position = feet_pos;
-                    current_world->play_sound(sound);
+                    world->play_sound(sound);
                     last_step_distance = 0;
                 }
             }
@@ -1095,7 +1097,7 @@ void EntityLiving::render(float partial_ticks, bool transparency)
     Vec3f entity_position = get_position(partial_ticks);
     Vec3f entity_rotation = get_rotation(partial_ticks);
     Vec3i block_pos = entity_position.round();
-    Block *block = get_block_at(block_pos);
+    Block *block = world->get_block_at(block_pos);
     if (block && !properties(block->id).m_solid)
     {
         light_level = block->light;
@@ -1199,10 +1201,10 @@ void EntityPlayer::hurt(int16_t damage)
     EntityLiving::hurt(damage);
     javaport::Random rng;
     Sound sound = get_sound("random/hurt");
-    sound.position = current_world->player.position;
+    sound.position = world->player.position;
     sound.volume = 0.5;
     sound.pitch = rng.nextFloat() * 0.4 + 0.8;
-    current_world->play_sound(sound);
+    world->play_sound(sound);
 }
 
 EntityPlayerLocal::EntityPlayerLocal(const Vec3f &position) : EntityPlayer(position)
@@ -1216,7 +1218,7 @@ void EntityPlayerLocal::serialize(NBTTagCompound *result)
     EntityLiving::serialize(result);
 
     result->setTag("Inventory", new NBTTagList);
-    result->setTag("Dimension", new NBTTagInt(-int(current_world->hell)));
+    result->setTag("Dimension", new NBTTagInt(-int(world->hell)));
     result->setTag("Score", new NBTTagInt(0));
     result->setTag("Sleeping", new NBTTagByte(in_bed));
     result->setTag("SleepTimer", new NBTTagShort(0));
@@ -1227,7 +1229,7 @@ void EntityPlayerLocal::deserialize(NBTTagCompound *result)
 {
     EntityLiving::deserialize(result);
 
-    set_world_hell(result->getInt("Dimension") == -1);
+    world->set_hell(result->getInt("Dimension") == -1);
     in_bed = result->getByte("Sleeping");
     NBTTagList *inv = dynamic_cast<NBTTagList *>(result->getTag("Inventory"));
     if (inv)
@@ -1239,7 +1241,7 @@ void EntityPlayerLocal::hurt(int16_t damage)
     EntityPlayer::hurt(damage);
     health_update_tick = 10;
     get_camera().rot.z += 8; // Tilt the camera a bit
-    if (dead && !current_world->is_remote())
+    if (dead && !world->is_remote())
     {
         GuiDirtscreen *dirt_screen = new GuiDirtscreen;
         dirt_screen->set_text("Respawning...");
@@ -1279,7 +1281,7 @@ void EntityPlayerLocal::tick()
         movement = Vec3f(0);
     }
     EntityLiving::tick();
-    if (!current_world->is_remote() && aabb.min.y < -750)
+    if (!world->is_remote() && aabb.min.y < -750)
         teleport(Vec3f(position.x, 256, position.z));
 }
 

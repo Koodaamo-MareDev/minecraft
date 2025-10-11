@@ -8,8 +8,9 @@ class GuiTitleScreen : public Gui
 {
 public:
     std::string splash_text = "§ePorted by Myntti!";
+    World **current_world;
 
-    GuiTitleScreen();
+    GuiTitleScreen(World **current_world);
 
     void draw() override;
     void update() override;
@@ -24,8 +25,8 @@ private:
     bool joystick_pressed = true;
     int joystick_timer = 0;
     void navigate(bool left, bool right, bool up, bool down);
-    static void join_singleplayer();
-    static void join_multiplayer();
-    static void quit_game();
+    void join_singleplayer();
+    void join_multiplayer();
+    void quit_game();
 };
 #endif

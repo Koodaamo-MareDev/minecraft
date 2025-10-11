@@ -17,6 +17,7 @@ constexpr vfloat_t ENTITY_GRAVITY = 9.8f;
 constexpr uint8_t creeper_fuse = 20;
 
 class Chunk;
+class World;
 
 class EntityBase
 {
@@ -52,6 +53,7 @@ public:
     vfloat_t y_size = 0;
     vfloat_t gravity = 0.08;
     Chunk *chunk = nullptr;
+    World *world = nullptr;
     bool on_ground = false;
     bool in_water = false;
     bool jumping = false;

@@ -13,7 +13,6 @@
 #include <util/lock.hpp>
 #include <world/chunkprovider.hpp>
 #include <render/model.hpp>
-#include <light_nether_rgba.h>
 #include <tuple>
 #include <map>
 #include <vector>
@@ -37,310 +36,9 @@ const Vec3i face_offsets[] = {
     Vec3i{+0, +0, -1},  // Negative Z
     Vec3i{+0, +0, +1}}; // Positive Z
 
-mutex_t chunk_mutex = LWP_MUTEX_NULL;
-static lwp_t chunk_manager_thread_handle = LWP_THREAD_NULL;
-static bool run_chunk_manager = false;
-
-std::deque<Chunk *> chunks;
-std::deque<Chunk *> chunk_cache;
-std::deque<Chunk *> pending_chunks;
-
-// Used to set the world to hell
-void set_world_hell(bool hell)
-{
-    if (current_world->hell == hell)
-        return;
-
-    // Stop processing any light updates
-    LightEngine::reset();
-    if (hell)
-    {
-        // Set the light map to the nether light map
-        memcpy(light_map, light_nether_rgba, 1024); // 256 * 4
-        GX_SetArray(GX_VA_CLR0, light_map, 4 * sizeof(u8));
-        GX_InvVtxCache();
-    }
-
-    // Disable sky light in hell
-    LightEngine::enable_skylight(!hell);
-
-    current_world->hell = hell;
-}
-
-std::deque<Chunk *> &get_chunks()
-{
-    return chunks;
-}
-
-std::map<int32_t, EntityPhysical *> &get_entities()
-{
-    static std::map<int32_t, EntityPhysical *> world_entities;
-    return world_entities;
-}
-
-Chunk *get_chunk_from_pos(const Vec3i &pos)
-{
-    return get_chunk(block_to_chunk_pos(pos));
-}
-
-Chunk *get_chunk(const Vec2i &pos)
-{
-    return get_chunk(pos.x, pos.y);
-}
-
-Chunk *get_chunk(int32_t x, int32_t z)
-{
-    auto predicate = [x, z](Chunk *chunk)
-    {
-        return chunk && chunk->x == x && chunk->z == z;
-    };
-    Lock chunk_lock(chunk_mutex);
-
-    std::deque<Chunk *>::iterator it = std::find_if(chunk_cache.begin(), chunk_cache.end(), predicate);
-    if (it == chunk_cache.end())
-    {
-        // In case of a cache miss, try to find the chunk in the active chunks
-        it = std::find_if(chunks.begin(), chunks.end(), predicate);
-        if (it != chunks.end())
-        {
-            // Add it to the cache
-            chunk_cache.push_front(*it);
-            return *it;
-        }
-
-        // Chunk not found
-        return nullptr;
-    }
-
-    Chunk *chunk = *it;
-
-    // Move the chunk to the front of the cache for faster access
-    chunk_cache.erase(it);
-    chunk_cache.push_front(chunk);
-
-    return chunk;
-}
-
-void remove_chunk(Chunk *chunk)
-{
-    if (!chunk)
-        return;
-
-    Lock chunk_lock(chunk_mutex);
-
-    // Remove the chunk from the active list
-    chunks.erase(std::remove(chunks.begin(), chunks.end(), chunk), chunks.end());
-
-    // Remove the chunk from the cache
-    chunk_cache.erase(std::remove(chunk_cache.begin(), chunk_cache.end(), chunk), chunk_cache.end());
-
-    // Delete the chunk
-    delete chunk;
-}
-
-void remove_chunks_if(std::function<bool(Chunk *)> predicate)
-{
-    Lock chunk_lock(chunk_mutex);
-
-    // Get list of chunks to be removed
-    std::vector<Chunk *> chunks_to_remove;
-    for (Chunk *chunk : chunks)
-    {
-        if (predicate(chunk))
-        {
-            chunks_to_remove.push_back(chunk);
-        }
-    }
-
-    chunk_lock.unlock();
-
-    for (Chunk *chunk : chunks_to_remove)
-    {
-        remove_chunk(chunk);
-    }
-}
-
-bool add_chunk(int32_t x, int32_t z)
-{
-    if (!run_chunk_manager || pending_chunks.size() + chunks.size() >= CHUNK_COUNT)
-        return false;
-    Lock chunk_lock(chunk_mutex);
-
-    // Function to find a chunk with the given coordinates
-    auto find_chunk = [x, z](Chunk *chunk)
-    {
-        return chunk && chunk->x == x && chunk->z == z;
-    };
-
-    // Check if the chunk already exists
-    if (std::find_if(pending_chunks.begin(), pending_chunks.end(), find_chunk) != pending_chunks.end())
-        return false;
-    if (std::find_if(chunks.begin(), chunks.end(), find_chunk) != chunks.end())
-        return false;
-
-    Chunk *chunk = new Chunk(x, z);
-
-    // Check if the chunk exists in the region file
-    mcr::Region *region = mcr::get_region(x >> 5, z >> 5);
-    if (region->locations[(x & 31) | ((z & 31) << 5)] != 0)
-        chunk->generation_stage = ChunkGenStage::loading;
-
-    // Add the chunk to the pending chunks
-    pending_chunks.push_back(chunk);
-    std::sort(pending_chunks.begin(), pending_chunks.end());
-
-    return true;
-}
-
-void deinit_chunk_manager()
-{
-    if (chunk_manager_thread_handle == LWP_THREAD_NULL)
-        return;
-
-    // Tell the chunk manager thread to stop
-    run_chunk_manager = false;
-
-    LWP_JoinThread(chunk_manager_thread_handle, NULL);
-    chunk_manager_thread_handle = LWP_THREAD_NULL;
-
-    // Cleanup the chunk mutex
-    Lock::destroy(chunk_mutex);
-}
-
-void init_chunk_manager(ChunkProvider *chunk_provider)
-{
-    if (chunk_manager_thread_handle != LWP_THREAD_NULL)
-        return;
-
-    // Chunk provider can be null if something else will be providing the chunks.
-    // This should only happen when in a remote world which means that chunks are
-    // provided via the network code. In such a case, don't start the thread.
-    if (!chunk_provider)
-    {
-        return;
-    }
-    auto chunk_manager_thread = [](void *arg) -> void *
-    {
-        ChunkProvider *provider = (ChunkProvider *)arg;
-        run_chunk_manager = true;
-        while (run_chunk_manager)
-        {
-            while (pending_chunks.empty())
-            {
-                LWP_YieldThread();
-                if (!run_chunk_manager)
-                {
-                    return NULL;
-                }
-            }
-            Chunk *chunk = pending_chunks.back();
-
-            // Generate the base terrain for the chunk
-            provider->provide_chunk(chunk);
-
-            // Move the chunk to the active list
-            Lock chunk_lock(chunk_mutex);
-            chunks.push_back(chunk);
-            pending_chunks.erase(std::find(pending_chunks.begin(), pending_chunks.end(), chunk));
-            chunk_lock.unlock();
-
-            // Finish the chunk with features
-            provider->populate_chunk(chunk);
-
-            usleep(100);
-        }
-        return NULL;
-    };
-
-    LWP_CreateThread(&chunk_manager_thread_handle,
-                     chunk_manager_thread,
-                     chunk_provider,
-                     NULL,
-                     0,
-                     50);
-}
-
-BlockID get_block_id_at(const Vec3i &position, BlockID default_id)
-{
-    Block *block = get_block_at(position);
-    if (!block)
-        return default_id;
-    return block->get_blockid();
-}
-
-Block *get_block_at(const Vec3i &position)
-{
-    if (position.y < 0 || position.y > MAX_WORLD_Y)
-        return nullptr;
-    Chunk *chunk = get_chunk_from_pos(position);
-    if (!chunk)
-        return nullptr;
-    return chunk->get_block(position);
-}
-
-uint8_t get_meta_at(const Vec3i &position)
-{
-    Block *block = get_block_at(position);
-    if (!block)
-        return 0;
-    return block->meta;
-}
-
-void set_block_at(const Vec3i &pos, BlockID id)
-{
-    Block *block = get_block_at(pos);
-    if (block)
-    {
-        if (block->get_blockid() == id)
-            return;
-        block->set_blockid(id);
-        block->meta = 0;
-        BlockProperties &prop = properties(id);
-        if (id != BlockID::air && prop.m_added)
-            prop.m_added(pos, *block);
-        mark_block_dirty(pos);
-    }
-}
-
-void set_meta_at(const Vec3i &pos, uint8_t meta)
-{
-    Block *block = get_block_at(pos);
-    if (block)
-    {
-        if (block->meta == meta)
-            return;
-
-        block->meta = meta;
-        mark_block_dirty(pos);
-    }
-}
-
-void set_block_and_meta_at(const Vec3i &pos, BlockID id, uint8_t meta)
-{
-    Block *block = get_block_at(pos);
-    if (block)
-    {
-        if (block->get_blockid() == id && block->meta == meta)
-            return;
-        block->set_blockid(id);
-        block->meta = meta;
-        BlockProperties &prop = properties(id);
-        if (id != BlockID::air && prop.m_added)
-            prop.m_added(pos, *block);
-        mark_block_dirty(pos);
-    }
-}
-
-void replace_air_at(Vec3i pos, BlockID id)
-{
-    if (get_block_id_at(pos) != BlockID::air)
-        return;
-    set_block_at(pos, id);
-}
-
 int32_t Chunk::player_taxicab_distance()
 {
-    EntityPlayerLocal &player = current_world->player;
+    EntityPlayerLocal &player = world->player;
     Vec3f pos = player.get_position(0);
     return std::abs((this->x << 4) - (int32_t(std::floor(pos.x)) & ~15)) + std::abs((this->z << 4) - (int32_t(std::floor(pos.z)) & ~15));
 }
@@ -365,40 +63,6 @@ void Chunk::update_height_map(Vec3i pos)
             if (get_block_opacity(id))
                 break;
             (*height)--;
-        }
-    }
-}
-
-void notify_at(const Vec3i &pos)
-{
-    if (!current_world->is_remote())
-        notify_neighbors(pos);
-}
-
-void mark_block_dirty(const Vec3i &pos)
-{
-    if (pos.y > MAX_WORLD_Y || pos.y < 0)
-        return;
-    Chunk *chunk = get_chunk_from_pos(pos);
-    if (!chunk)
-        return;
-    chunk->update_height_map(pos);
-    LightEngine::post(Coord(pos, chunk));
-}
-
-void notify_neighbors(const Vec3i &pos)
-{
-    for (int i = 0; i < 6; i++)
-    {
-        Vec3i neighbour = pos + face_offsets[i];
-        Block *block = get_block_at(neighbour);
-        if (block)
-        {
-            BlockProperties &prop = properties(block->id);
-            if (prop.m_neighbor_changed)
-            {
-                prop.m_neighbor_changed(neighbour, *block);
-            }
         }
     }
 }
@@ -453,7 +117,7 @@ void Chunk::recalculate_height_map()
 void Chunk::recalculate_visibility(Block *block, Vec3i pos)
 {
     Block *neighbors[6];
-    get_neighbors(pos, neighbors);
+    world->get_neighbors(pos, neighbors);
     uint8_t visibility = 0x40;
     for (int i = 0; i < 6; i++)
     {
@@ -740,7 +404,6 @@ int Chunk::build_vbo(int index, bool transparent)
     if (displist_vbo == nullptr)
     {
         printf("Failed to allocate %d bytes for section %d VBO at (%d, %d)\n", displist_size, index, this->x, this->z);
-        printf("Chunk count: %d\n", chunks.size());
         return (1);
     }
 
@@ -778,108 +441,16 @@ int Chunk::build_vbo(int index, bool transparent)
     return (0);
 }
 
-void get_neighbors(const Vec3i &pos, Block **neighbors)
-{
-    for (int x = 0; x < 6; x++)
-        neighbors[x] = get_block_at(pos + face_offsets[x]);
-}
-
-Vec3f get_fluid_direction(Block *block, Vec3i pos)
-{
-
-    uint8_t fluid_level = get_fluid_meta_level(block);
-    if ((fluid_level & 7) == 0)
-        return Vec3f(0.0, -1.0, 0.0);
-
-    BlockID block_id = block->get_blockid();
-
-    // Used to check block types around the fluid
-    Block *neighbors[6];
-    get_neighbors(pos, neighbors);
-
-    Vec3f direction = Vec3f(0.0, 0.0, 0.0);
-
-    bool direction_set = false;
-    for (int i = 0; i < 6; i++)
-    {
-        if (i == FACE_NY || i == FACE_PY)
-            continue;
-        if (neighbors[i] && is_same_fluid(neighbors[i]->get_blockid(), block_id))
-        {
-            direction_set = true;
-            if (get_fluid_meta_level(neighbors[i]) < fluid_level)
-                direction = direction - Vec3f(face_offsets[i].x, 0, face_offsets[i].z);
-            else if (get_fluid_meta_level(neighbors[i]) > fluid_level)
-                direction = direction + Vec3f(face_offsets[i].x, 0, face_offsets[i].z);
-            else
-                direction_set = false;
-        }
-    }
-    if (!direction_set)
-        direction.y = -1.0;
-    return direction.fast_normalize();
-}
-
-void add_entity(EntityPhysical *entity)
-{
-    std::map<int32_t, EntityPhysical *> &world_entities = get_entities();
-
-    // If the world is local, assign a unique entity ID to prevent conflicts
-    if (!current_world->is_remote())
-    {
-        while (world_entities.find(entity->entity_id) != world_entities.end())
-        {
-            entity->entity_id++;
-        }
-    }
-    world_entities[entity->entity_id] = entity;
-    Vec3i entity_pos = Vec3i(int(std::floor(entity->position.x)), int(std::floor(entity->position.y)), int(std::floor(entity->position.z)));
-    entity->chunk = get_chunk_from_pos(entity_pos);
-    if (entity->chunk)
-        entity->chunk->entities.push_back(entity);
-}
-
-void remove_entity(int32_t entity_id)
-{
-    EntityPhysical *entity = get_entity_by_id(entity_id);
-    if (!entity)
-    {
-        printf("Removing unknown entity %d\n", entity_id);
-        return;
-    }
-    entity->dead = true;
-    if (!entity->chunk)
-    {
-        std::map<int32_t, EntityPhysical *> &world_entities = get_entities();
-        if (world_entities.find(entity_id) != world_entities.end())
-            world_entities.erase(entity_id);
-        if (dynamic_cast<EntityPlayerLocal *>(entity) == nullptr)
-            delete entity;
-    }
-}
-
-EntityPhysical *get_entity_by_id(int32_t entity_id)
-{
-    try
-    {
-        return get_entities().at(entity_id);
-    }
-    catch (std::out_of_range &)
-    {
-        return nullptr;
-    }
-}
-
 void Chunk::update_entities()
 {
-    if (!current_world->is_remote())
+    if (!world->is_remote())
     {
         // Resolve collisions with current chunk and neighboring chunks' entities
         for (int i = 0; i <= 6; i++)
         {
             if (i == FACE_NY)
                 i += 2;
-            Chunk *neighbor = (i == 6 ? this : get_chunk(this->x + face_offsets[i].x, this->z + face_offsets[i].z));
+            Chunk *neighbor = (i == 6 ? this : world->get_chunk(this->x + face_offsets[i].x, this->z + face_offsets[i].z));
             if (neighbor)
             {
                 for (EntityPhysical *&entity : neighbor->entities)
@@ -904,7 +475,7 @@ void Chunk::update_entities()
     // Move entities to the correct chunk
     auto out_of_bounds_selector = [&](EntityPhysical *&entity)
     {
-        Chunk *new_chunk = get_chunk_from_pos(entity->get_foot_blockpos());
+        Chunk *new_chunk = world->get_chunk_from_pos(entity->get_foot_blockpos());
         if (new_chunk != entity->chunk)
         {
             entity->chunk = new_chunk;
@@ -919,14 +490,14 @@ void Chunk::update_entities()
     entities.erase(std::remove_if(entities.begin(), entities.end(), out_of_bounds_selector), entities.end());
 
     // When in multiplayer, the server will handle entity removal
-    if (!current_world->is_remote())
+    if (!world->is_remote())
     {
         auto remove_selector = [&](EntityPhysical *&entity)
         {
             if (entity->can_remove())
             {
                 entity->chunk = nullptr;
-                remove_entity(entity->entity_id);
+                world->remove_entity(entity->entity_id);
                 return true;
             }
             return false;
@@ -975,11 +546,11 @@ Chunk::~Chunk()
         if (entity->chunk == this)
         {
             entity->chunk = nullptr;
-            if (!current_world->is_remote())
+            if (!world->is_remote())
             {
                 // Remove the entity from the global entity list
                 // NOTE: This will also delete the entity as its chunk is nullptr
-                remove_entity(entity->entity_id);
+                world->remove_entity(entity->entity_id);
             }
         }
     }
@@ -989,7 +560,7 @@ void Chunk::save(NBTTagCompound &compound)
 {
     compound.setTag("xPos", new NBTTagInt(x));
     compound.setTag("zPos", new NBTTagInt(z));
-    compound.setTag("LastUpdate", new NBTTagLong(current_world->ticks));
+    compound.setTag("LastUpdate", new NBTTagLong(world->ticks));
 
     std::vector<uint8_t> blocks = std::vector<uint8_t>(32768);
     std::vector<uint8_t> data = std::vector<uint8_t>(16384);
@@ -1264,7 +835,7 @@ void Chunk::read()
     generation_stage = ChunkGenStage::done;
 
     Vec3i pos(this->x * 16, 0, this->z * 16);
-    Lock lock(current_world->tick_mutex);
+    Lock lock(world->tick_mutex);
     for (int i = 0; i < 32768; i++)
     {
         Block *block = &this->blockstates[i];
@@ -1273,7 +844,7 @@ void Chunk::read()
         Vec3i block_pos = pos + Vec3i(i & 0xF, (i >> 8) & 0x7F, (i >> 4) & 0xF);
         BlockProperties &prop = properties(block->id);
         if (prop.m_tick_on_load)
-            current_world->schedule_block_update(block_pos, block->get_blockid(), 0);
+            world->schedule_block_update(block_pos, block->get_blockid(), 0);
     }
 
     // Mark chunk as dirty

@@ -1,5 +1,6 @@
 #include <world/particle.hpp>
 #include <world/chunk.hpp>
+#include <world/world.hpp>
 #include <block/block_properties.hpp>
 
 void Particle::update(float dt)
@@ -40,7 +41,7 @@ void Particle::update(float dt)
     Vec3i new_pos = Vec3i(std::round(position.x), std::round(position.y), std::round(position.z));
 
     // Get the block at the particle's position
-    Block *block = get_block_at(new_pos);
+    Block *block = world->get_block_at(new_pos);
     if (block)
     {
         if (old_pos != new_pos)
@@ -76,7 +77,7 @@ void Particle::update(float dt)
         }
     }
     new_pos = Vec3i(std::round(position.x), std::round(position.y), std::round(position.z));
-    block = get_block_at(new_pos);
+    block = world->get_block_at(new_pos);
     if (block)
     {
         brightness = block->light;
@@ -106,6 +107,7 @@ void ParticleSystem::add_particle(Particle part)
         if (particles[i].life_time == 0)
         {
             particles[i] = part;
+            particles[i].world = world;
             return;
         }
     }

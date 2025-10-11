@@ -6,6 +6,8 @@
 
 class Chunk;
 class Block;
-int render_fluid(Block *block, const Vec3i &pos);
+class World;
+Vec3f get_fluid_direction(World *world, Block *block, Vec3i pos);
+int render_fluid(Block *block, const Vec3i &pos, World *world);
 int render_section_fluids(Chunk &chunk, int index, bool transparent, int vertexCount);
 #endif

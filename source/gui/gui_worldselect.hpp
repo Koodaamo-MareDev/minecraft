@@ -18,7 +18,7 @@ struct WorldInfo
 class GuiWorldSelect : public Gui
 {
 public:
-    GuiWorldSelect();
+    GuiWorldSelect(World **current_world);
 
     bool validate_world(const std::string &path, WorldInfo &out_info);
 
@@ -31,7 +31,7 @@ public:
 protected:
     size_t selected_world = 0;
     std::vector<WorldInfo> world_list;
-
+    World **current_world;
 private:
     bool joystick_released = true;
     int joystick_timer = 0;

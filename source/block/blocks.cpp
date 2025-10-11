@@ -243,23 +243,23 @@ BlockID fluid_collision_result(BlockID original, BlockID target)
     return BlockID::air;
 }
 
-void schedule_update(const Vec3i &pos, Block &block)
+void schedule_update(World *world, const Vec3i &pos, Block &block)
 {
     BlockProperties &props = properties(block.get_blockid());
-    current_world->schedule_block_update(pos, block.get_blockid(), props.m_tick_rate);
+    world->schedule_block_update(pos, block.get_blockid(), props.m_tick_rate);
 }
 
-int get_fluid_level_at(Vec3i pos, BlockID src_id)
+int get_fluid_level_at(World *world, Vec3i pos, BlockID src_id)
 {
-    Block *block = get_block_at(pos);
+    Block *block = world->get_block_at(pos);
     if (block && is_same_fluid(block->get_blockid(), src_id))
         return block->meta & 0xF;
     return -1;
 }
 
-int get_min_fluid_level(Vec3i pos, BlockID src_id, int src_fluid_level, int &sources)
+int get_min_fluid_level(World *world, Vec3i pos, BlockID src_id, int src_fluid_level, int &sources)
 {
-    int fluid_level = get_fluid_level_at(pos, src_id);
+    int fluid_level = get_fluid_level_at(world, pos, src_id);
 
     // If the fluid level is invalid, default to the original fluid level
     if (fluid_level < 0)
@@ -278,19 +278,19 @@ int get_min_fluid_level(Vec3i pos, BlockID src_id, int src_fluid_level, int &sou
     return fluid_level;
 }
 
-void set_fluid_stationary(Vec3i pos)
+void set_fluid_stationary(World *world, Vec3i pos)
 {
     // Set the block to the base fluid, keeping the same meta
-    set_block_and_meta_at(pos, basefluid(get_block_id_at(pos)), get_meta_at(pos));
+    world->set_block_and_meta_at(pos, basefluid(world->get_block_id_at(pos)), world->get_meta_at(pos));
 }
 
-void flow_fluid_later(Vec3i pos)
+void flow_fluid_later(World *world, Vec3i pos)
 {
-    Block *block = get_block_at(pos);
+    Block *block = world->get_block_at(pos);
     if (block)
     {
-        set_block_and_meta_at(pos, flowfluid(get_block_id_at(pos)), get_meta_at(pos));
-        schedule_update(pos, *block);
+        world->set_block_and_meta_at(pos, flowfluid(world->get_block_id_at(pos)), world->get_meta_at(pos));
+        schedule_update(world, pos, *block);
     }
 }
 
@@ -311,7 +311,7 @@ float get_percent_air(int fluid_level)
 // All I did was make it human readable and
 // converted it into suitable C++ code.
 // - Marcus
-float get_fluid_height(Vec3i pos, BlockID block_type)
+float get_fluid_height(World *world, Vec3i pos, BlockID block_type)
 {
     int block_x = pos.x, block_y = pos.y, block_z = pos.z;
     int surrounding_water = 0;
@@ -321,12 +321,12 @@ float get_fluid_height(Vec3i pos, BlockID block_type)
     {
         int check_x = block_x - (i & 1);
         int check_z = block_z - (i >> 1 & 1);
-        if (is_same_fluid(get_block_id_at(Vec3i(check_x, block_y + 1, check_z), BlockID::air), block_type))
+        if (is_same_fluid(world->get_block_id_at(Vec3i(check_x, block_y + 1, check_z), BlockID::air), block_type))
         {
             return 1.0F;
         }
 
-        BlockID check_block_type = get_block_id_at(Vec3i(check_x, block_y, check_z), BlockID::air);
+        BlockID check_block_type = world->get_block_id_at(Vec3i(check_x, block_y, check_z), BlockID::air);
         if (!is_same_fluid(check_block_type, block_type))
         {
             if (!is_solid(check_block_type))
@@ -337,7 +337,7 @@ float get_fluid_height(Vec3i pos, BlockID block_type)
         }
         else
         {
-            int fluid_level = get_fluid_meta_level(get_block_at(Vec3i(check_x, block_y, check_z)));
+            int fluid_level = get_fluid_meta_level(world->get_block_at(Vec3i(check_x, block_y, check_z)));
             if (fluid_level >= 8 || fluid_level == 0)
             {
                 water_percentage += get_percent_air(fluid_level) * 10.0F;
@@ -387,7 +387,7 @@ bool can_fluid_replace(BlockID fluid, BlockID id)
     return can_any_fluid_replace(id);
 }
 
-int get_flow_weight(Vec3i pos, BlockID fluid_type, int accumulated_weight, int previous_direction)
+int get_flow_weight(World *world, Vec3i pos, BlockID fluid_type, int accumulated_weight, int previous_direction)
 {
     int min_weight = 1000;
     for (int i = 0; i < 4; i++)
@@ -411,7 +411,7 @@ int get_flow_weight(Vec3i pos, BlockID fluid_type, int accumulated_weight, int p
             neighbor_z--;
         else if (i == 3)
             neighbor_z++;
-        Block *neighbor = get_block_at(Vec3i(neighbor_x, pos.y, neighbor_z));
+        Block *neighbor = world->get_block_at(Vec3i(neighbor_x, pos.y, neighbor_z));
         if (!neighbor)
             continue;
         BlockID neighbor_id = neighbor->get_blockid();
@@ -419,11 +419,11 @@ int get_flow_weight(Vec3i pos, BlockID fluid_type, int accumulated_weight, int p
         if (can_any_fluid_replace(neighbor_id) && (is_same_fluid(neighbor_id, fluid_type) || neighbor->meta != 0))
         {
             // Check if the neighbor allows downward flow
-            if (can_any_fluid_replace(get_block_id_at(Vec3i(neighbor_x, pos.y - 1, neighbor_z), BlockID::stone)))
+            if (can_any_fluid_replace(world->get_block_id_at(Vec3i(neighbor_x, pos.y - 1, neighbor_z), BlockID::stone)))
                 return accumulated_weight;
             if (accumulated_weight >= 4)
                 continue;
-            int weight = get_flow_weight(Vec3i(neighbor_x, pos.y, neighbor_z), fluid_type, accumulated_weight + 1, i);
+            int weight = get_flow_weight(world, Vec3i(neighbor_x, pos.y, neighbor_z), fluid_type, accumulated_weight + 1, i);
             if (weight < min_weight)
                 min_weight = weight;
         }
@@ -431,7 +431,7 @@ int get_flow_weight(Vec3i pos, BlockID fluid_type, int accumulated_weight, int p
     return min_weight;
 }
 
-void get_flow_directions(Vec3i pos, BlockID fluid_type, bool directions[4])
+void get_flow_directions(World *world, Vec3i pos, BlockID fluid_type, bool directions[4])
 {
     int weights[4];
     for (int i = 0; i < 4; i++)
@@ -448,16 +448,16 @@ void get_flow_directions(Vec3i pos, BlockID fluid_type, bool directions[4])
             neighbor_z--;
         else if (i == 3)
             neighbor_z++;
-        Block *neighbor = get_block_at(Vec3i(neighbor_x, pos.y, neighbor_z));
+        Block *neighbor = world->get_block_at(Vec3i(neighbor_x, pos.y, neighbor_z));
         if (!neighbor)
             continue;
         BlockID neighbor_id = neighbor->get_blockid();
         if (can_any_fluid_replace(neighbor_id) && (basefluid(neighbor_id) != basefluid(fluid_type) || neighbor->meta != 0))
         {
-            if (can_any_fluid_replace(get_block_id_at(Vec3i(neighbor_x, pos.y - 1, neighbor_z), BlockID::stone)))
+            if (can_any_fluid_replace(world->get_block_id_at(Vec3i(neighbor_x, pos.y - 1, neighbor_z), BlockID::stone)))
                 weights[i] = 0;
             else
-                weights[i] = get_flow_weight(Vec3i(neighbor_x, pos.y, neighbor_z), fluid_type, 1, i);
+                weights[i] = get_flow_weight(world, Vec3i(neighbor_x, pos.y, neighbor_z), fluid_type, 1, i);
         }
     }
 
@@ -486,9 +486,9 @@ uint8_t get_fluid_meta_level(Block *block)
     return 8;
 }
 
-uint8_t get_fluid_visual_level(Vec3i pos, BlockID block_id)
+uint8_t get_fluid_visual_level(World *world, Vec3i pos, BlockID block_id)
 {
-    return FLOAT_TO_FLUIDMETA(get_fluid_height(pos, block_id));
+    return FLOAT_TO_FLUIDMETA(get_fluid_height(world, pos, block_id));
 }
 
 inventory::ItemStack default_drop(const Block &old_block)
@@ -515,28 +515,28 @@ inventory::ItemStack random_drop(const Block &old_block, inventory::ItemStack it
     return item;
 }
 
-void default_destroy(const Vec3i &pos, const Block &old_block)
+void default_destroy(World *world, const Vec3i &pos, const Block &old_block)
 {
-    Block *block = get_block_at(pos + Vec3i(0, 1, 0));
+    Block *block = world->get_block_at(pos + Vec3i(0, 1, 0));
     if (block && properties(block->get_blockid()).m_needs_support)
     {
         // If the neighbor block needs support, destroy it.
-        current_world->destroy_block(pos + Vec3i(0, 1, 0), block);
+        world->destroy_block(pos + Vec3i(0, 1, 0), block);
     }
 }
 
-void stationary_fluid_tick(const Vec3i &pos, Block &block)
+void stationary_fluid_tick(World *world, const Vec3i &pos, Block &block)
 {
     // TODO: Lava fire spread
 }
 
-void flowing_fluid_tick(const Vec3i &pos, Block &block)
+void flowing_fluid_tick(World *world, const Vec3i &pos, Block &block)
 {
     BlockID orig_id = block.get_blockid();
     BlockProperties props = properties(orig_id);
-    int orig_level = get_fluid_level_at(pos, orig_id);
+    int orig_level = get_fluid_level_at(world, pos, orig_id);
     uint8_t drain_rate = props.m_drain_rate;
-    if (current_world->hell)
+    if (world->hell)
         drain_rate = std::max<uint8_t>(1, drain_rate / 2);
 
     bool stationary = true;
@@ -547,16 +547,16 @@ void flowing_fluid_tick(const Vec3i &pos, Block &block)
         int min_surrounding_level = -100;
 
         // Calculate next fluid level
-        min_surrounding_level = get_min_fluid_level(pos + Vec3i(-1, 0, 0), orig_id, min_surrounding_level, surrounding_sources);
-        min_surrounding_level = get_min_fluid_level(pos + Vec3i(1, 0, 0), orig_id, min_surrounding_level, surrounding_sources);
-        min_surrounding_level = get_min_fluid_level(pos + Vec3i(0, 0, -1), orig_id, min_surrounding_level, surrounding_sources);
-        min_surrounding_level = get_min_fluid_level(pos + Vec3i(0, 0, 1), orig_id, min_surrounding_level, surrounding_sources);
+        min_surrounding_level = get_min_fluid_level(world, pos + Vec3i(-1, 0, 0), orig_id, min_surrounding_level, surrounding_sources);
+        min_surrounding_level = get_min_fluid_level(world, pos + Vec3i(1, 0, 0), orig_id, min_surrounding_level, surrounding_sources);
+        min_surrounding_level = get_min_fluid_level(world, pos + Vec3i(0, 0, -1), orig_id, min_surrounding_level, surrounding_sources);
+        min_surrounding_level = get_min_fluid_level(world, pos + Vec3i(0, 0, 1), orig_id, min_surrounding_level, surrounding_sources);
 
         int current_level = min_surrounding_level + drain_rate;
         if (current_level >= 8 || min_surrounding_level < 0)
             current_level = -1;
 
-        int level_above = get_fluid_level_at(pos + Vec3i(0, 1, 0), orig_id);
+        int level_above = get_fluid_level_at(world, pos + Vec3i(0, 1, 0), orig_id);
         if (level_above >= 0)
         {
             current_level = level_above | 8;
@@ -565,7 +565,7 @@ void flowing_fluid_tick(const Vec3i &pos, Block &block)
         // Water source blocks can form if there are 2 or more surrounding source blocks
         if (surrounding_sources >= 2 && orig_id == BlockID::flowing_water)
         {
-            BlockID below_id = get_block_id_at(pos + Vec3i(0, -1, 0), BlockID::air);
+            BlockID below_id = world->get_block_id_at(pos + Vec3i(0, -1, 0), BlockID::air);
 
             if (is_solid(below_id) || (block.meta == 0 && basefluid(below_id) == orig_id))
                 current_level = 0;
@@ -589,44 +589,44 @@ void flowing_fluid_tick(const Vec3i &pos, Block &block)
             if (current_level < 0)
             {
                 // Drain the fluid completely.
-                set_block_at(pos, BlockID::air);
-                notify_at(pos);
+                world->set_block_at(pos, BlockID::air);
+                world->notify_at(pos);
             }
             else
             {
                 // Update to the new fluid level.
-                set_meta_at(pos, current_level);
-                notify_at(pos);
-                current_world->schedule_block_update(pos, orig_id, props.m_tick_rate);
+                world->set_meta_at(pos, current_level);
+                world->notify_at(pos);
+                world->schedule_block_update(pos, orig_id, props.m_tick_rate);
             }
         }
         else if (stationary)
         {
-            set_fluid_stationary(pos);
+            set_fluid_stationary(world, pos);
         }
     }
     else
     {
-        set_fluid_stationary(pos);
+        set_fluid_stationary(world, pos);
     }
 
     auto try_flow = [&](Vec3i offset, int level) -> bool
     {
-        if (can_fluid_replace(orig_id, get_block_id_at(pos + offset, BlockID::stone)))
+        if (can_fluid_replace(orig_id, world->get_block_id_at(pos + offset, BlockID::stone)))
         {
-            set_block_and_meta_at(pos + offset, orig_id, level);
-            notify_at(pos + offset);
+            world->set_block_and_meta_at(pos + offset, orig_id, level);
+            world->notify_at(pos + offset);
             return true;
         }
         return false;
     };
 
     // Flow downwards if possible
-    if (!try_flow(Vec3i(0, -1, 0), orig_level | 8) && (orig_level >= 0 && (orig_level == 0 || !can_any_fluid_replace(get_block_id_at(pos + Vec3i(0, -1, 0), BlockID::stone)))))
+    if (!try_flow(Vec3i(0, -1, 0), orig_level | 8) && (orig_level >= 0 && (orig_level == 0 || !can_any_fluid_replace(world->get_block_id_at(pos + Vec3i(0, -1, 0), BlockID::stone)))))
     {
         // Spread to sides if can't flow downwards
         bool flow_directions[4];
-        get_flow_directions(pos, orig_id, flow_directions);
+        get_flow_directions(world, pos, orig_id, flow_directions);
 
         int current_level = orig_level + drain_rate;
 
@@ -657,7 +657,7 @@ void flowing_fluid_tick(const Vec3i &pos, Block &block)
     }
 }
 
-void fluid_harden(const Vec3i &pos, Block &block)
+void fluid_harden(World *world, const Vec3i &pos, Block &block)
 {
     BlockID base_fluid_id = basefluid(block.get_blockid());
     if (base_fluid_id != BlockID::lava)
@@ -668,99 +668,99 @@ void fluid_harden(const Vec3i &pos, Block &block)
         if (direction == FACE_NY)
             continue;
         Vec3i offset = face_offsets[direction];
-        BlockID neighbor_id = get_block_id_at(pos + offset, BlockID::air);
+        BlockID neighbor_id = world->get_block_id_at(pos + offset, BlockID::air);
         if (is_same_fluid(neighbor_id, BlockID::water))
         {
-            int fluid_level = get_meta_at(pos);
+            int fluid_level = world->get_meta_at(pos);
             if (fluid_level == 0)
             {
-                set_block_at(pos, BlockID::obsidian);
-                notify_at(pos);
+                world->set_block_at(pos, BlockID::obsidian);
+                world->notify_at(pos);
                 return;
             }
             else if (fluid_level <= 4)
             {
-                set_block_at(pos, BlockID::cobblestone);
-                notify_at(pos);
+                world->set_block_at(pos, BlockID::cobblestone);
+                world->notify_at(pos);
                 return;
             }
         }
     }
 }
 
-void fluid_neighbor_update(const Vec3i &pos, Block &block)
+void fluid_neighbor_update(World *world, const Vec3i &pos, Block &block)
 {
-    fluid_harden(pos, block);
+    fluid_harden(world, pos, block);
 }
 
-void stationary_fluid_neighbor_update(const Vec3i &pos, Block &block)
+void stationary_fluid_neighbor_update(World *world, const Vec3i &pos, Block &block)
 {
     BlockID old_id = block.get_blockid();
-    fluid_neighbor_update(pos, block);
+    fluid_neighbor_update(world, pos, block);
     if (block.id == old_id)
-        flow_fluid_later(pos);
+        flow_fluid_later(world, pos);
 }
 
-void fluid_added(const Vec3i &pos, Block &block)
+void fluid_added(World *world, const Vec3i &pos, Block &block)
 {
-    fluid_harden(pos, block);
+    fluid_harden(world, pos, block);
 }
 
-void flowing_fluid_added(const Vec3i &pos, Block &block)
+void flowing_fluid_added(World *world, const Vec3i &pos, Block &block)
 {
     BlockID old_id = block.get_blockid();
-    fluid_added(pos, block);
+    fluid_added(world, pos, block);
     if (block.id == old_id)
-        schedule_update(pos, block);
+        schedule_update(world, pos, block);
 }
 
-void falling_block_tick(const Vec3i &pos, Block &block)
+void falling_block_tick(World *world, const Vec3i &pos, Block &block)
 {
-    BlockID block_below = get_block_id_at(pos + Vec3i(0, -1, 0));
+    BlockID block_below = world->get_block_id_at(pos + Vec3i(0, -1, 0));
     if (block_below == BlockID::air || properties(block_below).m_fluid)
     {
-        add_entity(new EntityFallingBlock(block, pos));
-        set_block_and_meta_at(pos, BlockID::air, 0);
-        notify_at(pos);
+        world->add_entity(new EntityFallingBlock(block, pos));
+        world->set_block_and_meta_at(pos, BlockID::air, 0);
+        world->notify_at(pos);
     }
 }
 
-void snow_layer_tick(const Vec3i &pos, Block &block)
+void snow_layer_tick(World *world, const Vec3i &pos, Block &block)
 {
-    Block *block_below = get_block_at(pos + Vec3i(0, -1, 0));
+    Block *block_below = world->get_block_at(pos + Vec3i(0, -1, 0));
     if (block_below && block_below->get_blockid() == BlockID::grass)
     {
         block_below->meta = 1; // Set the snowy flag
-        mark_block_dirty(pos + Vec3i(0, -1, 0));
+        world->mark_block_dirty(pos + Vec3i(0, -1, 0));
     }
 }
 
 // Turns broken ice into water unless it's floating in the air.
-void melt_destroy(const Vec3i &pos, const Block &old_block)
+void melt_destroy(World *world, const Vec3i &pos, const Block &old_block)
 {
     if (pos.y > 0)
     {
-        if (get_block_id_at(pos - Vec3i(0, 1, 0), BlockID::air) != BlockID::air)
+        if (world->get_block_id_at(pos - Vec3i(0, 1, 0), BlockID::air) != BlockID::air)
         {
-            set_block_at(pos, BlockID::water);
+            world->set_block_at(pos, BlockID::water);
         }
     }
 }
 
-void snow_layer_destroy(const Vec3i &pos, const Block &old_block)
+void snow_layer_destroy(World *world, const Vec3i &pos, const Block &old_block)
 {
-    Block *block = get_block_at(pos - Vec3i(0, 1, 0));
+    Block *block = world->get_block_at(pos - Vec3i(0, 1, 0));
     if (block && block->get_blockid() == BlockID::grass)
     {
         // If the block below is grass, reset the snowy flag.
         block->meta = 0;
-        mark_block_dirty(pos - Vec3i(0, 1, 0));
+        world->mark_block_dirty(pos - Vec3i(0, 1, 0));
     }
 }
 
-void spawn_tnt_destroy(const Vec3i &pos, const Block &old_block)
+void spawn_tnt_destroy(World *world, const Vec3i &pos, const Block &old_block)
 {
-    add_entity(new EntityExplosiveBlock(old_block, pos, 80));
+    world->add_entity(new EntityExplosiveBlock(old_block, pos, 80));
 }
 
 void default_aabb(const Vec3i &pos, Block *block, const AABB &other, std::vector<AABB> &aabb_list)
@@ -995,7 +995,7 @@ BlockProperties block_properties[256] = {
     BlockProperties().id(BlockID::redstone_torch).hardness(0.0f).texture(99).solid(false).opacity(0).transparent(true).luminance(7).sound(SoundType::stone).aabb(torch_aabb).render_type(RenderType::special).collision(CollisionType::none).needs_support(true),
     BlockProperties().id(BlockID::stone_button).tool(inventory::tool_type::pickaxe, inventory::tool_tier::no_tier).hardness(0.5f).texture(0).solid(false).opacity(0).transparent(false).sound(SoundType::stone).aabb(flat_aabb).render_type(RenderType::special).collision(CollisionType::none),
     BlockProperties().id(BlockID::snow_layer).tool(inventory::tool_type::shovel, inventory::tool_tier::wood).hardness(0.1f).texture(66).solid(false).opacity(0).transparent(false).sound(SoundType::cloth).aabb(snow_layer_aabb).render_type(RenderType::special).collision(CollisionType::none).drops(std::bind(no_drop, std::placeholders::_1)).destroy(snow_layer_destroy).needs_support(true),
-    BlockProperties().id(BlockID::ice).tool(inventory::tool_type::pickaxe, inventory::tool_tier::no_tier).hardness(0.5f).texture(67).solid(true).opacity(3).transparent(true).sound(SoundType::glass).slipperiness(0.98f).drops(std::bind(no_drop, std::placeholders::_1)).destroy(std::bind(melt_destroy, std::placeholders::_1, std::placeholders::_2)),
+    BlockProperties().id(BlockID::ice).tool(inventory::tool_type::pickaxe, inventory::tool_tier::no_tier).hardness(0.5f).texture(67).solid(true).opacity(3).transparent(true).sound(SoundType::glass).slipperiness(0.98f).drops(std::bind(no_drop, std::placeholders::_1)).destroy(std::bind(melt_destroy, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3)),
     BlockProperties().id(BlockID::snow_block).tool(inventory::tool_type::shovel, inventory::tool_tier::wood).hardness(0.2f).texture(66).solid(false).opacity(0).transparent(true).sound(SoundType::cloth).render_type(RenderType::full).collision(CollisionType::none),
     BlockProperties().id(BlockID::cactus).hardness(0.4f).texture(70).solid(false).opacity(0).transparent(true).sound(SoundType::cloth).aabb(cactus_aabb).render_type(RenderType::special).nonflat(true),
     BlockProperties().id(BlockID::clay).tool(inventory::tool_type::shovel, inventory::tool_tier::no_tier).hardness(0.6f).texture(72).sound(SoundType::dirt),

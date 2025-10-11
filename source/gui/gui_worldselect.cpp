@@ -6,7 +6,8 @@
 #include <filesystem>
 #include <fstream>
 
-GuiWorldSelect::GuiWorldSelect()
+GuiWorldSelect::GuiWorldSelect(World **current_world)
+    : current_world(current_world)
 {
     namespace fs = std::filesystem;
     fs::current_path("/apps/minecraft");
@@ -186,7 +187,7 @@ void GuiWorldSelect::update()
             {
                 if (selected_world < world_list.size())
                 {
-                    current_world = new World(world_list[selected_world].folder_name);
+                    *current_world = new World(world_list[selected_world].folder_name);
                     Gui::set_gui(nullptr);
                     break;
                 }

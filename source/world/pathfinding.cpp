@@ -29,10 +29,10 @@ bool PathFinding::a_star_search(Vec3i start, Vec3i goal, std::deque<Vec3i> &path
         Vec3i{0, -1, 0},
         Vec3i{0, 1, 0},
     };
-    auto is_valid = [](Vec3i position) -> bool
+    auto is_valid = [this](Vec3i position) -> bool
     {
-        Block *block = get_block_at(position);
-        Block *block_above = get_block_at(position + Vec3i(0, 1, 0));
+        Block *block = current_world->get_block_at(position);
+        Block *block_above = current_world->get_block_at(position + Vec3i(0, 1, 0));
         int y_below = checkbelow(position);
         if (position.y - y_below >= 10)
             return false;
@@ -64,7 +64,7 @@ bool PathFinding::a_star_search(Vec3i start, Vec3i goal, std::deque<Vec3i> &path
             {
                 if (!is_valid(next))
                     continue;
-                Block *block = get_block_at(next - Vec3i(0, 1, 0));
+                Block *block = current_world->get_block_at(next - Vec3i(0, 1, 0));
                 bool next_in_air = !block || properties(block->id).m_collision == CollisionType::none;
                 bool next_horizontal_in_air = false;
 
@@ -96,10 +96,10 @@ Vec3f PathFinding::simple_pathfind(Vec3f start, Vec3f goal, std::deque<Vec3i> &p
 
     bool path_valid = true;
 
-    auto is_valid = [](Vec3i position) -> bool
+    auto is_valid = [this](Vec3i position) -> bool
     {
-        Block *block = get_block_at(position);
-        Block *block_above = get_block_at(position + Vec3i(0, 1, 0));
+        Block *block = current_world->get_block_at(position);
+        Block *block_above = current_world->get_block_at(position + Vec3i(0, 1, 0));
         int y_below = checkbelow(position);
         if (position.y - y_below >= 10)
             return false;
@@ -141,7 +141,7 @@ Vec3f PathFinding::simple_pathfind(Vec3f start, Vec3f goal, std::deque<Vec3i> &p
     Vec3f dir = Vec3f(0, 0, 0);
     if (path.size() > 1)
         dir = (path[1] + Vec3f(0.5, 0, 0.5) - start);
-    if(path.size() > 2 && path[1].y != start_i.y)
+    if (path.size() > 2 && path[1].y != start_i.y)
         dir = dir + (path[2] + Vec3f(0.5, 0, 0.5) - start);
     return dir.fast_normalize();
 }

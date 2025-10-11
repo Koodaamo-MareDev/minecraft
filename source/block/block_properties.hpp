@@ -52,10 +52,11 @@ enum class CollisionType : uint8_t
 
 };
 class Block;
+class World;
 
 void default_aabb(const Vec3i &pos, Block *block, const AABB &other, std::vector<AABB> &aabb_list);
 void slab_aabb(const Vec3i &pos, Block *block, const AABB &other, std::vector<AABB> &aabb_list);
-void default_destroy(const Vec3i &pos, const Block &old_block);
+void default_destroy(World *world, const Vec3i &pos, const Block &old_block);
 inventory::ItemStack default_drop(const Block &old_block);
 
 struct BlockProperties
@@ -95,15 +96,15 @@ struct BlockProperties
 
     std::function<void(const Vec3i &, Block *, const AABB &, std::vector<AABB> &)> m_aabb = default_aabb;
 
-    std::function<void(const Vec3i &, const Block &)> m_destroy = default_destroy;
+    std::function<void(World *world, const Vec3i &, const Block &)> m_destroy = default_destroy;
 
     std::function<inventory::ItemStack(const Block &)> m_drops = default_drop;
 
-    std::function<void(const Vec3i &, Block &)> m_tick = nullptr;
+    std::function<void(World *world, const Vec3i &, Block &)> m_tick = nullptr;
 
-    std::function<void(const Vec3i &, Block &)> m_added = nullptr;
+    std::function<void(World *world, const Vec3i &, Block &)> m_added = nullptr;
 
-    std::function<void(const Vec3i &, Block &)> m_neighbor_changed = nullptr;
+    std::function<void(World *world, const Vec3i &, Block &)> m_neighbor_changed = nullptr;
 
     bool intersects(const Vec3i &pos, Block *block, const AABB &other)
     {
@@ -257,7 +258,7 @@ struct BlockProperties
         return *this;
     }
 
-    BlockProperties &destroy(std::function<void(const Vec3i &, const Block &)> destroy_func)
+    BlockProperties &destroy(std::function<void(World *world, const Vec3i &, const Block &)> destroy_func)
     {
         this->m_destroy = destroy_func;
         return *this;
@@ -269,19 +270,19 @@ struct BlockProperties
         return *this;
     }
 
-    BlockProperties &tick(std::function<void(const Vec3i &, Block &)> tick_func)
+    BlockProperties &tick(std::function<void(World *world, const Vec3i &, Block &)> tick_func)
     {
         this->m_tick = tick_func;
         return *this;
     }
 
-    BlockProperties &added(std::function<void(const Vec3i &, Block &)> added_func)
+    BlockProperties &added(std::function<void(World *world, const Vec3i &, Block &)> added_func)
     {
         this->m_added = added_func;
         return *this;
     }
 
-    BlockProperties &neighbor_changed(std::function<void(const Vec3i &, Block &)> neighbor_changed_func)
+    BlockProperties &neighbor_changed(std::function<void(World *world, const Vec3i &, Block &)> neighbor_changed_func)
     {
         this->m_neighbor_changed = neighbor_changed_func;
         return *this;

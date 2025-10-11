@@ -41,18 +41,11 @@ struct Camera
     vfloat_t far;    // Far clipping plane
 };
 
-inline uint8_t get_face_light_index(Vec3i pos, uint8_t face, Block *default_block = nullptr)
-{
-    Vec3i other = pos + face_offsets[face];
-    Block *other_block = get_block_at(other);
-    if (!other_block)
-    {
-        if (default_block)
-            return default_block->light;
-        return 255;
-    }
-    return other_block->light;
-}
+class World;
+
+extern World *render_world;
+
+void set_render_world(World *world);
 
 Camera &get_camera();
 
