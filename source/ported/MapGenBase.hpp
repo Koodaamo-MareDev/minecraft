@@ -2,9 +2,9 @@
 #define MAPGENBASE_HPP
 
 #include <cstdint>
-#include "Random.hpp"
-#include "SystemTime.hpp"
-#include "../chunk.hpp"
+#include <ported/Random.hpp>
+#include <ported/SystemTime.hpp>
+#include <world/chunk.hpp>
 
 namespace javaport
 {

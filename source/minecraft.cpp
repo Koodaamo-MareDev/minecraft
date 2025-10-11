@@ -7,22 +7,20 @@
 #include <ogc/conf.h>
 #include <stdarg.h>
 #include <sys/stat.h>
-#include "util/debuglog.hpp"
-#include "util/config.hpp"
-#include "block_id.hpp"
-#include "timers.hpp"
-#include "raycast.hpp"
-#include "render_gui.hpp"
-#include "inventory.hpp"
-#include "gui_survival.hpp"
-#include "gui_dirtscreen.hpp"
-#include "gui_titlescreen.hpp"
-#include "world.hpp"
-#include "util/input/keyboard_mouse.hpp"
-#include "util/input/wiimote_nunchuk.hpp"
-#include "util/input/wiimote_classic.hpp"
-#include "util/string_utils.hpp"
 #include <sys/unistd.h>
+#include <util/debuglog.hpp>
+#include <util/config.hpp>
+#include <util/timers.hpp>
+#include <render/render_gui.hpp>
+#include <item/inventory.hpp>
+#include <gui/gui_survival.hpp>
+#include <gui/gui_dirtscreen.hpp>
+#include <gui/gui_titlescreen.hpp>
+#include <world/world.hpp>
+#include <util/input/keyboard_mouse.hpp>
+#include <util/input/wiimote_nunchuk.hpp>
+#include <util/input/wiimote_classic.hpp>
+#include <util/string_utils.hpp>
 
 #include "light_day_mono_rgba.h"
 #include "light_night_mono_rgba.h"
@@ -32,7 +30,7 @@
 void *frameBuffer[2] = {NULL, NULL};
 static GXRModeObj *rmode = NULL;
 
-World *current_world = nullptr;
+static World *current_world = nullptr;
 
 int frameCounter = 0;
 
@@ -149,7 +147,7 @@ void MainGameLoop()
     uint32_t dev_id = 0;
     ES_GetDeviceID(&dev_id);
 
-    add_entity(&current_world->player);
+    current_world->add_entity(&current_world->player);
 
     current_world->seed = gettime();
 
@@ -265,7 +263,7 @@ void MainGameLoop()
         current_world->ticks += int(current_world->partial_ticks);
         current_world->partial_ticks -= int(current_world->partial_ticks);
     }
-    remove_entity(current_world->player.entity_id);
+    current_world->remove_entity(current_world->player.entity_id);
     current_world->save();
     delete current_world;
     current_world = nullptr;
@@ -320,7 +318,7 @@ int main(int argc, char **argv)
     while (!isExiting)
     {
         int fb = 0;
-        Gui::set_gui(new GuiTitleScreen);
+        Gui::set_gui(new GuiTitleScreen(&current_world));
 
         // Initialize the light map for block rendering
         std::memcpy(light_map, light_day_mono_rgba, 1024);
@@ -393,7 +391,7 @@ void UpdateLoadingStatus()
             for (int z = -1; z <= 1; z++)
             {
                 Vec3i chunk_pos = player_chunk_pos + Vec3i(x * 16, 0, z * 16);
-                Chunk *chunk = get_chunk_from_pos(chunk_pos);
+                Chunk *chunk = current_world->get_chunk_from_pos(chunk_pos);
                 if (!chunk || chunk->generation_stage != ChunkGenStage::done)
                 {
                     continue;
@@ -554,7 +552,7 @@ void HandleGUI(gertex::GXView &viewport)
                 }
                 else
                 {
-                    Gui::set_gui(new GuiSurvival(&current_world->player.items));
+                    Gui::set_gui(new GuiSurvival(&current_world->player, &current_world->player.items));
                 }
             }
         }
@@ -710,7 +708,7 @@ void UpdateFog()
 
     background = get_sky_color();
 
-    Block *block = get_block_at(current_world->player.get_head_blockpos());
+    Block *block = current_world->get_block_at(current_world->player.get_head_blockpos());
     if (block)
         fog_light_multiplier = lerpf(fog_light_multiplier, std::pow(0.9f, (15.0f - block->sky_light)), 0.05f);
 
@@ -871,10 +869,6 @@ void DrawGUI(gertex::GXView &viewport)
 {
     Gui *m_gui = Gui::get_gui();
     if (!m_gui)
-        return;
-
-    // This is required as blocks require a dummy chunk to be rendered
-    if (!get_chunks().size() && m_gui->use_cursor())
         return;
 
     // Disable depth testing for GUI elements
