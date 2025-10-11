@@ -26,7 +26,6 @@
 
 extern bool should_destroy_block;
 extern bool should_place_block;
-extern Gui *current_gui;
 
 World::World(std::string name)
     : name(name)
