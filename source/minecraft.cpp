@@ -364,6 +364,7 @@ int main(int argc, char **argv)
         isExiting |= !Gui::get_gui();
     }
     Crapper::deinitNetwork();
+    delete sound_system;
     input::deinit();
     WPAD_Shutdown();
     VIDEO_Flush();
