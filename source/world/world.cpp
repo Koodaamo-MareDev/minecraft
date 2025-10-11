@@ -19,6 +19,7 @@
 #include <world/light.hpp>
 #include <gui/gui_dirtscreen.hpp>
 #include <gui/gui_survival.hpp>
+#include <gui/gui_gameover.hpp>
 #include <world/chunkprovider.hpp>
 #include <util/face_pair.hpp>
 #include <util/debuglog.hpp>
@@ -124,23 +125,34 @@ bool World::tick()
 
     last_entity_tick = ticks;
 
-    if (player.dead)
+    if (player.dead && loaded)
     {
-        remove_entity(player.entity_id);
+        player.velocity = Vec3f(0, 0, 0);
+        player.prev_position = player.position;
+        GuiGameOver *game_over = dynamic_cast<GuiGameOver *>(Gui::get_gui());
+        if (!game_over)
+        {
+            GuiGameOver *game_over = new GuiGameOver(this);
+            Gui::set_gui(game_over);
 
-        // Send player to spawn
-        player.teleport(spawn_pos);
-
-        // Reset the player's health
-        player.health = 20;
-
-        // Reset camera rotation
-        get_camera().rot = Vec3f(0, 0, 0);
-
-        // Reset player state
-        player.dead = false;
-
-        return false;
+            // Drop all items
+            for (size_t i = 0; i < player.items.size(); i++)
+            {
+                if (!player.items[i].empty())
+                {
+                    EntityItem *item = new EntityItem(player.get_position(0) + Vec3f(0, 1, 0), player.items[i]);
+                    javaport::Random rng;
+                    item->velocity = Vec3f((rng.nextFloat() - 0.5f), rng.nextFloat() * 0.1f + 0.1f, (rng.nextFloat() - 0.5f)) * 0.1f;
+                    add_entity(item);
+                }
+            }
+            player.items.clear();
+        }
+        else
+        {
+            if (game_over->quitting)
+                return false;
+        }
     }
 
     return true;
