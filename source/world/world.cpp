@@ -37,7 +37,6 @@ World::World(std::string name)
     fs::create_directories(region_path);
     fs::current_path(save_path);
     LightEngine::init(this);
-    set_render_world(this);
 }
 
 World::World()

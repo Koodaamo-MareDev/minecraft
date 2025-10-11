@@ -122,6 +122,8 @@ void MainGameLoop()
     if (!current_world)
         return;
 
+    set_render_world(current_world);
+
     Configuration config;
     try
     {
@@ -326,6 +328,7 @@ int main(int argc, char **argv)
         GuiTitleScreen *titlescreen = new GuiTitleScreen(&current_world);
         titlescreen->sound_system = sound_system;
         Gui::set_gui(titlescreen);
+        set_render_world(nullptr);
 
         // Initialize the light map for block rendering
         std::memcpy(light_map, light_day_mono_rgba, 1024);
