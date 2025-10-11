@@ -1149,6 +1149,10 @@ void EntityLiving::deserialize(NBTTagCompound *nbt)
 {
     EntityPhysical::deserialize(nbt);
     health = nbt->getShort("Health");
+    if (health <= 0)
+    {
+        dead = true;
+    }
 }
 
 void EntityLiving::animate()
