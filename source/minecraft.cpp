@@ -341,6 +341,7 @@ int main(int argc, char **argv)
             GetInput();
             HandleGUI(state.view);
             GX_DrawDone();
+            sound_system->update(sound_system->head_right, sound_system->head_position, false);
 
             GX_CopyDisp(frameBuffer[fb], GX_TRUE);
 #ifdef DEBUG
