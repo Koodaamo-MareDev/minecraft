@@ -251,12 +251,12 @@ void GuiTitleScreen::join_multiplayer()
         World *new_world = new World;
         try
         {
-            Gui::set_gui(new GuiDirtscreen);
-
             // Attempt to connect to the server
             new_world->set_remote(true);
             new_world->client->joinServer(server_ip, server_port);
             *current_world = new_world;
+
+            Gui::set_gui(new GuiDirtscreen);
         }
         catch (std::runtime_error &e)
         {
