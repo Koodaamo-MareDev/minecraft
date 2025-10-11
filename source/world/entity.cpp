@@ -938,7 +938,7 @@ void EntityItem::resolve_collision(EntityPhysical *b)
         return;
 
     EntityPlayerLocal *player = dynamic_cast<EntityPlayerLocal *>(b);
-    if (!player)
+    if (!player || player->dead)
         return;
 
     inventory::ItemStack left_over = world->player.items.add(item_stack);
