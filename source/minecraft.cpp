@@ -323,7 +323,9 @@ int main(int argc, char **argv)
     while (!isExiting)
     {
         int fb = 0;
-        Gui::set_gui(new GuiTitleScreen(&current_world));
+        GuiTitleScreen *titlescreen = new GuiTitleScreen(&current_world);
+        titlescreen->sound_system = sound_system;
+        Gui::set_gui(titlescreen);
 
         // Initialize the light map for block rendering
         std::memcpy(light_map, light_day_mono_rgba, 1024);

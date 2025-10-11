@@ -10,7 +10,7 @@ class GuiTitleScreen : public Gui
 public:
     std::string splash_text = "§ePorted by Myntti!";
     World **current_world;
-    SoundSystem *sound_system;
+    SoundSystem *sound_system = nullptr;
 
     GuiTitleScreen(World **current_world);
 
