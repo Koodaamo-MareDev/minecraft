@@ -4,11 +4,13 @@
 #include <gui/gui.hpp>
 #include <string>
 #include <vector>
+class SoundSystem;
 class GuiTitleScreen : public Gui
 {
 public:
     std::string splash_text = "§ePorted by Myntti!";
     World **current_world;
+    SoundSystem *sound_system;
 
     GuiTitleScreen(World **current_world);
 

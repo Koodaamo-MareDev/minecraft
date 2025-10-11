@@ -31,6 +31,7 @@ void *frameBuffer[2] = {NULL, NULL};
 static GXRModeObj *rmode = NULL;
 
 static World *current_world = nullptr;
+static SoundSystem *sound_system = nullptr;
 
 int frameCounter = 0;
 
@@ -153,6 +154,8 @@ void MainGameLoop()
 
     // Use the username from the config or generate a default one
     current_world->player.player_name = std::string(config.get<std::string>("username", "Wii_" + std::to_string(dev_id)));
+
+    current_world->set_sound_system(sound_system);
 
     // Setup the loading screen
     GuiDirtscreen *dirtscreen = new GuiDirtscreen;
@@ -311,6 +314,8 @@ int main(int argc, char **argv)
     input::add_device(new input::KeyboardMouse);
     input::add_device(new input::WiimoteNunchuk);
     input::add_device(new input::WiimoteClassic);
+
+    sound_system = new SoundSystem();
 
     inventory::init_items();
     Gui::init_matrices(state.view.aspect_correction);

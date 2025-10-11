@@ -144,9 +144,11 @@ public:
     bool load();
     void create();
 
+    void set_sound_system(SoundSystem *sound_system);
+
 private:
     ParticleSystem m_particle_system = ParticleSystem(this);
-    SoundSystem m_sound_system;
+    SoundSystem *m_sound_system = nullptr;
 
     void update_entities();
     void update_player();

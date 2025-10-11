@@ -121,7 +121,8 @@ bool World::tick()
         memory_usage += chunk ? chunk->size() : 0;
     }
 
-    m_sound_system.update(angles_to_vector(0, get_camera().rot.y + 90), player.get_position(std::fmod(partial_ticks, 1)));
+    if (m_sound_system)
+        m_sound_system->update(angles_to_vector(0, get_camera().rot.y + 90), player.get_position(std::fmod(partial_ticks, 1)));
 
     last_entity_tick = ticks;
 
@@ -792,7 +793,7 @@ bool World::place_block(const Vec3i pos, const Vec3i targeted, Block *new_block,
         sound.volume = 0.4f;
         sound.pitch *= 0.8f;
         sound.position = Vec3f(pos.x, pos.y, pos.z);
-        m_sound_system.play_sound(sound);
+        play_sound(sound);
         player.items[player.selected_hotbar_slot + GuiSurvival::hotbar_start].count--;
         if (player.items[player.selected_hotbar_slot + GuiSurvival::hotbar_start].count == 0)
             player.items[player.selected_hotbar_slot + GuiSurvival::hotbar_start] = inventory::ItemStack();
@@ -825,7 +826,7 @@ void World::create_explosion(Vec3f pos, float power)
     sound.position = pos;
     sound.volume = 0.5;
     sound.pitch = 0.8;
-    m_sound_system.play_sound(sound);
+    play_sound(sound);
 
     Particle particle;
     particle.max_life_time = 80;
@@ -1319,6 +1320,11 @@ void World::create()
 
     // Start the chunk manager using the chunk provider
     init_chunk_manager(chunk_provider);
+}
+
+void World::set_sound_system(SoundSystem *sound_system)
+{
+    m_sound_system = sound_system;
 }
 
 void World::update_entities()
@@ -1928,5 +1934,7 @@ void World::add_particle(const Particle &particle)
 
 void World::play_sound(const Sound &sound)
 {
-    m_sound_system.play_sound(sound);
+    if (!m_sound_system)
+        return;
+    m_sound_system->play_sound(sound);
 }

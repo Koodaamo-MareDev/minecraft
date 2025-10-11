@@ -8,6 +8,8 @@
 #include <util/string_utils.hpp>
 #include <ported/Random.hpp>
 #include <ported/SystemTime.hpp>
+#include <sounds.hpp>
+#include <sound.hpp>
 
 static std::string logo = " *   * * *   * *** *** *** *** *** ***"
                           " ** ** * **  * *   *   * * * * *    * "
@@ -194,7 +196,15 @@ void GuiTitleScreen::update()
 
     // Handle button press
     if (confirm && buttons[selected_button].on_click && buttons[selected_button].enabled)
+    {
+        if (sound_system)
+        {
+            Sound click_sound = get_sound("random/click");
+            click_sound.position = sound_system->head_position;
+            sound_system->play_sound(click_sound);
+        }
         buttons[selected_button].on_click();
+    }
 }
 void GuiTitleScreen::navigate(bool left, bool right, bool up, bool down)
 {
