@@ -120,7 +120,7 @@ SoundSystem::~SoundSystem()
     ASND_End();
 }
 
-void SoundSystem::update(Vec3f head_right, Vec3f head_position)
+void SoundSystem::update(Vec3f head_right, Vec3f head_position, bool enable_music)
 {
     this->head_position = head_position;
     this->head_right = head_right;
@@ -137,7 +137,7 @@ void SoundSystem::update(Vec3f head_right, Vec3f head_position)
         frames_to_next_music = (10 * 60 * 60) + (rand() % (10 * 60 * 60)); // 10 minutes to 20 minutes
     }
 
-    if (frames_to_next_music <= 0)
+    if (frames_to_next_music <= 0 && enable_music)
     {
         play_music(RESOURCES_DIR + get_random_music());
     }

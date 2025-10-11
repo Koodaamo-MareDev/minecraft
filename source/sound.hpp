@@ -45,7 +45,7 @@ public:
     SoundSystem();
     ~SoundSystem();
 
-    void update(Vec3f head_right, Vec3f head_position);
+    void update(Vec3f head_right, Vec3f head_position, bool enable_music);
 
     void play_sound(Sound sound);
 
