@@ -120,7 +120,7 @@ bool World::tick()
     }
 
     if (m_sound_system)
-        m_sound_system->update(angles_to_vector(0, get_camera().rot.y + 90), player.get_position(std::fmod(partial_ticks, 1)));
+        m_sound_system->update(angles_to_vector(0, get_camera().rot.y + 90), player.get_position(std::fmod(partial_ticks, 1)), true);
 
     last_entity_tick = ticks;
 
