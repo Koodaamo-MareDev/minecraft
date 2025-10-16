@@ -700,7 +700,7 @@ void EntityCreeper::tick()
                 Sound sound = get_sound("random/fuse");
                 sound.position = position;
                 sound.volume = 0.5;
-                sound.pitch = 1.0;
+                sound.pitch = 0.5;
                 world->play_sound(sound);
             }
 
