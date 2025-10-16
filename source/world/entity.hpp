@@ -14,7 +14,7 @@
 
 constexpr vfloat_t ENTITY_GRAVITY = 9.8f;
 
-constexpr uint8_t creeper_fuse = 20;
+constexpr uint8_t creeper_fuse = 30;
 
 class Chunk;
 class World;

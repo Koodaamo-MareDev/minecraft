@@ -620,7 +620,7 @@ void EntityExplosiveBlock::render(float partial_ticks, bool transparency)
 
 EntityCreeper::EntityCreeper(const Vec3f &position) : EntityExplosive(), EntityLiving()
 {
-    this->fuse = 80;
+    this->fuse = creeper_fuse;
     this->power = 3;
     this->health = 20;
     this->width = 0.6;
