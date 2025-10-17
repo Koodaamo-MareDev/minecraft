@@ -61,13 +61,4 @@ public:
     uint32_t flow_dst_y = 0;
     void update() override;
 };
-
-inline void SimpleTexObjInit(GXTexObj *texture, int width, int height, void *buffer = nullptr)
-{
-    unsigned int buffer_len = GX_GetTexBufferSize(width, height, GX_TF_RGBA8, GX_FALSE, 0);
-    if (!buffer)
-        buffer = memalign(32, buffer_len);
-    printf("Texture Info: Width: %d, Height: %d, Pixel Size: %d, Raw Size: %d", width, height, buffer_len, width * height * 4);
-    GX_InitTexObj(texture, buffer, width, height, GX_TF_RGBA8, GX_REPEAT, GX_REPEAT, GX_FALSE);
-}
 #endif
