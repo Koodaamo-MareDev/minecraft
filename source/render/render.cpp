@@ -8,6 +8,8 @@
 #include <block/blocks.hpp>
 #include <world/world.hpp>
 
+#include <new>
+
 const GXColor sky_color = {0x88, 0xBB, 0xFF, 0xFF};
 
 GXTexObj white_texture;
@@ -53,7 +55,7 @@ Camera &get_camera()
 
 void init_missing_texture(GXTexObj &texture)
 {
-    void *texture_buf = memalign(32, 64); // 4x4 RGBA texture
+    void *texture_buf = new (std::align_val_t(32)) uint8_t[64]; // 4x4 RGBA texture
     memset(texture_buf, 0xFF, 64);
     DCFlushRange(texture_buf, 64);
 

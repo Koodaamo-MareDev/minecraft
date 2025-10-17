@@ -7,7 +7,6 @@
 #include <string>
 #include <stack>
 #include <cstring>
-#include <malloc.h>
 namespace gertex
 {
     constexpr float CAMERA_WIDTH(640.0f);

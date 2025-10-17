@@ -56,7 +56,7 @@ void ModelBox::prepare()
     buffer_size += 32;                                           // Add padding for GX_EndDispList
 
     // Create display list
-    display_list = memalign(32, buffer_size);
+    display_list = new (std::align_val_t(32)) uint8_t[buffer_size];
 
     if (!display_list)
     {

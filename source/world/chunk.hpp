@@ -35,14 +35,14 @@ inline Vec2i block_to_chunk_pos(const Vec3i &pos)
 class VBO
 {
 public:
-    void *buffer = nullptr;
+    uint8_t *buffer = nullptr;
     uint32_t length = 0;
 
     VBO() : buffer(nullptr), length(0)
     {
     }
 
-    VBO(void *buffer, uint32_t length) : buffer(buffer), length(length)
+    VBO(uint8_t *buffer, uint32_t length) : buffer(buffer), length(length)
     {
     }
 
@@ -73,7 +73,7 @@ public:
     {
         if (this->buffer)
         {
-            free(this->buffer);
+            delete[] this->buffer;
             this->buffer = nullptr;
         }
         this->length = 0;

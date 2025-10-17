@@ -20,7 +20,7 @@
 #include <algorithm>
 #include <gccore.h>
 #include <string.h>
-#include <malloc.h>
+#include <new>
 #include <math.h>
 #include <stdio.h>
 #include <fstream>
@@ -400,7 +400,7 @@ int Chunk::build_vbo(int index, bool transparent)
 
     displist_size = (displist_size + 31) & ~31;
 
-    void *displist_vbo = memalign(32, displist_size);
+    uint8_t *displist_vbo = new (std::align_val_t(32), std::nothrow) uint8_t[displist_size];
     if (displist_vbo == nullptr)
     {
         printf("Failed to allocate %d bytes for section %d VBO at (%d, %d)\n", displist_size, index, this->x, this->z);
@@ -425,7 +425,7 @@ int Chunk::build_vbo(int index, bool transparent)
     }
 
     // Set the rest of the buffer to 0
-    memset((void *)((u32)displist_vbo + pos), 0, displist_size - pos);
+    memset(&displist_vbo[pos], 0, displist_size - pos);
 
     if (transparent)
     {

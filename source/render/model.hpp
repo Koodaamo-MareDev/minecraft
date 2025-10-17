@@ -2,7 +2,6 @@
 #define MODEL_HPP
 
 #include <vector>
-#include <malloc.h>
 #include <ogcsys.h>
 #include <ogc/gx.h>
 #include <math/vec3f.hpp>
@@ -15,7 +14,7 @@ class ModelBox
 public:
     Vec3f pos = Vec3f(0, 0, 0);
     Vec3f rot = Vec3f(0, 0, 0);
-    void *display_list = nullptr;
+    uint8_t *display_list = nullptr;
     uint32_t display_list_size = 0;
     bool visible = true;
     ModelBox(Vec3f pivot = Vec3f(0, 0, 0), Vec3f size = Vec3f(1, 1, 1), uint16_t uv_off_x = 0, uint16_t uv_off_y = 0, vfloat_t inflate = 0) : pivot(pivot), size(size), uv_off_x(uv_off_x), uv_off_y(uv_off_y), inflate(inflate) {}
@@ -40,7 +39,7 @@ public:
     {
         if (display_list)
         {
-            free(display_list);
+            delete[] display_list;
         }
     }
 

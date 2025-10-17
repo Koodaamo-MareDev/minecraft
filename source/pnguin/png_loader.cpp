@@ -1,6 +1,5 @@
 #include "png_loader.hpp"
 #include <miniz/miniz.h>
-#include <malloc.h>
 #include <gccore.h>
 
 pnguin::PNGFile::PNGFile(const std::string &filename)
@@ -318,7 +317,7 @@ void pnguin::PNGFile::to_tpl(GXTexObj &texture, uint8_t mipmap_count)
         tmp_height >>= 1;
         tpl_size += (tmp_width) * (tmp_height) << 2;
     }
-    uint8_t *res = (uint8_t *)memalign(32, tpl_size);
+    uint8_t *res = new (std::align_val_t(32)) uint8_t[tpl_size];
     uint8_t *res_ptr = res;
     uint8_t *tmp_ptr = (uint8_t *)pixels.ptr();
 

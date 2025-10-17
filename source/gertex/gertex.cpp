@@ -1,5 +1,5 @@
 #include "gertex.hpp"
-
+#include <new>
 namespace gertex
 {
     GXState state;
@@ -218,7 +218,7 @@ namespace gertex
     {
         constexpr size_t DEFAULT_FIFO_SIZE = 256 * 1024;
 
-        void *gp_fifo = nullptr;
+        uint8_t *gp_fifo = nullptr;
 
         // These are the default universal rendering settings.
         // Feel free to change them directly via the GX APIs.
@@ -283,9 +283,9 @@ namespace gertex
             // (Re)allocate the FIFO buffer
             if (gp_fifo)
             {
-                free(gp_fifo);
+                delete[] gp_fifo;
             }
-            gp_fifo = memalign(32, DEFAULT_FIFO_SIZE);
+            gp_fifo = new (std::align_val_t(32), std::nothrow) uint8_t[DEFAULT_FIFO_SIZE];
             if (!gp_fifo)
             {
                 return false;
