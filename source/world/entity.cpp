@@ -277,13 +277,13 @@ void EntityPhysical::render(float partial_ticks, bool transparency)
         Vec3f entity_position = get_position(partial_ticks);
         entity_position.y = (aabb.max.y + aabb.min.y) * 0.5;
         Vec3i block_pos = (entity_position + Vec3f(0, 0.5, 0)).round();
-        block_t *block = get_block_at(block_pos, chunk);
+        Block *block = world->get_block_at(block_pos);
         if (block && !properties(block->id).m_solid)
         {
             light_level = block->light;
         }
         // Render a mob spawner at the entity's position
-        block_t block_state = {uint8_t(BlockID::bricks), 0x7F, 0, light_level};
+        Block block_state = {uint8_t(BlockID::bricks), 0x7F, 0, light_level};
         transform_view(gertex::get_view_matrix(), entity_position, (aabb.max - aabb.min));
 
         // Restore default texture
