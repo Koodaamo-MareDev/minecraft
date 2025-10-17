@@ -12,7 +12,7 @@
 class Sound
 {
 private:
-    Aiff *aiff_data = nullptr;
+    AiffContainer *aiff = nullptr;
 
 public:
     Vec3f position = Vec3f(0., 0., 0.);
@@ -23,10 +23,8 @@ public:
     bool valid = false;
     int voice = -1;
     Sound() {}
-    Sound(AiffContainer &aiff_data);
-    Sound(AiffContainer* aiff_data);
+    Sound(AiffContainer* aiff);
 
-    void set_aiff_data(AiffContainer &aiff_data);
     void play();
     void pause();
     void stop();

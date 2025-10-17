@@ -1,7 +1,9 @@
 #include "sounds.hpp"
 #include <cstring>
+#include <fstream>
 #include "ported/Random.hpp"
 #include "util/constants.hpp"
+#include "util/debuglog.hpp"
 
 std::vector<std::string> music_files(
     {"music/calm1.ogg",
@@ -37,44 +39,55 @@ AiffContainer *get_sound(std::string name)
     {
         return it->second;
     }
-    std::string path = SOUND_DIR + name + ".Aiff";
+    std::string path = SOUND_DIR + name + ".aiff";
 
-    FILE *file = fopen(path.c_str(), "rb");
-    if (!file)
+    // Open the file and get its size
+    std::ifstream file(path, std::ios::binary);
+    file.seekg(0, std::ios::end);
+    size_t size = file.tellg();
+    if (size < sizeof(Aiff))
     {
-        printf("Failed to open sound file: %s\n", path.c_str());
+        // Could be a corrupted file or too small to be a valid AIFF
+        debug::print("Failed to load sound %s: File is too small\n", path.c_str());
         return nullptr;
     }
-    fseek(file, 0, SEEK_END);
-    size_t size = ftell(file);
-    fseek(file, 0, SEEK_SET);
 
-    uint8_t *data = new (std::align_val_t(32)) uint8_t[size];
+    // Allocate temporary buffer for the file data
+    uint8_t *data = new (std::nothrow) uint8_t[size];
     if (!data)
     {
-        fclose(file);
+        debug::print("Failed to allocate memory for sound %s\n", path.c_str());
         return nullptr;
     }
 
-    fread(data, size, 1, file);
+    // Seek back to the beginning of the file and read the data
+    file.seekg(0, std::ios::beg);
+    file.read(reinterpret_cast<char *>(data), size);
+    file.close();
 
-    fclose(file);
-
-    AiffContainer *sound = new AiffContainer(data);
-    if (!sound->data)
+    try
     {
+        AiffContainer *sound = new AiffContainer(data);
+        sound_map[name] = sound;
+
+        // The aiff container will copy the data it needs, so we'll free the original buffer after creating it.
+        delete[] data;
+        return sound;
+    }
+    catch (std::runtime_error &e)
+    {
+        debug::print("Failed to load sound %s: %s\n", path.c_str(), e.what());
         // Aiff validation failed
-        delete sound;
         delete[] data;
         return nullptr;
     }
-
-    sound_map[name] = sound;
-    return sound;
 }
 
 AiffContainer *randomize_sound(std::string name, int count)
 {
-    name += std::to_string((rand() % count) + 1);
+    static javaport::Random random;
+    if (count < 1)
+        return nullptr;
+    name += std::to_string((random.nextInt(count)) + 1);
     return get_sound(name);
 }

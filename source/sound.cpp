@@ -2,23 +2,14 @@
 #include "sounds.hpp"
 #include <util/timers.hpp>
 #include <util/constants.hpp>
-Sound::Sound(AiffContainer &aiff_data)
-{
-    set_aiff_data(aiff_data);
-}
 
-Sound::Sound(AiffContainer *aiff_data)
+Sound::Sound(AiffContainer *source)
 {
-    if (aiff_data)
-        set_aiff_data(*aiff_data);
-}
-
-void Sound::set_aiff_data(AiffContainer &aiff_data)
-{
-    this->valid = aiff_data.data != nullptr;
-    if (!valid)
+    // If the container has no data, mark the sound as invalid. Otherwise, set the data pointer.
+    if (!source || !source->data)
         return;
-    this->aiff_data = aiff_data.data;
+    this->aiff = source;
+    this->valid = true;
 }
 
 void Sound::play()
@@ -31,7 +22,7 @@ void Sound::play()
     if (first_unused < 1)
         return;
     voice = first_unused;
-    ASND_SetVoice(voice, VOICE_MONO_16BIT, 16000 * pitch, 0, aiff_data->sound_data.sound_data, aiff_data->sound_data.chunk_size, left, right, nullptr);
+    ASND_SetVoice(voice, aiff->sample_format, aiff->sample_rate * pitch, 0, aiff->data, aiff->data_size, left, right, nullptr);
     ASND_PauseVoice(voice, 0);
 }
 
