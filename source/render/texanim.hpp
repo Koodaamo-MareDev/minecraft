@@ -1,7 +1,6 @@
 #ifndef _TEXANIM_HPP_
 #define _TEXANIM_HPP_
 #include <cstdio>
-#include <malloc.h>
 #include <cstring>
 #include <ogc/gx.h>
 
