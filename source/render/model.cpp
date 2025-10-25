@@ -130,6 +130,21 @@ void Model::render(vfloat_t distance, float partialTicks, bool transparency)
     prepare();
     use_texture(texture);
     Camera &camera = get_camera();
+    /*
+     *
+     * The Y offset (1.5 + 1 / 128) is a shared offset for all entity models.
+     * As to why this specific offset is used, it appears to be a historical
+     * value chosen to align models correctly in the world. It likely accounts
+     * for the typical eye height of entities and ensures that models are
+     * rendered at the correct vertical position.
+     *
+     * Another thing to note is the inversion of the model. Its likely caused
+     * from a bug where the matrix was inverted at some point and thus models
+     * had to be inverted to compensate. This inversion has been preserved for
+     * compatibility reasons. By adding camera position multiplied by 2 and
+     * subtracting the model's position, we effectively convert the position.
+     * In short, we go from -CameraPosition to CameraPosition - ModelPosition
+     */
     transform_view(gertex::get_view_matrix(), Vec3f(camera.position) * 2 - (Vec3f(pos.x, pos.y + 1.5078125F, pos.z)), Vec3f(1), rot, false);
     for (auto &box : boxes)
     {
