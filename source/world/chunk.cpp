@@ -508,6 +508,7 @@ void Chunk::update_entities()
 
 void Chunk::render_entities(float partial_ticks, bool transparency)
 {
+    gertex::GXState state = gertex::get_state();
     for (EntityPhysical *&entity : entities)
     {
         // Make sure the entity is valid
@@ -517,6 +518,9 @@ void Chunk::render_entities(float partial_ticks, bool transparency)
         if (entity->dead)
             continue;
         entity->render(partial_ticks, transparency);
+
+        // Restore the previous state after rendering the entity
+        gertex::set_state(state);
     }
 
     // Restore default texture
