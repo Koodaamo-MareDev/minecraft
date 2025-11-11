@@ -941,6 +941,11 @@ void World::draw_scene(bool opaque)
         }
     }
 
+    for (Chunk *&chunk : chunks)
+    {
+        chunk->render_entities(partial_ticks, !opaque);
+    }
+
     // Draw the vbos
     for (std::pair<Section *, VBO *> &pair : sections_to_draw)
     {
@@ -948,11 +953,6 @@ void World::draw_scene(bool opaque)
         VBO *&buffer = pair.second;
         transform_view(gertex::get_view_matrix(), Vec3f(sect->x, sect->y, sect->z) + Vec3f(0.5));
         GX_CallDispList(buffer->buffer, buffer->length);
-    }
-
-    for (Chunk *&chunk : chunks)
-    {
-        chunk->render_entities(partial_ticks, !opaque);
     }
 
     if (player.raycast_target_found && should_destroy_block && player.mining_tick > 0)
