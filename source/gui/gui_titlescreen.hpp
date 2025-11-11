@@ -22,6 +22,7 @@ public:
 
 private:
     std::vector<float> logo_block_z;
+    std::vector<float> logo_block_speed;
     std::vector<GuiButton> buttons;
     size_t selected_button = 0;
     bool joystick_pressed = true;

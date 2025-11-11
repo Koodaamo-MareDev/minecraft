@@ -24,19 +24,21 @@ GuiTitleScreen::GuiTitleScreen(World **current_world)
 
     int view_height = view.aspect_correction * view.height;
 
-    buttons.push_back(GuiButton((view.width - 400) / 2, view_height / 2 - 48, 400, 40, "Singleplayer", std::bind(&GuiTitleScreen::join_singleplayer, this)));
-    buttons.push_back(GuiButton((view.width - 400) / 2, view_height / 2, 400, 40, "Multiplayer", std::bind(&GuiTitleScreen::join_multiplayer, this)));
-    buttons.push_back(GuiButton((view.width - 400) / 2, view_height / 2 + 48, 400, 40, "Mods and Texture Packs", std::bind(&GuiTitleScreen::join_multiplayer, this)));
-    buttons.push_back(GuiButton((view.width - 400) / 2, view_height / 2 + 96, 196, 40, "Options", []() {}));
-    buttons.push_back(GuiButton((view.width - 400) / 2 + 204, view_height / 2 + 96, 196, 40, "Quit Game", std::bind(&GuiTitleScreen::quit_game, this)));
+    buttons.push_back(GuiButton((view.width - 400) / 2, view_height / 2 - 24, 400, 40, "Singleplayer", std::bind(&GuiTitleScreen::join_singleplayer, this)));
+    buttons.push_back(GuiButton((view.width - 400) / 2, view_height / 2 + 24, 400, 40, "Multiplayer", std::bind(&GuiTitleScreen::join_multiplayer, this)));
+    buttons.push_back(GuiButton((view.width - 400) / 2, view_height / 2 + 72, 400, 40, "Mods and Texture Packs", []() {}));
+    buttons.push_back(GuiButton((view.width - 400) / 2, view_height / 2 + 144, 196, 40, "Options", []() {}));
+    buttons.push_back(GuiButton((view.width - 400) / 2 + 204, view_height / 2 + 144, 196, 40, "Quit Game", std::bind(&GuiTitleScreen::quit_game, this)));
     buttons[2].enabled = false;
 
     // Randomize the initial Z positions of the logo blocks
     javaport::Random rng;
     logo_block_z.resize(logo.size());
+    logo_block_speed.resize(logo.size());
     for (size_t i = 0; i < logo.size(); i++)
     {
-        logo_block_z[i] = rng.nextFloat() * 10.0f;
+        logo_block_z[i] = rng.nextFloat() * 32.0f + 10.0f + int(i % 38) + int(i / 38);
+        logo_block_speed[i] = 0;
     }
 
     // Select a splash text from splashes.txt
@@ -57,7 +59,7 @@ GuiTitleScreen::GuiTitleScreen(World **current_world)
         file.close();
 
         if (splashes.size() > 0)
-            splash_text = "§e" + splashes[rng.nextInt(splashes.size())];
+            splash_text = splashes[rng.nextInt(splashes.size())];
     }
 }
 
@@ -82,6 +84,7 @@ void GuiTitleScreen::draw()
     GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, BASE3D_POS_FRAC_BITS);
 
     // We want to render the blocks in perspective mode
+    state.view.fov = 70;
     gertex::perspective(state.view);
 
     // Enable backface culling for terrain
@@ -95,21 +98,24 @@ void GuiTitleScreen::draw()
     gertex::set_alpha_cutoff(0);
     Block block = {.id = uint8_t(BlockID::stone), .visibility_flags = 0x7F, .meta = 0, .light = 0xFF};
 
+    Camera &camera = get_camera();
+    camera.rot = Vec3f(15, 0, 0);
+    camera.position = Vec3f(-0.4, -17.6, 21.6);
+
     // Render the logo blocks
     use_texture(terrain_texture);
     for (size_t i = 0; i < logo.size(); i++)
     {
         if (logo[i] != '*')
             continue;
-        logo_block_z[i] -= 0.3f;
+        if (logo_block_z[i] > 0)
+            logo_block_speed[i] -= 0.2f;
+        logo_block_z[i] += logo_block_speed[i];
+        logo_block_speed[i] *= 0.729f;
         if (logo_block_z[i] < 0)
-            logo_block_z[i] = 0;
-        Vec3f logo_block_pos = Vec3f((int(i) % 38) - 19, 14 - (int(i) / 38), logo_block_z[i] - 16);
-        Camera &camera = get_camera();
-        camera.fov = 70.0f;
-        camera.rot = Vec3f(10, 0, 0);
-        camera.position = Vec3f(0);
-        transform_view(gertex::get_view_matrix(), logo_block_pos, Vec3f(1.0f), Vec3f(90, 0, 0));
+            logo_block_z[i] = logo_block_speed[i] = 0;
+        Vec3f logo_block_pos = Vec3f(((int(i) % 38) - 19) * .89, -(int(i) / 38), logo_block_z[i]);
+        transform_view(gertex::get_view_matrix(), logo_block_pos, Vec3f(.89, 1, .4), Vec3f(90, 0, 0));
         render_single_block(block, false);
     }
 
@@ -124,14 +130,14 @@ void GuiTitleScreen::draw()
     float scale = 144.0f / std::max(text_width(splash_text), 72);
 
     // Prepare the splash text matrix
-    transform_view_screen(gertex::get_view_matrix(), Vec3f((viewport.width - 128), viewport.height * 0.25f, 0), Vec3f(scale * (1 + std::abs(sintime) * 0.125f)), Vec3f(0, 0, 22.5f));
+    transform_view_screen(gertex::get_view_matrix(), Vec3f((viewport.width - 128), viewport.height * 0.25f, 0), Vec3f(scale * (1 + std::abs(sintime) * 0.125f)), Vec3f(0, 0, 20));
 
     gertex::GXMatrix old_item_matrix;
     guMtxCopy(gui_item_matrix.mtx, old_item_matrix.mtx);
     guMtxCopy(gertex::get_matrix().mtx, gui_item_matrix.mtx);
 
     // Draw splash text
-    draw_text_with_shadow(-text_width(splash_text) / 2, 0, splash_text, GXColor{255, 255, 255, 255});
+    draw_text_with_shadow(-text_width(splash_text) / 2, 0, splash_text, GXColor{255, 255, 0, 255});
 
     guMtxCopy(old_item_matrix.mtx, gui_item_matrix.mtx);
 }
