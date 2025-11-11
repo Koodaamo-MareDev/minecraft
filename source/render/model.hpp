@@ -115,8 +115,8 @@ public:
     void render(vfloat_t distance, float partial_ticks, bool transparency) override
     {
         head->set_rot(head_rot - rot);
-        float leg_rot = std::cos(distance * 0.6662f) * 28 * speed;
-        float leg_rot2 = std::cos(distance * 0.6662f + 3.1415927f) * 28 * speed;
+        float leg_rot = std::cos(distance * 0.6662f) * 1.4f * speed / M_DTOR;
+        float leg_rot2 = std::cos(distance * 0.6662f + M_PI) * 1.4f * speed / M_DTOR;
         leg1->set_rot(Vec3f(leg_rot, 0, 0));
         leg2->set_rot(Vec3f(leg_rot2, 0, 0));
         leg3->set_rot(Vec3f(leg_rot2, 0, 0));
@@ -155,22 +155,21 @@ public:
 
     void render(vfloat_t distance, float partial_ticks, bool transparency) override
     {
-        float arm_rot = std::cos(distance) * speed;
-        float arm_rot2 = std::cos(distance + 3.1415927f) * speed;
+        float arm_rot = std::cos(distance * 0.6662f) * speed / M_DTOR;
+        float arm_rot2 = std::cos(distance * 0.6662f + M_PI) * speed / M_DTOR;
         head->set_rot(head_rot - rot);
         left_arm->set_rot(Vec3f(arm_rot, 0, 0));
         right_arm->set_rot(Vec3f(arm_rot2, 0, 0));
         left_leg->set_rot(Vec3f(arm_rot * 1.4, 0, 0));
         right_leg->set_rot(Vec3f(arm_rot2 * 1.4, 0, 0));
-        gertex::GXState state = gertex::get_state();
-        render_handitem(right_arm, equipment[0], Vec3f(0, -4, 14), Vec3f(-90, 0, 180), Vec3f(1.0), transparency);
-        gertex::set_state(state);
 
         // The player should not render in the transparent pass
-        if (transparency)
-            return;
+        if (!transparency)
+            Model::render(distance, partial_ticks, transparency);
 
-        Model::render(distance, partial_ticks, transparency);
+        gertex::GXState state = gertex::get_state();
+        render_handitem(right_arm, equipment[0], Vec3f(0, 0, 0), Vec3f(0, 0, 0), Vec3f(1.0), transparency);
+        gertex::set_state(state);
     }
 };
 

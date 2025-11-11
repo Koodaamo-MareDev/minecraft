@@ -153,6 +153,8 @@ public:
     vfloat_t last_step_distance = 0;
     vfloat_t accumulated_walk_distance = 0;
     vfloat_t body_rotation_y = 0.0;
+    float walk_speed = 0;
+    float last_walk_speed = 0;
 
     EntityLiving() : EntityPhysical() {}
 

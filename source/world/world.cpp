@@ -1377,13 +1377,16 @@ void World::update_entities()
 
         // Update the player entity
         update_player();
-        for (auto &&e : world_entities)
+        if (is_remote())
         {
-            EntityPhysical *entity = e.second;
-            if (!entity || entity->dead)
-                continue;
-            // Tick the entity animations
-            entity->animate();
+            for (auto &&e : world_entities)
+            {
+                EntityPhysical *entity = e.second;
+                if (!entity || entity->dead)
+                    continue;
+                // Tick the entity animations
+                entity->animate();
+            }
         }
     }
 }

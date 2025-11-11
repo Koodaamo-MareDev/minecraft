@@ -155,7 +155,7 @@ void Model::render(vfloat_t distance, float partialTicks, bool transparency)
     GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, BASE3D_POS_FRAC_BITS);
 }
 
-void Model::render_handitem(ModelBox *box, inventory::ItemStack &item, Vec3f offset, Vec3f rot, Vec3f scale, bool transparency)
+void Model::render_handitem(ModelBox *box, inventory::ItemStack &item, Vec3f offset, Vec3f offset_rot, Vec3f scale, bool transparency)
 {
     if (item.empty())
     {
@@ -177,37 +177,49 @@ void Model::render_handitem(ModelBox *box, inventory::ItemStack &item, Vec3f off
         }
         return true;
     };
-
-    float scale_factor = 0.5f;
-    if (!is_flat(item))
-    {
-        scale_factor = 0.25; // Non-flat items are rendered at quarter scale
-    }
-    scale = scale * scale_factor;
-
     gertex::GXState state = gertex::get_state();
     // Use fixed point format for vertex positions
     GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, BASE3D_POS_FRAC_BITS);
 
     // Setup matrices for rendering the item
-    transform_view(gertex::get_view_matrix(), pos, Vec3f(1), this->rot, false);
+    transform_view(gertex::get_view_matrix(), pos + Vec3f(0, 1.5078125F, 0), Vec3f(-1), this->rot, false);
     gertex::GXMatrix pos_mtx = gertex::get_matrix();
-    guMtxApplyTrans(pos_mtx.mtx, pos_mtx.mtx, (box->pos.x) / 16, (box->pos.y) / 16, (box->pos.z) / 16);
-    guMtxApplyScale(pos_mtx.mtx, pos_mtx.mtx, scale.x, scale.y, scale.z);
+    guMtxApplyTrans(pos_mtx.mtx, pos_mtx.mtx, -(box->pos.x) / 16, (box->pos.y) / 16, -(box->pos.z) / 16);
     Mtx tmp_mtx;
-    guMtxRotDeg(tmp_mtx, 'z', box->rot.z + rot.z);
+    guMtxRotDeg(tmp_mtx, 'z', box->rot.z + offset_rot.z);
     guMtxConcat(pos_mtx.mtx, tmp_mtx, pos_mtx.mtx);
-    guMtxRotDeg(tmp_mtx, 'y', box->rot.y + rot.y);
+    guMtxRotDeg(tmp_mtx, 'y', box->rot.y + offset_rot.y + 180);
     guMtxConcat(pos_mtx.mtx, tmp_mtx, pos_mtx.mtx);
-    guMtxRotDeg(tmp_mtx, 'x', box->rot.x + rot.x);
+    guMtxRotDeg(tmp_mtx, 'x', box->rot.x + offset_rot.x);
     guMtxConcat(pos_mtx.mtx, tmp_mtx, pos_mtx.mtx);
-    guMtxTrans(tmp_mtx, offset.x / 16 / scale_factor, offset.y / 16 / scale_factor, offset.z / 16 / scale_factor);
-    guMtxConcat(pos_mtx.mtx, tmp_mtx, pos_mtx.mtx);
+    guMtxApplyTrans(pos_mtx.mtx, pos_mtx.mtx, -1.0f / 16, 7.0f / 16, 1.0f / 16);
     if (!is_flat(item))
     {
-        guMtxRotDeg(tmp_mtx, 'y', -22.5);
+        scale = scale * 0.375f;
+        guMtxApplyTrans(pos_mtx.mtx, pos_mtx.mtx, 0, 3.0f / 16, 3.0f / 16);
+        guMtxRotDeg(tmp_mtx, 'x', -20);
         guMtxConcat(pos_mtx.mtx, tmp_mtx, pos_mtx.mtx);
-        guMtxRotDeg(tmp_mtx, 'x', -22.5);
+        guMtxRotDeg(tmp_mtx, 'y', -45);
+        guMtxConcat(pos_mtx.mtx, tmp_mtx, pos_mtx.mtx);
+        guMtxApplyScale(pos_mtx.mtx, pos_mtx.mtx, -scale.x, -scale.y, -scale.z);
+    }
+    else if (item.as_item().tool != inventory::tool_type::none || item.id == 392) // Fishing rod and tools
+    {
+        guMtxApplyTrans(pos_mtx.mtx, pos_mtx.mtx, 0, 2.0f / 16, 5.0f / 16);
+        guMtxApplyScale(pos_mtx.mtx, pos_mtx.mtx, -scale.x, -scale.y, -scale.z);
+        guMtxRotDeg(tmp_mtx, 'y', 90);
+        guMtxConcat(pos_mtx.mtx, tmp_mtx, pos_mtx.mtx);
+        guMtxRotDeg(tmp_mtx, 'z', 45);
+        guMtxConcat(pos_mtx.mtx, tmp_mtx, pos_mtx.mtx);
+    }
+    else
+    {
+        scale = scale * 0.375f;
+        guMtxApplyTrans(pos_mtx.mtx, pos_mtx.mtx, 0, 3.0f / 16, 3.0f / 16);
+        guMtxApplyScale(pos_mtx.mtx, pos_mtx.mtx, scale.x, -scale.y, scale.z);
+        guMtxRotDeg(tmp_mtx, 'x', 90);
+        guMtxConcat(pos_mtx.mtx, tmp_mtx, pos_mtx.mtx);
+        guMtxRotDeg(tmp_mtx, 'z', 180);
         guMtxConcat(pos_mtx.mtx, tmp_mtx, pos_mtx.mtx);
     }
     gertex::use_matrix(pos_mtx.mtx, true);
@@ -222,6 +234,9 @@ void Model::render_handitem(ModelBox *box, inventory::ItemStack &item, Vec3f off
 
         if (!is_flat(item))
         {
+            // Use the terrain texture
+            use_texture(terrain_texture);
+
             // Render as a block
             render_single_block(selected_block, transparency);
 
@@ -248,9 +263,11 @@ void Model::render_handitem(ModelBox *box, inventory::ItemStack &item, Vec3f off
         use_texture(items_texture);
     }
 
-    // Render as an item
+    // Render as an item without culling
+    GX_SetCullMode(GX_CULL_NONE);
     if (transparency)
         render_single_item(texture_index, transparency);
+    GX_SetCullMode(GX_CULL_BACK);
 
     gertex::set_state(state);
 }

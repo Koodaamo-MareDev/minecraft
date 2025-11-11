@@ -627,7 +627,6 @@ EntityCreeper::EntityCreeper(const Vec3f &position) : EntityExplosive(), EntityL
     this->height = 1.7;
     this->walk_sound = false;
     this->gravity = 0.08;
-    this->y_offset = 1.445;
     memcpy(&creeper_model.texture, &creeper_texture, sizeof(GXTexObj));
     teleport(position);
 }
@@ -636,7 +635,7 @@ void EntityCreeper::tick()
 {
     if (world->is_remote())
     {
-        EntityPhysical::tick();
+        EntityLiving::tick();
         return;
     }
 
@@ -716,7 +715,7 @@ void EntityCreeper::tick()
             follow_entity = nullptr;
         }
     }
-    EntityPhysical::tick();
+    EntityLiving::tick();
 }
 
 bool EntityCreeper::should_jump()
@@ -739,46 +738,13 @@ void EntityCreeper::render(float partial_ticks, bool transparency)
     if (transparency)
         return;
 
+    EntityLiving::render(partial_ticks, transparency);
+
     Vec3f entity_position = get_position(partial_ticks);
     Vec3f entity_rotation = get_rotation(partial_ticks);
 
-    Vec3i block_pos = entity_position.round();
-    Block *block = world->get_block_at(block_pos);
-    if (block && !properties(block->id).m_solid)
-    {
-        light_level = block->light;
-    }
-
-    while (entity_rotation.y < 0)
-        entity_rotation.y += 360;
-    entity_rotation.y = std::fmod(entity_rotation.y, 360);
-
-    while (body_rotation_y < 0)
-        body_rotation_y += 360;
-    body_rotation_y = std::fmod(body_rotation_y, 360);
-
-    vfloat_t diff = entity_rotation.y - body_rotation_y;
-    // Get the shortest angle
-    if (diff > 180)
-        diff -= 360;
-    if (diff < -180)
-        diff += 360;
-
-    // Rotate the body to stay in bounds of the head rotation
-    if (diff > 45)
-        body_rotation_y = entity_rotation.y - 45;
-    if (diff < -45)
-        body_rotation_y = entity_rotation.y + 45;
-
-    Vec3f h_velocity = animation_tick ? (animation_pos - position) : (position - prev_position);
-    h_velocity.y = 0;
-
-    body_rotation_y = lerpd(body_rotation_y, entity_rotation.y, h_velocity.magnitude());
-
-    creeper_model.speed = h_velocity.magnitude() * 30;
-
+    creeper_model.speed = std::min(1.0f, last_walk_speed + (walk_speed - last_walk_speed) * partial_ticks);
     creeper_model.pos = entity_position;
-    creeper_model.pos.y += y_offset;
     creeper_model.rot.y = body_rotation_y;
     creeper_model.head_rot = Vec3f(entity_rotation.x, entity_rotation.y, 0);
 
@@ -790,7 +756,7 @@ void EntityCreeper::render(float partial_ticks, bool transparency)
         gertex::set_color_add(std::sin(fuse + partial_ticks * 0.1) > 0 ? GXColor{0, 0, 0, 0xFF} : GXColor{0xFF, 0xFF, 0xFF, 0xFF});
     }
 
-    creeper_model.render(accumulated_walk_distance, partial_ticks, transparency);
+    creeper_model.render(accumulated_walk_distance - walk_speed * (1 - partial_ticks), partial_ticks, transparency);
 #ifdef DEBUG
     if (follow_entity)
     {
@@ -1043,6 +1009,9 @@ void EntityLiving::hurt(int16_t damage)
 void EntityLiving::tick()
 {
     EntityPhysical::tick();
+    last_walk_speed = walk_speed;
+    walk_speed += (std::min(1.0, Vec3f(velocity.x, 0, velocity.z).magnitude() * 4) - walk_speed) * 0.4;
+    accumulated_walk_distance += walk_speed;
     if (hurt_ticks > 0)
     {
         hurt_ticks--;
@@ -1121,7 +1090,7 @@ void EntityLiving::render(float partial_ticks, bool transparency)
             diff -= 360;
         while (diff < -180)
             diff += 360;
-        body_rotation_y = lerpd(body_rotation_y, body_rotation_y + diff, h_speed);
+        body_rotation_y = lerpd(body_rotation_y, body_rotation_y + diff, 0.05);
     }
 
     diff = entity_rotation.y - body_rotation_y;
@@ -1170,19 +1139,20 @@ void EntityLiving::animate()
         while (diff_rot >= 180.0)
             diff_rot -= 360.0;
         Vec3f new_rotation = rotation + Vec3f((animation_rot.x - rotation.x) / animation_tick, diff_rot / animation_tick, 0);
-        if (std::abs(new_rotation.y - body_rotation_y) > 45)
-            body_rotation_y += diff_rot / animation_tick;
         animation_tick--;
         teleport(new_position);
+        prev_rotation = rotation;
         rotation = new_rotation;
     }
     else if (!simulate_offline)
     {
         teleport(animation_pos);
+        prev_rotation = rotation;
         rotation = animation_rot;
     }
 
-    velocity = Vec3f::lerp(velocity, position - old_position, 0.25);
+    velocity = position - old_position;
+    prev_position = old_position;
 }
 
 EntityPlayer::EntityPlayer(const Vec3f &position) : EntityLiving()
@@ -1326,7 +1296,7 @@ EntityPlayerMp::EntityPlayerMp(const Vec3f &position, std::string player_name) :
 
 void EntityPlayerMp::tick()
 {
-    EntityPhysical::tick();
+    EntityLiving::tick();
 }
 
 void EntityPlayerMp::render(float partial_ticks, bool transparency)
@@ -1376,21 +1346,8 @@ void EntityPlayerMp::render(float partial_ticks, bool transparency)
     }
     EntityLiving::render(partial_ticks, transparency);
 
-    vfloat_t h_speed = velocity.magnitude();
-
-    if (h_speed > 0.025)
-    {
-        h_speed /= 3;
-        accumulated_walk_distance += h_speed;
-        player_model.speed = lerpd(player_model.speed, 32, 0.15);
-    }
-    else
-    {
-        player_model.speed = lerpd(player_model.speed, 0, 0.15);
-    }
-
+    player_model.speed = std::min(1.0f, last_walk_speed + (walk_speed - last_walk_speed) * partial_ticks);
     player_model.pos = entity_position;
-    player_model.pos.y += y_offset;
     player_model.rot = Vec3f(0, body_rotation_y, 0);
     player_model.head_rot = Vec3f(entity_rotation.x, entity_rotation.y, 0);
 
@@ -1399,5 +1356,5 @@ void EntityPlayerMp::render(float partial_ticks, bool transparency)
     {
         player_model.equipment[i] = equipment[i];
     }
-    player_model.render(accumulated_walk_distance, partial_ticks, transparency);
+    player_model.render(accumulated_walk_distance - walk_speed * (1 - partial_ticks), partial_ticks, transparency);
 }
