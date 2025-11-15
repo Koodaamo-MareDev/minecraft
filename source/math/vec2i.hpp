@@ -36,4 +36,13 @@ public:
     }
 };
 
+inline static uint64_t uint32_pair(uint32_t a, uint32_t b)
+{
+    uint64_t result = 0;
+    uint32_t *ptr = reinterpret_cast<uint32_t *>(&result);
+    ptr[0] = a;
+    ptr[1] = b;
+    return result;
+}
+
 #endif

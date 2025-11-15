@@ -1333,6 +1333,7 @@ namespace Crapper
             try
             {
                 chunk = new Chunk(chunk_pos.x, chunk_pos.y, remote_world);
+                debug::print("Created chunk %d, %d", chunk_pos.x, chunk_pos.y);
             }
             catch (std::bad_alloc &e)
             {
@@ -1441,6 +1442,8 @@ namespace Crapper
         if (!chunk_exists)
         {
             remote_world->chunks.push_back(chunk);
+            uint64_t key = uint32_pair(chunk->x, chunk->z);
+            remote_world->chunk_cache.insert_or_assign(key, chunk);
         }
     }
 

@@ -1603,35 +1603,13 @@ Chunk *World::get_chunk(const Vec2i &pos)
 
 Chunk *World::get_chunk(int32_t x, int32_t z)
 {
-    auto predicate = [x, z](Chunk *chunk)
+    uint64_t key = uint32_pair(x, z);
+    if (auto it = chunk_cache.find(key); it != chunk_cache.end())
     {
-        return chunk && chunk->x == x && chunk->z == z;
-    };
-    Lock chunk_lock(chunk_mutex);
-
-    std::deque<Chunk *>::iterator it = std::find_if(chunk_cache.begin(), chunk_cache.end(), predicate);
-    if (it == chunk_cache.end())
-    {
-        // In case of a cache miss, try to find the chunk in the active chunks
-        it = std::find_if(chunks.begin(), chunks.end(), predicate);
-        if (it != chunks.end())
-        {
-            // Add it to the cache
-            chunk_cache.push_front(*it);
-            return *it;
-        }
-
-        // Chunk not found
-        return nullptr;
+        return it->second;
     }
 
-    Chunk *chunk = *it;
-
-    // Move the chunk to the front of the cache for faster access
-    chunk_cache.erase(it);
-    chunk_cache.push_front(chunk);
-
-    return chunk;
+    return nullptr;
 }
 
 void World::delete_chunk(Chunk *chunk)
@@ -1645,7 +1623,8 @@ void World::delete_chunk(Chunk *chunk)
     chunks.erase(std::remove(chunks.begin(), chunks.end(), chunk), chunks.end());
 
     // Remove the chunk from the cache
-    chunk_cache.erase(std::remove(chunk_cache.begin(), chunk_cache.end(), chunk), chunk_cache.end());
+    uint64_t key = uint32_pair(chunk->x, chunk->z);
+    chunk_cache.erase(key);
 
     // Delete the chunk
     delete chunk;
@@ -1756,6 +1735,8 @@ void World::init_chunk_manager(ChunkProvider *chunk_provider)
             Lock chunk_lock(world->chunk_mutex);
             world->chunks.push_back(chunk);
             world->pending_chunks.erase(std::find(world->pending_chunks.begin(), world->pending_chunks.end(), chunk));
+            uint64_t key = uint32_pair(chunk->x, chunk->z);
+            world->chunk_cache.insert_or_assign(key, chunk);
             chunk_lock.unlock();
 
             // Finish the chunk with features

@@ -8,6 +8,7 @@
 #include <math/math_utils.h>
 #include <crapper/client.hpp>
 #include <set>
+#include <map>
 
 #include <world/particle.hpp>
 #include "sound.hpp"
@@ -70,7 +71,7 @@ public:
 
     std::map<int32_t, EntityPhysical *> world_entities;
     std::deque<Chunk *> chunks;
-    std::deque<Chunk *> chunk_cache;
+    std::map<uint64_t, Chunk *> chunk_cache;
     std::deque<Chunk *> pending_chunks;
     mutex_t chunk_mutex = LWP_MUTEX_NULL;
     lwp_t chunk_manager_thread_handle = LWP_THREAD_NULL;
