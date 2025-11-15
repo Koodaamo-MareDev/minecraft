@@ -28,7 +28,7 @@ BUILD_FEAT	:=	-DITEM_DESYNC_FIX
 # options for code generation
 #---------------------------------------------------------------------------------
 
-CFLAGS	= -g -O2 -Wall $(MACHDEP) $(INCLUDE) $(DEFINES) $(BUILD_FEAT)
+CFLAGS	= -g -O2 -Wall -fno-optimize-sibling-calls $(MACHDEP) $(INCLUDE) $(DEFINES) $(BUILD_FEAT)
 CXXFLAGS	=	$(CFLAGS)
 
 LDFLAGS	=	-g $(MACHDEP) -Wl,-Map,$(notdir $@).map
