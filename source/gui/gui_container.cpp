@@ -153,6 +153,7 @@ void GuiGenericContainer::update()
                 on_result_taken();
                 result_slot->taken = false;
             }
+            on_interact(index);
 
             // Copy the GUI slots to the container after interaction
             if (linked_container)

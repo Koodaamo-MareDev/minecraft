@@ -1,11 +1,11 @@
-#include "gui_survival.hpp"
+#include "gui_crafting.hpp"
 
 #include <world/entity.hpp>
 #include <world/world.hpp>
 #include <util/input/input.hpp>
 #include <crafting/recipe_manager.hpp>
 
-GuiSurvival::GuiSurvival(EntityPhysical *owner, inventory::Container *container) : GuiGenericContainer(owner, container, 45, 0, "Inventory")
+GuiCrafting::GuiCrafting(EntityPhysical *owner, inventory::Container *container, uint8_t window_id) : GuiGenericContainer(owner, container, 46, window_id, "Crafting")
 {
     gertex::GXView viewport = gertex::get_state().view;
 
@@ -14,26 +14,19 @@ GuiSurvival::GuiSurvival(EntityPhysical *owner, inventory::Container *container)
 
     // Crafting
     slots.push_back(new GuiResultSlot(start_x + 288, start_y + 72, inventory::ItemStack()));
-    size_t slot_index = 1;
-    for (size_t j = 0; slot_index < armor_start; slot_index++, j++)
+    for (size_t i = 0; i < 9; i++)
     {
-        slots.push_back(new GuiSlot(start_x + 176 + (j % 2) * 36, start_y + 52 + (j / 2) * 36, inventory::ItemStack()));
-    }
-
-    // Armor
-    for (size_t i = 0; slot_index < inventory_start; slot_index++, i++)
-    {
-        slots.push_back(new GuiSlot(start_x + 16, start_y + 16 + i * 36, inventory::ItemStack()));
+        slots.push_back(new GuiSlot(start_x + 60 + (i % 3) * 36, start_y + 34 + (i / 3) * 36, inventory::ItemStack()));
     }
 
     // Inventory
-    for (size_t i = 0; slot_index < hotbar_start; slot_index++, i++)
+    for (size_t i = 0; i < 27; i++)
     {
         slots.push_back(new GuiSlot(start_x + 16 + (i % 9) * 36, start_y + 168 + (i / 9) * 36, inventory::ItemStack()));
     }
 
     // Hotbar
-    for (size_t i = 0; slot_index < linked_container->size(); slot_index++, i++)
+    for (size_t i = 0; i < 9; i++)
     {
         slots.push_back(new GuiSlot(start_x + 16 + i * 36, start_y + 284, inventory::ItemStack()));
     }
@@ -41,7 +34,7 @@ GuiSurvival::GuiSurvival(EntityPhysical *owner, inventory::Container *container)
     refresh();
 }
 
-void GuiSurvival::draw()
+void GuiCrafting::draw()
 {
     gertex::GXView viewport = gertex::get_state().view;
 
@@ -57,7 +50,7 @@ void GuiSurvival::draw()
     GX_SetCullMode(GX_CULL_NONE);
 
     // Draw the background
-    draw_textured_quad(inventory_texture, start_x, start_y, 512, 512, 0, 0, 256, 256);
+    draw_textured_quad(crafting_texture, start_x, start_y, 512, 512, 0, 0, 256, 256);
 
     // Enable backface culling for the items
     GX_SetCullMode(GX_CULL_BACK);
@@ -106,16 +99,16 @@ void GuiSurvival::draw()
     }
 }
 
-bool GuiSurvival::contains(int x, int y)
+bool GuiCrafting::contains(int x, int y)
 {
     gertex::GXView viewport = gertex::get_state().view;
 
     return x >= (viewport.width - width) / 2 && x < (viewport.width + width) / 2 && y >= (viewport.height - height) / 2 && y < (viewport.height + height) / 2;
 }
 
-void GuiSurvival::on_result_taken()
+void GuiCrafting::on_result_taken()
 {
-    for (size_t i = 1; i <= 4; i++)
+    for (size_t i = 1; i <= 9; i++)
     {
         inventory::ItemStack ingredient = slots[i]->item;
         if (ingredient.empty())
@@ -135,16 +128,16 @@ void GuiSurvival::on_result_taken()
     }
 }
 
-void GuiSurvival::on_interact(size_t slot)
+void GuiCrafting::on_interact(size_t slot)
 {
-    if (slot < 5)
+    if (slot < 10)
     {
         // Build the recipe input
         std::vector<inventory::ItemStack> inputs;
-        for (size_t i = 1; i <= 4; i++)
+        for (size_t i = 1; i <= 9; i++)
             inputs.push_back(slots[i]->item);
 
-        crafting::Input current_input(2, 2, inputs);
+        crafting::Input current_input(3, 3, inputs);
 
         // Get result
         inventory::ItemStack result = crafting::RecipeManager::instance().craft(current_input);
@@ -152,14 +145,14 @@ void GuiSurvival::on_interact(size_t slot)
     }
 }
 
-void GuiSurvival::close()
+void GuiCrafting::close()
 {
     GuiGenericContainer::close();
 
     if (owner->world->is_remote())
         return;
 
-    for (size_t i = 1; i <= 4; i++)
+    for (size_t i = 1; i <= 9; i++)
     {
         inventory::ItemStack stack = slots[i]->item;
         if (!stack.empty())

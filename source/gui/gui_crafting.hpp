@@ -4,22 +4,18 @@
 #include <array>
 #include <gui/gui_container.hpp>
 
-class GuiSurvival : public GuiGenericContainer
+class GuiCrafting : public GuiGenericContainer
 {
 public:
-    const static size_t hotbar_start = 36;
-    const static size_t inventory_start = 9;
-    const static size_t armor_start = 5;
-
     int width = 352;
     int height = 332;
 
-    GuiSurvival(EntityPhysical *owner, inventory::Container *Container);
+    GuiCrafting(EntityPhysical *owner, inventory::Container *Container, uint8_t window_id);
 
     void draw() override;
     bool contains(int x, int y) override;
     void on_result_taken() override;
-    void on_interact(size_t slot) override;
+    void on_interact(size_t slot);
     void close() override;
 };
 #endif

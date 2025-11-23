@@ -303,6 +303,10 @@ inventory::ItemStack GuiSlot::interact(inventory::ItemStack hand, bool right_cli
 
 inventory::ItemStack GuiResultSlot::interact(inventory::ItemStack hand, bool right_click)
 {
+    // No-op if the slot is empty
+    if (item.empty())
+        return hand;
+
     if (hand.empty())
     {
         // Take the item from the slot

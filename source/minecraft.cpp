@@ -17,6 +17,7 @@
 #include <gui/gui_dirtscreen.hpp>
 #include <gui/gui_titlescreen.hpp>
 #include <world/world.hpp>
+#include <crafting/recipe_manager.hpp>
 #include <util/input/keyboard_mouse.hpp>
 #include <util/input/wiimote_nunchuk.hpp>
 #include <util/input/wiimote_classic.hpp>
@@ -320,6 +321,7 @@ int main(int argc, char **argv)
     sound_system = new SoundSystem();
 
     inventory::init_items();
+    crafting::RecipeManager::instance();
     Gui::init_matrices(state.view.aspect_correction);
 
     while (!isExiting)

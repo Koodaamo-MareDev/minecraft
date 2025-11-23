@@ -20,6 +20,7 @@ public:
     virtual void close();
     virtual bool use_cursor() { return true; }
     virtual void on_result_taken();
+    virtual void on_interact(size_t slot) {}
     void set_slot(size_t slot, inventory::ItemStack item);
     inventory::ItemStack get_slot(size_t slot);
     ~GuiGenericContainer();

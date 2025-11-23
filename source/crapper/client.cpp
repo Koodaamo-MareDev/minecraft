@@ -12,6 +12,7 @@
 #include <world/world.hpp>
 #include <gui/gui_dirtscreen.hpp>
 #include <gui/gui_container.hpp>
+#include <gui/gui_crafting.hpp>
 #include <util/debuglog.hpp>
 
 namespace Crapper
@@ -1573,6 +1574,12 @@ namespace Crapper
         {
             // Chest
             GuiContainer *gui = new GuiContainer(&remote_world->player, nullptr, slot_count, window_id, window_title);
+            Gui::set_gui(gui);
+            break;
+        }
+        case 1:
+        {
+            GuiCrafting *gui = new GuiCrafting(&remote_world->player, nullptr, window_id);
             Gui::set_gui(gui);
             break;
         }

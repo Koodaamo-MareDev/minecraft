@@ -27,6 +27,7 @@ GXTexObj player_texture;
 GXTexObj font_texture;
 GXTexObj items_texture;
 GXTexObj inventory_texture;
+GXTexObj crafting_texture;
 GXTexObj gui_texture;
 
 // Animated textures
@@ -96,6 +97,7 @@ void init_textures()
     init_png_texture(font_texture, "font/default.png");
     init_png_texture(items_texture, "gui/items.png");
     init_png_texture(inventory_texture, "gui/inventory.png");
+    init_png_texture(crafting_texture, "gui/crafting.png");
     init_png_texture(gui_texture, "gui/gui.png");
 
     GX_InitTexObjWrapMode(&clouds_texture, GX_REPEAT, GX_REPEAT);
