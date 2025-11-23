@@ -153,6 +153,7 @@ namespace Crapper
         void sendBlockItemSwitch(uint16_t item_id);
         void sendWindowClose(uint8_t window_id);
         void sendWindowClick(uint8_t window_id, int16_t slot, uint8_t button, int16_t action, int16_t id, uint8_t item_count, int16_t item_meta);
+        void sendTransaction(uint8_t window_id, int16_t action, bool success);
         void sendKeepAlive();
 
         bool handlePacket(ByteBuffer &buffer);

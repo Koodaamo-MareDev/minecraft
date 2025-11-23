@@ -851,6 +851,16 @@ namespace Crapper
         send(buffer);
     }
 
+    void MinecraftClient::sendTransaction(uint8_t window_id, int16_t action, bool success)
+    {
+        ByteBuffer buffer;
+        buffer.writeByte(0x6A); // Packet ID
+        buffer.writeByte(window_id);
+        buffer.writeShort(action);
+        buffer.writeBool(success);
+        send(buffer);
+    }
+
     void MinecraftClient::handleNamedEntitySpawn(ByteBuffer &buffer)
     {
         // Read named entity spawn
@@ -1586,10 +1596,16 @@ namespace Crapper
 
     void MinecraftClient::handleTransaction(ByteBuffer &buffer)
     {
-        // Not used, just skip
-        buffer.readByte();
-        buffer.readShort();
-        buffer.readBool();
+        uint8_t window_id = buffer.readByte();
+        int16_t action_id = buffer.readShort();
+        bool success = buffer.readBool();
+        if (buffer.underflow)
+            return;
+        Gui *current_gui = Gui::get_gui();
+        if (!success && current_gui && current_gui->window_id == window_id)
+        {
+            sendTransaction(window_id, action_id, true);
+        }
     }
 
     void MinecraftClient::handleSetSlot(ByteBuffer &buffer)
