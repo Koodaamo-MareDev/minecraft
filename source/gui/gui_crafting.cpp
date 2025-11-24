@@ -13,7 +13,7 @@ GuiCrafting::GuiCrafting(EntityPhysical *owner, inventory::Container *container,
     int start_y = (viewport.aspect_correction * viewport.height - height) / 2;
 
     // Crafting
-    slots.push_back(new GuiResultSlot(start_x + 288, start_y + 72, inventory::ItemStack()));
+    slots.push_back(new GuiResultSlot(start_x + 248, start_y + 70, inventory::ItemStack()));
     for (size_t i = 0; i < 9; i++)
     {
         slots.push_back(new GuiSlot(start_x + 60 + (i % 3) * 36, start_y + 34 + (i / 3) * 36, inventory::ItemStack()));
