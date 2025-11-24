@@ -1,5 +1,5 @@
-#ifndef GUI_SURVIVAL_HPP
-#define GUI_SURVIVAL_HPP
+#ifndef GUI_CRAFTING_HPP
+#define GUI_CRAFTING_HPP
 
 #include <array>
 #include <gui/gui_container.hpp>
