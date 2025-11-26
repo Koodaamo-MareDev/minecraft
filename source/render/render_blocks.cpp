@@ -255,10 +255,10 @@ int render_torch_with_angle(Block *block, const Vec3f &vertex_pos, float ax, flo
     GX_VertexLit({vertex_pos + Vec3f{0.5f, 0.5f, 0.0625f}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PZ);
     GX_VertexLit({vertex_pos + Vec3f{0.5f + ax, -.5f, 0.0625f + az}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PZ);
     // Top side
-    GX_VertexLit({vertex_pos + Vec3f{0.0625f + ax * 0.375f, 0.125f, -.0625f + az * 0.375f}, TEXTURE_X(texture_index) + 9. * BASE3D_BLOCK_UV_SCALE, TEXTURE_Y(texture_index) + 8. * BASE3D_BLOCK_UV_SCALE}, lighting, FACE_PY);
-    GX_VertexLit({vertex_pos + Vec3f{0.0625f + ax * 0.375f, 0.125f, 0.0625f + az * 0.375f}, TEXTURE_X(texture_index) + 9. * BASE3D_BLOCK_UV_SCALE, TEXTURE_Y(texture_index) + 6. * BASE3D_BLOCK_UV_SCALE}, lighting, FACE_PY);
-    GX_VertexLit({vertex_pos + Vec3f{-.0625f + ax * 0.375f, 0.125f, 0.0625f + az * 0.375f}, TEXTURE_X(texture_index) + 7. * BASE3D_BLOCK_UV_SCALE, TEXTURE_Y(texture_index) + 6. * BASE3D_BLOCK_UV_SCALE}, lighting, FACE_PY);
-    GX_VertexLit({vertex_pos + Vec3f{-.0625f + ax * 0.375f, 0.125f, -.0625f + az * 0.375f}, TEXTURE_X(texture_index) + 7. * BASE3D_BLOCK_UV_SCALE, TEXTURE_Y(texture_index) + 8. * BASE3D_BLOCK_UV_SCALE}, lighting, FACE_PY);
+    GX_VertexLit({vertex_pos + Vec3f{0.0625f + ax * 0.375f, 0.125f, -.0625f + az * 0.375f}, TEXTURE_X(texture_index) + 9. * BASE3D_PIXEL_UV_SCALE, TEXTURE_Y(texture_index) + 8. * BASE3D_BLOCK_UV_SCALE}, lighting, FACE_PY);
+    GX_VertexLit({vertex_pos + Vec3f{0.0625f + ax * 0.375f, 0.125f, 0.0625f + az * 0.375f}, TEXTURE_X(texture_index) + 9. * BASE3D_PIXEL_UV_SCALE, TEXTURE_Y(texture_index) + 6. * BASE3D_BLOCK_UV_SCALE}, lighting, FACE_PY);
+    GX_VertexLit({vertex_pos + Vec3f{-.0625f + ax * 0.375f, 0.125f, 0.0625f + az * 0.375f}, TEXTURE_X(texture_index) + 7. * BASE3D_PIXEL_UV_SCALE, TEXTURE_Y(texture_index) + 6. * BASE3D_BLOCK_UV_SCALE}, lighting, FACE_PY);
+    GX_VertexLit({vertex_pos + Vec3f{-.0625f + ax * 0.375f, 0.125f, -.0625f + az * 0.375f}, TEXTURE_X(texture_index) + 7. * BASE3D_PIXEL_UV_SCALE, TEXTURE_Y(texture_index) + 8. * BASE3D_BLOCK_UV_SCALE}, lighting, FACE_PY);
 
     return 20;
 }
@@ -276,7 +276,7 @@ int render_door(Block *block, const Vec3i &pos)
     uint8_t direction = block->meta & 3;
     if (!open)
         direction = (direction + 3) & 3;
-    if (!top_half && replace_texture)
+    if (!top_half && !replace_texture)
         texture_index += 16;
 
     constexpr vfloat_t door_thickness = 0.1875;
@@ -296,19 +296,19 @@ int render_door(Block *block, const Vec3i &pos)
     // Bottom face (we'll not render the bottom face of the top half)
     if (!top_half)
     {
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.min.y, door_bounds.min.z), TEXTURE_X(texture_index) + (door_bounds.min.x * 16), TEXTURE_Y(texture_index) + (door_bounds.min.z * 16)}, lighting, FACE_NY);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.min.y, door_bounds.max.z), TEXTURE_X(texture_index) + (door_bounds.min.x * 16), TEXTURE_Y(texture_index) + (door_bounds.max.z * 16)}, lighting, FACE_NY);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.min.y, door_bounds.max.z), TEXTURE_X(texture_index) + (door_bounds.max.x * 16), TEXTURE_Y(texture_index) + (door_bounds.max.z * 16)}, lighting, FACE_NY);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.min.y, door_bounds.min.z), TEXTURE_X(texture_index) + (door_bounds.max.x * 16), TEXTURE_Y(texture_index) + (door_bounds.min.z * 16)}, lighting, FACE_NY);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.min.y, door_bounds.min.z), TEXTURE_X(texture_index) + (door_bounds.min.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_Y(texture_index) + (door_bounds.min.z * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NY);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.min.y, door_bounds.max.z), TEXTURE_X(texture_index) + (door_bounds.min.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_Y(texture_index) + (door_bounds.max.z * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NY);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.min.y, door_bounds.max.z), TEXTURE_X(texture_index) + (door_bounds.max.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_Y(texture_index) + (door_bounds.max.z * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NY);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.min.y, door_bounds.min.z), TEXTURE_X(texture_index) + (door_bounds.max.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_Y(texture_index) + (door_bounds.min.z * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NY);
     }
 
     // Top face (we'll not render the top face of the bottom half)
     if (top_half)
     {
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.max.y, door_bounds.min.z), TEXTURE_X(texture_index) + (door_bounds.max.x * 16), TEXTURE_Y(texture_index) + (door_bounds.min.z * 16)}, lighting, FACE_PY);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.max.y, door_bounds.max.z), TEXTURE_X(texture_index) + (door_bounds.max.x * 16), TEXTURE_Y(texture_index) + (door_bounds.max.z * 16)}, lighting, FACE_PY);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.max.y, door_bounds.max.z), TEXTURE_X(texture_index) + (door_bounds.min.x * 16), TEXTURE_Y(texture_index) + (door_bounds.max.z * 16)}, lighting, FACE_PY);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.max.y, door_bounds.min.z), TEXTURE_X(texture_index) + (door_bounds.min.x * 16), TEXTURE_Y(texture_index) + (door_bounds.min.z * 16)}, lighting, FACE_PY);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.max.y, door_bounds.min.z), TEXTURE_X(texture_index) + (door_bounds.max.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_Y(texture_index) + (door_bounds.min.z * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PY);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.max.y, door_bounds.max.z), TEXTURE_X(texture_index) + (door_bounds.max.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_Y(texture_index) + (door_bounds.max.z * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PY);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.max.y, door_bounds.max.z), TEXTURE_X(texture_index) + (door_bounds.min.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_Y(texture_index) + (door_bounds.max.z * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PY);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.max.y, door_bounds.min.z), TEXTURE_X(texture_index) + (door_bounds.min.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_Y(texture_index) + (door_bounds.min.z * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PY);
     }
 
     bool flip_states[4] = {false, false, false, false};
@@ -324,65 +324,65 @@ int render_door(Block *block, const Vec3i &pos)
     // Negative X side
     if (flip_states[1])
     {
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.max.y, door_bounds.min.z), TEXTURE_X(texture_index) + (door_bounds.min.z * 16), TEXTURE_PY(texture_index) - (door_bounds.max.y * 16)}, lighting, FACE_NX);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.max.y, door_bounds.max.z), TEXTURE_X(texture_index) + (door_bounds.max.z * 16), TEXTURE_PY(texture_index) - (door_bounds.max.y * 16)}, lighting, FACE_NX);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.min.y, door_bounds.max.z), TEXTURE_X(texture_index) + (door_bounds.max.z * 16), TEXTURE_PY(texture_index) - (door_bounds.min.y * 16)}, lighting, FACE_NX);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.min.y, door_bounds.min.z), TEXTURE_X(texture_index) + (door_bounds.min.z * 16), TEXTURE_PY(texture_index) - (door_bounds.min.y * 16)}, lighting, FACE_NX);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.max.y, door_bounds.min.z), TEXTURE_X(texture_index) + (door_bounds.min.z * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NX);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.max.y, door_bounds.max.z), TEXTURE_X(texture_index) + (door_bounds.max.z * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NX);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.min.y, door_bounds.max.z), TEXTURE_X(texture_index) + (door_bounds.max.z * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NX);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.min.y, door_bounds.min.z), TEXTURE_X(texture_index) + (door_bounds.min.z * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NX);
     }
     else
     {
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.max.y, door_bounds.min.z), TEXTURE_PX(texture_index) - (door_bounds.min.z * 16), TEXTURE_PY(texture_index) - (door_bounds.max.y * 16)}, lighting, FACE_NX);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.max.y, door_bounds.max.z), TEXTURE_PX(texture_index) - (door_bounds.max.z * 16), TEXTURE_PY(texture_index) - (door_bounds.max.y * 16)}, lighting, FACE_NX);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.min.y, door_bounds.max.z), TEXTURE_PX(texture_index) - (door_bounds.max.z * 16), TEXTURE_PY(texture_index) - (door_bounds.min.y * 16)}, lighting, FACE_NX);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.min.y, door_bounds.min.z), TEXTURE_PX(texture_index) - (door_bounds.min.z * 16), TEXTURE_PY(texture_index) - (door_bounds.min.y * 16)}, lighting, FACE_NX);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.max.y, door_bounds.min.z), TEXTURE_PX(texture_index) - (door_bounds.min.z * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NX);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.max.y, door_bounds.max.z), TEXTURE_PX(texture_index) - (door_bounds.max.z * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NX);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.min.y, door_bounds.max.z), TEXTURE_PX(texture_index) - (door_bounds.max.z * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NX);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.min.y, door_bounds.min.z), TEXTURE_PX(texture_index) - (door_bounds.min.z * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NX);
     }
 
     // Positive X side
     if (flip_states[3])
     {
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.min.y, door_bounds.min.z), TEXTURE_X(texture_index) + (door_bounds.min.z * 16), TEXTURE_PY(texture_index) - (door_bounds.min.y * 16)}, lighting, FACE_PX);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.min.y, door_bounds.max.z), TEXTURE_X(texture_index) + (door_bounds.max.z * 16), TEXTURE_PY(texture_index) - (door_bounds.min.y * 16)}, lighting, FACE_PX);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.max.y, door_bounds.max.z), TEXTURE_X(texture_index) + (door_bounds.max.z * 16), TEXTURE_PY(texture_index) - (door_bounds.max.y * 16)}, lighting, FACE_PX);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.max.y, door_bounds.min.z), TEXTURE_X(texture_index) + (door_bounds.min.z * 16), TEXTURE_PY(texture_index) - (door_bounds.max.y * 16)}, lighting, FACE_PX);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.min.y, door_bounds.min.z), TEXTURE_X(texture_index) + (door_bounds.min.z * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PX);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.min.y, door_bounds.max.z), TEXTURE_X(texture_index) + (door_bounds.max.z * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PX);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.max.y, door_bounds.max.z), TEXTURE_X(texture_index) + (door_bounds.max.z * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PX);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.max.y, door_bounds.min.z), TEXTURE_X(texture_index) + (door_bounds.min.z * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PX);
     }
     else
     {
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.min.y, door_bounds.min.z), TEXTURE_PX(texture_index) - (door_bounds.min.z * 16), TEXTURE_PY(texture_index) - (door_bounds.min.y * 16)}, lighting, FACE_PX);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.min.y, door_bounds.max.z), TEXTURE_PX(texture_index) - (door_bounds.max.z * 16), TEXTURE_PY(texture_index) - (door_bounds.min.y * 16)}, lighting, FACE_PX);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.max.y, door_bounds.max.z), TEXTURE_PX(texture_index) - (door_bounds.max.z * 16), TEXTURE_PY(texture_index) - (door_bounds.max.y * 16)}, lighting, FACE_PX);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.max.y, door_bounds.min.z), TEXTURE_PX(texture_index) - (door_bounds.min.z * 16), TEXTURE_PY(texture_index) - (door_bounds.max.y * 16)}, lighting, FACE_PX);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.min.y, door_bounds.min.z), TEXTURE_PX(texture_index) - (door_bounds.min.z * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PX);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.min.y, door_bounds.max.z), TEXTURE_PX(texture_index) - (door_bounds.max.z * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PX);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.max.y, door_bounds.max.z), TEXTURE_PX(texture_index) - (door_bounds.max.z * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PX);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.max.y, door_bounds.min.z), TEXTURE_PX(texture_index) - (door_bounds.min.z * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PX);
     }
 
     // Negative Z side
     if (flip_states[2])
     {
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.min.y, door_bounds.min.z), TEXTURE_X(texture_index) + (door_bounds.min.x * 16), TEXTURE_PY(texture_index) - (door_bounds.min.y * 16)}, lighting, FACE_NZ);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.min.y, door_bounds.min.z), TEXTURE_X(texture_index) + (door_bounds.max.x * 16), TEXTURE_PY(texture_index) - (door_bounds.min.y * 16)}, lighting, FACE_NZ);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.max.y, door_bounds.min.z), TEXTURE_X(texture_index) + (door_bounds.max.x * 16), TEXTURE_PY(texture_index) - (door_bounds.max.y * 16)}, lighting, FACE_NZ);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.max.y, door_bounds.min.z), TEXTURE_X(texture_index) + (door_bounds.min.x * 16), TEXTURE_PY(texture_index) - (door_bounds.max.y * 16)}, lighting, FACE_NZ);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.min.y, door_bounds.min.z), TEXTURE_X(texture_index) + (door_bounds.min.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NZ);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.min.y, door_bounds.min.z), TEXTURE_X(texture_index) + (door_bounds.max.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NZ);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.max.y, door_bounds.min.z), TEXTURE_X(texture_index) + (door_bounds.max.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NZ);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.max.y, door_bounds.min.z), TEXTURE_X(texture_index) + (door_bounds.min.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NZ);
     }
     else
     {
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.min.y, door_bounds.min.z), TEXTURE_PX(texture_index) - (door_bounds.min.x * 16), TEXTURE_PY(texture_index) - (door_bounds.min.y * 16)}, lighting, FACE_NZ);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.min.y, door_bounds.min.z), TEXTURE_PX(texture_index) - (door_bounds.max.x * 16), TEXTURE_PY(texture_index) - (door_bounds.min.y * 16)}, lighting, FACE_NZ);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.max.y, door_bounds.min.z), TEXTURE_PX(texture_index) - (door_bounds.max.x * 16), TEXTURE_PY(texture_index) - (door_bounds.max.y * 16)}, lighting, FACE_NZ);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.max.y, door_bounds.min.z), TEXTURE_PX(texture_index) - (door_bounds.min.x * 16), TEXTURE_PY(texture_index) - (door_bounds.max.y * 16)}, lighting, FACE_NZ);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.min.y, door_bounds.min.z), TEXTURE_PX(texture_index) - (door_bounds.min.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NZ);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.min.y, door_bounds.min.z), TEXTURE_PX(texture_index) - (door_bounds.max.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NZ);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.max.y, door_bounds.min.z), TEXTURE_PX(texture_index) - (door_bounds.max.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NZ);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.max.y, door_bounds.min.z), TEXTURE_PX(texture_index) - (door_bounds.min.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NZ);
     }
 
     // Positive Z side
     if (flip_states[0])
     {
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.max.y, door_bounds.max.z), TEXTURE_X(texture_index) + (door_bounds.min.x * 16), TEXTURE_PY(texture_index) - (door_bounds.max.y * 16)}, lighting, FACE_PZ);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.max.y, door_bounds.max.z), TEXTURE_X(texture_index) + (door_bounds.max.x * 16), TEXTURE_PY(texture_index) - (door_bounds.max.y * 16)}, lighting, FACE_PZ);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.min.y, door_bounds.max.z), TEXTURE_X(texture_index) + (door_bounds.max.x * 16), TEXTURE_PY(texture_index) - (door_bounds.min.y * 16)}, lighting, FACE_PZ);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.min.y, door_bounds.max.z), TEXTURE_X(texture_index) + (door_bounds.min.x * 16), TEXTURE_PY(texture_index) - (door_bounds.min.y * 16)}, lighting, FACE_PZ);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.max.y, door_bounds.max.z), TEXTURE_X(texture_index) + (door_bounds.min.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PZ);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.max.y, door_bounds.max.z), TEXTURE_X(texture_index) + (door_bounds.max.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PZ);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.min.y, door_bounds.max.z), TEXTURE_X(texture_index) + (door_bounds.max.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PZ);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.min.y, door_bounds.max.z), TEXTURE_X(texture_index) + (door_bounds.min.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PZ);
     }
     else
     {
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.max.y, door_bounds.max.z), TEXTURE_PX(texture_index) - (door_bounds.min.x * 16), TEXTURE_PY(texture_index) - (door_bounds.max.y * 16)}, lighting, FACE_PZ);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.max.y, door_bounds.max.z), TEXTURE_PX(texture_index) - (door_bounds.max.x * 16), TEXTURE_PY(texture_index) - (door_bounds.max.y * 16)}, lighting, FACE_PZ);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.min.y, door_bounds.max.z), TEXTURE_PX(texture_index) - (door_bounds.max.x * 16), TEXTURE_PY(texture_index) - (door_bounds.min.y * 16)}, lighting, FACE_PZ);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.min.y, door_bounds.max.z), TEXTURE_PX(texture_index) - (door_bounds.min.x * 16), TEXTURE_PY(texture_index) - (door_bounds.min.y * 16)}, lighting, FACE_PZ);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.max.y, door_bounds.max.z), TEXTURE_PX(texture_index) - (door_bounds.min.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PZ);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.max.y, door_bounds.max.z), TEXTURE_PX(texture_index) - (door_bounds.max.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PZ);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.min.y, door_bounds.max.z), TEXTURE_PX(texture_index) - (door_bounds.max.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PZ);
+        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.min.y, door_bounds.max.z), TEXTURE_PX(texture_index) - (door_bounds.min.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PZ);
     }
 
     return 20;
