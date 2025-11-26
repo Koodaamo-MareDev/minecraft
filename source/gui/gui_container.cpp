@@ -155,6 +155,13 @@ void GuiGenericContainer::update()
             }
             on_interact(index);
 
+            // Copy the last 36 slots to the player's inventory
+            inventory::PlayerInventory &inventory = owner->world->player.items;
+            for (size_t i = 0; i < 36; i++)
+            {
+                inventory[inventory.size() - 1 - i] = slots[slots.size() - 1 - i]->item;
+            }
+
             // Copy the GUI slots to the container after interaction
             if (linked_container)
             {
