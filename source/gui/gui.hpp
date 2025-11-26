@@ -42,9 +42,9 @@ class Gui
 {
 public:
     inventory::ItemStack item_in_hand;
-    uint8_t window_id = 0;
+    uint8_t window_id;
     int16_t transaction_id = 1;
-    Gui()
+    Gui(uint8_t window_id = 0) : window_id(window_id)
     {
     }
     virtual ~Gui() = default;

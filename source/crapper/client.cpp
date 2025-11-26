@@ -1573,7 +1573,7 @@ namespace Crapper
         case 0:
         {
             // Chest
-            GuiContainer *gui = new GuiContainer(&remote_world->player, nullptr, slot_count, window_id, window_title);
+            GuiContainer *gui = new GuiContainer(&remote_world->player, nullptr, window_id, window_title, slot_count);
             Gui::set_gui(gui);
             break;
         }

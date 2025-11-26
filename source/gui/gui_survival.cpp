@@ -5,7 +5,7 @@
 #include <util/input/input.hpp>
 #include <crafting/recipe_manager.hpp>
 
-GuiSurvival::GuiSurvival(EntityPhysical *owner, inventory::Container *container) : GuiGenericContainer(owner, container, 45, 0, "Inventory")
+GuiSurvival::GuiSurvival(EntityPhysical *owner, inventory::Container *container) : GuiGenericContainer(owner, container, 0, "Inventory")
 {
     gertex::GXView viewport = gertex::get_state().view;
 
@@ -14,26 +14,25 @@ GuiSurvival::GuiSurvival(EntityPhysical *owner, inventory::Container *container)
 
     // Crafting
     slots.push_back(new GuiResultSlot(start_x + 288, start_y + 72, inventory::ItemStack()));
-    size_t slot_index = 1;
-    for (size_t j = 0; slot_index < armor_start; slot_index++, j++)
+    for (size_t i = 0; i < 4; i++)
     {
-        slots.push_back(new GuiSlot(start_x + 176 + (j % 2) * 36, start_y + 52 + (j / 2) * 36, inventory::ItemStack()));
+        slots.push_back(new GuiSlot(start_x + 176 + (i % 2) * 36, start_y + 52 + (i / 2) * 36, inventory::ItemStack()));
     }
 
     // Armor
-    for (size_t i = 0; slot_index < inventory_start; slot_index++, i++)
+    for (size_t i = 0; i < 4; i++)
     {
         slots.push_back(new GuiSlot(start_x + 16, start_y + 16 + i * 36, inventory::ItemStack()));
     }
 
     // Inventory
-    for (size_t i = 0; slot_index < hotbar_start; slot_index++, i++)
+    for (size_t i = 0; i < 27; i++)
     {
         slots.push_back(new GuiSlot(start_x + 16 + (i % 9) * 36, start_y + 168 + (i / 9) * 36, inventory::ItemStack()));
     }
 
     // Hotbar
-    for (size_t i = 0; slot_index < linked_container->size(); slot_index++, i++)
+    for (size_t i = 0; i < 9; i++)
     {
         slots.push_back(new GuiSlot(start_x + 16 + i * 36, start_y + 284, inventory::ItemStack()));
     }
@@ -128,10 +127,7 @@ void GuiSurvival::on_result_taken()
             ingredient.count--;
 
         // Clear the slot if the item count is zero
-        if (ingredient.empty())
-            slots[i]->item = inventory::ItemStack();
-        else
-            slots[i]->item = ingredient;
+        set_slot(i, ingredient.empty() ? inventory::ItemStack() : ingredient);
     }
 }
 

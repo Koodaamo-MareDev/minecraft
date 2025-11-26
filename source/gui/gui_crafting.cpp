@@ -5,7 +5,7 @@
 #include <util/input/input.hpp>
 #include <crafting/recipe_manager.hpp>
 
-GuiCrafting::GuiCrafting(EntityPhysical *owner, inventory::Container *container, uint8_t window_id) : GuiGenericContainer(owner, container, 46, window_id, "Crafting")
+GuiCrafting::GuiCrafting(EntityPhysical *owner, inventory::Container *container, uint8_t window_id) : GuiGenericContainer(owner, container, window_id, "Crafting")
 {
     gertex::GXView viewport = gertex::get_state().view;
 

@@ -8,13 +8,11 @@ class GuiSurvival : public GuiGenericContainer
 {
 public:
     const static size_t hotbar_start = 36;
-    const static size_t inventory_start = 9;
-    const static size_t armor_start = 5;
 
     int width = 352;
     int height = 332;
 
-    GuiSurvival(EntityPhysical *owner, inventory::Container *Container);
+    GuiSurvival(EntityPhysical *owner, inventory::Container *container);
 
     void draw() override;
     bool contains(int x, int y) override;

@@ -2,7 +2,7 @@
 #include <world/world.hpp>
 #include <util/input/input.hpp>
 
-GuiContainer::GuiContainer(EntityPhysical *owner, inventory::Container *container, uint8_t slots, uint8_t window_id, std::string title) : GuiGenericContainer(owner, container, slots, window_id, title)
+GuiContainer::GuiContainer(EntityPhysical *owner, inventory::Container *container, uint8_t window_id, std::string title, uint8_t slots) : GuiGenericContainer(owner, container, window_id, title)
 {
     int inventory_height = 192;
     int container_height = 36 + ((slots + 8) / 9) * 36;
