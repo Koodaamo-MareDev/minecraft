@@ -515,6 +515,14 @@ inventory::ItemStack random_drop(const Block &old_block, inventory::ItemStack it
     return item;
 }
 
+inventory::ItemStack random_range_drop(const Block &old_block, inventory::ItemStack item, uint8_t min, uint8_t max)
+{
+    javaport::Random rng;
+    if (min < max)
+        item.count = rng.nextInt(max - min + 1) + min;
+    return item;
+}
+
 void default_destroy(World *world, const Vec3i &pos, const Block &old_block)
 {
     Block *block = world->get_block_at(pos + Vec3i(0, 1, 0));
@@ -932,12 +940,12 @@ BlockProperties block_properties[256] = {
     BlockProperties().id(BlockID::gravel).tool(inventory::tool_type::shovel, inventory::tool_tier::no_tier).hardness(0.6f).texture(19).sound(SoundType::dirt).tick_rate(3).tick(falling_block_tick).added(schedule_update).neighbor_changed(schedule_update),
     BlockProperties().id(BlockID::gold_ore).tool(inventory::tool_type::pickaxe, inventory::tool_tier::stone).hardness(3.0f).texture(32).sound(SoundType::stone),
     BlockProperties().id(BlockID::iron_ore).tool(inventory::tool_type::pickaxe, inventory::tool_tier::stone).hardness(3.0f).texture(33).sound(SoundType::stone),
-    BlockProperties().id(BlockID::coal_ore).tool(inventory::tool_type::pickaxe, inventory::tool_tier::stone).hardness(3.0f).texture(34).sound(SoundType::stone),
+    BlockProperties().id(BlockID::coal_ore).tool(inventory::tool_type::pickaxe, inventory::tool_tier::stone).hardness(3.0f).texture(34).sound(SoundType::stone).drops(std::bind(fixed_drop, std::placeholders::_1, inventory::ItemStack(+ItemID::coal, 1))),
     BlockProperties().id(BlockID::wood).tool(inventory::tool_type::axe, inventory::tool_tier::no_tier).hardness(2.0f).texture(20).sound(SoundType::wood).render_type(RenderType::full_special),
-    BlockProperties().id(BlockID::leaves).hardness(0.2f).texture(186).sound(SoundType::grass).opacity(1).transparent(true).render_type(RenderType::special).nonflat(true),
+    BlockProperties().id(BlockID::leaves).hardness(0.2f).texture(186).sound(SoundType::grass).opacity(1).transparent(true).render_type(RenderType::special).nonflat(true).drops(std::bind(random_range_drop, std::placeholders::_1, inventory::ItemStack(+BlockID::sapling, 1), 0, 1)),
     BlockProperties().id(BlockID::sponge).hardness(0.6f).texture(48).sound(SoundType::grass),
     BlockProperties().id(BlockID::glass).hardness(0.3f).texture(49).sound(SoundType::glass).opacity(0).transparent(true).drops(std::bind(no_drop, std::placeholders::_1)),
-    BlockProperties().id(BlockID::lapis_ore).tool(inventory::tool_type::pickaxe, inventory::tool_tier::stone).hardness(3.0f).texture(160).sound(SoundType::stone),
+    BlockProperties().id(BlockID::lapis_ore).tool(inventory::tool_type::pickaxe, inventory::tool_tier::stone).hardness(3.0f).texture(160).sound(SoundType::stone).drops(std::bind(random_range_drop, std::placeholders::_1, inventory::ItemStack(+ItemID::dye, 1, 4), 4, 8)),
     BlockProperties().id(BlockID::lapis_block).tool(inventory::tool_type::pickaxe, inventory::tool_tier::stone).hardness(3.0f).texture(144).sound(SoundType::stone),
     BlockProperties().id(BlockID::dispenser).tool(inventory::tool_type::pickaxe, inventory::tool_tier::wood).hardness(3.5f).texture(46).sound(SoundType::stone).render_type(RenderType::full_special),
     BlockProperties().id(BlockID::sandstone).tool(inventory::tool_type::pickaxe, inventory::tool_tier::wood).hardness(0.8f).texture(176).sound(SoundType::stone).render_type(RenderType::full_special),
@@ -972,7 +980,7 @@ BlockProperties block_properties[256] = {
     BlockProperties().id(BlockID::oak_stairs).tool(inventory::tool_type::axe, inventory::tool_tier::no_tier).hardness(2.0f).texture(4).solid(false).sound(SoundType::wood),
     BlockProperties().id(BlockID::chest).tool(inventory::tool_type::axe, inventory::tool_tier::no_tier).hardness(2.5f).texture(27).sound(SoundType::wood).render_type(RenderType::full_special),
     BlockProperties().id(BlockID::redstone_wire).hardness(0.0f).texture(164).solid(false).opacity(0).transparent(true).sound(SoundType::stone).aabb(flat_aabb).render_type(RenderType::flat_ground).valid_item(false).collision(CollisionType::none).needs_support(true),
-    BlockProperties().id(BlockID::diamond_ore).tool(inventory::tool_type::pickaxe, inventory::tool_tier::iron).hardness(3.0f).texture(50).sound(SoundType::stone),
+    BlockProperties().id(BlockID::diamond_ore).tool(inventory::tool_type::pickaxe, inventory::tool_tier::iron).hardness(3.0f).texture(50).sound(SoundType::stone).drops(std::bind(fixed_drop, std::placeholders::_1, inventory::ItemStack(+ItemID::diamond, 1))),
     BlockProperties().id(BlockID::diamond_block).tool(inventory::tool_type::pickaxe, inventory::tool_tier::iron).hardness(5.0f).texture(24).sound(SoundType::metal),
     BlockProperties().id(BlockID::crafting_table).tool(inventory::tool_type::axe, inventory::tool_tier::no_tier).hardness(2.5f).texture(59).sound(SoundType::wood).render_type(RenderType::full_special),
     BlockProperties().id(BlockID::wheat).hardness(0.0f).texture(95).solid(false).opacity(0).transparent(true).sound(SoundType::grass).render_type(RenderType::cross).collision(CollisionType::none).needs_support(true),
@@ -989,8 +997,8 @@ BlockProperties block_properties[256] = {
     BlockProperties().id(BlockID::stone_pressure_plate).tool(inventory::tool_type::pickaxe, inventory::tool_tier::no_tier).hardness(0.5f).texture(0).solid(false).opacity(0).transparent(true).sound(SoundType::stone).aabb(flat_aabb).render_type(RenderType::flat_ground).collision(CollisionType::none).needs_support(true),
     BlockProperties().id(BlockID::iron_door).tool(inventory::tool_type::pickaxe, inventory::tool_tier::no_tier).hardness(5.0f).texture(82).solid(false).opacity(0).transparent(true).sound(SoundType::metal).render_type(RenderType::special).aabb(door_aabb),
     BlockProperties().id(BlockID::wooden_pressure_plate).tool(inventory::tool_type::pickaxe, inventory::tool_tier::no_tier).hardness(0.5f).texture(4).solid(false).opacity(0).transparent(true).sound(SoundType::wood).aabb(flat_aabb).render_type(RenderType::flat_ground).collision(CollisionType::none).needs_support(true),
-    BlockProperties().id(BlockID::redstone_ore).tool(inventory::tool_type::pickaxe, inventory::tool_tier::iron).hardness(3.0f).texture(51).sound(SoundType::stone),
-    BlockProperties().id(BlockID::lit_redstone_ore).tool(inventory::tool_type::pickaxe, inventory::tool_tier::iron).texture(51).sound(SoundType::stone).luminance(9),
+    BlockProperties().id(BlockID::redstone_ore).tool(inventory::tool_type::pickaxe, inventory::tool_tier::iron).hardness(3.0f).texture(51).sound(SoundType::stone).drops(std::bind(random_range_drop, std::placeholders::_1, inventory::ItemStack(+ItemID::redstone_dust, 1), 4, 5)),
+    BlockProperties().id(BlockID::lit_redstone_ore).tool(inventory::tool_type::pickaxe, inventory::tool_tier::iron).texture(51).sound(SoundType::stone).luminance(9).drops(std::bind(random_range_drop, std::placeholders::_1, inventory::ItemStack(+ItemID::redstone_dust, 1), 4, 5)),
     BlockProperties().id(BlockID::unlit_redstone_torch).hardness(0.0f).texture(115).solid(false).opacity(0).transparent(true).luminance(0).sound(SoundType::stone).aabb(torch_aabb).render_type(RenderType::special).collision(CollisionType::none).needs_support(true),
     BlockProperties().id(BlockID::redstone_torch).hardness(0.0f).texture(99).solid(false).opacity(0).transparent(true).luminance(7).sound(SoundType::stone).aabb(torch_aabb).render_type(RenderType::special).collision(CollisionType::none).needs_support(true),
     BlockProperties().id(BlockID::stone_button).tool(inventory::tool_type::pickaxe, inventory::tool_tier::no_tier).hardness(0.5f).texture(0).solid(false).opacity(0).transparent(false).sound(SoundType::stone).aabb(flat_aabb).render_type(RenderType::special).collision(CollisionType::none),
