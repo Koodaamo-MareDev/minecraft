@@ -19,6 +19,7 @@
 #include <world/light.hpp>
 #include <gui/gui_dirtscreen.hpp>
 #include <gui/gui_survival.hpp>
+#include <gui/gui_crafting.hpp>
 #include <gui/gui_gameover.hpp>
 #include <world/chunkprovider.hpp>
 #include <util/face_pair.hpp>
@@ -604,6 +605,17 @@ void World::edit_blocks()
                 else if (editable_block->get_blockid() != BlockID::air && !properties(editable_block->id).m_fluid)
                 {
                     should_place_block = false;
+                }
+
+                // Block use handlers
+                if (!finish_destroying && should_place_block)
+                {
+                    // Open crafting gui if it's a crafting table
+                    if (targeted_block->get_blockid() == BlockID::crafting_table)
+                    {
+                        Gui::set_gui(new GuiCrafting(&player, nullptr, 0));
+                        should_place_block = false;
+                    }
                 }
             }
 
