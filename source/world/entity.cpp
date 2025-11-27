@@ -17,6 +17,7 @@
 #include <gui/gui_dirtscreen.hpp>
 #include <world/world.hpp>
 #include <util/input/input.hpp>
+#include <nbt/serializers.hpp>
 
 PathFinding pathfinder;
 
@@ -293,51 +294,13 @@ void EntityPhysical::render(float partial_ticks, bool transparency)
 #endif
 }
 
-NBTTagList *serialize_Vec3(Vec3f vec)
-{
-    NBTTagList *result = new NBTTagList;
-    result->addTag(new NBTTagDouble(vec.x));
-    result->addTag(new NBTTagDouble(vec.y));
-    result->addTag(new NBTTagDouble(vec.z));
-    return result;
-}
-
-NBTTagList *serialize_Vec2(Vec3f vec)
-{
-    NBTTagList *result = new NBTTagList;
-    result->addTag(new NBTTagFloat(vec.x));
-    result->addTag(new NBTTagFloat(vec.y));
-    return result;
-}
-
-Vec3f deserialize_Vec3(NBTTagList *list)
-{
-    if (!list || list->tagType != NBTBase::TAG_Double || list->value.size() < 3)
-        return Vec3f(0, 0, 0);
-    Vec3f result;
-    result.x = ((NBTTagDouble *)list->getTag(0))->value;
-    result.y = ((NBTTagDouble *)list->getTag(1))->value;
-    result.z = ((NBTTagDouble *)list->getTag(2))->value;
-    return result;
-}
-
-Vec3f deserialize_Vec2(NBTTagList *list)
-{
-    if (!list || list->tagType != NBTBase::TAG_Float || list->value.size() < 2)
-        return Vec3f(0, 0, 0);
-    Vec3f result;
-    result.x = ((NBTTagFloat *)list->getTag(0))->value;
-    result.y = ((NBTTagFloat *)list->getTag(1))->value;
-    return result;
-}
-
 void EntityPhysical::serialize(NBTTagCompound *result)
 {
     Vec3f pos(position.x, aabb.min.y + y_offset - y_size + 0.0001, position.z);
 
-    result->setTag("Motion", serialize_Vec3(velocity));
-    result->setTag("Pos", serialize_Vec3(pos));
-    result->setTag("Rotation", serialize_Vec2(rotation));
+    result->setTag("Motion", serialize_Vec3f(velocity));
+    result->setTag("Pos", serialize_Vec3f(pos));
+    result->setTag("Rotation", serialize_Vec2f(rotation));
 
     result->setTag("Air", new NBTTagShort(300));
     result->setTag("AttackTime", new NBTTagShort(0));
@@ -350,9 +313,9 @@ void EntityPhysical::serialize(NBTTagCompound *result)
 
 void EntityPhysical::deserialize(NBTTagCompound *nbt)
 {
-    Vec3f pos = deserialize_Vec3(nbt->getList("Pos"));
-    Vec3f motion = deserialize_Vec3(nbt->getList("Motion"));
-    Vec3f rotation = deserialize_Vec2(nbt->getList("Rotation"));
+    Vec3f pos = deserialize_Vec3f(nbt->getList("Pos"));
+    Vec3f motion = deserialize_Vec3f(nbt->getList("Motion"));
+    Vec3f rotation = deserialize_Vec2f(nbt->getList("Rotation"));
 
     teleport(pos);
     velocity = motion;
