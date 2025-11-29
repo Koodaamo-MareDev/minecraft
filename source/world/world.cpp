@@ -611,7 +611,7 @@ void World::edit_blocks()
                 // Block use handlers
                 if (!finish_destroying && should_place_block)
                 {
-                    switch (BlockID targeted_id = targeted_block->get_blockid())
+                    switch (targeted_block->get_blockid())
                     {
                     case BlockID::crafting_table:
                     {
@@ -631,6 +631,7 @@ void World::edit_blocks()
                             Gui::set_gui(new GuiContainer(&player, &chest->items));
                         }
                         should_place_block = false;
+                        break;
                     }
                     default:
                         break;
