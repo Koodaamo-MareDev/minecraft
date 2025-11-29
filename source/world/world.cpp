@@ -1660,6 +1660,17 @@ void World::delete_chunks_if(std::function<bool(Chunk *)> predicate)
 
     for (Chunk *chunk : chunks_to_remove)
     {
+        if (!is_remote())
+        {
+            try
+            {
+                chunk->write();
+            }
+            catch (std::runtime_error &e)
+            {
+                printf("Failed to save chunk: %s\n", e.what());
+            }
+        }
         delete_chunk(chunk);
     }
 }
