@@ -327,6 +327,7 @@ int main(int argc, char **argv)
 
         // Initialize the light map for block rendering
         std::memcpy(light_map, light_day_mono_rgba, 1024);
+        DCFlushRange(light_map, 1024);
         GX_SetArray(GX_VA_CLR0, light_map, 4 * sizeof(u8));
         GX_InvVtxCache();
 
