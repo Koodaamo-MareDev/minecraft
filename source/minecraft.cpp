@@ -299,9 +299,11 @@ int main(int argc, char **argv)
     VIDEO_WaitVSync();
 
     gertex::init(rmode);
+    input::init();
+
+    registry::register_all();
 
     init_face_normals();
-    init_textures();
     update_textures();
 
     gertex::GXState state = gertex::get_state();
@@ -310,14 +312,10 @@ int main(int argc, char **argv)
     cursor_x = state.view.width / 2;
     cursor_y = state.view.height * state.view.aspect_correction / 2;
 
-    input::init();
-
     sound_system = new SoundSystem();
 
     crafting::RecipeManager::instance();
     Gui::init_matrices(state.view.aspect_correction);
-
-    registry::register_all();
 
     while (!isExiting)
     {

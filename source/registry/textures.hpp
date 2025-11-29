@@ -1,9 +1,17 @@
 #ifndef TEXTURES_HPP
 #define TEXTURES_HPP
 
+#include <string>
+#include <cstdint>
 #include <ogc/gx_struct.h>
-
 #include <render/texanim.hpp>
+
+namespace registry
+{
+    void register_textures();
+    void init_missing_texture(GXTexObj &texture);
+    void init_png_texture(GXTexObj &texture, const std::string &filename, uint32_t mipmap_levels = 0);
+} // namespace registry
 
 extern GXTexObj white_texture;
 extern GXTexObj clouds_texture;

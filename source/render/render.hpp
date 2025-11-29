@@ -49,8 +49,6 @@ void set_render_world(World *world);
 
 Camera &get_camera();
 
-void init_textures();
-
 void update_textures();
 
 void use_texture(GXTexObj &texture);
