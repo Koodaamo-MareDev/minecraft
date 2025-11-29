@@ -5,7 +5,7 @@
 #include <ogc/gx.h>
 
 #include <math/vec3i.hpp>
-#include <render/texturedefs.hpp>
+#include <registry/textures.hpp>
 #include <render/render.hpp>
 #include <render/base3d.hpp>
 #include <ported/Random.hpp>

@@ -8,7 +8,8 @@
 #include <math/aabb.hpp>
 #include <math/vec3f.hpp>
 #include <math/vec3i.hpp>
-#include <item/inventory.hpp>
+#include <item/item.hpp>
+#include <item/item_stack.hpp>
 
 #include <block/block_id.hpp>
 
@@ -57,7 +58,7 @@ class World;
 void default_aabb(const Vec3i &pos, Block *block, const AABB &other, std::vector<AABB> &aabb_list);
 void slab_aabb(const Vec3i &pos, Block *block, const AABB &other, std::vector<AABB> &aabb_list);
 void default_destroy(World *world, const Vec3i &pos, const Block &old_block);
-inventory::ItemStack default_drop(const Block &old_block);
+item::ItemStack default_drop(const Block &old_block);
 
 struct BlockProperties
 {
@@ -75,8 +76,8 @@ struct BlockProperties
     CollisionType m_collision = CollisionType::solid;
     float_t m_slipperiness = 0.6f;
     float_t m_blast_resistance = 0.5f;
-    inventory::tool_type m_tool_type = inventory::tool_type::none;
-    inventory::tool_tier m_tool_tier = inventory::tool_tier::no_tier;
+    item::ToolType m_tool_type = item::ToolType::none;
+    item::ToolTier m_tool_tier = item::ToolTier::no_tier;
     float_t m_hardness = 2.0f;
 
     union
@@ -98,7 +99,7 @@ struct BlockProperties
 
     std::function<void(World *world, const Vec3i &, const Block &)> m_destroy = default_destroy;
 
-    std::function<inventory::ItemStack(const Block &)> m_drops = default_drop;
+    std::function<item::ItemStack(const Block &)> m_drops = default_drop;
 
     std::function<void(World *world, const Vec3i &, Block &)> m_tick = nullptr;
 
@@ -264,7 +265,7 @@ struct BlockProperties
         return *this;
     }
 
-    BlockProperties &drops(std::function<inventory::ItemStack(const Block &)> drops_func)
+    BlockProperties &drops(std::function<item::ItemStack(const Block &)> drops_func)
     {
         this->m_drops = drops_func;
         return *this;
@@ -288,7 +289,7 @@ struct BlockProperties
         return *this;
     }
 
-    BlockProperties &tool(inventory::tool_type tool, inventory::tool_tier tier)
+    BlockProperties &tool(item::ToolType tool, item::ToolTier tier)
     {
         this->m_tool_type = tool;
         this->m_tool_tier = tier;
@@ -301,12 +302,12 @@ struct BlockProperties
         return *this;
     }
 
-    bool can_be_broken_with(const inventory::ItemStack &item) const
+    bool can_be_broken_with(const item::ItemStack &item) const
     {
-        if (this->m_tool_type == inventory::tool_type::none)
+        if (this->m_tool_type == item::ToolType::none)
             return true; // Can break with hands or any item
 
-        if (this->m_tool_tier == inventory::tool_tier::no_tier)
+        if (this->m_tool_tier == item::ToolTier::no_tier)
             return true; // Can break with any item or hands, but still slow
 
         if (item.as_item().tool == this->m_tool_type && item.as_item().tier >= this->m_tool_tier)
@@ -315,7 +316,7 @@ struct BlockProperties
         return false; // Cannot break with this item
     }
 
-    float get_break_multiplier(const inventory::ItemStack &item, bool on_ground, bool in_water) const
+    float get_break_multiplier(const item::ItemStack &item, bool on_ground, bool in_water) const
     {
         if (m_hardness < 0.0f)
             return 0.0f; // Block cannot be broken

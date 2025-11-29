@@ -110,7 +110,7 @@ public:
     void play_sound(const Sound &sound);
     void destroy_block(const Vec3i pos, Block *old_block);
     bool place_block(const Vec3i pos, const Vec3i targeted, Block *new_block, uint8_t face);
-    void spawn_drop(const Vec3i &pos, const Block *old_block, inventory::ItemStack item);
+    void spawn_drop(const Vec3i &pos, const Block *old_block, item::ItemStack item);
     void create_explosion(Vec3f pos, float power);
 
     void init_chunk_manager(ChunkProvider *chunk_provider);

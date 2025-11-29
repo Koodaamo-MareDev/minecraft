@@ -2,7 +2,7 @@
 #define GUI_HPP
 
 #include <render/render_gui.hpp>
-#include <item/inventory.hpp>
+#include <item/item_stack.hpp>
 #include <functional>
 
 extern int cursor_x;
@@ -14,13 +14,13 @@ public:
     int x = 0;
     int y = 0;
     uint8_t slot = 0;
-    inventory::ItemStack item;
+    item::ItemStack item;
     GuiSlot() = default;
-    GuiSlot(int x, int y, inventory::ItemStack item) : x(x), y(y), item(item) {}
+    GuiSlot(int x, int y, item::ItemStack item) : x(x), y(y), item(item) {}
 
     virtual ~GuiSlot() = default;
 
-    virtual inventory::ItemStack interact(inventory::ItemStack hand, bool right_click);
+    virtual item::ItemStack interact(item::ItemStack hand, bool right_click);
 
     bool contains(int x, int y)
     {
@@ -33,15 +33,15 @@ class GuiResultSlot : public GuiSlot
 public:
     bool taken = false;
 
-    GuiResultSlot(int x, int y, inventory::ItemStack item) : GuiSlot(x, y, item) {}
+    GuiResultSlot(int x, int y, item::ItemStack item) : GuiSlot(x, y, item) {}
 
-    inventory::ItemStack interact(inventory::ItemStack hand, bool right_click) override;
+    item::ItemStack interact(item::ItemStack hand, bool right_click) override;
 };
 
 class Gui
 {
 public:
-    inventory::ItemStack item_in_hand;
+    item::ItemStack item_in_hand;
     uint8_t window_id;
     int16_t transaction_id = 1;
     Gui(uint8_t window_id = 0) : window_id(window_id)
@@ -61,7 +61,7 @@ public:
     static int text_width(std::string str);
     static void draw_text(int x, int y, std::string str, GXColor color = {255, 255, 255, 255});
     static void draw_text_with_shadow(int x, int y, std::string str, GXColor color = {255, 255, 255, 255});
-    static void draw_item(int x, int y, inventory::ItemStack item, gertex::GXView &viewport);
+    static void draw_item(int x, int y, item::ItemStack item, gertex::GXView &viewport);
 
     /**
      * This function draws the items in the Container.

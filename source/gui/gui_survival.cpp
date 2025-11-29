@@ -13,28 +13,28 @@ GuiSurvival::GuiSurvival(EntityPhysical *owner, inventory::Container *container)
     int start_y = (viewport.aspect_correction * viewport.height - height) / 2;
 
     // Crafting
-    slots.push_back(new GuiResultSlot(start_x + 288, start_y + 72, inventory::ItemStack()));
+    slots.push_back(new GuiResultSlot(start_x + 288, start_y + 72, item::ItemStack()));
     for (size_t i = 0; i < 4; i++)
     {
-        slots.push_back(new GuiSlot(start_x + 176 + (i % 2) * 36, start_y + 52 + (i / 2) * 36, inventory::ItemStack()));
+        slots.push_back(new GuiSlot(start_x + 176 + (i % 2) * 36, start_y + 52 + (i / 2) * 36, item::ItemStack()));
     }
 
     // Armor
     for (size_t i = 0; i < 4; i++)
     {
-        slots.push_back(new GuiSlot(start_x + 16, start_y + 16 + i * 36, inventory::ItemStack()));
+        slots.push_back(new GuiSlot(start_x + 16, start_y + 16 + i * 36, item::ItemStack()));
     }
 
     // Inventory
     for (size_t i = 0; i < 27; i++)
     {
-        slots.push_back(new GuiSlot(start_x + 16 + (i % 9) * 36, start_y + 168 + (i / 9) * 36, inventory::ItemStack()));
+        slots.push_back(new GuiSlot(start_x + 16 + (i % 9) * 36, start_y + 168 + (i / 9) * 36, item::ItemStack()));
     }
 
     // Hotbar
     for (size_t i = 0; i < 9; i++)
     {
-        slots.push_back(new GuiSlot(start_x + 16 + i * 36, start_y + 284, inventory::ItemStack()));
+        slots.push_back(new GuiSlot(start_x + 16 + i * 36, start_y + 284, item::ItemStack()));
     }
 
     refresh();
@@ -116,7 +116,7 @@ void GuiSurvival::on_result_taken()
 {
     for (size_t i = 1; i <= 4; i++)
     {
-        inventory::ItemStack ingredient = slots[i]->item;
+        item::ItemStack ingredient = slots[i]->item;
         if (ingredient.empty())
             continue;
 
@@ -127,7 +127,7 @@ void GuiSurvival::on_result_taken()
             ingredient.count--;
 
         // Clear the slot if the item count is zero
-        set_slot(i, ingredient.empty() ? inventory::ItemStack() : ingredient);
+        set_slot(i, ingredient.empty() ? item::ItemStack() : ingredient);
     }
 }
 
@@ -136,14 +136,14 @@ void GuiSurvival::on_interact(size_t slot)
     if (slot < 5)
     {
         // Build the recipe input
-        std::vector<inventory::ItemStack> inputs;
+        std::vector<item::ItemStack> inputs;
         for (size_t i = 1; i <= 4; i++)
             inputs.push_back(slots[i]->item);
 
         crafting::Input current_input(2, 2, inputs);
 
         // Get result
-        inventory::ItemStack result = crafting::RecipeManager::instance().craft(current_input);
+        item::ItemStack result = crafting::RecipeManager::instance().craft(current_input);
         set_slot(0, result);
     }
 }
@@ -157,7 +157,7 @@ void GuiSurvival::close()
 
     for (size_t i = 1; i <= 4; i++)
     {
-        inventory::ItemStack stack = slots[i]->item;
+        item::ItemStack stack = slots[i]->item;
         if (!stack.empty())
         {
             EntityItem *item_entity = new EntityItem(owner->get_position(0), stack);

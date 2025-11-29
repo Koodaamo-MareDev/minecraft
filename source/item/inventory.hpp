@@ -9,147 +9,20 @@
 #include <vector>
 
 #include <block/block_id.hpp>
-#include "item_id.hpp"
-#include "nbt/nbt.hpp"
+#include <item/item_stack.hpp>
+#include <nbt/nbt.hpp>
 
 class EntityPhysical;
 
 namespace inventory
 {
-    enum tool_type : uint8_t
-    {
-        none,
-        pickaxe,
-        axe,
-        shovel,
-        hoe,
-        sword,
-        shears,
-        bow,
-    };
-
-    enum tool_tier : uint8_t
-    {
-        no_tier,
-        wood,
-        gold,
-        stone,
-        iron,
-        diamond,
-    };
-
-    class Item;
-    void default_on_use(Item &item, Vec3i pos, Vec3i face, EntityPhysical *entity);
-
-    void init_items();
-
-    class Item
-    {
-    public:
-        int16_t id = 0;
-        uint8_t max_stack = 64;
-        uint8_t texture_index = 0;
-        tool_type tool = none;
-        tool_tier tier = wood;
-        int32_t damage = 0;
-        std::function<void(Item &, Vec3i, Vec3i, EntityPhysical *)> on_use = default_on_use;
-
-        Item(int16_t id = 0, uint8_t texture_index = 0, uint8_t max_stack = 64, std::function<void(Item &, Vec3i, Vec3i, EntityPhysical *)> on_use = default_on_use) : id(id), max_stack(max_stack), texture_index(texture_index), on_use(on_use) {}
-
-        bool is_block() const
-        {
-            return id < 0x100;
-        }
-
-        Item set_tool_properties(tool_type type, tool_tier tier, int32_t damage)
-        {
-            this->tool = type;
-            this->tier = tier;
-            this->damage = damage;
-            return *this;
-        }
-
-        float get_efficiency(BlockID block_id, tool_type type, tool_tier tier) const;
-    };
-
-    extern Item item_list[2560];
-
-    class ItemStack
-    {
-    public:
-        int16_t id;
-        uint8_t count;
-        int16_t meta;
-
-        ItemStack(int16_t id = 0, uint8_t count = 0, int16_t meta = 0) : id(id), count(count), meta(meta) {}
-        ItemStack(BlockID id, uint8_t count = 0, int16_t meta = 0) : id(uint8_t(id)), count(count), meta(meta) {}
-        ItemStack(NBTTagCompound *nbt)
-        {
-            if (nbt)
-            {
-                this->id = nbt->getShort("id");
-                this->count = nbt->getByte("Count");
-                this->meta = nbt->getShort("Damage");
-            }
-            else
-            {
-                this->id = 0;
-                this->count = 0;
-                this->meta = 0;
-            }
-        }
-
-        Item &as_item() const
-        {
-            return item_list[id & 0x1FF];
-        }
-
-        bool empty()
-        {
-            if (count == 0)
-            {
-                // Nullify the item_stack just in case
-                id = 0;
-                meta = 0;
-                return true;
-            }
-            return id == 0;
-        }
-
-        uint8_t get_texture_index() const
-        {
-            if (this->id == +ItemID::dye)
-            {
-                // Remap color index to the 2x8 portion in the texture atlas
-                uint8_t base_index = as_item().texture_index;
-                uint8_t color_index = (this->meta >> 3) | ((this->meta & 0x7) << 4);
-                return base_index + color_index;
-            }
-            return as_item().texture_index;
-        }
-
-        /**
-         * Converts the item_stack to an NBT compound tag
-         * @return NBTTagCompound* the NBT compound tag
-         * @note The returned NBTTagCompound* must be deleted by the caller
-         */
-        NBTTagCompound *serialize()
-        {
-            NBTTagCompound *nbt = new NBTTagCompound;
-            nbt->setTag("id", new NBTTagShort(id));
-            nbt->setTag("Count", new NBTTagByte(count));
-            nbt->setTag("Damage", new NBTTagShort(meta));
-            return nbt;
-        }
-    };
-
     class Container
     {
     private:
         uint32_t usable_slots;
 
     protected:
-        std::vector<ItemStack> stacks;
+        std::vector<item::ItemStack> stacks;
 
     public:
         Container(size_t size, uint32_t usable_slots) : usable_slots(usable_slots)
@@ -162,7 +35,7 @@ namespace inventory
         }
         Container(size_t size) : Container(size, size) {}
 
-        ItemStack &operator[](size_t index)
+        item::ItemStack &operator[](size_t index)
         {
             if (index >= stacks.size())
             {
@@ -192,14 +65,14 @@ namespace inventory
          * @param stack the item_stack to add
          * @return the remaining stack
          */
-        virtual ItemStack add(ItemStack stack);
+        virtual item::ItemStack add(item::ItemStack stack);
 
         /**
          * Inserts the item_stack at the specified index
          * @param stack the item_stack to insert
          * @param index the index to insert the item_stack
          */
-        virtual void replace(ItemStack stack, size_t index);
+        virtual void replace(item::ItemStack stack, size_t index);
 
         /**
          * Places the item at the specified index
@@ -208,7 +81,7 @@ namespace inventory
          * @param item the item to place
          * @param index the index to place the item
          */
-        virtual ItemStack place(ItemStack item, size_t index);
+        virtual item::ItemStack place(item::ItemStack item, size_t index);
 
         /**
          * Finds a free slot for the item_stack
@@ -218,7 +91,7 @@ namespace inventory
          * @param stack the item_stack to find a free slot for
          * @return the index of the free slot, or -1 if there's no space
          */
-        virtual int find_free_slot_for(ItemStack stack);
+        virtual int find_free_slot_for(item::ItemStack stack);
 
         /**
          * Converts the Container to an NBT list tag
@@ -239,7 +112,7 @@ namespace inventory
     public:
         PlayerInventory(size_t inventory_size) : Container(inventory_size) {}
 
-        virtual int find_free_slot_for(ItemStack stack) override;
+        virtual int find_free_slot_for(item::ItemStack stack) override;
 
         virtual NBTTagList *serialize() override;
 

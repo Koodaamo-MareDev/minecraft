@@ -16,7 +16,7 @@ namespace crafting
         void load_id_mappings();
         void clear();
 
-        inventory::ItemStack craft(Input &input);
+        item::ItemStack craft(Input &input);
 
     private:
         RecipeManager();

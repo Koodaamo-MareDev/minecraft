@@ -1,7 +1,8 @@
-#ifndef TEXTUREDEFS_H
-#define TEXTUREDEFS_H
+#ifndef TEXTURES_HPP
+#define TEXTURES_HPP
 
-#include <render/base3d.hpp>
+#include <ogc/gx_struct.h>
+
 #include <render/texanim.hpp>
 
 extern GXTexObj white_texture;

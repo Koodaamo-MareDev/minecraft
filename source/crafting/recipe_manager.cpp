@@ -63,7 +63,7 @@ namespace crafting
             throw std::runtime_error("No id mapping for " + name);
         };
 
-        auto json_to_item = [&](nlohmann::json item) -> inventory::ItemStack
+        auto json_to_item = [&](nlohmann::json item) -> item::ItemStack
         {
             int16_t id = 0;
             int16_t meta = 0;
@@ -82,7 +82,7 @@ namespace crafting
             if (item.contains("count"))
                 count = item["count"];
 
-            return inventory::ItemStack(id, count, meta);
+            return item::ItemStack(id, count, meta);
         };
 
         std::ifstream file(file_path);
@@ -97,7 +97,7 @@ namespace crafting
         {
             nlohmann::json ingredients = recipe_json["ingredients"];
 
-            std::vector<inventory::ItemStack> inputs;
+            std::vector<item::ItemStack> inputs;
             for (nlohmann::json ingredient : ingredients)
             {
                 // TODO: Handle alternative ingredients properly
@@ -109,13 +109,13 @@ namespace crafting
             }
             nlohmann::json result = recipe_json["result"];
 
-            inventory::ItemStack result_item = json_to_item(result);
+            item::ItemStack result_item = json_to_item(result);
 
             shapeless_recipes.push_back(ShapelessRecipe(Input(1, inputs.size(), inputs), result_item));
         }
         else if (type == "crafting_shaped")
         {
-            std::map<char, inventory::ItemStack> item_keys;
+            std::map<char, item::ItemStack> item_keys;
             nlohmann::json ingredient_keys = recipe_json["key"];
             for (auto &[key, ingredient] : ingredient_keys.items())
             {
@@ -134,7 +134,7 @@ namespace crafting
 
             size_t height = pattern.size();
             size_t width = 0;
-            std::vector<inventory::ItemStack> recipe;
+            std::vector<item::ItemStack> recipe;
             for (std::string row : pattern)
             {
                 // Ensure consistency of the width.
@@ -150,12 +150,12 @@ namespace crafting
                     if (auto it = item_keys.find(c); it != item_keys.end())
                         recipe.push_back(it->second);
                     else
-                        recipe.push_back(inventory::ItemStack());
+                        recipe.push_back(item::ItemStack());
                 }
             }
             nlohmann::json result = recipe_json["result"];
 
-            inventory::ItemStack result_item = json_to_item(result);
+            item::ItemStack result_item = json_to_item(result);
 
             shaped_recipes.push_back(ShapedRecipe(Input(width, height, recipe), result_item));
         }
@@ -183,7 +183,7 @@ namespace crafting
         id_mappings.clear();
     }
 
-    inventory::ItemStack RecipeManager::craft(Input &input)
+    item::ItemStack RecipeManager::craft(Input &input)
     {
         // Try shaped recipes first.
         for (ShapedRecipe &recipe : shaped_recipes)
@@ -201,7 +201,7 @@ namespace crafting
         }
 
         // No matches found.
-        return inventory::ItemStack();
+        return item::ItemStack();
     }
 
 } // namespace crafting

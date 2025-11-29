@@ -838,7 +838,7 @@ bool World::place_block(const Vec3i pos, const Vec3i targeted, Block *new_block,
         play_sound(sound);
         player.items[player.selected_hotbar_slot + GuiSurvival::hotbar_start].count--;
         if (player.items[player.selected_hotbar_slot + GuiSurvival::hotbar_start].count == 0)
-            player.items[player.selected_hotbar_slot + GuiSurvival::hotbar_start] = inventory::ItemStack();
+            player.items[player.selected_hotbar_slot + GuiSurvival::hotbar_start] = item::ItemStack();
     }
 
     if (is_remote())
@@ -847,7 +847,7 @@ bool World::place_block(const Vec3i pos, const Vec3i targeted, Block *new_block,
     return !intersects_entity;
 }
 
-void World::spawn_drop(const Vec3i &pos, const Block *old_block, inventory::ItemStack item)
+void World::spawn_drop(const Vec3i &pos, const Block *old_block, item::ItemStack item)
 {
     if (item.empty())
         return;

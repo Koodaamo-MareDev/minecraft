@@ -468,7 +468,7 @@ void EntityFallingBlock::tick()
         // Drop the block as an item
         if (world && !world->is_remote())
         {
-            inventory::ItemStack item = properties(block_state.id).m_drops(block_state);
+            item::ItemStack item = properties(block_state.id).m_drops(block_state);
             world->spawn_drop(get_foot_blockpos(), &block_state, item);
         }
     }
@@ -749,7 +749,7 @@ void EntityCreeper::render(float partial_ticks, bool transparency)
 #endif
 }
 
-EntityItem::EntityItem(const Vec3f &position, const inventory::ItemStack &item_stack) : EntityPhysical()
+EntityItem::EntityItem(const Vec3f &position, const item::ItemStack &item_stack) : EntityPhysical()
 {
     this->walk_sound = false;
     this->gravity = 0.04;
@@ -811,7 +811,7 @@ void EntityItem::render(float partial_ticks, bool transparency)
 
     int multi = item_stack.count > 1 ? 1 : 0;
 
-    inventory::Item item = item_stack.as_item();
+    item::Item item = item_stack.as_item();
 
     RenderType render_type = properties(item.id).m_render_type;
     Block block = {uint8_t(item.id & 0xFF), 0x7F, uint8_t(item_stack.meta & 0xFF), 0xF, 0xF};
@@ -870,7 +870,7 @@ void EntityItem::resolve_collision(EntityPhysical *b)
     if (!player || player->dead)
         return;
 
-    inventory::ItemStack left_over = world->player.items.add(item_stack);
+    item::ItemStack left_over = world->player.items.add(item_stack);
     if (left_over.count)
     {
         if (left_over.count != item_stack.count)

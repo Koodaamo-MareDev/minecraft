@@ -1,6 +1,6 @@
 #include "chunk.hpp"
 #include <block/blocks.hpp>
-#include <render/texturedefs.hpp>
+#include <registry/textures.hpp>
 #include <math/vec2i.hpp>
 #include <math/vec3i.hpp>
 #include <util/timers.hpp>

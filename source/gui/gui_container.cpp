@@ -16,19 +16,19 @@ GuiContainer::GuiContainer(EntityPhysical *owner, inventory::Container *containe
     // Container slots
     for (uint32_t i = 0; i < slots; i++)
     {
-        this->slots.push_back(new GuiSlot(start_x + 16 + (i % 9) * 36, start_y + 36 + (i / 9) * 36, inventory::ItemStack()));
+        this->slots.push_back(new GuiSlot(start_x + 16 + (i % 9) * 36, start_y + 36 + (i / 9) * 36, item::ItemStack()));
     }
 
     // Inventory
     for (size_t i = 0; i < 27; i++)
     {
-        this->slots.push_back(new GuiSlot(start_x + 16 + (i % 9) * 36, start_y + container_height + 28 + (i / 9) * 36, inventory::ItemStack()));
+        this->slots.push_back(new GuiSlot(start_x + 16 + (i % 9) * 36, start_y + container_height + 28 + (i / 9) * 36, item::ItemStack()));
     }
 
     // Hotbar
     for (size_t i = 0; i < 9; i++)
     {
-        this->slots.push_back(new GuiSlot(start_x + 16 + i * 36, start_y + container_height + 144, inventory::ItemStack()));
+        this->slots.push_back(new GuiSlot(start_x + 16 + i * 36, start_y + container_height + 144, item::ItemStack()));
     }
 
     refresh();
@@ -143,7 +143,7 @@ void GuiGenericContainer::update()
         // If the slot is valid, interact with it
         if (slot)
         {
-            inventory::ItemStack prev_item = slot->item;
+            item::ItemStack prev_item = slot->item;
 
             item_in_hand = slot->interact(item_in_hand, is_right_click);
 
@@ -211,7 +211,7 @@ void GuiGenericContainer::on_result_taken()
 {
 }
 
-void GuiGenericContainer::set_slot(size_t slot, inventory::ItemStack item)
+void GuiGenericContainer::set_slot(size_t slot, item::ItemStack item)
 {
     if (slot >= slots.size())
         return;
@@ -224,10 +224,10 @@ void GuiGenericContainer::set_slot(size_t slot, inventory::ItemStack item)
     }
 }
 
-inventory::ItemStack GuiGenericContainer::get_slot(size_t slot)
+item::ItemStack GuiGenericContainer::get_slot(size_t slot)
 {
     if (slot >= slots.size())
-        return inventory::ItemStack();
+        return item::ItemStack();
 
     return slots[slot]->item;
 }

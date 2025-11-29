@@ -13,22 +13,22 @@ GuiCrafting::GuiCrafting(EntityPhysical *owner, inventory::Container *container,
     int start_y = (viewport.aspect_correction * viewport.height - height) / 2;
 
     // Crafting
-    slots.push_back(new GuiResultSlot(start_x + 248, start_y + 70, inventory::ItemStack()));
+    slots.push_back(new GuiResultSlot(start_x + 248, start_y + 70, item::ItemStack()));
     for (size_t i = 0; i < 9; i++)
     {
-        slots.push_back(new GuiSlot(start_x + 60 + (i % 3) * 36, start_y + 34 + (i / 3) * 36, inventory::ItemStack()));
+        slots.push_back(new GuiSlot(start_x + 60 + (i % 3) * 36, start_y + 34 + (i / 3) * 36, item::ItemStack()));
     }
 
     // Inventory
     for (size_t i = 0; i < 27; i++)
     {
-        slots.push_back(new GuiSlot(start_x + 16 + (i % 9) * 36, start_y + 168 + (i / 9) * 36, inventory::ItemStack()));
+        slots.push_back(new GuiSlot(start_x + 16 + (i % 9) * 36, start_y + 168 + (i / 9) * 36, item::ItemStack()));
     }
 
     // Hotbar
     for (size_t i = 0; i < 9; i++)
     {
-        slots.push_back(new GuiSlot(start_x + 16 + i * 36, start_y + 284, inventory::ItemStack()));
+        slots.push_back(new GuiSlot(start_x + 16 + i * 36, start_y + 284, item::ItemStack()));
     }
 
     refresh();
@@ -110,7 +110,7 @@ void GuiCrafting::on_result_taken()
 {
     for (size_t i = 1; i <= 9; i++)
     {
-        inventory::ItemStack ingredient = slots[i]->item;
+        item::ItemStack ingredient = slots[i]->item;
         if (ingredient.empty())
             continue;
 
@@ -122,7 +122,7 @@ void GuiCrafting::on_result_taken()
 
         // Clear the slot if the item count is zero
         if (ingredient.empty())
-            slots[i]->item = inventory::ItemStack();
+            slots[i]->item = item::ItemStack();
         else
             slots[i]->item = ingredient;
     }
@@ -133,14 +133,14 @@ void GuiCrafting::on_interact(size_t slot)
     if (slot < 10)
     {
         // Build the recipe input
-        std::vector<inventory::ItemStack> inputs;
+        std::vector<item::ItemStack> inputs;
         for (size_t i = 1; i <= 9; i++)
             inputs.push_back(slots[i]->item);
 
         crafting::Input current_input(3, 3, inputs);
 
         // Get result
-        inventory::ItemStack result = crafting::RecipeManager::instance().craft(current_input);
+        item::ItemStack result = crafting::RecipeManager::instance().craft(current_input);
         set_slot(0, result);
     }
 }
@@ -154,7 +154,7 @@ void GuiCrafting::close()
 
     for (size_t i = 1; i <= 9; i++)
     {
-        inventory::ItemStack stack = slots[i]->item;
+        item::ItemStack stack = slots[i]->item;
         if (!stack.empty())
         {
             EntityItem *item_entity = new EntityItem(owner->get_position(0), stack);

@@ -6,12 +6,12 @@ namespace crafting
     {
         Input result = *this;
 
-        auto sorter = [](inventory::ItemStack &a, inventory::ItemStack &b) -> bool
+        auto sorter = [](item::ItemStack &a, item::ItemStack &b) -> bool
         {
             return ((a.id << 16) | a.meta) < ((b.id << 16) | b.meta);
         };
 
-        auto filter = [](inventory::ItemStack &a) -> bool
+        auto filter = [](item::ItemStack &a) -> bool
         {
             return a.id == 0;
         };
@@ -23,7 +23,7 @@ namespace crafting
         return result;
     }
 
-    void crafting::Input::trim(size_t width, size_t height, const std::vector<inventory::ItemStack> &input_items)
+    void crafting::Input::trim(size_t width, size_t height, const std::vector<item::ItemStack> &input_items)
     {
         this->items = input_items;
 
@@ -125,8 +125,8 @@ namespace crafting
             return false;
         for (size_t i = 0; i < input.size(); i++)
         {
-            inventory::ItemStack a = input[i];
-            inventory::ItemStack b = recipe[i];
+            item::ItemStack a = input[i];
+            item::ItemStack b = recipe[i];
             if (a.id != b.id || a.meta != b.meta)
             {
                 return false;
@@ -141,8 +141,8 @@ namespace crafting
             return false;
         for (size_t i = 0; i < input.size(); i++)
         {
-            inventory::ItemStack a = input[i];
-            inventory::ItemStack b = recipe[i];
+            item::ItemStack a = input[i];
+            item::ItemStack b = recipe[i];
             if (a.id != b.id || a.meta != b.meta)
             {
                 return false;

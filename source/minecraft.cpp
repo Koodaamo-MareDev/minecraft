@@ -4,7 +4,6 @@
 #include <cmath>
 #include <wiiuse/wpad.h>
 #include <fat.h>
-#include <ogc/conf.h>
 #include <stdarg.h>
 #include <sys/stat.h>
 #include <sys/unistd.h>
@@ -12,17 +11,14 @@
 #include <util/config.hpp>
 #include <util/timers.hpp>
 #include <render/render_gui.hpp>
-#include <item/inventory.hpp>
 #include <gui/gui_survival.hpp>
 #include <gui/gui_dirtscreen.hpp>
 #include <gui/gui_titlescreen.hpp>
 #include <world/world.hpp>
 #include <crafting/recipe_manager.hpp>
-#include <util/input/keyboard_mouse.hpp>
-#include <util/input/wiimote_nunchuk.hpp>
-#include <util/input/wiimote_classic.hpp>
+#include <util/input/input.hpp>
 #include <util/string_utils.hpp>
-#include <registry/tile_entities.hpp>
+#include <registry/registry.hpp>
 
 #include "light_day_mono_rgba.h"
 #include "light_night_mono_rgba.h"
@@ -315,17 +311,13 @@ int main(int argc, char **argv)
     cursor_y = state.view.height * state.view.aspect_correction / 2;
 
     input::init();
-    input::add_device(new input::KeyboardMouse);
-    input::add_device(new input::WiimoteNunchuk);
-    input::add_device(new input::WiimoteClassic);
 
     sound_system = new SoundSystem();
 
-    inventory::init_items();
     crafting::RecipeManager::instance();
     Gui::init_matrices(state.view.aspect_correction);
 
-    registry::register_tile_entities();
+    registry::register_all();
 
     while (!isExiting)
     {

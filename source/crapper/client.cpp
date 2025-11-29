@@ -585,21 +585,21 @@ namespace Crapper
         if (item == -1)
         {
             // Remove the item from the slot
-            player->equipment[slot] = inventory::ItemStack(); // Clear the slot
+            player->equipment[slot] = item::ItemStack(); // Clear the slot
             EntityPlayerLocal *local_player = dynamic_cast<EntityPlayerLocal *>(player);
             if (local_player)
             {
-                local_player->items[slot + 5] = inventory::ItemStack();
+                local_player->items[slot + 5] = item::ItemStack();
             }
         }
         else
         {
             // Add the item to the slot
-            player->equipment[slot] = inventory::ItemStack(item, 1, meta);
+            player->equipment[slot] = item::ItemStack(item, 1, meta);
             EntityPlayerLocal *local_player = dynamic_cast<EntityPlayerLocal *>(player);
             if (local_player)
             {
-                local_player->items[slot + 5] = inventory::ItemStack(item, 1, meta);
+                local_player->items[slot + 5] = item::ItemStack(item, 1, meta);
             }
         }
     }
@@ -903,7 +903,7 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        EntityItem *entity = new EntityItem(Vec3f(x, y, z), inventory::ItemStack(item, count, meta));
+        EntityItem *entity = new EntityItem(Vec3f(x, y, z), item::ItemStack(item, count, meta));
         entity->set_server_position(Vec3i(x, y, z));
         entity->teleport(Vec3f(x / 32.0, y / 32.0 + 1.0 / 64.0, z / 32.0));
         entity->entity_id = entity_id;
@@ -1625,12 +1625,12 @@ namespace Crapper
         if (buffer.underflow)
             return;
 
-        inventory::ItemStack item(0, 0, 0);
+        item::ItemStack item(0, 0, 0);
         if (item_id >= 0)
         {
             uint8_t count = buffer.readByte();
             uint16_t meta = buffer.readShort() & 0xFFFF;
-            item = inventory::ItemStack(item_id, count, meta);
+            item = item::ItemStack(item_id, count, meta);
         }
         if (buffer.underflow)
             return;
@@ -1669,7 +1669,7 @@ namespace Crapper
     void MinecraftClient::handleWindowItems(ByteBuffer &buffer)
     {
         // Read inventory
-        std::vector<inventory::ItemStack> items;
+        std::vector<item::ItemStack> items;
 
         uint8_t window_id = buffer.readByte();
         int16_t count = buffer.readShort();
@@ -1683,11 +1683,11 @@ namespace Crapper
             {
                 uint8_t count = buffer.readByte();
                 uint16_t meta = buffer.readShort() & 0xFFFF;
-                items.push_back(inventory::ItemStack(item_id, count, meta));
+                items.push_back(item::ItemStack(item_id, count, meta));
             }
             else
             {
-                items.push_back(inventory::ItemStack());
+                items.push_back(item::ItemStack());
             }
             if (buffer.underflow)
                 return;

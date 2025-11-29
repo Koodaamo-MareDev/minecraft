@@ -42,8 +42,8 @@ public:
     virtual bool use_cursor() { return true; }
     virtual void on_result_taken();
     virtual void on_interact(size_t slot) {}
-    virtual void set_slot(size_t slot, inventory::ItemStack item);
-    virtual inventory::ItemStack get_slot(size_t slot);
+    virtual void set_slot(size_t slot, item::ItemStack item);
+    virtual item::ItemStack get_slot(size_t slot);
     virtual ~GuiGenericContainer();
 
 protected:

@@ -155,7 +155,7 @@ void Model::render(vfloat_t distance, float partialTicks, bool transparency)
     GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, BASE3D_POS_FRAC_BITS);
 }
 
-void Model::render_handitem(ModelBox *box, inventory::ItemStack &item, Vec3f offset, Vec3f offset_rot, Vec3f scale, bool transparency)
+void Model::render_handitem(ModelBox *box, item::ItemStack &item, Vec3f offset, Vec3f offset_rot, Vec3f scale, bool transparency)
 {
     if (item.empty())
     {
@@ -164,7 +164,7 @@ void Model::render_handitem(ModelBox *box, inventory::ItemStack &item, Vec3f off
     if (!box)
         return;
 
-    auto is_flat = [](const inventory::ItemStack &item)
+    auto is_flat = [](const item::ItemStack &item)
     {
         if (item.as_item().is_block())
         {
@@ -203,7 +203,7 @@ void Model::render_handitem(ModelBox *box, inventory::ItemStack &item, Vec3f off
         guMtxConcat(pos_mtx.mtx, tmp_mtx, pos_mtx.mtx);
         guMtxApplyScale(pos_mtx.mtx, pos_mtx.mtx, -scale.x, -scale.y, -scale.z);
     }
-    else if (item.as_item().tool != inventory::tool_type::none || item.id == 392) // Fishing rod and tools
+    else if (item.as_item().tool != item::ToolType::none || item.id == 392) // Fishing rod and tools
     {
         guMtxApplyTrans(pos_mtx.mtx, pos_mtx.mtx, 0, 2.0f / 16, 5.0f / 16);
         guMtxApplyScale(pos_mtx.mtx, pos_mtx.mtx, -scale.x, -scale.y, -scale.z);

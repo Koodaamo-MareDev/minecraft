@@ -67,7 +67,7 @@ public:
     void prepare();
 
     virtual void render(vfloat_t distance, float partial_ticks, bool transparency);
-    void render_handitem(ModelBox *box, inventory::ItemStack &item, Vec3f pos, Vec3f rot, Vec3f scale, bool transparency);
+    void render_handitem(ModelBox *box, item::ItemStack &item, Vec3f pos, Vec3f rot, Vec3f scale, bool transparency);
 
     ModelBox *add_box(Vec3f pos, Vec3f size, uint16_t uv_off_x, uint16_t uv_off_y, vfloat_t inflate)
     {
@@ -134,7 +134,7 @@ public:
     ModelBox *right_arm = nullptr;
     ModelBox *left_leg = nullptr;
     ModelBox *right_leg = nullptr;
-    inventory::ItemStack equipment[5] = {}; // 0: hand, 1: helmet, 2: chestplate, 3: leggings, 4: boots
+    item::ItemStack equipment[5] = {}; // 0: hand, 1: helmet, 2: chestplate, 3: leggings, 4: boots
     float speed = 0.0f;
     Vec3f head_rot = Vec3f(0, 0, 0);
     PlayerModel()

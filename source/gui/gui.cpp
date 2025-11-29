@@ -150,7 +150,7 @@ void Gui::draw_text_with_shadow(int x, int y, std::string str, GXColor color)
     draw_text(x, y, str, color);
 }
 
-void Gui::draw_item(int x, int y, inventory::ItemStack stack, gertex::GXView &viewport)
+void Gui::draw_item(int x, int y, item::ItemStack stack, gertex::GXView &viewport)
 {
     if (stack.empty())
         return;
@@ -162,7 +162,7 @@ void Gui::draw_item(int x, int y, inventory::ItemStack stack, gertex::GXView &vi
     GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
 
     // Draw the item
-    inventory::Item item = stack.as_item();
+    item::Item item = stack.as_item();
     Mtx tmp_matrix;
 
     if (item.is_block())
@@ -223,14 +223,14 @@ void Gui::draw_container(int x, int y, inventory::Container &Container, gertex::
     }
 }
 
-inventory::ItemStack GuiSlot::interact(inventory::ItemStack hand, bool right_click)
+item::ItemStack GuiSlot::interact(item::ItemStack hand, bool right_click)
 {
     // If the slot is empty, place the item in the slot
     if (item.empty())
     {
         // Do nothing if both the hand and the slot are empty
         if (hand.empty())
-            return inventory::ItemStack();
+            return item::ItemStack();
 
         if (right_click)
         {
@@ -239,14 +239,14 @@ inventory::ItemStack GuiSlot::interact(inventory::ItemStack hand, bool right_cli
             item.count = 1;
             hand.count--;
             if (hand.empty())
-                return inventory::ItemStack();
+                return item::ItemStack();
             return hand;
         }
         else
         {
             // Left click to place the entire stack
             item = hand;
-            return inventory::ItemStack();
+            return item::ItemStack();
         }
     }
 
@@ -283,7 +283,7 @@ inventory::ItemStack GuiSlot::interact(inventory::ItemStack hand, bool right_cli
         }
 
         // Return an empty stack
-        return inventory::ItemStack();
+        return item::ItemStack();
     }
 
     // Take half of the stack if right clicking with an empty hand
@@ -296,12 +296,12 @@ inventory::ItemStack GuiSlot::interact(inventory::ItemStack hand, bool right_cli
     }
 
     // Swap the stacks - in this case it doesn't matter if it's a right or left click
-    inventory::ItemStack temp = item;
+    item::ItemStack temp = item;
     item = hand;
     return temp;
 }
 
-inventory::ItemStack GuiResultSlot::interact(inventory::ItemStack hand, bool right_click)
+item::ItemStack GuiResultSlot::interact(item::ItemStack hand, bool right_click)
 {
     // No-op if the slot is empty
     if (item.empty())

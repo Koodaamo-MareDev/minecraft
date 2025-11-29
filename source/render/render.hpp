@@ -12,7 +12,7 @@
 #include <ogcsys.h>
 
 #include <world/chunk.hpp>
-#include <render/texturedefs.hpp>
+#include <registry/textures.hpp>
 #include <render/base3d.hpp>
 #include <render/texanim.hpp>
 #include <world/particle.hpp>

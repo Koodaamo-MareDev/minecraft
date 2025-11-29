@@ -245,8 +245,8 @@ public:
 class EntityItem : virtual public EntityPhysical
 {
 public:
-    inventory::ItemStack item_stack;
-    EntityItem(const Vec3f &position, const inventory::ItemStack &item_stack);
+    item::ItemStack item_stack;
+    EntityItem(const Vec3f &position, const item::ItemStack &item_stack);
 
     virtual void tick();
 
@@ -270,7 +270,7 @@ public:
     int selected_hotbar_slot = 0;
     bool in_bed = false;
     Vec3i bed_pos = Vec3i(0, 0, 0);
-    inventory::ItemStack equipment[5] = {};
+    item::ItemStack equipment[5] = {};
 
     EntityPlayer(const Vec3f &position);
 
@@ -296,7 +296,7 @@ public:
     AABB raycast_target_bounds;
 
     inventory::PlayerInventory items = inventory::PlayerInventory(45); // 9 special slots, 4 rows of 9 slots
-    inventory::ItemStack *selected_item = nullptr;
+    item::ItemStack *selected_item = nullptr;
 
     EntityPlayerLocal(const Vec3f &position);
 
