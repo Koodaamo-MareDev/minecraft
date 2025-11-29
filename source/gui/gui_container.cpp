@@ -240,10 +240,8 @@ void GuiGenericContainer::refresh()
      * number of slots as the linked container, which generally should be the
      * case. If not, it's best to just not sync.
      */
-    if ((linked_container && slots.size() != linked_container->size()) || slots.size() < 36)
+    if ((linked_container && slots.size() - 36 != linked_container->size()) || slots.size() < 36)
         return;
-
-    size_t i = 0;
 
     /*
      * The player slots are always last so we need to reverse the destination
@@ -255,20 +253,19 @@ void GuiGenericContainer::refresh()
      * TL;DR: We copy from the end of the inventory to the end of the slots.
      */
 
-    inventory::PlayerInventory &inventory = owner->world->player.items;
-
-    for (; i < 36; i++)
-    {
-        slots[slots.size() - 1 - i]->item = inventory[inventory.size() - 1 - i];
-    }
-
-    // Copy the container slots as mentioned above
     if (linked_container)
     {
-        for (; i < slots.size(); i++)
+        for (size_t i = 0; i < slots.size() - 36; i++)
         {
-            slots[slots.size() - 1 - i]->item = (*linked_container)[slots.size() - 1 - i];
+            slots[i]->item = (*linked_container)[i];
         }
+    }
+
+    inventory::PlayerInventory &inventory = owner->world->player.items;
+
+    for (size_t i = 1; i <= 36; i++)
+    {
+        slots[slots.size() - i]->item = inventory[inventory.size() - i];
     }
 }
 
