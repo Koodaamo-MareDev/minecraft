@@ -12,6 +12,11 @@ namespace javaport
         {
             return ticks_to_millisecs(SYS_Time());
         }
+
+        static int64_t nanoTime()
+        {
+            return ticks_to_nanosecs(SYS_Time());
+        }
     };
 }
 

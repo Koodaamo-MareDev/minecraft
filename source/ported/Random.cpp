@@ -9,7 +9,7 @@ namespace javaport
 
     Random::Random()
     {
-        setSeed(System::currentTimeMillis());
+        setSeed(System::nanoTime());
     }
 
     void Random::setSeed(int64_t seed)
