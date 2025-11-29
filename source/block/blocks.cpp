@@ -8,6 +8,7 @@
 #include <world/light.hpp>
 #include <sounds.hpp>
 #include <world/world.hpp>
+#include <registry/tile_entities.hpp>
 
 // Used for the block breaking animation
 // If negative, use default texture index
@@ -722,6 +723,15 @@ void flowing_fluid_added(World *world, const Vec3i &pos, Block &block)
         schedule_update(world, pos, block);
 }
 
+void chest_added(World *world, const Vec3i &pos, Block &block)
+{
+    Chunk *chunk = world->get_chunk_from_pos(pos);
+    TileEntityChest *chest_entity = new TileEntityChest;
+    chest_entity->pos = pos;
+    chest_entity->chunk = chunk;
+    chunk->tile_entities.push_back(chest_entity);
+}
+
 void falling_block_tick(World *world, const Vec3i &pos, Block &block)
 {
     BlockID block_below = world->get_block_id_at(pos + Vec3i(0, -1, 0));
@@ -769,6 +779,20 @@ void snow_layer_destroy(World *world, const Vec3i &pos, const Block &old_block)
 void spawn_tnt_destroy(World *world, const Vec3i &pos, const Block &old_block)
 {
     world->add_entity(new EntityExplosiveBlock(old_block, pos, 80));
+}
+
+void chest_destroy(World *world, const Vec3i &pos, const Block &old_block)
+{
+    TileEntityChest *chest = dynamic_cast<TileEntityChest *>(world->get_tile_entity(pos));
+    if (!chest)
+        return;
+    for (size_t i = 0; i < chest->items.size(); i++)
+    {
+        inventory::ItemStack &stack = chest->items[i];
+        if (!stack.empty())
+            world->spawn_drop(pos, &old_block, stack);
+    }
+    chest->chunk->remove_tile_entity(chest);
 }
 
 void default_aabb(const Vec3i &pos, Block *block, const AABB &other, std::vector<AABB> &aabb_list)
@@ -978,7 +1002,7 @@ BlockProperties block_properties[256] = {
     BlockProperties().id(BlockID::fire).hardness(0.0f).texture(31).solid(false).opacity(0).transparent(true).luminance(15).sound(SoundType::cloth),
     BlockProperties().id(BlockID::mob_spawner).tool(inventory::tool_type::pickaxe, inventory::tool_tier::wood).hardness(5.0f).texture(65).solid(false).opacity(0).transparent(true).sound(SoundType::metal).drops(std::bind(no_drop, std::placeholders::_1)),
     BlockProperties().id(BlockID::oak_stairs).tool(inventory::tool_type::axe, inventory::tool_tier::no_tier).hardness(2.0f).texture(4).solid(false).sound(SoundType::wood),
-    BlockProperties().id(BlockID::chest).tool(inventory::tool_type::axe, inventory::tool_tier::no_tier).hardness(2.5f).texture(27).sound(SoundType::wood).render_type(RenderType::full_special),
+    BlockProperties().id(BlockID::chest).tool(inventory::tool_type::axe, inventory::tool_tier::no_tier).hardness(2.5f).texture(27).sound(SoundType::wood).render_type(RenderType::full_special).added(chest_added).destroy(chest_destroy),
     BlockProperties().id(BlockID::redstone_wire).hardness(0.0f).texture(164).solid(false).opacity(0).transparent(true).sound(SoundType::stone).aabb(flat_aabb).render_type(RenderType::flat_ground).valid_item(false).collision(CollisionType::none).needs_support(true),
     BlockProperties().id(BlockID::diamond_ore).tool(inventory::tool_type::pickaxe, inventory::tool_tier::iron).hardness(3.0f).texture(50).sound(SoundType::stone).drops(std::bind(fixed_drop, std::placeholders::_1, inventory::ItemStack(+ItemID::diamond, 1))),
     BlockProperties().id(BlockID::diamond_block).tool(inventory::tool_type::pickaxe, inventory::tool_tier::iron).hardness(5.0f).texture(24).sound(SoundType::metal),

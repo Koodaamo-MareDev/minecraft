@@ -21,6 +21,7 @@ class AABB;
 class Camera;
 class ChunkProvider;
 class Frustum;
+class TileEntity;
 
 enum class SectionUpdatePhase : uint8_t
 {
@@ -122,6 +123,7 @@ public:
     void set_meta_at(const Vec3i &pos, uint8_t meta);
     void set_block_and_meta_at(const Vec3i &pos, BlockID id, uint8_t meta);
     void replace_air_at(Vec3i pos, BlockID id);
+    TileEntity *get_tile_entity(const Vec3i &position);
     Chunk *get_chunk_from_pos(const Vec3i &pos);
     Chunk *get_chunk(int32_t x, int32_t z);
     Chunk *get_chunk(const Vec2i &pos);

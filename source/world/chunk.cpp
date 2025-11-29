@@ -27,6 +27,8 @@
 #include <nbt/nbt.hpp>
 #include <mcregion.hpp>
 #include <world/world.hpp>
+#include <world/tile_entity/tile_entity.hpp>
+#include <util/debuglog.hpp>
 #include <util/face_pair.hpp>
 const Vec3i face_offsets[] = {
     Vec3i{-1, +0, +0},  // Negative X
@@ -41,6 +43,28 @@ int32_t Chunk::player_taxicab_distance()
     EntityPlayerLocal &player = world->player;
     Vec3f pos = player.get_position(0);
     return std::abs((this->x << 4) - (int32_t(std::floor(pos.x)) & ~15)) + std::abs((this->z << 4) - (int32_t(std::floor(pos.z)) & ~15));
+}
+
+TileEntity *Chunk::get_tile_entity(const Vec3i &position)
+{
+    for (size_t i = 0; i < tile_entities.size(); i++)
+    {
+        TileEntity *tile_entity = tile_entities[i];
+        if (tile_entity->pos == position)
+            return tile_entity;
+    }
+    return nullptr;
+}
+
+void Chunk::remove_tile_entity(TileEntity *entity)
+{
+    if (!entity)
+        return;
+    if (entity->chunk != this)
+        return;
+    if (auto it = std::find(tile_entities.begin(), tile_entities.end(), entity); it != tile_entities.end())
+        tile_entities.erase(it);
+    delete entity;
 }
 
 void Chunk::update_height_map(Vec3i pos)
@@ -558,6 +582,12 @@ Chunk::~Chunk()
             }
         }
     }
+    for (TileEntity *&tile_entity : tile_entities)
+    {
+        if (!tile_entity)
+            continue;
+        delete tile_entity;
+    }
 }
 
 void Chunk::save(NBTTagCompound &compound)
@@ -598,6 +628,13 @@ void Chunk::save(NBTTagCompound &compound)
     compound.setTag("HeightMap", new NBTTagByteArray(heightmap));
     compound.setTag("Entities", new NBTTagList());
     compound.setTag("TileEntities", new NBTTagList());
+
+    // Save tile entities
+    NBTTagList *tile_entities_list = (NBTTagList *)compound.setTag("TileEntities", new NBTTagList);
+    for (size_t i = 0; i < tile_entities.size(); i++)
+    {
+        tile_entities_list->addTag(tile_entities[i]->serialize());
+    }
 }
 
 void Chunk::load(NBTTagCompound &stream)
@@ -638,6 +675,25 @@ void Chunk::load(NBTTagCompound &stream)
     for (int i = 0; i < 256; i++)
     {
         height_map[i] = heightmap[i];
+    }
+
+    // Load tile entities
+    NBTTagList *tile_entities_list = stream.getList("TileEntities");
+    if (tile_entities_list && tile_entities_list->tagType == NBTBase::TAG_Compound)
+    {
+        for (size_t i = 0; i < tile_entities_list->value.size(); i++)
+        {
+            NBTTagCompound *compound = (NBTTagCompound *)tile_entities_list->getTag(i);
+            try
+            {
+                TileEntity *tile_entity = TileEntity::load(compound, this);
+                tile_entities.push_back(tile_entity);
+            }
+            catch (std::exception &e)
+            {
+                debug::print("Skipping TileEntity: %s", e.what());
+            }
+        }
     }
 }
 

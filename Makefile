@@ -19,7 +19,7 @@ include $(DEVKITPPC)/wii_rules
 TARGET		:=	$(notdir $(CURDIR))
 BUILD		:=	build
 SOURCES		:=	source source/crapper source/gertex source/math source/nbt source/util source/util/input source/pnguin source/auxio source/ported source/thirdparty/miniz \
-				source/block source/world source/world/util source/world/tile_entity source/render source/item source/gui source/crafting
+				source/block source/world source/world/util source/world/tile_entity source/render source/item source/gui source/crafting source/registry
 TEXTURES	:=	textures
 INCLUDES	:=	source source/thirdparty
 DEFINES		:=	-DMINIZ_NO_ARCHIVE_APIS -DMINIZ_NO_ZLIB_COMPATIBLE_NAMES

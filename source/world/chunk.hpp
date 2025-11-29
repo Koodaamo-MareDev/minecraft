@@ -103,6 +103,7 @@ public:
 
 class NBTTagCompound;
 class World;
+class TileEntity;
 
 class Chunk
 {
@@ -119,6 +120,7 @@ public:
     uint8_t has_fluid_updates[VERTICAL_SECTION_COUNT] = {1};
     uint32_t light_update_count = 0;
     std::vector<EntityPhysical *> entities;
+    std::vector<TileEntity *> tile_entities;
 
     /**
      * Get block - wraps around the chunk if out of bounds
@@ -204,6 +206,9 @@ public:
     {
         return this->player_taxicab_distance() < other.player_taxicab_distance();
     }
+
+    TileEntity *get_tile_entity(const Vec3i &position);
+    void remove_tile_entity(TileEntity *entity);
 
     void update_height_map(Vec3i pos);
     void light_up();

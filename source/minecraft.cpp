@@ -22,6 +22,7 @@
 #include <util/input/wiimote_nunchuk.hpp>
 #include <util/input/wiimote_classic.hpp>
 #include <util/string_utils.hpp>
+#include <registry/tile_entities.hpp>
 
 #include "light_day_mono_rgba.h"
 #include "light_night_mono_rgba.h"
@@ -323,6 +324,8 @@ int main(int argc, char **argv)
     inventory::init_items();
     crafting::RecipeManager::instance();
     Gui::init_matrices(state.view.aspect_correction);
+
+    registry::register_tile_entities();
 
     while (!isExiting)
     {

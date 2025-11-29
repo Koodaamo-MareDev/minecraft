@@ -22,6 +22,7 @@
 #include <gui/gui_crafting.hpp>
 #include <gui/gui_gameover.hpp>
 #include <world/chunkprovider.hpp>
+#include <registry/tile_entities.hpp>
 #include <util/face_pair.hpp>
 #include <util/debuglog.hpp>
 #include <light_nether_rgba.h>
@@ -610,11 +611,29 @@ void World::edit_blocks()
                 // Block use handlers
                 if (!finish_destroying && should_place_block)
                 {
-                    // Open crafting gui if it's a crafting table
-                    if (targeted_block->get_blockid() == BlockID::crafting_table)
+                    switch (BlockID targeted_id = targeted_block->get_blockid())
+                    {
+                    case BlockID::crafting_table:
                     {
                         Gui::set_gui(new GuiCrafting(&player, nullptr, 0));
                         should_place_block = false;
+                        break;
+                    }
+                    case BlockID::chest:
+                    {
+                        TileEntity *tile_entity = get_tile_entity(player.raycast_target_pos);
+
+                        // The loaded tile entity could technically be any tile entity.
+                        // Who knows if this chest has the data of a furnace?
+                        TileEntityChest *chest = dynamic_cast<TileEntityChest *>(tile_entity);
+                        if (chest)
+                        {
+                            Gui::set_gui(new GuiContainer(&player, &chest->items));
+                        }
+                        should_place_block = false;
+                    }
+                    default:
+                        break;
                     }
                 }
             }
@@ -1894,6 +1913,14 @@ void World::mark_block_dirty(const Vec3i &pos)
         return;
     chunk->update_height_map(pos);
     LightEngine::post(Coord(pos, chunk));
+}
+
+TileEntity *World::get_tile_entity(const Vec3i &position)
+{
+    Chunk *chunk = get_chunk_from_pos(position);
+    if (!chunk)
+        return nullptr;
+    return chunk->get_tile_entity(position);
 }
 
 void World::add_entity(EntityPhysical *entity)
