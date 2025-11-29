@@ -19,6 +19,7 @@
 #include <util/input/input.hpp>
 #include <util/string_utils.hpp>
 #include <registry/registry.hpp>
+#include <util/busy_wait.hpp>
 
 #include "light_day_mono_rgba.h"
 #include "light_night_mono_rgba.h"
@@ -314,8 +315,13 @@ int main(int argc, char **argv)
 
     sound_system = new SoundSystem();
 
-    crafting::RecipeManager::instance();
     Gui::init_matrices(state.view.aspect_correction);
+
+    auto init_recipes = []()
+    {
+        crafting::RecipeManager::instance();
+    };
+    busy_wait(init_recipes, "Building recipes");
 
     while (!isExiting)
     {
