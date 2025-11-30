@@ -116,6 +116,7 @@ void GuiGameOver::navigate(bool up, bool down)
 
 void GuiGameOver::respawn()
 {
+    World *world = this->world;
     GuiDirtscreen *dirt_screen = new GuiDirtscreen;
     dirt_screen->set_text("Respawning...");
     dirt_screen->set_progress(0, 100);
