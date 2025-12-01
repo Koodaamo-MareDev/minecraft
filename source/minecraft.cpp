@@ -365,7 +365,11 @@ int main(int argc, char **argv)
             }
         }
         if (current_world)
+        {
             MainGameLoop();
+            isExiting = false;
+            continue;
+        }
 
         isExiting |= !Gui::get_gui();
     }
