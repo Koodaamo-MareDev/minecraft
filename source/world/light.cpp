@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <list>
 #include <cstdio>
+#include <set>
 
 lwp_t LightEngine::thread_handle = 0;
 bool LightEngine::thread_active = false;
@@ -65,7 +66,7 @@ void LightEngine::loop()
     uint64_t start = time_get();
     while (pending_updates.size() > 0 && thread_active)
     {
-        Coord &current = pending_updates.front();
+        Coord current = pending_updates.front();
         pending_updates.pop_front();
         Chunk *chunk = current.chunk;
         if (chunk)
@@ -119,9 +120,11 @@ static inline int8_t MAX_I8(int8_t a, int8_t b)
 
 void LightEngine::update(const Coord &update)
 {
+    std::set<Section *> affected_sections;
     std::deque<Coord> light_updates;
     std::deque<Chunk *> &chunks = current_world->chunks;
     Coord origin = update;
+    affected_sections.insert(&origin.chunk->sections[(origin.coords.y >> 4) & 15]);
     light_updates.push_back(origin);
     while (light_updates.size() > 0)
     {
@@ -142,7 +145,7 @@ void LightEngine::update(const Coord &update)
         uint8_t new_skylight = 0;
         uint8_t new_blocklight = properties(block->id).m_luminance;
 
-        if (use_skylight && current.coords.y >= chunk->height_map[current.coords.h_index])
+        if (use_skylight && current.coords.y >= chunk->height_map[current.coords.x | (current.coords.z << 4)])
             new_skylight = 0xF;
 
         Block *neighbors[6];
@@ -177,10 +180,20 @@ void LightEngine::update(const Coord &update)
                     {
                         coord_chunk = current_world->get_chunk_from_pos(new_pos);
                     }
+                    if (!coord_chunk)
+                        continue;
                     light_updates.push_back(Coord(new_pos, coord_chunk));
+                    affected_sections.insert(&coord_chunk->sections[(new_pos.y >> 4) & 15]);
                 }
             }
         }
-        chunk->sections[(current.coords.y >> 4) & 15].dirty = true;
+    }
+    while (!affected_sections.empty())
+    {
+        auto first = affected_sections.begin();
+        Section *sect = *first;
+        if (sect && sect->chunk && sect->chunk->state != ChunkState::invalid)
+            (*first)->dirty = true;
+        affected_sections.erase(first);
     }
 }
