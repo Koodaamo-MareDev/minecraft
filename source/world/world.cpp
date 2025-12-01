@@ -1769,16 +1769,18 @@ void World::init_chunk_manager(ChunkProvider *chunk_provider)
                 Lock chunk_lock(world->chunk_mutex);
                 world->pending_chunks.erase(std::find(world->pending_chunks.begin(), world->pending_chunks.end(), chunk));
                 delete chunk;
+                break;
             }
             default:
             {
                 // Empty the queue to avoid a rare deadlock
-                if (world->run_chunk_manager)
+                if (!world->run_chunk_manager)
                 {
                     Lock chunk_lock(world->chunk_mutex);
                     world->pending_chunks.erase(std::find(world->pending_chunks.begin(), world->pending_chunks.end(), chunk));
-                    break;
+                    delete chunk;
                 }
+                break;
             }
             }
 
