@@ -22,6 +22,7 @@ class Camera;
 class ChunkProvider;
 class Frustum;
 class TileEntity;
+struct Progress;
 
 enum class SectionUpdatePhase : uint8_t
 {
@@ -103,8 +104,7 @@ public:
     void edit_blocks();
 
     int prepare_chunks(int count);
-    void remove_chunk(Chunk *chunk);
-    void cleanup_chunks();
+    void save_and_clean_chunk(Chunk *chunk);
 
     void add_particle(const Particle &particle);
     void play_sound(const Sound &sound);
@@ -128,8 +128,7 @@ public:
     Chunk *get_chunk(int32_t x, int32_t z);
     Chunk *get_chunk(const Vec2i &pos);
     bool add_chunk(int32_t x, int32_t z);
-    void delete_chunk(Chunk *chunk);
-    void delete_chunks_if(std::function<bool(Chunk *)> predicate);
+    void save_chunk(Chunk *chunk);
     void get_neighbors(const Vec3i &pos, Block **neighbors);
     void notify_at(const Vec3i &pos);
     void mark_block_dirty(const Vec3i &pos);
@@ -143,7 +142,7 @@ public:
     void draw_selected_block();
     void draw_bounds(AABB *bounds);
 
-    void save();
+    void save(Progress *prog = nullptr);
     bool load();
     void create();
 

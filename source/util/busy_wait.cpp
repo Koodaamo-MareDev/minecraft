@@ -5,13 +5,9 @@
 #include <stdexcept>
 #include <util/lock.hpp>
 #include <util/debuglog.hpp>
-#include <gui/gui_busy_wait.hpp>
 
-extern bool isExiting;
-extern s8 HWButton;
 extern void *frameBuffer[2];
 static lwp_t thread_handle = LWP_THREAD_NULL;
-static lwp_t ui_thread_handle = LWP_THREAD_NULL;
 static int fb = 0;
 static s8 thread_done = 0;
 static std::function<void()> active_blocking_call = nullptr;
@@ -58,20 +54,17 @@ static void draw_busy_gui()
 
     // Swap buffers
     fb ^= 1;
-    if (HWButton != -1)
-        isExiting = true;
 }
 
-void busy_wait(std::function<void()> blocking_call, std::string description)
+void busy_wait(std::function<void()> blocking_call, Gui *gui)
 {
     if (thread_handle != LWP_THREAD_NULL)
         throw std::runtime_error("Attempt to enter busy wait twice");
     if (!blocking_call)
         return;
     active_blocking_call = blocking_call;
-    Gui::set_gui(new GuiBusyWait(description));
+    Gui::set_gui(gui);
 
-    ui_thread_handle = LWP_GetSelf();
     thread_done = 0;
 
     auto wrapper = [](void *) -> void *
@@ -98,11 +91,15 @@ void busy_wait(std::function<void()> blocking_call, std::string description)
         }
     };
 
+    // Install
     VIRetraceCallback old_cb = VIDEO_SetPostRetraceCallback(suspend_threadcallback);
-    while (!isExiting && !thread_done)
+    while (!thread_done)
     {
         VIDEO_WaitVSync();
     }
+
+    // Clean up
     VIDEO_SetPostRetraceCallback(old_cb);
     Gui::set_gui(nullptr);
+    thread_handle = LWP_THREAD_NULL;
 }

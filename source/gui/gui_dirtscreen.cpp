@@ -14,10 +14,10 @@ void GuiDirtscreen::draw()
     {
         Gui::draw_text_with_shadow((viewport.width - Gui::text_width(text_lines[i])) / 2, viewport.aspect_correction * 200 + i * 16, text_lines[i]);
     }
-    if (max_progress > 0)
+    if (progress && progress->max_progress)
     {
         draw_colored_quad((viewport.width - 200) / 2, viewport.aspect_correction * 200 + 72, 200, 4, 0x80, 0x80, 0x80, 0xFF);
-        draw_colored_quad((viewport.width - 200) / 2, viewport.aspect_correction * 200 + 72, int(progress) * 200 / int(max_progress), 4, 0x80, 0xFF, 0x80, 0xFF);
+        draw_colored_quad((viewport.width - 200) / 2, viewport.aspect_correction * 200 + 72, int(progress->progress) * 200 / int(progress->max_progress), 4, 0x80, 0xFF, 0x80, 0xFF);
     }
 }
 
@@ -43,8 +43,7 @@ void GuiDirtscreen::set_text(const std::string &text)
     text_lines = str::split(text, '\n');
 }
 
-void GuiDirtscreen::set_progress(uint8_t progress, uint8_t max_progress)
+void GuiDirtscreen::set_progress(Progress *prog)
 {
-    this->progress = progress;
-    this->max_progress = max_progress;
+    this->progress = prog;
 }

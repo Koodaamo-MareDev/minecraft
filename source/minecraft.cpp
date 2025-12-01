@@ -20,6 +20,7 @@
 #include <util/string_utils.hpp>
 #include <registry/registry.hpp>
 #include <util/busy_wait.hpp>
+#include <gui/gui_busy_wait.hpp>
 
 #include "light_day_mono_rgba.h"
 #include "light_night_mono_rgba.h"
@@ -45,7 +46,7 @@ int cursor_y = 0;
 float fog_depth_multiplier = 1.0f;
 float fog_light_multiplier = 1.0f;
 
-void UpdateLoadingStatus();
+void UpdateLoadingStatus(Progress *prog);
 void HandleGUI(gertex::GXView &viewport);
 void UpdateGUI(gertex::GXView &viewport);
 void DrawGUI(gertex::GXView &viewport);
@@ -171,22 +172,15 @@ void MainGameLoop()
             current_world->create();
         }
     }
+    Progress prog;
 
     uint32_t fb = 0;
 
     bool in_game = true;
 
     // Begin the main loop
-    while (!isExiting && in_game)
+    while (!isExiting && in_game && HWButton == -1)
     {
-        if (HWButton != -1)
-        {
-            GuiDirtscreen *dirtscreen = new GuiDirtscreen;
-            dirtscreen->set_text("Saving level...");
-            Gui::set_gui(dirtscreen);
-            isExiting = true;
-        }
-
         uint64_t frame_start = time_get();
 
         // Update the light map
@@ -215,7 +209,7 @@ void MainGameLoop()
 
         current_world->update();
 
-        UpdateLoadingStatus();
+        UpdateLoadingStatus(&prog);
 
         state = gertex::get_state();
         gertex::perspective(state.view);
@@ -268,7 +262,16 @@ void MainGameLoop()
         current_world->partial_ticks -= int(current_world->partial_ticks);
     }
     current_world->remove_entity(current_world->player.entity_id);
-    current_world->save();
+
+    dirtscreen = new GuiDirtscreen;
+    dirtscreen->set_text("Saving level...");
+    dirtscreen->set_progress(&prog);
+
+    auto save_func = [&prog]()
+    {
+        current_world->save(&prog);
+    };
+    busy_wait(save_func, dirtscreen);
     delete current_world;
     current_world = nullptr;
 
@@ -321,7 +324,7 @@ int main(int argc, char **argv)
     {
         crafting::RecipeManager::instance();
     };
-    busy_wait(init_recipes, "Building recipes");
+    busy_wait(init_recipes, new GuiBusyWait("Building recipes"));
 
     while (!isExiting)
     {
@@ -379,7 +382,7 @@ int main(int argc, char **argv)
     return 0;
 }
 
-void UpdateLoadingStatus()
+void UpdateLoadingStatus(Progress *prog)
 {
     if (!current_world)
         return;
@@ -406,7 +409,7 @@ void UpdateLoadingStatus()
             {
                 Vec3i chunk_pos = player_chunk_pos + Vec3i(x * 16, 0, z * 16);
                 Chunk *chunk = current_world->get_chunk_from_pos(chunk_pos);
-                if (!chunk || chunk->generation_stage != ChunkGenStage::done)
+                if (!chunk || chunk->state != ChunkState::done)
                 {
                     continue;
                 }
@@ -434,21 +437,15 @@ void UpdateLoadingStatus()
             is_loading = true;
             loading_progress = 0;
         }
-
-        GuiDirtscreen *dirtscreen = dynamic_cast<GuiDirtscreen *>(Gui::get_gui());
-        if (dirtscreen)
+        if (prog)
         {
-            if (is_loading)
-            {
-                // Update the loading screen
-                dirtscreen->set_progress(loading_progress, required);
-            }
-            else
-            {
-                // The world is loaded - remove the loading screen
-                current_world->loaded = true;
-                Gui::set_gui(nullptr);
-            }
+            prog->progress = loading_progress;
+            prog->max_progress = required;
+        }
+        if (!is_loading)
+        {
+            current_world->loaded = true;
+            Gui::set_gui(nullptr);
         }
     }
 }

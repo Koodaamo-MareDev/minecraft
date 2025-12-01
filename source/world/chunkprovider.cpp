@@ -20,12 +20,13 @@ ChunkProviderOverworld::ChunkProviderOverworld(World *world)
 void ChunkProviderOverworld::provide_chunk(Chunk *chunk)
 {
     // Prioritize loading the chunk from disk if it exists
-    if (chunk->generation_stage == ChunkGenStage::loading)
+    if (chunk->state == ChunkState::loading)
     {
         chunk->read();
         return;
     }
-
+    else if (chunk->state != ChunkState::empty)
+        return;
     int index;
     javaport::Random rng(chunk->x * 0x4F9939F508L + chunk->z * 0x1F38D3E7L + world->seed);
 
@@ -74,7 +75,7 @@ void ChunkProviderOverworld::provide_chunk(Chunk *chunk)
     }
 
     // The chunk is now ready for features generation
-    chunk->generation_stage = ChunkGenStage::features;
+    chunk->state = ChunkState::features;
 }
 
 void ChunkProviderOverworld::populate_chunk(Chunk *chunk)
@@ -107,7 +108,7 @@ void ChunkProviderOverworld::populate_chunk(Chunk *chunk)
         }
     }
 
-    chunk->generation_stage = ChunkGenStage::done;
+    chunk->state = ChunkState::done;
 }
 
 void ChunkProviderOverworld::plant_tree(Vec3i pos, int height)

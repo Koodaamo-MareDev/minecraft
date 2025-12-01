@@ -16,7 +16,7 @@
 #include <block/block_properties.hpp>
 #include <world/entity.hpp>
 
-enum class ChunkGenStage : uint8_t
+enum class ChunkState : uint8_t
 {
     empty = 0,
     features = 1,
@@ -24,6 +24,7 @@ enum class ChunkGenStage : uint8_t
 
     // Special values
     loading = 128,
+    saving = 129,
     invalid = 0xFF,
 };
 
@@ -111,7 +112,7 @@ public:
     int x = 0;
     int z = 0;
     World *world = nullptr;
-    ChunkGenStage generation_stage = ChunkGenStage::empty;
+    ChunkState state = ChunkState::empty;
     uint8_t lit_state = 0;
     Block blockstates[16 * 16 * WORLD_HEIGHT] = {0};
     uint8_t height_map[16 * 16] = {0};

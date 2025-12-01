@@ -2,8 +2,9 @@
 #define BUSY_WAIT_CPP
 
 #include <functional>
-#include <string>
+#include <gui/gui.hpp>
 
-void busy_wait(std::function<void()> blocking_call, std::string description = "");
+// Calls a blocking function while displaying a Gui
+void busy_wait(std::function<void()> blocking_call, Gui *gui = nullptr);
 
 #endif

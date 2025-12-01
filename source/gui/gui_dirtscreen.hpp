@@ -6,6 +6,12 @@
 #include <string>
 #include <vector>
 
+struct Progress
+{
+    uint8_t progress = 0;
+    uint8_t max_progress = 0;
+};
+
 class GuiDirtscreen : public Gui
 {
 public:
@@ -17,12 +23,10 @@ public:
     bool use_cursor() override { return false; }
 
     void set_text(const std::string &text);
-    void set_progress(uint8_t progress, uint8_t max_progress);
+    void set_progress(Progress *prog);
 
 private:
-    uint8_t progress = 0;
-    uint8_t max_progress = 0;
     std::vector<std::string> text_lines;
+    Progress *progress = nullptr;
 };
-
 #endif

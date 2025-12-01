@@ -119,7 +119,6 @@ void GuiGameOver::respawn()
     World *world = this->world;
     GuiDirtscreen *dirt_screen = new GuiDirtscreen;
     dirt_screen->set_text("Respawning...");
-    dirt_screen->set_progress(0, 100);
     Gui::set_gui(dirt_screen);
 
     // Send player to spawn

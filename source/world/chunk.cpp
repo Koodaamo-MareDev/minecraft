@@ -78,7 +78,7 @@ void Chunk::update_height_map(Vec3i pos)
         if (pos.y >= *height)
             *height = pos.y + 1;
     }
-    else
+    else if (pos.y < *height)
     {
         while (*height > 0)
         {
@@ -832,7 +832,7 @@ void Chunk::read()
         region->locations[offset] = 0;
 
         // Regenerate the chunk
-        this->generation_stage = ChunkGenStage::empty;
+        this->state = ChunkState::empty;
         return;
     }
 
@@ -863,7 +863,7 @@ void Chunk::read()
         printf("Failed to read chunk data: %s\n", e.what());
 
         // Regenerate the chunk
-        this->generation_stage = ChunkGenStage::empty;
+        this->state = ChunkState::empty;
         return;
     }
 
@@ -883,7 +883,7 @@ void Chunk::read()
         printf("Failed to load chunk data: %s\n", e.what());
 
         // Regenerate the chunk
-        this->generation_stage = ChunkGenStage::empty;
+        this->state = ChunkState::empty;
 
         // Clean up
         delete compound;
@@ -892,7 +892,7 @@ void Chunk::read()
     delete compound;
 
     lit_state = 1;
-    generation_stage = ChunkGenStage::done;
+    state = ChunkState::done;
 
     Vec3i pos(this->x * 16, 0, this->z * 16);
     Lock lock(world->tick_mutex);

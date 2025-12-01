@@ -50,16 +50,9 @@ World::World()
 World::~World()
 {
     LightEngine::deinit();
-
-    for (Chunk *chunk : chunks)
-    {
-        if (chunk)
-            remove_chunk(chunk);
-    }
-    cleanup_chunks();
     mcr::cleanup();
-    set_remote(false);
     deinit_chunk_manager();
+    set_remote(false);
     if (tick_mutex != LWP_MUTEX_NULL)
         LWP_MutexDestroy(tick_mutex);
     if (chunk_mutex != LWP_MUTEX_NULL)
@@ -112,7 +105,6 @@ bool World::tick()
     }
     update_entities();
     calculate_visibility();
-    cleanup_chunks();
     update_chunks();
 
     // Calculate chunk memory usage
@@ -188,6 +180,7 @@ void World::update_frustum(Camera &camera)
 void World::update_chunks()
 {
     int light_up_calls = 0;
+    std::vector<Chunk *> to_remove;
     for (Chunk *&chunk : chunks)
     {
         if (chunk)
@@ -195,11 +188,10 @@ void World::update_chunks()
             int hdistance = chunk->player_taxicab_distance();
             if (hdistance > CHUNK_DISTANCE * 24 + 24 && !is_remote())
             {
-                remove_chunk(chunk);
+                to_remove.push_back(chunk);
                 continue;
             }
-
-            if (chunk->generation_stage != ChunkGenStage::done)
+            if (chunk->state != ChunkState::done)
                 continue;
 
             if (!chunk->lit_state && light_up_calls < 5)
@@ -208,6 +200,10 @@ void World::update_chunks()
                 chunk->light_up();
             }
         }
+    }
+    for (Chunk *&chunk : to_remove)
+    {
+        save_and_clean_chunk(chunk);
     }
     if (!is_remote())
     {
@@ -280,7 +276,7 @@ SectionUpdatePhase World::update_sections(SectionUpdatePhase phase)
     {
         for (Chunk *&chunk : chunks)
         {
-            if (chunk && chunk->generation_stage == ChunkGenStage::done && !chunk->light_update_count)
+            if (chunk && chunk->state == ChunkState::done && !chunk->light_update_count)
             {
                 // Check if chunk has other chunks around it.
                 bool surrounding = true;
@@ -291,7 +287,7 @@ SectionUpdatePhase World::update_sections(SectionUpdatePhase phase)
                         i = 4;
                     // Check if the surrounding chunk exists and has no lighting updates pending
                     Chunk *surrounding_chunk = get_chunk(chunk->x + face_offsets[i].x, chunk->z + face_offsets[i].z);
-                    if (!surrounding_chunk || surrounding_chunk->light_update_count || surrounding_chunk->generation_stage != ChunkGenStage::done)
+                    if (!surrounding_chunk || surrounding_chunk->light_update_count || surrounding_chunk->state != ChunkState::done)
                     {
                         surrounding = false;
                         break;
@@ -719,7 +715,7 @@ int World::prepare_chunks(int count)
     return count;
 }
 
-void World::remove_chunk(Chunk *chunk)
+void World::save_and_clean_chunk(Chunk *chunk)
 {
     for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
     {
@@ -738,17 +734,7 @@ void World::remove_chunk(Chunk *chunk)
         current.cached_solid.clear();
         current.cached_transparent.clear();
     }
-    chunk->generation_stage = ChunkGenStage::invalid;
-}
-
-void World::cleanup_chunks()
-{
-    auto is_invalid = [](Chunk *c)
-    {
-        return c->generation_stage == ChunkGenStage::invalid;
-    };
-
-    delete_chunks_if(is_invalid);
+    save_chunk(chunk);
 }
 
 void World::destroy_block(const Vec3i pos, Block *old_block)
@@ -943,7 +929,7 @@ void World::draw_scene(bool opaque)
     {
         for (Chunk *&chunk : chunks)
         {
-            if (chunk && chunk->generation_stage == ChunkGenStage::done && chunk->lit_state)
+            if (chunk && chunk->state == ChunkState::done && chunk->lit_state)
             {
                 for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
                 {
@@ -960,7 +946,7 @@ void World::draw_scene(bool opaque)
     {
         for (Chunk *&chunk : chunks)
         {
-            if (chunk && chunk->generation_stage == ChunkGenStage::done && chunk->lit_state)
+            if (chunk && chunk->state == ChunkState::done && chunk->lit_state)
             {
                 for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
                 {
@@ -1218,22 +1204,28 @@ void World::draw_bounds(AABB *bounds)
     gertex::set_state(state);
 }
 
-void World::save()
+void World::save(Progress *prog)
 {
     // Save the world to disk if in singleplayer
     if (!is_remote())
     {
         namespace fs = std::filesystem;
-        try
+        if (prog)
         {
-            for (Chunk *c : chunks)
+            prog->progress = 0;
+            prog->max_progress = chunks.size();
+        }
+        for (Chunk *c : chunks)
+            try
+            {
                 c->write();
-        }
-        catch (std::runtime_error &e)
-        {
-            printf("Failed to save chunk: %s\n", e.what());
-        }
-
+                if (prog)
+                    prog->progress++;
+            }
+            catch (std::runtime_error &e)
+            {
+                debug::print("Failed to save chunk: %s\n", e.what());
+            }
         int64_t dir_size = 0;
 
         for (auto &file : fs::recursive_directory_iterator(fs::current_path()))
@@ -1644,7 +1636,7 @@ Chunk *World::get_chunk(int32_t x, int32_t z)
     return nullptr;
 }
 
-void World::delete_chunk(Chunk *chunk)
+void World::save_chunk(Chunk *chunk)
 {
     if (!chunk)
         return;
@@ -1658,41 +1650,10 @@ void World::delete_chunk(Chunk *chunk)
     uint64_t key = uint32_pair(chunk->x, chunk->z);
     chunk_cache.erase(key);
 
-    // Delete the chunk
-    delete chunk;
-}
+    chunk->state = is_remote() ? ChunkState::invalid : ChunkState::saving;
 
-void World::delete_chunks_if(std::function<bool(Chunk *)> predicate)
-{
-    Lock chunk_lock(chunk_mutex);
-
-    // Get list of chunks to be removed
-    std::vector<Chunk *> chunks_to_remove;
-    for (Chunk *chunk : chunks)
-    {
-        if (predicate(chunk))
-        {
-            chunks_to_remove.push_back(chunk);
-        }
-    }
-
-    chunk_lock.unlock();
-
-    for (Chunk *chunk : chunks_to_remove)
-    {
-        if (!is_remote())
-        {
-            try
-            {
-                chunk->write();
-            }
-            catch (std::runtime_error &e)
-            {
-                printf("Failed to save chunk: %s\n", e.what());
-            }
-        }
-        delete_chunk(chunk);
-    }
+    // Send the chunk to the chunk manager
+    pending_chunks.push_back(chunk);
 }
 
 bool World::add_chunk(int32_t x, int32_t z)
@@ -1718,11 +1679,10 @@ bool World::add_chunk(int32_t x, int32_t z)
     // Check if the chunk exists in the region file
     mcr::Region *region = mcr::get_region(x >> 5, z >> 5);
     if (region->locations[(x & 31) | ((z & 31) << 5)] != 0)
-        chunk->generation_stage = ChunkGenStage::loading;
+        chunk->state = ChunkState::loading;
 
-    // Add the chunk to the pending chunks
+    // Send the chunk to the chunk manager
     pending_chunks.push_back(chunk);
-    std::sort(pending_chunks.begin(), pending_chunks.end());
 
     return true;
 }
@@ -1759,7 +1719,7 @@ void World::init_chunk_manager(ChunkProvider *chunk_provider)
         World *world = (World *)arg;
         ChunkProvider *provider = world->chunk_provider;
         world->run_chunk_manager = true;
-        while (world->run_chunk_manager)
+        while (world->run_chunk_manager || !world->pending_chunks.empty())
         {
             while (world->pending_chunks.empty())
             {
@@ -1770,20 +1730,50 @@ void World::init_chunk_manager(ChunkProvider *chunk_provider)
                 }
             }
             Chunk *chunk = world->pending_chunks.back();
+            switch (chunk->state)
+            {
+            case ChunkState::loading:
+            case ChunkState::empty:
+            {
+                // Generate the base terrain for the chunk
+                provider->provide_chunk(chunk);
+            }
+            // Fall to the next case immediately: features
+            case ChunkState::features:
+            {
+                // Move the chunk to the active list
+                Lock chunk_lock(world->chunk_mutex);
+                world->chunks.push_back(chunk);
+                world->pending_chunks.erase(std::find(world->pending_chunks.begin(), world->pending_chunks.end(), chunk));
+                uint64_t key = uint32_pair(chunk->x, chunk->z);
+                world->chunk_cache.insert_or_assign(key, chunk);
+                chunk_lock.unlock();
 
-            // Generate the base terrain for the chunk
-            provider->provide_chunk(chunk);
-
-            // Move the chunk to the active list
-            Lock chunk_lock(world->chunk_mutex);
-            world->chunks.push_back(chunk);
-            world->pending_chunks.erase(std::find(world->pending_chunks.begin(), world->pending_chunks.end(), chunk));
-            uint64_t key = uint32_pair(chunk->x, chunk->z);
-            world->chunk_cache.insert_or_assign(key, chunk);
-            chunk_lock.unlock();
-
-            // Finish the chunk with features
-            provider->populate_chunk(chunk);
+                // Finish the chunk with features
+                provider->populate_chunk(chunk);
+                break;
+            }
+            case ChunkState::saving:
+            {
+                try
+                {
+                    chunk->write();
+                }
+                catch (std::runtime_error &e)
+                {
+                    debug::print("Failed to save chunk: %s\n", e.what());
+                }
+            }
+            // Fall to removal case after saving
+            case ChunkState::invalid:
+            {
+                Lock chunk_lock(world->chunk_mutex);
+                world->pending_chunks.erase(std::find(world->pending_chunks.begin(), world->pending_chunks.end(), chunk));
+                delete chunk;
+            }
+            default:
+                break;
+            }
 
             usleep(100);
         }

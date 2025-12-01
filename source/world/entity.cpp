@@ -1178,13 +1178,6 @@ void EntityPlayerLocal::hurt(int16_t damage)
     EntityPlayer::hurt(damage);
     health_update_tick = 10;
     get_camera().rot.z += 8; // Tilt the camera a bit
-    if (dead && !world->is_remote())
-    {
-        GuiDirtscreen *dirt_screen = new GuiDirtscreen;
-        dirt_screen->set_text("Respawning...");
-        dirt_screen->set_progress(0, 100);
-        Gui::set_gui(dirt_screen);
-    }
 }
 
 void EntityPlayerLocal::tick()

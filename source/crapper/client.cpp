@@ -509,7 +509,6 @@ namespace Crapper
             if (!dirtscreen)
                 dirtscreen = new GuiDirtscreen;
             dirtscreen->set_text("Loading level\n\n\nDownloading terrain");
-            dirtscreen->set_progress(0, 0);
             Gui::set_gui(dirtscreen);
         }
         login_success = true;
@@ -1269,10 +1268,7 @@ namespace Crapper
             if (chunk)
             {
                 // Mark chunk for removal
-                remote_world->remove_chunk(chunk);
-
-                // Also trigger a cleanup immediately
-                remote_world->cleanup_chunks();
+                remote_world->save_and_clean_chunk(chunk);
             }
         }
 #ifdef PREALLOCATE_CHUNKS
@@ -1282,7 +1278,7 @@ namespace Crapper
             try
             {
                 Chunk *chunk = new Chunk(x, z);
-                chunk->generation_stage = ChunkGenStage::empty;
+                chunk->state = ChunkState::empty;
                 get_chunks().push_back(chunk);
             }
             catch (...)
@@ -1424,7 +1420,7 @@ namespace Crapper
         delete[] decompressed_data;
 
         chunk->lit_state = 1;
-        chunk->generation_stage = ChunkGenStage::done;
+        chunk->state = ChunkState::done;
         chunk->recalculate_height_map();
 
         // Update the VBOs
