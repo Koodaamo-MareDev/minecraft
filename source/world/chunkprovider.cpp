@@ -296,14 +296,14 @@ void ChunkProviderOverworld::generate_features(Chunk *chunk)
             lava_lake_gen.generate(rng, pos);
     }
 
-    javaport::WorldGenLiquids water_liquid_gen(world, BlockID::water);
+    javaport::WorldGenLiquids water_liquid_gen(world, BlockID::flowing_water);
     for (int i = 0; i < 50; i++)
     {
         Vec3i pos(rng.nextInt(16) + 8, rng.nextInt(120) + 8, rng.nextInt(16) + 8);
         water_liquid_gen.generate(rng, pos + block_pos);
     }
 
-    javaport::WorldGenLiquids lava_gen(world, BlockID::lava);
+    javaport::WorldGenLiquids lava_gen(world, BlockID::flowing_lava);
     for (int i = 0; i < 20; i++)
     {
         Vec3i pos(rng.nextInt(16) + 8, rng.nextInt(rng.nextInt(rng.nextInt(112) + 8) + 8), rng.nextInt(16) + 8);
