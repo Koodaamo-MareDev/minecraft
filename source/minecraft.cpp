@@ -160,8 +160,10 @@ void MainGameLoop()
     current_world->set_sound_system(sound_system);
 
     // Setup the loading screen
+    Progress prog;
     GuiDirtscreen *dirtscreen = new GuiDirtscreen;
     dirtscreen->set_text("Loading level\n\n\nBuilding terrain");
+    dirtscreen->set_progress(&prog);
     Gui::set_gui(dirtscreen);
 
     // Fall back to local world if not connected to a server
@@ -172,7 +174,6 @@ void MainGameLoop()
             current_world->create();
         }
     }
-    Progress prog;
 
     uint32_t fb = 0;
 
