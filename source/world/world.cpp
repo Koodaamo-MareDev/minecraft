@@ -1772,7 +1772,15 @@ void World::init_chunk_manager(ChunkProvider *chunk_provider)
                 delete chunk;
             }
             default:
-                break;
+            {
+                // Empty the queue to avoid a rare deadlock
+                if (world->run_chunk_manager)
+                {
+                    Lock chunk_lock(world->chunk_mutex);
+                    world->pending_chunks.erase(std::find(world->pending_chunks.begin(), world->pending_chunks.end(), chunk));
+                    break;
+                }
+            }
             }
 
             usleep(100);
