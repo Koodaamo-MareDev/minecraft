@@ -77,3 +77,18 @@ namespace debug
         initialized = false;
     }
 }
+#ifdef DEBUG
+
+// Gotta hate crashes sending me to Wii Menu when debugging.
+void abort()
+{
+    CON_Init(VIDEO_GetCurrentFramebuffer(), 0, 0, 640, 480, 1280);
+    printf("\n\nThe game has encountered an unexpected error.\nYou can:\n- Hold power button of your console to shut down.\n- Debug the crash in Dolphin Emulator.");
+    VIDEO_SetNextFramebuffer(VIDEO_GetCurrentFramebuffer());
+    VIDEO_Flush();
+    VIDEO_WaitVSync();
+    VIDEO_WaitVSync();
+    while (1)
+        ;
+}
+#endif
