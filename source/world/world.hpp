@@ -70,6 +70,7 @@ public:
     bool hell = false;
     int64_t seed = 0;
     ChunkProvider *chunk_provider = nullptr;
+    SectionUpdatePhase current_update_phase = SectionUpdatePhase::BLOCK_VISIBILITY;
 
     std::map<int32_t, EntityPhysical *> world_entities;
     std::deque<Chunk *> chunks;

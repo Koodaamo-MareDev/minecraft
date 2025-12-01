@@ -154,7 +154,6 @@ bool World::tick()
 
 void World::update()
 {
-    static SectionUpdatePhase current_update_phase = SectionUpdatePhase::BLOCK_VISIBILITY;
     // If there are no chunks loaded, we can skip the update
     uint64_t start_time = time_get();
     uint64_t elapsed_time = 0;
