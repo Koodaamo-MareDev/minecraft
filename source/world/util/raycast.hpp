@@ -12,6 +12,12 @@
 #include <world/chunk.hpp>
 #include <block/blocks.hpp>
 
+#ifdef FAST_SKYCAST
+#define skycast skycast_fast
+#else
+#define skycast skycast_safe
+#endif
+
 template <typename T>
 inline int sgn(T val)
 {
@@ -63,7 +69,7 @@ inline int checkbelow(Vec3i pos, Chunk *chunk = nullptr, World *world = nullptr)
     // This should return 0 at most which means the ray hit the bedrock
     return pos.y;
 }
-inline int skycast(Vec3i pos, Chunk *chunk = nullptr, World *world = nullptr)
+inline int skycast_safe(Vec3i pos, Chunk *chunk = nullptr, World *world = nullptr)
 {
     Block *block = nullptr;
     chunk = chunk ? chunk : (world ? world->get_chunk_from_pos(pos) : nullptr);
@@ -77,6 +83,18 @@ inline int skycast(Vec3i pos, Chunk *chunk = nullptr, World *world = nullptr)
     if (!block)
         return -9999;
     return pos.y;
+}
+
+// The fastest readable skycast method I could think of.
+// This one offers absolutely no safety checks.
+// Assume chunk != null, xzy-ordered coordinates, 0 < x < 16, same for z
+inline int skycast_fast(Vec3i pos, Chunk *chunk)
+{
+    Block *last = &chunk->blockstates[pos.x | (pos.z << 4)];
+    Block *curr = &last[(MAX_WORLD_Y << 8)];
+    while (curr != last && !block_properties[curr->id].m_opacity)
+        curr -= 256;
+    return (curr - chunk->blockstates) >> 8;
 }
 
 // Highly optimized (and unsafe) version of skycast that only checks for sky light.

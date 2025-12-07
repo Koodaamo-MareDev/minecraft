@@ -99,7 +99,7 @@ void Chunk::light_up()
         for (int i = 0; i < 256; i++)
         {
             pos.coords.h_index = i;
-            int end_y = skycast(Vec3i(pos), this);
+            int end_y = skycast(Vec3i(pos.coords.x, 0, pos.coords.z), this);
             if (end_y >= MAX_WORLD_Y || end_y <= 0)
                 return;
             this->height_map[i] = end_y + 1;

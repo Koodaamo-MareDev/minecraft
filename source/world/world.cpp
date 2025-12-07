@@ -1238,7 +1238,8 @@ void World::save(Progress *prog)
         player.serialize((NBTTagCompound *)level_data->setTag("Player", new NBTTagCompound));
         level_data->setTag("Time", new NBTTagLong(ticks));
         level_data->setTag("SpawnX", new NBTTagInt(spawn_pos.x));
-        int spawn_y = skycast(Vec3i(0, 0, 0), nullptr);
+        Chunk *spawn_ch = get_chunk_from_pos(spawn_pos);
+        int spawn_y = spawn_ch ? skycast(Vec3i(spawn_pos.x, 0, spawn_pos.z), spawn_ch) : spawn_pos.y;
         level_data->setTag("SpawnY", new NBTTagInt(spawn_y < 0 ? this->spawn_pos.y : spawn_y));
         level_data->setTag("SpawnZ", new NBTTagInt(spawn_pos.z));
         level_data->setTag("LastPlayed", new NBTTagLong(time(nullptr) * 1000LL));
