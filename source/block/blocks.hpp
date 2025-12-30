@@ -45,6 +45,13 @@ Sound get_step_sound(BlockID block_id);
 Sound get_mine_sound(BlockID block_id);
 Sound get_break_sound(BlockID block_id);
 
+inline bool can_see_through(const BlockProperties &props)
+{
+    if (props.m_transparent || props.m_fluid)
+        return true;
+    return props.m_render_type != RenderType::full && props.m_render_type != RenderType::full_special;
+}
+
 inline bool is_flowing_fluid(BlockID id)
 {
     return id != BlockID::air && block_properties[static_cast<uint8_t>(id)].m_flow_fluid == id;

@@ -27,6 +27,7 @@
 #include <nbt/nbt.hpp>
 #include <mcregion.hpp>
 #include <world/world.hpp>
+#include <world/util/coord.hpp>
 #include <world/tile_entity/tile_entity.hpp>
 #include <util/debuglog.hpp>
 #include <util/face_pair.hpp>
@@ -73,7 +74,7 @@ void Chunk::update_height_map(Vec3i pos)
     pos.z &= 15;
     uint8_t *height = &height_map[pos.x | (pos.z << 4)];
     BlockID id = get_block(pos)->get_blockid();
-    if (get_block_opacity(id))
+    if (id != BlockID::air && (!can_see_through(properties(id)) || get_block_opacity(id) > 0))
     {
         if (pos.y >= *height)
             *height = pos.y + 1;
@@ -84,7 +85,7 @@ void Chunk::update_height_map(Vec3i pos)
         {
             pos.y = *height - 1;
             id = get_block(pos)->get_blockid();
-            if (get_block_opacity(id))
+            if (id != BlockID::air && (!can_see_through(properties(id)) || get_block_opacity(id) > 0))
                 break;
             (*height)--;
         }

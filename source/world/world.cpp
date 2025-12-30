@@ -1913,7 +1913,7 @@ void World::mark_block_dirty(const Vec3i &pos)
     if (!chunk)
         return;
     chunk->update_height_map(pos);
-    LightEngine::post(Coord(pos, chunk));
+    LightEngine::post(pos);
 }
 
 TileEntity *World::get_tile_entity(const Vec3i &position)
