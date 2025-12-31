@@ -4,6 +4,7 @@
 #include <map>
 #include <queue>
 #include <deque>
+#include <algorithm>
 #include <math/vec3f.hpp>
 #include <math/aabb.hpp>
 #include <math/math_utils.h>

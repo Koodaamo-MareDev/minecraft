@@ -3,6 +3,7 @@
 
 #include "MapGenBase.hpp"
 #include <cmath>
+#include <algorithm>
 
 class NoiseSynthesizer;
 namespace javaport
