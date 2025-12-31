@@ -26,6 +26,33 @@
                 "limitSymbolsToIncludedHeaders": true
             },
             "compilerArgs": []
+        },
+        {
+            "name": "Linux",
+            "includePath": [
+                "/opt/devkitpro/libogc/include",
+                "/opt/devkitpro/portlibs/ppc/include",
+                "${workspaceFolder}/source",
+                "${workspaceFolder}/source/thirdparty",
+                "${workspaceFolder}/build"
+            ],
+            "defines": [
+                "HW_RVL",
+                "__wii__"
+            ],
+            "configurationProvider": "ms-vscode.makefile-tools",
+            "compilerPath": "/opt/devkitpro/devkitPPC/bin/powerpc-eabi-g++",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "gcc-arm",
+            "mergeConfigurations": true,
+            "browse": {
+                "path": [
+                    "${workspaceFolder}"
+                ],
+                "limitSymbolsToIncludedHeaders": true
+            },
+            "compilerArgs": []
         }
     ],
     "version": 4
