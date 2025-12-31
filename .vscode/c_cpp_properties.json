@@ -1,24 +1,19 @@
 {
     "configurations": [
         {
-            "name": "wii",
+            "name": "Windows",
             "includePath": [
-                "C:\\devkitPro\\portlibs\\wii",
                 "C:\\devkitPro\\libogc\\include",
                 "C:\\devkitPro\\portlibs\\ppc\\include",
-                "C:\\devkitPro\\portlibs\\ppc\\include\\freetype2",
                 "${workspaceFolder}\\source",
                 "${workspaceFolder}\\source\\thirdparty",
                 "${workspaceFolder}\\build"
             ],
             "defines": [
                 "HW_RVL",
-                "__wii__",
-                "MINIZ_NO_ZLIB_COMPATIBLE_NAMES",
-                "ITEM_DESYNC_FIX",
-                "MINIZ_NO_ARCHIVE_APIS"
+                "__wii__"
             ],
-            "windowsSdkVersion": "10.0.19041.0",
+            "configurationProvider": "ms-vscode.makefile-tools",
             "compilerPath": "C:/devkitPro/devkitPPC/bin/powerpc-eabi-g++.exe",
             "cStandard": "c17",
             "cppStandard": "c++17",
