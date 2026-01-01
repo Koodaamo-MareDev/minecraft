@@ -1,0 +1,26 @@
+{
+    "name": "Wii Homebrew Dev",
+    "workspaceFolder": "/minecraft",
+    "workspaceMount": "source=${localWorkspaceFolder},target=/minecraft,type=bind",
+    "build": {
+        "dockerfile": "Dockerfile",
+        "context": ".."
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-vscode.cpptools",
+                "ms-vscode.makefile-tools"
+            ],
+            "settings": {
+                "C_Cpp.default.includePath": [
+                    "${workspaceFolder}/**",
+                    "/opt/devkitpro/libogc/include",
+                    "/opt/devkitpro/devkitPPC/powerpc-eabi/include"
+                ],
+                "C_Cpp.default.compilerPath": "/opt/devkitpro/devkitPPC/bin/powerpc-eabi-gcc"
+            }
+        }
+    },
+    "postStartCommand": "make"
+}
