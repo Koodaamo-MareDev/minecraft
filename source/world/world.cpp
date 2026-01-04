@@ -1217,17 +1217,22 @@ void World::save(Progress *prog)
             prog->progress = 0;
             prog->max_progress = chunks.size();
         }
+        std::vector<Chunk *> chunks_to_clean;
+        chunks_to_clean.reserve(chunks.size());
         for (Chunk *c : chunks)
             try
             {
                 c->write();
                 if (prog)
                     prog->progress++;
+                chunks_to_clean.push_back(c);
             }
             catch (std::runtime_error &e)
             {
                 debug::print("Failed to save chunk: %s\n", e.what());
             }
+        for (Chunk *&c : chunks_to_clean)
+            save_and_clean_chunk(c);
         int64_t dir_size = 0;
 
         for (auto &file : fs::recursive_directory_iterator(fs::current_path()))
