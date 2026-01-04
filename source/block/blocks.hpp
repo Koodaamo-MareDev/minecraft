@@ -13,6 +13,7 @@
 #define FLOAT_TO_FLUIDMETA(A) (int(roundf((A) * 8)))
 class Block;
 class Chunk;
+extern bool render_fast_leaves;
 
 int8_t get_block_opacity(BlockID blockid);
 

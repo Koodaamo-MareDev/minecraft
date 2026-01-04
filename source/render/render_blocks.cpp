@@ -444,10 +444,7 @@ int render_cactus(Block *block, const Vec3i &pos)
 }
 int render_leaves(Block *block, const Vec3i &pos)
 {
-    int vertexCount = 0;
-    vertexCount += render_inverted_cube_special(block, pos, true);
-    vertexCount += render_cube_special(block, pos, true);
-    return vertexCount;
+    return render_cube_special(block, pos, !render_fast_leaves);
 }
 int render_cross(Block *block, const Vec3i &pos)
 {

@@ -31,6 +31,7 @@ GuiOptions::GuiOptions()
     add_toggle_button("vsync", "Use VSync");
     add_toggle_button("mono_lighting", "Monochrome lighting");
     add_toggle_button("smooth_lighting", "Smooth lighting");
+    add_toggle_button("fast_leaves", "Fast leaves");
 
     buttons.push_back(new GuiButton((view.width - 400) / 2, view.height - 48, 400, 40, "Done", std::bind(&GuiOptions::quit_to_title, this)));
 }

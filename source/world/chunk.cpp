@@ -153,7 +153,7 @@ void Chunk::recalculate_visibility(Block *block, Vec3i pos)
             continue;
         }
 
-        if (other_block->id != block->id || !properties(block->id).m_transparent)
+        if (other_block->id != block->id || !properties(block->id).m_transparent || (!render_fast_leaves && block->id == BlockID::leaves))
         {
             RenderType other_rt = properties(other_block->id).m_render_type;
             visibility |= ((other_rt != RenderType::full && other_rt != RenderType::full_special) || properties(other_block->id).m_transparent) << i;

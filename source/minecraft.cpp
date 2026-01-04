@@ -26,6 +26,7 @@
 #include "light_night_mono_rgba.h"
 #include "light_day_rgba.h"
 #include "light_night_rgba.h"
+#include "block/blocks.hpp"
 
 void *frameBuffer[2] = {NULL, NULL};
 static GXRModeObj *rmode = NULL;
@@ -146,6 +147,8 @@ void MainGameLoop()
     bool mono_lighting = ((int)config.get("mono_lighting", 0) != 0);
     bool smooth_lighting = ((int)config.get("smooth_lighting", 0) != 0);
     bool vsync = ((int)config.get("vsync", 0) != 0);
+    bool fast_leaves = ((int)config.get("fast_leaves", 0) != 0);
+    render_fast_leaves = fast_leaves;
     current_world->sync_chunk_updates = ((int)config.get("sync_chunk_updates", 0) != 0);
     set_smooth_lighting(smooth_lighting);
 

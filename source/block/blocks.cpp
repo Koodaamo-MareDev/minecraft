@@ -17,6 +17,8 @@
 // If positive, use this texture index for all blocks
 static int32_t block_texture_index = -1;
 
+bool render_fast_leaves = false;
+
 int8_t get_block_opacity(BlockID blockid)
 {
     return block_properties[int(blockid)].m_opacity;
@@ -91,10 +93,10 @@ uint32_t get_face_texture_index(Block *block, int face)
     {
         uint8_t meta = block->meta;
         if (meta == 1)
-            return 219;
+            return 219 + render_fast_leaves;
         if (meta == 2)
-            return 52;
-        return 186;
+            return 52 + render_fast_leaves;
+        return 186 + render_fast_leaves;
     }
     case BlockID::wood:
     { // log
