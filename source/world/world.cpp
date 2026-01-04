@@ -298,7 +298,7 @@ SectionUpdatePhase World::update_sections(SectionUpdatePhase phase)
                 for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
                 {
                     Section &other_section = chunk->sections[j];
-                    if (other_section.visible && other_section.dirty && (!curr_section || other_section.chunk < curr_section->chunk))
+                    if (other_section.visible && other_section.dirty && (!curr_section || *other_section.chunk < *curr_section->chunk))
                     {
                         // If the current section is not set or the other section is closer to the player, set it as the current section
                         curr_section = &other_section;
