@@ -334,7 +334,6 @@ int main(int argc, char **argv)
     {
         int fb = 0;
         GuiTitleScreen *titlescreen = new GuiTitleScreen(&current_world);
-        titlescreen->sound_system = sound_system;
         Gui::set_gui(titlescreen);
         set_render_world(nullptr);
 
@@ -347,6 +346,7 @@ int main(int argc, char **argv)
         // Enter the main menu loop
         while (!isExiting && Gui::get_gui() && !current_world)
         {
+            Gui::get_gui()->sound_system = sound_system;
             GetInput();
             HandleGUI(state.view);
             GX_DrawDone();
@@ -366,6 +366,8 @@ int main(int argc, char **argv)
             {
                 isExiting = true;
             }
+            if (Gui::get_gui() == nullptr || Gui::get_gui()->quitting)
+                break;
         }
         if (current_world)
         {

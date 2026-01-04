@@ -4,13 +4,11 @@
 #include <gui/gui.hpp>
 #include <string>
 #include <vector>
-class SoundSystem;
 class GuiTitleScreen : public Gui
 {
 public:
     std::string splash_text = "§ePorted by Myntti!";
     World **current_world;
-    SoundSystem *sound_system = nullptr;
 
     GuiTitleScreen(World **current_world);
 
@@ -30,6 +28,7 @@ private:
     void navigate(bool left, bool right, bool up, bool down);
     void join_singleplayer();
     void join_multiplayer();
+    void options();
     void quit_game();
 };
 #endif

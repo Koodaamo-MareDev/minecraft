@@ -8,6 +8,7 @@
 extern int cursor_x;
 extern int cursor_y;
 
+class SoundSystem;
 class GuiSlot
 {
 public:
@@ -41,6 +42,8 @@ public:
 class Gui
 {
 public:
+    bool quitting = false; // Flag for quitting back to main menu
+    SoundSystem *sound_system = nullptr;
     item::ItemStack item_in_hand;
     uint8_t window_id;
     int16_t transaction_id = 1;
@@ -104,12 +107,22 @@ public:
     GuiButton(int x, int y, int width, int height, std::string text, std::function<void()> on_click) : x(x), y(y), width(width), height(height), text(text), on_click(on_click) {}
     virtual ~GuiButton() = default;
 
-    void draw(bool selected);
+    virtual void draw(bool selected);
 
     bool contains(int mx, int my)
     {
         return mx >= x && mx < x + width && my >= y && my < y + height;
     }
+};
+
+class GuiButtonWithValue : public GuiButton
+{
+public:
+    std::string key;
+    std::string value;
+    GuiButtonWithValue(int x, int y, int width, int height, std::string text, std::string key, std::string value, std::function<void()> on_click) : GuiButton(x, y, width, height, text, on_click), key(key), value(value) {}
+    void draw(bool selected) override;
+    virtual ~GuiButtonWithValue() = default;
 };
 
 extern gertex::GXMatrix gui_block_matrix;

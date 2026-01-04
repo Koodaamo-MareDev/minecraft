@@ -3,6 +3,7 @@
 #include <util/input/input.hpp>
 #include <gui/gui_worldselect.hpp>
 #include <gui/gui_dirtscreen.hpp>
+#include <gui/gui_options.hpp>
 #include <world/world.hpp>
 #include <render/render.hpp>
 #include <util/string_utils.hpp>
@@ -27,7 +28,7 @@ GuiTitleScreen::GuiTitleScreen(World **current_world)
     buttons.push_back(GuiButton((view.width - 400) / 2, view_height / 2 - 24, 400, 40, "Singleplayer", std::bind(&GuiTitleScreen::join_singleplayer, this)));
     buttons.push_back(GuiButton((view.width - 400) / 2, view_height / 2 + 24, 400, 40, "Multiplayer", std::bind(&GuiTitleScreen::join_multiplayer, this)));
     buttons.push_back(GuiButton((view.width - 400) / 2, view_height / 2 + 72, 400, 40, "Mods and Texture Packs", []() {}));
-    buttons.push_back(GuiButton((view.width - 400) / 2, view_height / 2 + 144, 196, 40, "Options", []() {}));
+    buttons.push_back(GuiButton((view.width - 400) / 2, view_height / 2 + 144, 196, 40, "Options", std::bind(&GuiTitleScreen::options, this)));
     buttons.push_back(GuiButton((view.width - 400) / 2 + 204, view_height / 2 + 144, 196, 40, "Quit Game", std::bind(&GuiTitleScreen::quit_game, this)));
     buttons[2].enabled = false;
 
@@ -272,6 +273,11 @@ void GuiTitleScreen::join_multiplayer()
             printf("Failed to connect to server: %s\n", e.what());
         }
     }
+}
+
+void GuiTitleScreen::options()
+{
+    Gui::set_gui(new GuiOptions);
 }
 
 void GuiTitleScreen::quit_game()

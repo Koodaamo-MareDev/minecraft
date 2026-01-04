@@ -9,8 +9,6 @@ class World;
 class GuiGameOver : public Gui
 {
 public:
-    bool quitting = false;
-
     GuiGameOver(World *world);
     void draw() override;
     void update() override;
