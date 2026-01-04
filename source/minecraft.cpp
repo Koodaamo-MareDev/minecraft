@@ -145,6 +145,7 @@ void MainGameLoop()
     camera.far = state.view.far;
     bool mono_lighting = ((int)config.get("mono_lighting", 0) != 0);
     bool vsync = ((int)config.get("vsync", 0) != 0);
+    current_world->sync_chunk_updates = ((int)config.get("sync_chunk_updates", 0) != 0);
 
     // Generate a "unique" username based on the device ID
     uint32_t dev_id = 0;

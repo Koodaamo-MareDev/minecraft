@@ -350,28 +350,31 @@ SectionUpdatePhase World::update_sections(SectionUpdatePhase phase)
         {
             if (current->dirty)
                 continue;
-            bool updated_neighbors = true;
-            for (int i = 0; i < 6; i++)
+            if (sync_chunk_updates)
             {
-                Vec3i neighbor_pos = Vec3i(current->x, current->y, current->z) + face_offsets[i] * 16;
-                Section *neighbor = section_at(neighbor_pos);
-                if (!neighbor || !neighbor->visible)
-                    continue;
-
-                if (neighbor->dirty || neighbor->chunk->light_update_count)
+                bool updated_neighbors = true;
+                for (int i = 0; i < 6; i++)
                 {
-                    // Redo this section
-                    curr_section = neighbor;
-                    updated_neighbors = false;
-                    break;
-                }
-            }
+                    Vec3i neighbor_pos = Vec3i(current->x, current->y, current->z) + face_offsets[i] * 16;
+                    Section *neighbor = section_at(neighbor_pos);
+                    if (!neighbor || !neighbor->visible)
+                        continue;
 
-            if (!updated_neighbors)
-            {
-                // If the neighbors are not up-to-date, skip this section
-                skipped_sections.push_back(current);
-                continue;
+                    if (neighbor->dirty || neighbor->chunk->light_update_count)
+                    {
+                        // Redo this section
+                        curr_section = neighbor;
+                        updated_neighbors = false;
+                        break;
+                    }
+                }
+
+                if (!updated_neighbors)
+                {
+                    // If the neighbors are not up-to-date, skip this section
+                    skipped_sections.push_back(current);
+                    continue;
+                }
             }
 
             if (current->solid != current->cached_solid)
