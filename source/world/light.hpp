@@ -32,14 +32,11 @@ class LightUpdateNode
 {
 public:
     Vec3i location;
-    int8_t direction;
 
-    LightUpdateNode(Vec3i location, int8_t direction = -1)
+    LightUpdateNode(Vec3i location)
     {
         this->location = location;
-        this->direction = direction;
     }
-    Chunk *chunk();
     uint8_t lightmap_index();
 
 private:

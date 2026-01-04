@@ -172,11 +172,8 @@ void LightEngine::update(const Vec3i &update)
     if (initial_blocklight < old_blocklight)
         remove_queue.emplace_back(update, old_blocklight, false);
 
-    if (source_block->light > 0)
-    {
-        prop_queue.emplace_back(update, -1);
-        prop_set.insert(update);
-    }
+    prop_queue.emplace_back(update);
+    prop_set.insert(update);
 
     std::set<Section *> affected_sections;
     affected_sections.insert(&origin_chunk->sections[(update.y >> 4) & 7]);
@@ -214,7 +211,7 @@ void LightEngine::update(const Vec3i &update)
                     // This neighbor is a potential light source for the propagation pass.
                     if (prop_set.find(neighbor_pos) == prop_set.end())
                     {
-                        prop_queue.emplace_back(neighbor_pos, -1);
+                        prop_queue.emplace_back(neighbor_pos);
                         prop_set.insert(neighbor_pos);
                     }
                 }
@@ -264,7 +261,6 @@ void LightEngine::update(const Vec3i &update)
         if (prop_new_light > old_prop_light || current.location == update)
         {
             current_block->light = prop_new_light;
-            affected_sections.insert(&chunk->sections[(current.location.y >> 4) & 7]);
             for (int i = 0; i < 6; i++)
             {
                 if (prop_neighbors[i])
@@ -272,9 +268,10 @@ void LightEngine::update(const Vec3i &update)
                     Vec3i new_pos = current.location + face_offsets[i];
                     if (prop_set.find(new_pos) == prop_set.end())
                     {
-                        prop_queue.emplace_back(new_pos, i);
+                        prop_queue.emplace_back(new_pos);
                         prop_set.insert(new_pos);
                     }
+                    affected_sections.insert(&get_nearby_chunk(new_pos.x >> 4, new_pos.z >> 4)->sections[(new_pos.y >> 4) & 7]);
                 }
             }
         }
@@ -284,19 +281,9 @@ void LightEngine::update(const Vec3i &update)
         auto first = affected_sections.begin();
         Section *sect = *first;
         if (sect && sect->chunk && sect->chunk->state != ChunkState::invalid)
-            (*first)->dirty = true;
+            sect->dirty = true;
         affected_sections.erase(first);
     }
-}
-
-Chunk *LightUpdateNode::chunk()
-{
-    if (_chunk)
-        return _chunk;
-    World *world = LightEngine::world();
-    if (world)
-        _chunk = world->get_chunk_from_pos(location);
-    return _chunk;
 }
 
 uint8_t LightUpdateNode::lightmap_index()
