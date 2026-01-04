@@ -81,6 +81,8 @@ void draw_sky();
 
 GXColor get_sky_color(bool cave_darkness = true);
 
+GXColor get_fog_color();
+
 GXColor get_lightmap_color(uint8_t light);
 
 void draw_particle(Camera &camera, Vec3f pos, uint32_t texture_index, float size, uint8_t brightness);

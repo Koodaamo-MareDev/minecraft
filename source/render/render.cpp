@@ -1092,6 +1092,14 @@ GXColor get_sky_color(bool cave_darkness)
     return GXColor{uint8_t(sky_color.r * brightness), uint8_t(sky_color.g * brightness), uint8_t(sky_color.b * brightness), 0xFF};
 }
 
+GXColor get_fog_color()
+{
+    if (render_world && render_world->hell)
+        return GXColor{0x20, 0, 0, 0xFF};
+    float sky_multiplier = get_sky_multiplier();
+    return GXColor{uint8_t(0xC0 * sky_multiplier), uint8_t(0xD8 * sky_multiplier), uint8_t(0xFF * sky_multiplier), 0xFF};
+}
+
 float *get_sunrise_color()
 {
     static float out_color[4] = {0.0F, 0.0F, 0.0F, 0.0F};
@@ -1212,6 +1220,46 @@ void draw_sky()
 
     // Draw sunrise
     draw_sunrise();
+
+    float sky_alpha = get_sky_multiplier();
+    if (sky_alpha > 0.0f)
+    {
+        GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
+
+        // Use short vertex positions with no fractional bits
+        GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, 0);
+
+        // Use default blend mode
+        gertex::set_blending(gertex::GXBlendMode::normal);
+        gertex::set_alpha_cutoff(0);
+
+        transform_view(gertex::get_view_matrix(), get_camera().position);
+
+        float sky_dist = FOG_DISTANCE * 2 / BASE3D_POS_FRAC;
+        GXColor sky_color = get_sky_color();
+
+        // Approach 2: Draw XZ cylinder (without caps) with radius = sky_dist, with 16 faces
+        GX_BeginGroup(GX_TRIANGLES, 48);
+        for (int i = 0; i < 16;)
+        {
+            float v1 = (float)i++ * (float)M_PI * 2.0f / 16.0f;
+            float v2 = (float)i * (float)M_PI * 2.0f / 16.0f;
+            float x1 = std::sin(v1);
+            float z1 = std::cos(v1);
+            float x2 = std::sin(v2);
+            float z2 = std::cos(v2);
+            GX_Vertex(Vertex(Vec3f(x1 * sky_dist, 0, z1 * sky_dist), 0, 1, sky_color.r, sky_color.g, sky_color.b, 0));
+            GX_Vertex(Vertex(Vec3f(x2 * sky_dist, 0, z2 * sky_dist), 1, 1, sky_color.r, sky_color.g, sky_color.b, 0));
+            GX_Vertex(Vertex(Vec3f(0, +1, 0), 1, 0, sky_color.r, sky_color.g, sky_color.b, uint8_t(sky_alpha * 255)));
+        }
+        GX_EndGroup();
+
+        // Restore previous blend params
+        gertex::set_blending(gertex::GXBlendMode::additive);
+        GX_SetAlphaUpdate(GX_FALSE);
+        GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_FALSE);
+        gertex::use_fog(false);
+    }
 
     // Use short vertex positions with fractional bits
     GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, BASE3D_POS_FRAC_BITS);

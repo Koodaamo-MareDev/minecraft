@@ -723,7 +723,7 @@ void UpdateFog()
     gertex::GXState state = gertex::get_state();
     gertex::GXFog fog = gertex::GXFog{true, gertex::GXFogType::linear, state.view.near, state.view.far, state.view.near, state.view.far, background};
 
-    background = get_sky_color();
+    background = get_fog_color();
 
     Block *block = current_world->get_block_at(current_world->player.get_head_blockpos());
     if (block)
