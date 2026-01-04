@@ -47,6 +47,8 @@ extern World *render_world;
 
 void set_render_world(World *world);
 
+void set_smooth_lighting(bool enabled);
+
 Camera &get_camera();
 
 void update_textures();
