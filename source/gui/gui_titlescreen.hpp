@@ -21,11 +21,6 @@ public:
 private:
     std::vector<float> logo_block_z;
     std::vector<float> logo_block_speed;
-    std::vector<GuiButton> buttons;
-    size_t selected_button = 0;
-    bool joystick_pressed = true;
-    int joystick_timer = 0;
-    void navigate(bool left, bool right, bool up, bool down);
     void join_singleplayer();
     void join_multiplayer();
     void options();

@@ -10,8 +10,8 @@ GuiGameOver::GuiGameOver(World *world) : world(world)
     gertex::GXView view = gertex::get_state().view;
 
     int view_height = view.aspect_correction * view.height;
-    buttons.push_back(GuiButton((view.width - 400) / 2, view_height / 4 + 144, 400, 40, "Respawn", std::bind(&GuiGameOver::respawn, this)));
-    buttons.push_back(GuiButton((view.width - 400) / 2, view_height / 4 + 192, 400, 40, "Title menu", std::bind(&GuiGameOver::quit_to_title, this)));
+    buttons.push_back(new GuiButton((view.width - 400) / 2, view_height / 4 + 144, 400, 40, "Respawn", std::bind(&GuiGameOver::respawn, this)));
+    buttons.push_back(new GuiButton((view.width - 400) / 2, view_height / 4 + 192, 400, 40, "Title menu", std::bind(&GuiGameOver::quit_to_title, this)));
 }
 
 void GuiGameOver::draw()
@@ -48,70 +48,12 @@ void GuiGameOver::draw()
     std::string score_text = "§eScore: 0";
     Gui::draw_text_with_shadow((view.width - Gui::text_width(score_text)) / 2, 200, score_text);
 
-    // Draw buttons
-    for (size_t i = 0; i < buttons.size(); i++)
-    {
-        buttons[i].draw(i == selected_button);
-    }
+    Gui::draw_buttons();
 }
 
 void GuiGameOver::update()
 {
-    bool pointer_visible = false;
-    bool confirm = false;
-
-    for (input::Device *dev : input::devices)
-    {
-        if (dev->connected())
-        {
-            if ((dev->get_buttons_down() & input::BUTTON_CONFIRM))
-            {
-                confirm = true;
-            }
-            if (dev->is_pointer_visible())
-            {
-                pointer_visible = true;
-                break;
-            }
-
-            Vec3f left_stick = dev->get_left_stick();
-
-            bool up = left_stick.y > 0.5f;
-            bool down = left_stick.y < -0.5f;
-            navigate(up, down);
-            break;
-        }
-    }
-
-    if (pointer_visible)
-    {
-        // Handle pointer input
-        for (size_t i = 0; i < buttons.size(); i++)
-        {
-            if (buttons[i].contains(cursor_x, cursor_y) && buttons[i].enabled)
-            {
-                selected_button = i;
-                break;
-            }
-        }
-    }
-
-    // Handle button press
-    if (confirm && buttons[selected_button].on_click && buttons[selected_button].enabled)
-    {
-        Sound click_sound = get_sound("random/click");
-        click_sound.position = world->spawn_pos;
-        world->play_sound(click_sound);
-        buttons[selected_button].on_click();
-    }
-}
-
-void GuiGameOver::navigate(bool up, bool down)
-{
-    if (up)
-        selected_button = 0;
-    else if (down)
-        selected_button = 1;
+    Gui::update_buttons();
 }
 
 void GuiGameOver::respawn()

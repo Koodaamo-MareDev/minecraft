@@ -39,8 +39,16 @@ public:
     item::ItemStack interact(item::ItemStack hand, bool right_click) override;
 };
 
+class GuiButton;
+
 class Gui
 {
+protected:
+    std::vector<GuiButton *> buttons;
+    bool joystick_pressed = true;
+    int joystick_timer = 0;
+    size_t selected_button = 0;
+
 public:
     bool quitting = false; // Flag for quitting back to main menu
     SoundSystem *sound_system = nullptr;
@@ -50,13 +58,16 @@ public:
     Gui(uint8_t window_id = 0) : window_id(window_id)
     {
     }
-    virtual ~Gui() = default;
+    virtual ~Gui();
     virtual void draw() = 0;
     virtual void update() = 0;
     virtual bool contains(int x, int y) = 0;
     virtual void close() = 0;
     virtual void refresh() {}
     virtual bool use_cursor() { return true; }
+    virtual void update_buttons();
+    virtual void draw_buttons();
+    virtual void navigate(bool left, bool right, bool up, bool down);
 
     static void init_matrices(float aspect_correction);
     static void fill_rect(int x, int y, int width, int height, GXColor color = {255, 255, 255, 255});
@@ -112,6 +123,16 @@ public:
     bool contains(int mx, int my)
     {
         return mx >= x && mx < x + width && my >= y && my < y + height;
+    }
+
+    int cx()
+    {
+        return x + width / 2;
+    }
+
+    int cy()
+    {
+        return y + height / 2;
     }
 };
 

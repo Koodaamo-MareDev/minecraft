@@ -4,11 +4,24 @@
 #include <ported/Random.hpp>
 #include <ported/SystemTime.hpp>
 #include <util/string_utils.hpp>
+#include <util/input/input.hpp>
+#include <limits>
+#include <sounds.hpp>
+#include <sound.hpp>
 
 gertex::GXMatrix gui_block_matrix;
 gertex::GXMatrix gui_item_matrix;
 
 Gui *Gui::current_gui = nullptr;
+
+Gui::~Gui()
+{
+    for (GuiButton *button : buttons)
+    {
+        if (button)
+            delete button;
+    }
+}
 
 void Gui::init_matrices(float aspect_correction)
 {
@@ -220,6 +233,159 @@ void Gui::draw_container(int x, int y, inventory::Container &Container, gertex::
     for (size_t i = 0; i < Container.size(); i++)
     {
         draw_item(x + (i % 9) * 36, y + (i / 9) * 36, Container[i], viewport);
+    }
+}
+
+void Gui::update_buttons()
+{
+    bool pointer_visible = false;
+    bool confirm = false;
+
+    for (input::Device *dev : input::devices)
+    {
+        if (dev->connected())
+        {
+            if ((dev->get_buttons_down() & input::BUTTON_CONFIRM))
+            {
+                confirm = true;
+            }
+            if (dev->is_pointer_visible())
+            {
+                pointer_visible = true;
+                break;
+            }
+
+            Vec3f left_stick = dev->get_left_stick();
+
+            bool left = left_stick.x < -0.5f;
+            bool right = left_stick.x > 0.5f;
+            bool up = left_stick.y > 0.5f;
+            bool down = left_stick.y < -0.5f;
+            bool prev_joystick_pressed = joystick_pressed;
+            joystick_pressed = left || right || up || down;
+
+            if (joystick_pressed && !prev_joystick_pressed)
+            {
+                joystick_timer = 0;
+                navigate(left, right, up, down);
+            }
+            else if (joystick_pressed)
+            {
+                joystick_timer++;
+                if (joystick_timer > 20 && joystick_timer % 10 == 0)
+                {
+                    navigate(left, right, up, down);
+                }
+            }
+            break;
+        }
+    }
+
+    if (pointer_visible)
+    {
+        // Handle pointer input
+        for (size_t i = 0; i < buttons.size(); i++)
+        {
+            if (buttons[i]->contains(cursor_x, cursor_y) && buttons[i]->enabled)
+            {
+                selected_button = i;
+                break;
+            }
+        }
+    }
+
+    // Handle button press
+    if (confirm && buttons[selected_button]->on_click && buttons[selected_button]->enabled)
+    {
+        if (sound_system)
+        {
+            Sound click_sound = get_sound("random/click");
+            click_sound.position = sound_system->head_position;
+            sound_system->play_sound(click_sound);
+        }
+        buttons[selected_button]->on_click();
+    }
+}
+
+void Gui::draw_buttons()
+{
+    for (size_t i = 0; i < buttons.size(); i++)
+    {
+        buttons[i]->draw(i == selected_button);
+    }
+}
+
+void Gui::navigate(bool left, bool right, bool up, bool down)
+{
+    GuiButton *prev_selected = buttons[selected_button];
+
+    const std::function<bool(GuiButton *, GuiButton *)> conditions[4] = {
+        [](GuiButton *from, GuiButton *to)
+        { return from->x > to->x; },
+        [](GuiButton *from, GuiButton *to)
+        { return from->x < to->x; },
+        [](GuiButton *from, GuiButton *to)
+        { return from->y > to->y; },
+        [](GuiButton *from, GuiButton *to)
+        { return from->y < to->y; }};
+
+    std::function<bool(GuiButton *, GuiButton *)> condition = nullptr;
+
+    bool vertical = false;
+
+    if (left)
+        condition = conditions[0];
+    else if (right)
+        condition = conditions[1];
+    else if (up)
+    {
+        vertical = true;
+        condition = conditions[2];
+    }
+    else if (down)
+    {
+        vertical = true;
+        condition = conditions[3];
+    }
+    else
+        return;
+    int dist = std::numeric_limits<int>::max();
+    std::vector<uint32_t> candidates;
+    for (size_t i = 0; i < buttons.size(); i++)
+    {
+        // Only get buttons on the requested side.
+        if (i != selected_button && buttons[i]->enabled && condition(prev_selected, buttons[i]))
+        {
+            // Sort by distance on the primary axis
+            int d = vertical ? std::abs(buttons[i]->cx() - prev_selected->cx()) : std::abs(buttons[i]->cy() - prev_selected->cy());
+
+            // Secondary axis distance will be used to prevent steep jumps
+            int sec_d = vertical ? std::abs(buttons[i]->cy() - prev_selected->cy()) : std::abs(buttons[i]->cx() - prev_selected->cx());
+            if (d > sec_d)
+                continue;
+
+            if (d < dist)
+            {
+                dist = d;
+                candidates.clear();
+                candidates.push_back(i);
+            }
+            else if (d == dist)
+            {
+                candidates.push_back(i);
+            }
+        }
+    }
+    dist = std::numeric_limits<int>::max();
+    for (uint32_t i : candidates)
+    {
+        // Sort by distance on secondary axis
+        int d = vertical ? std::abs(buttons[i]->cy() - prev_selected->cy()) : std::abs(buttons[i]->cx() - prev_selected->cx());
+        if (d < dist)
+        {
+            dist = d;
+            selected_button = i;
+        }
     }
 }
 

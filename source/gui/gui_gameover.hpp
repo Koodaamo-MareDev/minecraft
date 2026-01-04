@@ -19,10 +19,6 @@ public:
 private:
     World *world = nullptr;
 
-    std::vector<GuiButton> buttons;
-    size_t selected_button = 0;
-
-    void navigate(bool up, bool down);
     void respawn();
     void quit_to_title();
 };
