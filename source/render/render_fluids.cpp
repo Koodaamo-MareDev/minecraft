@@ -206,7 +206,7 @@ int render_fluid(Block *block, const Vec3i &pos, World *world)
         {(local_pos + Vec3f{-.5f, -.5f + corner_tops[0], -.5f}), (tex_off_x + cos_angle - sin_angle), (tex_off_y - cos_angle - sin_angle)},
     };
     if (!is_same_fluid(block_id, neighbor_ids[FACE_PY]))
-        faceCount += DrawHorizontalQuad(topPlaneCoords[0], topPlaneCoords[1], topPlaneCoords[2], topPlaneCoords[3], is_solid(neighbor_ids[FACE_PY]) ? light : neighbors[FACE_PY]->light);
+        faceCount += DrawHorizontalQuad(topPlaneCoords[0], topPlaneCoords[1], topPlaneCoords[2], topPlaneCoords[3], !neighbors[FACE_PY] || is_solid(neighbor_ids[FACE_PY]) ? light : neighbors[FACE_PY]->light);
 
     texture_offset = get_default_texture_index(flowfluid(block_id));
 
