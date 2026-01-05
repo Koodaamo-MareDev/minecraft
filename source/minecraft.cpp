@@ -767,25 +767,21 @@ void UpdateGUI(gertex::GXView &viewport)
 {
     if (!Gui::get_gui())
         return;
-
-    for (input::Device *dev : input::devices)
-    {
-        if (dev->connected())
+    if (Gui::get_gui()->use_cursor())
+        for (input::Device *dev : input::devices)
         {
-            // Update the cursor position based on the left stick
-            Vec3f left_stick = dev->get_left_stick();
-            cursor_x += left_stick.x * 8;
-            cursor_y -= left_stick.y * 8;
-
-            // Override the cursor position with the pointer position if applicable
-            if (dev->is_pointer_visible())
+            if (dev->connected())
             {
+                // Update the cursor position based on the left stick
+                Vec3f left_stick = dev->get_left_stick();
+                cursor_x += left_stick.x * 8;
+                cursor_y -= left_stick.y * 8;
+
                 // Since you can technically go out of bounds using a joystick, we need to clamp the cursor position; it'd be really annoying losing the cursor
                 cursor_x = std::clamp(cursor_x, 0, int(viewport.width / viewport.aspect_correction));
                 cursor_y = std::clamp(cursor_y, 0, int(viewport.height));
             }
         }
-    }
     Gui::get_gui()->update();
 }
 
