@@ -29,6 +29,7 @@
 #include "block/blocks.hpp"
 
 void *frameBuffer[2] = {NULL, NULL};
+static int fb = 0;
 static GXRModeObj *rmode = NULL;
 
 static World *current_world = nullptr;
@@ -180,8 +181,6 @@ void MainGameLoop()
             current_world->create();
         }
     }
-
-    uint32_t fb = 0;
 
     bool in_game = true;
 
@@ -335,7 +334,6 @@ int main(int argc, char **argv)
 
     while (!isExiting)
     {
-        int fb = 0;
         GuiTitleScreen *titlescreen = new GuiTitleScreen(&current_world);
         Gui::set_gui(titlescreen);
         set_render_world(nullptr);
