@@ -77,29 +77,16 @@ void busy_wait(std::function<void()> blocking_call, Gui *gui)
     GX_InvalidateTexAll();
     GX_InvVtxCache();
     GX_Flush();
-    LWP_CreateThread(&thread_handle, wrapper, NULL, NULL, 0, 50);
+    // Use a lower priority (higher number) for the worker thread so the main thread can update the screen
+    LWP_CreateThread(&thread_handle, wrapper, NULL, NULL, 0, 80);
 
-    auto suspend_threadcallback = [](u32)
-    {
-        if (LWP_GetSelf() != thread_handle && !thread_done && thread_handle != LWP_THREAD_NULL)
-        {
-            if (LWP_SuspendThread(thread_handle) == 0)
-            {
-                draw_busy_gui();
-                LWP_ResumeThread(thread_handle);
-            }
-        }
-    };
-
-    // Install
-    VIRetraceCallback old_cb = VIDEO_SetPostRetraceCallback(suspend_threadcallback);
     while (!thread_done)
     {
+        draw_busy_gui();
         VIDEO_WaitVSync();
     }
 
-    // Clean up
-    VIDEO_SetPostRetraceCallback(old_cb);
     Gui::set_gui(nullptr);
+    LWP_JoinThread(thread_handle, NULL);
     thread_handle = LWP_THREAD_NULL;
 }
