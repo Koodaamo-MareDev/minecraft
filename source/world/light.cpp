@@ -96,7 +96,12 @@ void LightEngine::post(const Vec3i &location)
     if (!chunk)
         return;
     ++chunk->light_update_count;
-    pending_updates.push_back(location);
+
+    // Approximate the importance of the update in the queue by distance.
+    if (chunk->player_taxicab_distance() > 32)
+        pending_updates.push_back(location);
+    else
+        pending_updates.push_front(location);
 }
 
 /*
