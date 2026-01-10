@@ -28,8 +28,8 @@ GuiTitleScreen::GuiTitleScreen(World **current_world)
     buttons.push_back(new GuiButton((view.width - 400) / 2, view_height / 2 - 24, 400, 40, "Singleplayer", std::bind(&GuiTitleScreen::join_singleplayer, this)));
     buttons.push_back(new GuiButton((view.width - 400) / 2, view_height / 2 + 24, 400, 40, "Multiplayer", std::bind(&GuiTitleScreen::join_multiplayer, this)));
     buttons.push_back(new GuiButton((view.width - 400) / 2, view_height / 2 + 72, 400, 40, "Mods and Texture Packs", []() {}));
-    buttons.push_back(new GuiButton((view.width - 400) / 2, view_height / 2 + 144, 196, 40, "Options", std::bind(&GuiTitleScreen::options, this)));
-    buttons.push_back(new GuiButton((view.width - 400) / 2 + 204, view_height / 2 + 144, 196, 40, "Quit Game", std::bind(&GuiTitleScreen::quit_game, this)));
+    buttons.push_back(new GuiButton((view.width - 400) / 2, std::min(view_height / 2 + 144, view_height - 48), 196, 40, "Options", std::bind(&GuiTitleScreen::options, this)));
+    buttons.push_back(new GuiButton((view.width - 400) / 2 + 204, std::min(view_height / 2 + 144, view_height - 48), 196, 40, "Quit Game", std::bind(&GuiTitleScreen::quit_game, this)));
     buttons[2]->enabled = false;
 
     // Randomize the initial Z positions of the logo blocks
