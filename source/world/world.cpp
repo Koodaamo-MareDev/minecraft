@@ -1004,10 +1004,16 @@ void World::draw_scene(bool opaque)
             // Override texture index for the block breaking animation
             override_texture_index(240 + (int)(player.mining_progress * 10.0f));
 
+            // Setup TEV for decal rendering
+            GX_SetNumTevStages(1);
+            GX_SetTevOp(GX_TEVSTAGE0, GX_DECAL);
+
             render_single_block(targeted_block_copy, !opaque);
 
             // Reset texture index override
             override_texture_index(-1);
+
+            gertex::tev_reset();
 
             // Restore the previous state
             gertex::set_state(state);
