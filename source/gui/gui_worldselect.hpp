@@ -33,8 +33,6 @@ protected:
     std::vector<WorldInfo> world_list;
     World **current_world;
 private:
-    bool joystick_released = true;
-    int joystick_timer = 0;
     int scroll_offset = 0;
 };
 

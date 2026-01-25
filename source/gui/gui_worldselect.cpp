@@ -194,24 +194,24 @@ void GuiWorldSelect::update()
             }
 
             Vec3f left_stick = dev->get_left_stick();
-            if (left_stick.y < -0.5f && joystick_released)
+            if (left_stick.y < -0.5f && !joystick_pressed)
             {
-                joystick_released = false;
+                joystick_pressed = true;
                 joystick_timer = 0;
                 selected_world = selected_world + 1 < world_list.size() ? selected_world + 1 : selected_world;
             }
-            else if (left_stick.y > 0.5f && joystick_released)
+            else if (left_stick.y > 0.5f && !joystick_pressed)
             {
-                joystick_released = false;
+                joystick_pressed = true;
                 joystick_timer = 0;
                 selected_world = (selected_world == 0) ? 0 : selected_world - 1;
             }
             else if (std::abs(left_stick.y) < 0.5f)
             {
-                joystick_released = true;
+                joystick_pressed = false;
                 joystick_timer = 0;
             }
-            else if (!joystick_released)
+            else if (joystick_pressed)
             {
                 joystick_timer++;
                 if (joystick_timer > 20 && joystick_timer % 15 == 0)
