@@ -127,6 +127,7 @@ namespace gertex
 
         void apply();
     };
+    void tev_reset();
     void init(GXRModeObj *rmode, float fov = 90, float near = CAMERA_NEAR, float far = CAMERA_FAR, bool apply_defaults = true);
     void use_defaults();
 
