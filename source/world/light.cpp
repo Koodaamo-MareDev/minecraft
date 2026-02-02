@@ -10,11 +10,13 @@
 #include <cmath>
 #include <sys/unistd.h>
 #include <gccore.h>
-#include <deque>
+#include <stack>
+#include <unordered_set>
 #include <algorithm>
 #include <list>
 #include <cstdio>
 #include <set>
+#include <ported/SystemTime.hpp>
 
 lwp_t LightEngine::thread_handle = 0;
 bool LightEngine::thread_active = false;
@@ -68,7 +70,7 @@ void LightEngine::loop()
     {
         Vec3i current = pending_updates.front();
         pending_updates.pop_front();
-        update(current);
+        update_optimized(current);
         if ((++updates & 1023) == 0)
         {
             if (time_diff_us(start, time_get()) > 100)
@@ -95,203 +97,231 @@ void LightEngine::post(const Vec3i &location)
     Chunk *chunk = current_world->get_chunk_from_pos(location);
     if (!chunk)
         return;
-    ++chunk->light_update_count;
-
-    // Approximate the importance of the update in the queue by distance.
-    if (chunk->player_taxicab_distance() > 32)
-        pending_updates.push_back(location);
-    else
-        pending_updates.push_front(location);
+    //++chunk->light_update_count;
+    pending_updates.push_back(location);
 }
 
 /*
- *  This was a pain to implement - I will not be maintaining this myself.
- *  Although it's mostly rewritten by AI, it works and seems to be faster
- *  than any other implementation that I could find online in 2025.
+ *  Copied from CavEX:
+ *  https://github.com/xtreme8000/CavEX/blob/master/source/lighting.c
+ */
+static inline int8_t MAX_I8(int8_t a, int8_t b)
+{
+    return a > b ? a : b;
+}
+
+/*
+ *  This code is HEAVILY inspired by the CavEX source code by xtreme8000
+ *  The code can be obtained from the following GitHub repository:
+ *  https://github.com/xtreme8000/CavEX/
+ *  I prefer it because not only does it work well, it's significantly
+ *  faster than any other implementation that I could find online.
  */
 void LightEngine::update(const Vec3i &update)
 {
+    std::set<Vec3i> affected_sections;
+    std::deque<Vec3i> light_updates;
+    std::deque<Chunk *> &chunks = current_world->chunks;
     Chunk *origin_chunk = current_world->get_chunk_from_pos(update);
     if (!origin_chunk)
         return;
-    --origin_chunk->light_update_count;
+    //--origin.chunk->light_update_count;
 
-    /*
-     * Simple cache system for a subset of chunks near
-     * the light update. This relies on the fact that
-     * light updates can only affect blocks within 15
-     * blocks (taxicab).
-     */
-    std::vector<Chunk *> nearby_chunks;
-    for (int x = -16; x <= 16; x += 16)
+    affected_sections.insert(Vec3i(update.x & ~15, update.y & ~15, update.z & ~15));
+    light_updates.push_back(update);
+    while (light_updates.size() > 0)
     {
-        for (int z = -16; z <= 16; z += 16)
-        {
-            Chunk *chunk = current_world->get_chunk_from_pos(update + Vec3i(x, 0, z));
-            if (chunk && std::find(nearby_chunks.begin(), nearby_chunks.end(), chunk) == nearby_chunks.end())
-                nearby_chunks.push_back(chunk);
-        }
-    }
-
-    auto get_nearby_chunk = [&](int x, int z) -> Chunk *
-    {
-        for (Chunk *chunk : nearby_chunks)
-        {
-            if (chunk->x == x && chunk->z == z)
-                return chunk;
-        }
-        return nullptr;
-    };
-
-    auto get_neighbors = [&](const Vec3i &pos, Block *neighbors[6])
-    {
-        for (int i = 0; i < 6; i++)
-        {
-            Chunk *chunk = get_nearby_chunk((pos.x + face_offsets[i].x) >> 4, (pos.z + face_offsets[i].z) >> 4);
-            if (!chunk)
-                neighbors[i] = nullptr;
-            else
-                neighbors[i] = chunk->get_block(pos + face_offsets[i]);
-        }
-    };
-
-    Block *source_block = origin_chunk->get_block(update);
-    uint8_t old_skylight = source_block->sky_light;
-    uint8_t old_blocklight = source_block->block_light;
-
-    // Set source block's light to its own emission value.
-    // Propagation will handle light from neighbors.
-    uint8_t initial_blocklight = properties(source_block->id).m_luminance;
-    uint8_t initial_skylight = (use_skylight && update.y >= origin_chunk->height_map[LightUpdateNode(update).lightmap_index()]) ? 0xF : 0;
-
-    source_block->light = (initial_skylight << 4) | initial_blocklight;
-
-    std::deque<LightRemoveNode> remove_queue;
-    std::deque<LightUpdateNode> prop_queue;
-    std::set<Vec3i> prop_set;
-
-    // --- Queue Initialization ---
-    if (initial_skylight < old_skylight)
-        remove_queue.emplace_back(update, old_skylight, true);
-
-    if (initial_blocklight < old_blocklight)
-        remove_queue.emplace_back(update, old_blocklight, false);
-
-    prop_queue.emplace_back(update);
-    prop_set.insert(update);
-
-    std::set<Section *> affected_sections;
-    affected_sections.insert(&origin_chunk->sections[(update.y >> 4) & 7]);
-    // --- Removal Pass ---
-    while (!remove_queue.empty())
-    {
-        LightRemoveNode current = remove_queue.front();
-        remove_queue.pop_front();
-
-        for (int i = 0; i < 6; i++)
-        {
-            Vec3i neighbor_pos = current.location + face_offsets[i];
-            Chunk *neighbor_chunk = get_nearby_chunk(neighbor_pos.x >> 4, neighbor_pos.z >> 4);
-            if (!neighbor_chunk)
-                continue;
-            Block *neighbor_block = neighbor_chunk->get_block(neighbor_pos);
-            if (!neighbor_block)
-                continue;
-
-            uint8_t neighbor_level = current.is_sky ? neighbor_block->sky_light : neighbor_block->block_light;
-
-            if (neighbor_level > 0)
-            {
-                // If the neighbor's light level is dimmer than the light being removed,
-                // it was likely lit by this path.
-                if (neighbor_level < current.level)
-                {
-                    uint8_t old_neighbor_level = neighbor_level;
-                    (current.is_sky ? neighbor_block->sky_light : neighbor_block->block_light) = 0;
-                    affected_sections.insert(&neighbor_chunk->sections[(neighbor_pos.y >> 4) & 7]);
-                    remove_queue.emplace_back(neighbor_pos, old_neighbor_level, current.is_sky);
-                }
-                else
-                {
-                    // This neighbor is a potential light source for the propagation pass.
-                    if (prop_set.find(neighbor_pos) == prop_set.end())
-                    {
-                        prop_queue.emplace_back(neighbor_pos);
-                        prop_set.insert(neighbor_pos);
-                    }
-                }
-            }
-        }
-    }
-
-    // --- Propagation Pass ---
-    while (!prop_queue.empty())
-    {
-        LightUpdateNode current = prop_queue.front();
-        prop_queue.pop_front();
-        prop_set.erase(current.location);
-
         if (!thread_active)
+            return;
+        Vec3i current = light_updates.front();
+        light_updates.pop_front();
+        if (current.y < 0 || current.y > MAX_WORLD_Y)
             continue;
-        Chunk *chunk = get_nearby_chunk(current.location.x >> 4, current.location.z >> 4);
 
-        if (!chunk || current.location.y < 0)
+        Chunk *chunk = current_world->get_chunk_from_pos(current);
+        if (std::find(chunks.begin(), chunks.end(), chunk) == chunks.end()) // FIXME: This is a hacky way
+            return;                                                         // to check if the chunk is valid
+
+        if (!chunk)
             continue;
 
-        Block *current_block = chunk->get_block(current.location);
-        uint8_t old_prop_light = current_block->light;
+        Block *block = chunk->get_block(current);
 
-        // Recalculate light for the current propagation node
-        uint8_t prop_skylight = (use_skylight && current.location.y >= chunk->height_map[current.lightmap_index()]) ? 0xF : 0;
-        uint8_t prop_blocklight = properties(current_block->id).m_luminance;
+        uint8_t new_skylight = 0;
+        uint8_t new_blocklight = properties(block->id).m_luminance;
 
-        Block *prop_neighbors[6];
-        get_neighbors(current.location, prop_neighbors);
-        int8_t prop_opacity = get_block_opacity(current_block->get_blockid());
+        if (use_skylight && current.y >= chunk->height_map[(current.x & 15) | ((current.z & 15) << 4)])
+            new_skylight = 0xF;
+        Block *neighbors[6];
+        current_world->get_neighbors(current, neighbors);
 
-        if (prop_opacity < 15)
+        int8_t opacity = get_block_opacity(block->get_blockid());
+        if (block->id == BlockID::air || can_see_through(properties(block->id)))
         {
-            prop_opacity = std::max<int8_t>(prop_opacity, 1);
+            opacity = MAX_I8(opacity, 1);
             for (int i = 0; i < 6; i++)
             {
-                if (!prop_neighbors[i])
+                if (!neighbors[i])
                     continue;
-                prop_skylight = std::max<int8_t>(prop_skylight, std::max<int8_t>(prop_neighbors[i]->sky_light - prop_opacity, 0));
-                prop_blocklight = std::max<int8_t>(prop_blocklight, std::max<int8_t>(prop_neighbors[i]->block_light - prop_opacity, 0));
+                new_skylight = MAX_I8(MAX_I8(neighbors[i]->sky_light - opacity, 0), new_skylight);
+                new_blocklight = MAX_I8(MAX_I8(neighbors[i]->block_light - opacity, 0), new_blocklight);
             }
         }
-        uint8_t prop_new_light = (prop_skylight << 4) | prop_blocklight;
 
-        // Only propagate if the new light is stronger
-        if (prop_new_light > old_prop_light || current.location == update)
+        uint8_t new_light = (new_skylight << 4) | new_blocklight;
+
+        if (block->light != new_light || update == current)
         {
-            current_block->light = prop_new_light;
+            block->light = new_light;
+            affected_sections.insert(Vec3i(current.x & ~15, current.y & ~15, current.z & ~15));
             for (int i = 0; i < 6; i++)
             {
-                if (prop_neighbors[i])
+                if (neighbors[i])
                 {
-                    Vec3i new_pos = current.location + face_offsets[i];
-                    if (prop_set.find(new_pos) == prop_set.end())
-                    {
-                        prop_queue.emplace_back(new_pos);
-                        prop_set.insert(new_pos);
-                    }
-                    affected_sections.insert(&get_nearby_chunk(new_pos.x >> 4, new_pos.z >> 4)->sections[(new_pos.y >> 4) & 7]);
+                    light_updates.push_back(current + face_offsets[i]);
                 }
             }
         }
     }
-    while (!affected_sections.empty())
+    for (auto sect : affected_sections)
     {
-        auto first = affected_sections.begin();
-        Section *sect = *first;
-        if (sect && sect->chunk && sect->chunk->state != ChunkState::invalid)
-            sect->dirty = true;
-        affected_sections.erase(first);
+        for (int x = sect.x - 1; x <= sect.x + 1; x++)
+        {
+            for (int z = sect.z - 1; z <= sect.z + 1; z++)
+            {
+                Chunk *chunk = current_world->get_chunk_from_pos(Vec3i(x, 0, z));
+                if (!chunk)
+                    continue;
+                for (int y = update.y - 1; y <= update.y + 1; y++)
+                {
+                    // Skip non-adjacent sections if smooth lighting is disabled
+                    if (!current_world->smooth_lighting && std::abs(x - update.x) + std::abs(z - update.z) + std::abs(y - update.y) > 1)
+                        continue;
+                    if (y < 0 || y > MAX_WORLD_Y)
+                        continue;
+                    chunk->sections[y >> 4].dirty = true;
+                }
+            }
+        }
     }
 }
-
-uint8_t LightUpdateNode::lightmap_index()
+static ChunkCache build_chunk_cache(World *world, int cx, int cz)
 {
-    return (location.x & 0xF) | ((location.z & 0xF) << 4);
+    ChunkCache cache{};
+    cache.base_cx = cx;
+    cache.base_cz = cz;
+
+    for (int dz = -1; dz <= 1; dz++)
+    {
+        for (int dx = -1; dx <= 1; dx++)
+        {
+            cache.chunks[dx + 1][dz + 1] =
+                world->get_chunk(cx + dx, cz + dz);
+        }
+    }
+    return cache;
+}
+
+inline Block *get_block_cached(
+    ChunkCache &cache,
+    int x, int y, int z,
+    Chunk *&out_chunk)
+{
+    if (y < 0 || y > MAX_WORLD_Y)
+        return nullptr;
+
+    int cx = x >> 4;
+    int cz = z >> 4;
+
+    int dx = cx - cache.base_cx;
+    int dz = cz - cache.base_cz;
+
+    if ((unsigned)(dx + 1) > 2 || (unsigned)(dz + 1) > 2)
+        return nullptr;
+
+    Chunk *chunk = cache.chunks[dx + 1][dz + 1];
+    if (!chunk)
+        return nullptr;
+
+    out_chunk = chunk;
+    return &chunk->blockstates[(y << 8) | ((z & 15) << 4) | (x & 15)];
+}
+void LightEngine::update_optimized(const Vec3i &start)
+{
+    int start_cx = start.x >> 4;
+    int start_cz = start.z >> 4;
+
+    ChunkCache cache = build_chunk_cache(current_world, start_cx, start_cz);
+    Chunk *start_chunk = cache.chunks[1][1];
+    if (!start_chunk)
+        return;
+    std::deque<LightNode> stack;
+    stack.push_back({start.x, start.y, start.z});
+
+    while (!stack.empty())
+    {
+        LightNode n = stack.front();
+        stack.pop_front();
+
+        Chunk *chunk = nullptr;
+        Block *block = get_block_cached(cache, n.x, n.y, n.z, chunk);
+        if (!block)
+            continue;
+
+        uint8_t old_light = block->light;
+
+        uint8_t sky = 0;
+        uint8_t torch = properties(block->id).m_luminance;
+
+        if (use_skylight && n.y >= chunk->height_map[(n.z & 15) << 4 | (n.x & 15)])
+            sky = 0xF;
+
+        if (!block->id || can_see_through(properties(block->id)))
+        {
+            int8_t opacity = MAX_I8(get_block_opacity(block->get_blockid()), 1);
+
+            for (int i = 0; i < 6; i++)
+            {
+                const Vec3i &o = face_offsets[i];
+                Chunk *n_chunk;
+                Block *nb = get_block_cached(cache, n.x + o.x, n.y + o.y, n.z + o.z, n_chunk);
+                if (!nb)
+                    continue;
+
+                sky = MAX_I8(sky, MAX_I8(nb->sky_light - opacity, 0));
+                torch = MAX_I8(torch, MAX_I8(nb->block_light - opacity, 0));
+            }
+        }
+
+        uint8_t new_light = (sky << 4) | torch;
+        if (new_light == old_light && !(n.x == start.x && n.y == start.y && n.z == start.z))
+            continue;
+
+        block->light = new_light;
+
+        for (int i = 0; i < 6; i++)
+        {
+            const Vec3i &o = face_offsets[i];
+            Chunk *nchunk = nullptr;
+            Block *nblock = nullptr;
+            if ((nblock = get_block_cached(cache, n.x + o.x, n.y + o.y, n.z + o.z, nchunk)))
+            {
+                stack.push_back({n.x + o.x, n.y + o.y, n.z + o.z});
+
+                nchunk->sections[std::clamp((n.y + o.y) >> 4, 0, VERTICAL_SECTION_COUNT - 1)].dirty = true;
+                // Apply to neighbors if at chunk border
+                if (current_world->smooth_lighting)
+                    for (int j = 0; j < 6; j++)
+                    {
+                        const Vec3i &o2 = face_offsets[j];
+                        Chunk *nchunk2 = nullptr;
+                        if (get_block_cached(cache, n.x + o.x + o2.x, n.y + o.y + o2.y, n.z + o.z + o2.z, nchunk2) && nchunk2 != nchunk)
+                        {
+                            if ((n.y + o.y + o2.y) >> 4 != (n.y + o2.y) >> 4)
+                                nchunk2->sections[std::clamp((n.y + o.y + o2.y) >> 4, 0, VERTICAL_SECTION_COUNT - 1)].dirty = true;
+                        }
+                    }
+            }
+        }
+    }
 }

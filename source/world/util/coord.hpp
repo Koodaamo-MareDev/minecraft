@@ -49,25 +49,17 @@ struct Coord
         coords.y = pos.y & 0xFF;
     }
 
-    Coord(int16_t packed, Chunk *chunk = nullptr) : _index(packed), chunk(chunk)
-    {
-    }
-
-    Coord(uint16_t packed, Chunk *chunk = nullptr) : index(packed), chunk(chunk)
-    {
-    }
-
-    operator int16_t() const
+    int16_t s16() const
     {
         return _index;
     }
 
-    operator uint16_t() const
+    uint16_t u16() const
     {
         return index;
     }
 
-    operator Vec3i() const;
+    Vec3i vec() const;
 };
 
 #endif

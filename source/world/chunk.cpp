@@ -70,52 +70,33 @@ void Chunk::remove_tile_entity(TileEntity *entity)
 
 void Chunk::update_height_map(Vec3i pos)
 {
-    pos.x &= 15;
-    pos.z &= 15;
-    uint8_t *height = &height_map[pos.x | (pos.z << 4)];
-    BlockID id = get_block(pos)->get_blockid();
-    if (id != BlockID::air && (!can_see_through(properties(id)) || get_block_opacity(id) > 0))
-    {
-        if (pos.y >= *height)
-            *height = pos.y + 1;
-    }
-    else if (pos.y < *height)
-    {
-        while (*height > 0)
-        {
-            pos.y = *height - 1;
-            id = get_block(pos)->get_blockid();
-            if (id != BlockID::air && (!can_see_through(properties(id)) || get_block_opacity(id) > 0))
-                break;
-            (*height)--;
-        }
-    }
+    height_map[(pos.x & 0xF) | ((pos.z & 0xF) << 4)] = skycast_fast(Vec3i(pos.x, 0, pos.z), this) + 1;
 }
 
 void Chunk::light_up()
 {
     if (!this->lit_state)
     {
-        Coord pos = Coord(Vec3i(), this);
+        std::memset(height_map, MAX_WORLD_Y, 256);
         for (int i = 0; i < 256; i++)
         {
-            pos.coords.h_index = i;
-            int end_y = skycast(Vec3i(pos.coords.x, 0, pos.coords.z), this);
-            if (end_y >= MAX_WORLD_Y || end_y <= 0)
-                return;
-            this->height_map[i] = end_y + 1;
-            for (pos.coords.y = MAX_WORLD_Y; pos.coords.y > end_y; pos.coords.y--)
+            update_height_map(Vec3i(i & 15, 0, (i >> 4) & 15));
+            Block *low_block = &blockstates[i];
+            Block *high_block = &low_block[MAX_WORLD_Y << 8];
+            Block *max_height_block = &low_block[int(height_map[i]) << 8];
+            for (Block *block = high_block; block >= max_height_block; block -= 256)
             {
-                this->blockstates[uint16_t(pos)].sky_light = 15;
+                block->sky_light = 15;
             }
 
             // Update top-most block under daylight
+            Vec3i pos = Vec3i((i & 15) | (this->x << 4), height_map[i], ((i >> 4) & 15) | (this->z << 4));
             LightEngine::post(pos);
 
             // Update block lights
-            for (pos.coords.y = 0; pos.coords.y < end_y; pos.coords.y++)
+            pos.y = 0;
+            for (Block *block = low_block; block < max_height_block; block += 256, pos.y++)
             {
-                Block *block = &this->blockstates[uint16_t(pos)];
                 if (get_block_luminance(block->get_blockid()))
                 {
                     LightEngine::post(pos);
@@ -128,15 +109,12 @@ void Chunk::light_up()
 
 void Chunk::recalculate_height_map()
 {
-    Coord pos = Coord(Vec3i(), this);
-    for (int i = 0; i < 256; i++)
-    {
-        pos.coords.h_index = i;
-        int end_y = skycast(Vec3i(pos), this);
-        if (end_y >= MAX_WORLD_Y || end_y <= 0)
-            return;
-        this->height_map[i] = end_y + 1;
-    }
+    std::memset(height_map, MAX_WORLD_Y, 256);
+    for (int x = 0; x < 16; x++)
+        for (int z = 0; z < 16; z++)
+        {
+            update_height_map(Vec3i(x, 0, z));
+        }
 }
 
 void Chunk::recalculate_visibility(Block *block, Vec3i pos)

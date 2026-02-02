@@ -12,16 +12,9 @@ const GXColor sky_color = {0x88, 0xBB, 0xFF, 0xFF};
 
 World *render_world = nullptr;
 
-static bool smooth_lighting = true;
-
 void set_render_world(World *world)
 {
     render_world = world;
-}
-
-void set_smooth_lighting(bool enabled)
-{
-    smooth_lighting = enabled;
 }
 
 Camera &get_camera()
@@ -307,7 +300,9 @@ void get_face(Vec3i pos, uint8_t face, uint32_t texture_index, Block *block, uin
     uint8_t lighting[4] = {light_val, light_val, light_val, light_val};
     Vertex16 vertices[4];
     uint8_t index = 0;
-#define SMOOTH(ao_tgt) if(smooth_lighting) smooth_light(pos, face, cube_vertex_offsets[face][index], block, lighting[index], ao_tgt[index])
+#define SMOOTH(ao_tgt)   \
+    if (render_world && render_world->smooth_lighting) \
+    smooth_light(pos, face, cube_vertex_offsets[face][index], block, lighting[index], ao_tgt[index])
     if ((face & ~1) != FACE_NY)
     {
         // Side faces

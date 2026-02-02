@@ -1737,7 +1737,7 @@ void World::init_chunk_manager(ChunkProvider *chunk_provider)
         {
             while (world->pending_chunks.empty())
             {
-                LWP_YieldThread();
+                usleep(10000);
                 if (!world->run_chunk_manager)
                 {
                     return NULL;

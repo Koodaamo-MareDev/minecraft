@@ -1,7 +1,7 @@
 #include "coord.hpp"
 #include <world/chunk.hpp>
 
-Coord::operator Vec3i() const
+Vec3i Coord::vec() const
 {
     if (!chunk)
         return Vec3i(coords.x, coords.y, coords.z);

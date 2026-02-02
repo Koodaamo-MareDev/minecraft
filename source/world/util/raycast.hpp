@@ -90,7 +90,7 @@ inline int skycast_safe(Vec3i pos, Chunk *chunk = nullptr, World *world = nullpt
 // Assume chunk != null, xzy-ordered coordinates, 0 < x < 16, same for z
 inline int skycast_fast(Vec3i pos, Chunk *chunk)
 {
-    Block *last = &chunk->blockstates[pos.x | (pos.z << 4)];
+    Block *last = &chunk->blockstates[(pos.x & 15) | ((pos.z & 15) << 4)];
     Block *curr = &last[(MAX_WORLD_Y << 8)];
     while (curr != last && !block_properties[curr->id].m_opacity)
         curr -= 256;
