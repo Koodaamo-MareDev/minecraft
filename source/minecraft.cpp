@@ -682,6 +682,21 @@ void DrawDebugInfo(gertex::GXView &viewport)
     std::string resolution_str = std::to_string(int(viewport.width)) + "x" + std::to_string(int(viewport.height));
     std::string widescreen_str = viewport.widescreen ? " Widescreen" : "";
     Gui::draw_text_with_shadow(0, viewport.ystart + 32, resolution_str + widescreen_str);
+
+    if (current_world && current_world->player.chunk)
+    {
+        Block *block = current_world->get_block_at(current_world->player.get_foot_blockpos());
+        if (block)
+        {
+            int height_index = (int(current_world->player.position.x) & 0xF) | ((int(current_world->player.position.z) & 0xF) << 4);
+            int height = current_world->player.chunk->height_map[height_index];
+            std::string height_str = "Y:" + std::to_string(int(current_world->player.aabb.min.y)) +
+                                     ", H:" + std::to_string(height) +
+                                     ", B: " + std::to_string(block->block_light) +
+                                     ", S: " + std::to_string(block->sky_light);
+            Gui::draw_text_with_shadow(viewport.width - Gui::text_width(height_str), viewport.ystart + 32, height_str);
+        }
+    }
 }
 
 void UpdateCamera()
