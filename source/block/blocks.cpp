@@ -1135,7 +1135,7 @@ Sound get_break_sound(BlockID block_id)
         sound = randomize_sound("step/cloth", 4);
         break;
     case SoundType::glass:
-        sound = randomize_sound("step/glass", 3);
+        sound = randomize_sound("random/glass", 3);
         break;
     case SoundType::grass:
         sound = randomize_sound("step/grass", 4);
