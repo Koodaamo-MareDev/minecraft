@@ -69,9 +69,15 @@ namespace crafting
             int16_t meta = 0;
             uint8_t count = 1;
 
+            // Support for newer recipe json
+            if (item.is_string())
+                return item::ItemStack(name_to_id(item), count, meta);
+
             // The item should at least contain the id.
             if (item.contains("item"))
                 id = name_to_id(item["item"]);
+            else if (item.contains("id"))
+                id = name_to_id(item["id"]);
             else
                 throw std::runtime_error("Missing item id");
 
@@ -92,7 +98,7 @@ namespace crafting
         nlohmann::json recipe_json;
         file >> recipe_json;
         std::string type = recipe_json["type"];
-
+        type = type.substr(type.find(':') + 1);
         if (type == "crafting_shapeless")
         {
             nlohmann::json ingredients = recipe_json["ingredients"];
