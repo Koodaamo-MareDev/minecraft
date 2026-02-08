@@ -4,6 +4,7 @@
 #include <crafting/recipe_manager.hpp>
 #include <block/block_properties.hpp>
 #include <item/item_id.hpp>
+#include <gui/gui_smelting.hpp>
 
 NBTTagCompound *TileEntityFurnace::serialize()
 {
@@ -123,7 +124,9 @@ void TileEntityFurnace::tick(World *world)
     }
     if (updated)
     {
-        // TODO: Update GUI
+        GuiSmelting *gui = dynamic_cast<GuiSmelting *>(Gui::get_gui());
+        if (gui && gui->furnace == this)
+            gui->refresh();
     }
 }
 
@@ -134,5 +137,7 @@ std::string TileEntityFurnace::id()
 
 TileEntityFurnace::~TileEntityFurnace()
 {
-    // TODO: Remove any associated GUI instance.
+    GuiSmelting *gui = dynamic_cast<GuiSmelting *>(Gui::get_gui());
+    if (gui && gui->furnace == this)
+        gui->set_gui(nullptr);
 }
