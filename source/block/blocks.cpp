@@ -185,10 +185,10 @@ uint32_t get_face_texture_index(Block *block, int face)
     case BlockID::furnace:
     case BlockID::lit_furnace:
     {
-        int block_direction = block->meta & 3;
+        int block_direction = block->meta % 6;
         if (face == FACE_NY || face == FACE_PY)
             return 62;
-        if (face == directionmap[block_direction])
+        if (face == facingmap[block_direction])
             return get_default_texture_index(blockid);
         return 45;
     }
@@ -744,9 +744,8 @@ void furnace_added(World *world, const Vec3i &pos, Block &block)
     furnace_entity->chunk = chunk;
     chunk->tile_entities.push_back(furnace_entity);
 
-    int facing = int(world->player.rotation.y / 90) % 4;
-    const uint8_t facing_map[] = {2, 0, 3, 1};
-    // NX, PX, NZ, PZ
+    int facing = int(world->player.rotation.y / 90 + 0.5) & 3;
+    const uint8_t facing_map[] = {3, 5, 2, 4};
     chunk->get_block(pos)->meta = facing_map[facing];
 }
 
