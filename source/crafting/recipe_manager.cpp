@@ -159,6 +159,16 @@ namespace crafting
 
             shaped_recipes.push_back(ShapedRecipe(Input(width, height, recipe), result_item));
         }
+        else if (type == "smelting")
+        {
+            nlohmann::json input = recipe_json["ingredient"];
+            nlohmann::json result = recipe_json["result"];
+
+            item::ItemStack input_item = json_to_item(input);
+            item::ItemStack result_item = json_to_item(result);
+
+            furnace_recipes.push_back(FurnaceRecipe(input_item, result_item));
+        }
     }
 
     // See https://minecraft-ids.grahamedgecombe.com/api
@@ -201,6 +211,18 @@ namespace crafting
         }
 
         // No matches found.
+        return item::ItemStack();
+    }
+
+    item::ItemStack RecipeManager::smelt(item::ItemStack input)
+    {
+        Input inp(1, 1, {input});
+        for (FurnaceRecipe &recipe : furnace_recipes)
+        {
+            if (recipe.matches(inp))
+                return recipe.result;
+        }
+
         return item::ItemStack();
     }
 

@@ -192,6 +192,7 @@ namespace Crapper
         void handleMultiBlockChange(ByteBuffer &buffer);
         void handleExplosion(ByteBuffer &buffer);
         void handleWindowItems(ByteBuffer &buffer);
+        void handleUpdateProgressBar(ByteBuffer &buffer);
         void handleUpdateSign(ByteBuffer &buffer);
         void handleKick(ByteBuffer &buffer);
         void handleOpenWindow(ByteBuffer &buffer);

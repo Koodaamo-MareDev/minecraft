@@ -17,11 +17,13 @@ namespace crafting
         void clear();
 
         item::ItemStack craft(Input &input);
+        item::ItemStack smelt(item::ItemStack input);
 
     private:
         RecipeManager();
         std::unordered_map<std::string, int16_t> id_mappings;
         std::vector<ShapedRecipe> shaped_recipes;
         std::vector<ShapelessRecipe> shapeless_recipes;
+        std::vector<FurnaceRecipe> furnace_recipes;
     };
 } // namespace crafting

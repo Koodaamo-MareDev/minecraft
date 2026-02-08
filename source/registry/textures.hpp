@@ -29,6 +29,7 @@ extern GXTexObj font_texture;
 extern GXTexObj items_texture;
 extern GXTexObj inventory_texture;
 extern GXTexObj crafting_texture;
+extern GXTexObj furnace_texture;
 extern GXTexObj gui_texture;
 
 // Animated textures

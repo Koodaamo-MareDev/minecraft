@@ -509,6 +509,15 @@ void Chunk::update_entities()
     }
 }
 
+void Chunk::tick_tile_entities()
+{
+    for (size_t i = 0; i < tile_entities.size(); i++)
+    {
+        TileEntity *tile_entity = tile_entities[i];
+        tile_entity->tick(world);
+    }
+}
+
 void Chunk::render_entities(float partial_ticks, bool transparency)
 {
     gertex::GXState state = gertex::get_state();

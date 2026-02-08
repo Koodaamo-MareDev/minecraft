@@ -20,6 +20,7 @@
 #include <gui/gui_dirtscreen.hpp>
 #include <gui/gui_survival.hpp>
 #include <gui/gui_crafting.hpp>
+#include <gui/gui_smelting.hpp>
 #include <gui/gui_gameover.hpp>
 #include <world/chunkprovider.hpp>
 #include <registry/tile_entities.hpp>
@@ -192,6 +193,7 @@ void World::update_chunks()
             }
             if (chunk->state != ChunkState::done)
                 continue;
+            chunk->tick_tile_entities();
 
             if (!chunk->lit_state && light_up_calls < 5)
             {
@@ -627,6 +629,20 @@ void World::edit_blocks()
                         if (chest)
                         {
                             Gui::set_gui(new GuiContainer(&player, &chest->items));
+                        }
+                        should_place_block = false;
+                        break;
+                    }
+                    case BlockID::lit_furnace:
+                    case BlockID::furnace:
+                    {
+                        TileEntity *tile_entity = get_tile_entity(player.raycast_target_pos);
+
+                        // Ensure it's a furnace
+                        TileEntityFurnace *furnace = dynamic_cast<TileEntityFurnace *>(tile_entity);
+                        if (furnace)
+                        {
+                            Gui::set_gui(new GuiSmelting(&player, &furnace->items, 0, furnace));
                         }
                         should_place_block = false;
                         break;

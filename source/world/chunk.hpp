@@ -221,6 +221,7 @@ public:
     void refresh_section_visibility(int index);
     int build_vbo(int index, bool transparent);
     void update_entities();
+    void tick_tile_entities();
 
     void render_entities(float partial_ticks, bool transparency);
 

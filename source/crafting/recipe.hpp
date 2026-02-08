@@ -68,5 +68,17 @@ namespace crafting
         bool matches(Input &input);
     };
 
+    class FurnaceRecipe : public Recipe
+    {
+    public:
+        item::ItemStack recipe;
+        FurnaceRecipe(item::ItemStack recipe, item::ItemStack result)
+        {
+            this->recipe = recipe;
+            this->result = result;
+        }
+        bool matches(Input &input);
+    };
+
 } // namespace crafting
 #endif
