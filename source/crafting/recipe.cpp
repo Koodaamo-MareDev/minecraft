@@ -151,4 +151,11 @@ namespace crafting
         return true;
     }
 
+    bool FurnaceRecipe::matches(Input &input)
+    {
+        if (input.size() != 1)
+            return false;
+        return (input[0].id == this->recipe.id && input[0].meta == this->recipe.meta);
+    }
+
 } // namespace crafting
