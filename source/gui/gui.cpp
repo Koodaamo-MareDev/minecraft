@@ -224,7 +224,7 @@ void Gui::draw_item(int x, int y, item::ItemStack stack, gertex::GXView &viewpor
     {
         std::string count_str = std::to_string(stack.count);
         int count_width = text_width(count_str);
-        draw_text_with_shadow(x + 34 - count_width, y + 16, count_str);
+        draw_text_with_shadow(x + 34 - count_width, y + 17, count_str);
     }
 }
 
