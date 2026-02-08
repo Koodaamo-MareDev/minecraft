@@ -263,26 +263,3 @@ int render_fluid(Block *block, const Vec3i &pos, World *world)
         faceCount += DrawVerticalQuad(sideCoords[0], sideCoords[1], sideCoords[2], sideCoords[3], neighbors[FACE_PX]->light);
     return faceCount * 3;
 }
-
-int render_section_fluids(Chunk &chunk, int index, bool transparent, int vertexCount)
-{
-    Vec3i chunk_offset = Vec3i(chunk.x * 16, index * 16, chunk.z * 16);
-
-    GX_BeginGroup(GX_TRIANGLES, vertexCount);
-    vertexCount = 0;
-    Block *block = chunk.get_block(chunk_offset);
-    for (int _y = 0; _y < 16; _y++)
-    {
-        for (int _z = 0; _z < 16; _z++)
-        {
-            for (int _x = 0; _x < 16; _x++, block++)
-            {
-                Vec3i blockpos = Vec3i(_x, _y, _z) + chunk_offset;
-                if (properties(block->id).m_fluid && transparent == properties(block->id).m_transparent)
-                    vertexCount += render_fluid(block, blockpos, chunk.world);
-            }
-        }
-    }
-    GX_EndGroup();
-    return vertexCount;
-}

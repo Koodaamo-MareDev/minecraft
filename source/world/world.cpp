@@ -12,6 +12,7 @@
 #include <block/blocks.hpp>
 #include <world/entity.hpp>
 #include <render/render.hpp>
+#include <render/render_chunks.hpp>
 #include <world/particle.hpp>
 #include <mcregion.hpp>
 #include <util/lock.hpp>
@@ -156,16 +157,18 @@ bool World::tick()
 
 void World::update()
 {
-    // If there are no chunks loaded, we can skip the update
     uint64_t start_time = time_get();
-    uint64_t elapsed_time = 0;
-
-    // Limit to 6ms per update
-    while (elapsed_time < 6000)
+    try
     {
-        // Cycle through the phases
-        current_update_phase = update_sections(current_update_phase);
-        elapsed_time = time_diff_us(start_time, time_get());
+        // Limit to 6ms per update
+        do
+        {
+            current_update_phase = update_sections(current_update_phase);
+        } while (time_diff_us(start_time, time_get()) < 6000);
+    }
+    catch (const std::exception &e)
+    {
+        throw std::runtime_error("Section update failed: " + std::string(e.what()));
     }
     edit_blocks();
     m_particle_system.update(delta_time);
@@ -329,13 +332,12 @@ SectionUpdatePhase World::update_sections(SectionUpdatePhase phase)
     case SectionUpdatePhase::SOLID:
         if (!curr_section)
             break;
-        curr_section->chunk->build_vbo(curr_section->y >> 4, false);
+        ChunkRenderer::render_section(*curr_section, false);
         break;
     case SectionUpdatePhase::TRANSPARENT:
         if (!curr_section)
             break;
-        curr_section->chunk->build_vbo(curr_section->y >> 4, true);
-
+        ChunkRenderer::render_section(*curr_section, true);
         // Clear the section's dirty flag
         curr_section->dirty = false;
 

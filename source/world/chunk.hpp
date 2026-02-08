@@ -219,7 +219,6 @@ public:
     static void init_floodfill_startpoints();
     void vbo_visibility_flood_fill(Vec3i pos);
     void refresh_section_visibility(int index);
-    int build_vbo(int index, bool transparent);
     void update_entities();
     void tick_tile_entities();
 

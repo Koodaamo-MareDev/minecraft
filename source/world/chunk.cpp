@@ -7,8 +7,6 @@
 #include <world/light.hpp>
 #include <render/base3d.hpp>
 #include <render/render.hpp>
-#include <render/render_blocks.hpp>
-#include <render/render_fluids.hpp>
 #include <world/util/raycast.hpp>
 #include <util/lock.hpp>
 #include <world/chunkprovider.hpp>
@@ -337,111 +335,6 @@ void Chunk::refresh_section_visibility(int index)
             floodfill_flood_id = floodfill_to_replace;
         }
     }
-}
-
-int Chunk::build_vbo(int index, bool transparent)
-{
-    Section &vbo = this->sections[index];
-    static uint8_t vbo_buffer[64000 * VERTEX_ATTR_LENGTH] __attribute__((aligned(32)));
-    DCInvalidateRange(vbo_buffer, sizeof(vbo_buffer));
-
-    GX_BeginDispList(vbo_buffer, sizeof(vbo_buffer));
-
-    // The first byte (GX_Begin command) is skipped, and after that the vertex count is stored as a uint16_t
-    uint16_t *quadVtxCountPtr = (uint16_t *)(&vbo_buffer[1]);
-
-    // Render the block mesh
-    int quadVtxCount = render_section_blocks(*this, index, transparent, 64000U);
-
-    // 3 bytes for the GX_Begin command, with 1 byte offset to access the vertex count (uint16_t)
-    int offset = (quadVtxCount * VERTEX_ATTR_LENGTH) + 1 + 3;
-
-    // The vertex count for the fluid mesh is stored as a uint16_t after the block mesh vertex data
-    uint16_t *triVtxCountPtr = (uint16_t *)(&vbo_buffer[offset]);
-
-    int triVtxCount = render_section_fluids(*this, index, transparent, 64000U);
-
-    // End the display list - we don't need to store the size, as we can calculate it from the vertex counts
-    uint32_t success = GX_EndDispList();
-
-    if (!success)
-    {
-        printf("Failed to create display list for section %d at (%d, %d)\n", index, this->x, this->z);
-        return (2);
-    }
-    if (transparent)
-    {
-        vbo.transparent.detach();
-    }
-    else
-    {
-        vbo.solid.detach();
-    }
-
-    if (!quadVtxCount && !triVtxCount)
-    {
-        return (0);
-    }
-
-    if (quadVtxCount)
-    {
-        // Store the vertex count for the block mesh
-        quadVtxCountPtr[0] = quadVtxCount;
-    }
-
-    if (triVtxCount)
-    {
-        // Store the vertex count for the fluid mesh
-        triVtxCountPtr[0] = triVtxCount;
-    }
-    uint32_t displist_size = (triVtxCount + quadVtxCount) * VERTEX_ATTR_LENGTH;
-    if (quadVtxCount)
-        displist_size += 3;
-    if (triVtxCount)
-        displist_size += 3;
-    displist_size += 32;
-
-    displist_size = (displist_size + 31) & ~31;
-
-    uint8_t *displist_vbo = new (std::align_val_t(32), std::nothrow) uint8_t[displist_size];
-    if (displist_vbo == nullptr)
-    {
-        printf("Failed to allocate %d bytes for section %d VBO at (%d, %d)\n", displist_size, index, this->x, this->z);
-        return (1);
-    }
-
-    uint32_t pos = 0;
-    // Copy the quad data
-    if (quadVtxCount)
-    {
-        uint32_t quadSize = quadVtxCount * VERTEX_ATTR_LENGTH + 3;
-        memcpy(displist_vbo, vbo_buffer, quadSize);
-        pos += quadSize;
-    }
-
-    // Copy the triangle data
-    if (triVtxCount)
-    {
-        uint32_t triSize = triVtxCount * VERTEX_ATTR_LENGTH + 3;
-        memcpy((void *)((u32)displist_vbo + pos), (void *)((u32)vbo_buffer + (quadVtxCount * VERTEX_ATTR_LENGTH + 3)), triSize);
-        pos += triSize;
-    }
-
-    // Set the rest of the buffer to 0
-    memset(&displist_vbo[pos], 0, displist_size - pos);
-
-    if (transparent)
-    {
-        vbo.transparent.buffer = displist_vbo;
-        vbo.transparent.length = displist_size;
-    }
-    else
-    {
-        vbo.solid.buffer = displist_vbo;
-        vbo.solid.length = displist_size;
-    }
-    DCFlushRange(displist_vbo, displist_size);
-    return (0);
 }
 
 void Chunk::update_entities()

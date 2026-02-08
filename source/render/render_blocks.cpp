@@ -5,30 +5,6 @@
 #include <block/blocks.hpp>
 #include <render/render.hpp>
 
-int render_section_blocks(Chunk &chunk, int index, bool transparent, int vertexCount)
-{
-    Vec3i chunk_offset = Vec3i(chunk.x * 16, index * 16, chunk.z * 16);
-    GX_BeginGroup(GX_QUADS, vertexCount);
-    vertexCount = 0;
-    // Build the mesh from the blockstates
-    Block *block = chunk.get_block(chunk_offset);
-    for (int _y = 0; _y < 16; _y++)
-    {
-        for (int _z = 0; _z < 16; _z++)
-        {
-            for (int _x = 0; _x < 16; _x++, block++)
-            {
-                Vec3i blockpos = Vec3i(_x, _y, _z) + chunk_offset;
-                vertexCount += render_block(block, blockpos, transparent);
-            }
-        }
-    }
-    uint16_t vtxCount = GX_EndGroup();
-    if (vtxCount != vertexCount)
-        printf("VTXCOUNT: %d != %d", vertexCount, vtxCount);
-    return vertexCount;
-}
-
 int render_block(Block *block, const Vec3i &pos, bool transparent)
 {
     if (!block->get_visibility() || properties(block->id).m_fluid || transparent != properties(block->id).m_transparent)

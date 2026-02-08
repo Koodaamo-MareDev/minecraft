@@ -4,10 +4,8 @@
 #include <cstdint>
 #include <math/vec3i.hpp>
 
-class Chunk;
 class Block;
 
-int render_section_blocks(Chunk &chunk, int index, bool transparent, int vertexCount);
 int render_block(Block *block, const Vec3i &pos, bool transparent);
 int render_cube(Block *block, const Vec3i &pos, bool transparent);
 int render_inverted_cube(Block *block, const Vec3i &pos, bool transparent);
