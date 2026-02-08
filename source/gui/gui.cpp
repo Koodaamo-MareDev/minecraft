@@ -430,6 +430,8 @@ item::ItemStack GuiSlot::interact(item::ItemStack hand, bool right_click)
                 item.count--;
                 hand.count++;
             }
+            if (hand.empty())
+                return item::ItemStack();
             return hand;
         }
         else
