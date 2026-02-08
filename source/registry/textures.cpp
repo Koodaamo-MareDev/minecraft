@@ -19,6 +19,7 @@ GXTexObj font_texture;
 GXTexObj items_texture;
 GXTexObj inventory_texture;
 GXTexObj crafting_texture;
+GXTexObj furnace_texture;
 GXTexObj gui_texture;
 
 // Animated textures
@@ -47,6 +48,7 @@ namespace registry
         init_png_texture(items_texture, "gui/items.png");
         init_png_texture(inventory_texture, "gui/inventory.png");
         init_png_texture(crafting_texture, "gui/crafting.png");
+        init_png_texture(furnace_texture, "gui/furnace.png");
         init_png_texture(gui_texture, "gui/gui.png");
 
         GX_InitTexObjWrapMode(&clouds_texture, GX_REPEAT, GX_REPEAT);
