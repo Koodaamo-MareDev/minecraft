@@ -5,5 +5,6 @@ namespace registry
     void register_tile_entities()
     {
         TileEntity::register_ctor<TileEntityChest>("Chest");
+        TileEntity::register_ctor<TileEntityFurnace>("Furnace");
     }
 }
