@@ -10,7 +10,7 @@
 #include <math/vec3i.hpp>
 #include <item/item.hpp>
 #include <item/item_stack.hpp>
-
+#include <block/material.hpp>
 #include <block/block_id.hpp>
 
 #define FACE_NX 0
@@ -79,6 +79,7 @@ struct BlockProperties
     item::ToolType m_tool_type = item::ToolType::none;
     item::ToolTier m_tool_tier = item::ToolTier::no_tier;
     float_t m_hardness = 2.0f;
+    Materials m_material = Materials::ROCK;
 
     union
     {
@@ -299,6 +300,12 @@ struct BlockProperties
     BlockProperties &hardness(float value)
     {
         this->m_hardness = value;
+        return *this;
+    }
+
+    BlockProperties &material(Materials value)
+    {
+        this->m_material = value;
         return *this;
     }
 

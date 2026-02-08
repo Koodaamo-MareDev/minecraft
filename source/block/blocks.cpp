@@ -736,6 +736,20 @@ void chest_added(World *world, const Vec3i &pos, Block &block)
     chunk->tile_entities.push_back(chest_entity);
 }
 
+void furnace_added(World *world, const Vec3i &pos, Block &block)
+{
+    Chunk *chunk = world->get_chunk_from_pos(pos);
+    TileEntityFurnace *furnace_entity = new TileEntityFurnace;
+    furnace_entity->pos = pos;
+    furnace_entity->chunk = chunk;
+    chunk->tile_entities.push_back(furnace_entity);
+
+    int facing = int(world->player.rotation.y / 90) % 4;
+    const uint8_t facing_map[] = {2, 0, 3, 1};
+    // NX, PX, NZ, PZ
+    chunk->get_block(pos)->meta = facing_map[facing];
+}
+
 void falling_block_tick(World *world, const Vec3i &pos, Block &block)
 {
     BlockID block_below = world->get_block_id_at(pos + Vec3i(0, -1, 0));
@@ -797,6 +811,20 @@ void chest_destroy(World *world, const Vec3i &pos, const Block &old_block)
             world->spawn_drop(pos, &old_block, stack);
     }
     chest->chunk->remove_tile_entity(chest);
+}
+
+void furnace_destroy(World *world, const Vec3i &pos, const Block &old_block)
+{
+    TileEntityFurnace *furnace = dynamic_cast<TileEntityFurnace *>(world->get_tile_entity(pos));
+    if (!furnace)
+        return;
+    for (size_t i = 0; i < furnace->items.size(); i++)
+    {
+        item::ItemStack &stack = furnace->items[i];
+        if (!stack.empty())
+            world->spawn_drop(pos, &old_block, stack);
+    }
+    furnace->chunk->remove_tile_entity(furnace);
 }
 
 void default_aabb(const Vec3i &pos, Block *block, const AABB &other, std::vector<AABB> &aabb_list)
@@ -952,101 +980,101 @@ void cactus_aabb(const Vec3i &pos, Block *block, const AABB &other, std::vector<
 }
 
 BlockProperties block_properties[256] = {
-    BlockProperties().id(BlockID::air).opacity(0).solid(false).transparent(true).collision(CollisionType::none).valid_item(false),
-    BlockProperties().id(BlockID::stone).tool(item::ToolType::pickaxe, item::ToolTier::wood).hardness(1.5f).texture(0).sound(SoundType::stone).drops(std::bind(fixed_drop, std::placeholders::_1, item::ItemStack(BlockID::cobblestone, 1))),
-    BlockProperties().id(BlockID::grass).tool(item::ToolType::shovel, item::ToolTier::no_tier).hardness(0.6f).texture(202).sound(SoundType::grass).render_type(RenderType::full_special).drops(std::bind(fixed_drop, std::placeholders::_1, item::ItemStack(BlockID::dirt, 1))),
-    BlockProperties().id(BlockID::dirt).tool(item::ToolType::shovel, item::ToolTier::no_tier).hardness(0.5f).texture(2).sound(SoundType::dirt),
-    BlockProperties().id(BlockID::cobblestone).tool(item::ToolType::pickaxe, item::ToolTier::wood).hardness(2.0f).texture(16).sound(SoundType::stone),
-    BlockProperties().id(BlockID::planks).tool(item::ToolType::axe, item::ToolTier::no_tier).hardness(2.0f).texture(4).sound(SoundType::wood),
-    BlockProperties().id(BlockID::sapling).tool(item::ToolType::none, item::ToolTier::no_tier).hardness(0.0f).texture(15).sound(SoundType::grass).opacity(0).solid(false).transparent(true).render_type(RenderType::cross).collision(CollisionType::none),
-    BlockProperties().id(BlockID::bedrock).tool(item::ToolType::pickaxe, item::ToolTier::diamond).hardness(-1.0f).texture(17).sound(SoundType::stone).blast_resistance(-1),
-    BlockProperties().id(BlockID::flowing_water).hardness(100.0f).texture(206).fluid(true).base_fluid(BlockID::water).flow_fluid(BlockID::flowing_water).drain_rate(1).neighbor_changed(fluid_neighbor_update).added(flowing_fluid_added).tick_on_load(true).tick_rate(5).tick(flowing_fluid_tick).opacity(1).solid(false).transparent(true).render_type(RenderType::special).collision(CollisionType::fluid).blast_resistance(500),
-    BlockProperties().id(BlockID::water).hardness(100.0f).texture(205).fluid(true).base_fluid(BlockID::water).flow_fluid(BlockID::flowing_water).drain_rate(1).neighbor_changed(stationary_fluid_neighbor_update).added(fluid_added).opacity(1).solid(false).transparent(true).render_type(RenderType::special).collision(CollisionType::fluid).blast_resistance(500),
-    BlockProperties().id(BlockID::flowing_lava).hardness(0.0f).texture(238).fluid(true).base_fluid(BlockID::lava).flow_fluid(BlockID::flowing_lava).drain_rate(2).neighbor_changed(fluid_neighbor_update).added(flowing_fluid_added).tick_on_load(true).tick_rate(30).tick(flowing_fluid_tick).opacity(1).luminance(15).solid(false).render_type(RenderType::special).collision(CollisionType::fluid).blast_resistance(500),
-    BlockProperties().id(BlockID::lava).hardness(100.0f).texture(237).fluid(true).base_fluid(BlockID::lava).flow_fluid(BlockID::flowing_lava).drain_rate(2).neighbor_changed(stationary_fluid_neighbor_update).added(fluid_added).tick_on_load(true).opacity(1).luminance(15).solid(false).render_type(RenderType::special).collision(CollisionType::fluid).blast_resistance(500),
-    BlockProperties().id(BlockID::sand).tool(item::ToolType::shovel, item::ToolTier::no_tier).hardness(0.5f).texture(18).sound(SoundType::sand).tick_rate(3).tick(falling_block_tick).added(schedule_update).neighbor_changed(schedule_update),
-    BlockProperties().id(BlockID::gravel).tool(item::ToolType::shovel, item::ToolTier::no_tier).hardness(0.6f).texture(19).sound(SoundType::dirt).tick_rate(3).tick(falling_block_tick).added(schedule_update).neighbor_changed(schedule_update),
-    BlockProperties().id(BlockID::gold_ore).tool(item::ToolType::pickaxe, item::ToolTier::stone).hardness(3.0f).texture(32).sound(SoundType::stone),
-    BlockProperties().id(BlockID::iron_ore).tool(item::ToolType::pickaxe, item::ToolTier::stone).hardness(3.0f).texture(33).sound(SoundType::stone),
-    BlockProperties().id(BlockID::coal_ore).tool(item::ToolType::pickaxe, item::ToolTier::stone).hardness(3.0f).texture(34).sound(SoundType::stone).drops(std::bind(fixed_drop, std::placeholders::_1, item::ItemStack(+ItemID::coal, 1))),
-    BlockProperties().id(BlockID::wood).tool(item::ToolType::axe, item::ToolTier::no_tier).hardness(2.0f).texture(20).sound(SoundType::wood).render_type(RenderType::full_special),
-    BlockProperties().id(BlockID::leaves).hardness(0.2f).texture(186).sound(SoundType::grass).opacity(1).transparent(true).render_type(RenderType::special).nonflat(true).drops(std::bind(random_range_drop, std::placeholders::_1, item::ItemStack(+BlockID::sapling, 1), 0, 1)),
-    BlockProperties().id(BlockID::sponge).hardness(0.6f).texture(48).sound(SoundType::grass),
-    BlockProperties().id(BlockID::glass).hardness(0.3f).texture(49).sound(SoundType::glass).opacity(0).transparent(true).drops(std::bind(no_drop, std::placeholders::_1)),
-    BlockProperties().id(BlockID::lapis_ore).tool(item::ToolType::pickaxe, item::ToolTier::stone).hardness(3.0f).texture(160).sound(SoundType::stone).drops(std::bind(random_range_drop, std::placeholders::_1, item::ItemStack(+ItemID::dye, 1, 4), 4, 8)),
-    BlockProperties().id(BlockID::lapis_block).tool(item::ToolType::pickaxe, item::ToolTier::stone).hardness(3.0f).texture(144).sound(SoundType::stone),
-    BlockProperties().id(BlockID::dispenser).tool(item::ToolType::pickaxe, item::ToolTier::wood).hardness(3.5f).texture(46).sound(SoundType::stone).render_type(RenderType::full_special),
-    BlockProperties().id(BlockID::sandstone).tool(item::ToolType::pickaxe, item::ToolTier::wood).hardness(0.8f).texture(176).sound(SoundType::stone).render_type(RenderType::full_special),
-    BlockProperties().id(BlockID::note_block).tool(item::ToolType::axe, item::ToolTier::no_tier).hardness(0.8f).texture(74).sound(SoundType::wood),
-    BlockProperties().id(BlockID::bed).hardness(0.2f).texture(134).transparent(true).solid(false).opacity(0).sound(SoundType::stone).render_type(RenderType::special).valid_item(false),
-    BlockProperties().id(BlockID::golden_rail).tool(item::ToolType::pickaxe, item::ToolTier::no_tier).texture(163).opacity(0).transparent(true).solid(false).sound(SoundType::metal).aabb(flat_aabb).render_type(RenderType::flat_ground).collision(CollisionType::none).needs_support(true),
-    BlockProperties().id(BlockID::detector_rail).tool(item::ToolType::pickaxe, item::ToolTier::no_tier).texture(179).opacity(0).transparent(true).solid(false).sound(SoundType::metal).aabb(flat_aabb).render_type(RenderType::flat_ground).collision(CollisionType::none).needs_support(true),
-    BlockProperties().id(BlockID::sticky_piston).tool(item::ToolType::pickaxe, item::ToolTier::no_tier).state(0x0B).texture(106).solid(false).sound(SoundType::stone).render_type(RenderType::full_special),
-    BlockProperties().id(BlockID::cobweb).tool(item::ToolType::sword, item::ToolTier::wood).texture(11).solid(false).opacity(0).transparent(true).sound(SoundType::stone).render_type(RenderType::cross).collision(CollisionType::none),
-    BlockProperties().id(BlockID::tallgrass).texture(55).solid(false).opacity(0).transparent(true).sound(SoundType::grass).render_type(RenderType::cross).collision(CollisionType::none).needs_support(true),
-    BlockProperties().id(BlockID::deadbush).texture(55).solid(false).opacity(0).transparent(true).sound(SoundType::grass).render_type(RenderType::cross).collision(CollisionType::none).needs_support(true),
-    BlockProperties().id(BlockID::piston).tool(item::ToolType::pickaxe, item::ToolTier::no_tier).state(3).texture(108).solid(false).sound(SoundType::stone).render_type(RenderType::full_special),
-    BlockProperties().id(BlockID::piston_head).tool(item::ToolType::pickaxe, item::ToolTier::no_tier).texture(107).solid(false).sound(SoundType::stone).valid_item(false),
-    BlockProperties().id(BlockID::wool).hardness(0.8f).texture(64).sound(SoundType::cloth).render_type(RenderType::full_special),
-    BlockProperties().id(BlockID::piston_extension).texture(0).solid(false).sound(SoundType::stone).valid_item(false),
-    BlockProperties().id(BlockID::dandelion).hardness(0.0f).texture(13).solid(false).opacity(0).transparent(true).sound(SoundType::grass).aabb(flower_aabb).render_type(RenderType::cross).collision(CollisionType::none).needs_support(true),
-    BlockProperties().id(BlockID::rose).hardness(0.0f).texture(12).solid(false).opacity(0).transparent(true).sound(SoundType::grass).aabb(flower_aabb).render_type(RenderType::cross).collision(CollisionType::none).needs_support(true),
-    BlockProperties().id(BlockID::brown_mushroom).hardness(0.0f).texture(29).solid(false).opacity(0).transparent(true).sound(SoundType::grass).aabb(mushroom_aabb).render_type(RenderType::cross).collision(CollisionType::none).needs_support(true),
-    BlockProperties().id(BlockID::red_mushroom).hardness(0.0f).texture(28).solid(false).opacity(0).transparent(true).sound(SoundType::grass).aabb(mushroom_aabb).render_type(RenderType::cross).collision(CollisionType::none).needs_support(true),
-    BlockProperties().id(BlockID::gold_block).tool(item::ToolType::pickaxe, item::ToolTier::iron).hardness(3.0f).texture(23).sound(SoundType::metal),
-    BlockProperties().id(BlockID::iron_block).tool(item::ToolType::pickaxe, item::ToolTier::iron).hardness(5.0f).texture(22).sound(SoundType::metal),
-    BlockProperties().id(BlockID::double_stone_slab).tool(item::ToolType::pickaxe, item::ToolTier::wood).hardness(2.0f).texture(6).sound(SoundType::stone).render_type(RenderType::full_special),
-    BlockProperties().id(BlockID::stone_slab).tool(item::ToolType::pickaxe, item::ToolTier::wood).hardness(2.0f).texture(6).opacity(0).solid(false).transparent(true).sound(SoundType::stone).aabb(slab_aabb).render_type(RenderType::slab),
-    BlockProperties().id(BlockID::bricks).tool(item::ToolType::pickaxe, item::ToolTier::wood).hardness(2.0f).texture(7).sound(SoundType::stone),
-    BlockProperties().id(BlockID::tnt).hardness(0.0f).texture(8).sound(SoundType::grass).render_type(RenderType::full_special).destroy(spawn_tnt_destroy).drops(std::bind(no_drop, std::placeholders::_1)),
-    BlockProperties().id(BlockID::bookshelf).tool(item::ToolType::axe, item::ToolTier::no_tier).hardness(1.5f).texture(35).sound(SoundType::wood).render_type(RenderType::full_special),
-    BlockProperties().id(BlockID::mossy_cobblestone).tool(item::ToolType::pickaxe, item::ToolTier::wood).hardness(2.0f).texture(36).sound(SoundType::stone),
-    BlockProperties().id(BlockID::obsidian).tool(item::ToolType::pickaxe, item::ToolTier::diamond).hardness(10.0f).texture(37).sound(SoundType::stone).blast_resistance(-1),
-    BlockProperties().id(BlockID::torch).hardness(0.0f).texture(80).solid(false).opacity(0).transparent(true).luminance(14).sound(SoundType::wood).aabb(torch_aabb).render_type(RenderType::special).collision(CollisionType::none).needs_support(true),
-    BlockProperties().id(BlockID::fire).hardness(0.0f).texture(31).solid(false).opacity(0).transparent(true).luminance(15).sound(SoundType::cloth),
-    BlockProperties().id(BlockID::mob_spawner).tool(item::ToolType::pickaxe, item::ToolTier::wood).hardness(5.0f).texture(65).solid(false).opacity(0).transparent(true).sound(SoundType::metal).drops(std::bind(no_drop, std::placeholders::_1)),
-    BlockProperties().id(BlockID::oak_stairs).tool(item::ToolType::axe, item::ToolTier::no_tier).hardness(2.0f).texture(4).solid(false).sound(SoundType::wood),
-    BlockProperties().id(BlockID::chest).tool(item::ToolType::axe, item::ToolTier::no_tier).hardness(2.5f).texture(27).sound(SoundType::wood).render_type(RenderType::full_special).added(chest_added).destroy(chest_destroy),
-    BlockProperties().id(BlockID::redstone_wire).hardness(0.0f).texture(164).solid(false).opacity(0).transparent(true).sound(SoundType::stone).aabb(flat_aabb).render_type(RenderType::flat_ground).valid_item(false).collision(CollisionType::none).needs_support(true),
-    BlockProperties().id(BlockID::diamond_ore).tool(item::ToolType::pickaxe, item::ToolTier::iron).hardness(3.0f).texture(50).sound(SoundType::stone).drops(std::bind(fixed_drop, std::placeholders::_1, item::ItemStack(+ItemID::diamond, 1))),
-    BlockProperties().id(BlockID::diamond_block).tool(item::ToolType::pickaxe, item::ToolTier::iron).hardness(5.0f).texture(24).sound(SoundType::metal),
-    BlockProperties().id(BlockID::crafting_table).tool(item::ToolType::axe, item::ToolTier::no_tier).hardness(2.5f).texture(59).sound(SoundType::wood).render_type(RenderType::full_special),
-    BlockProperties().id(BlockID::wheat).hardness(0.0f).texture(95).solid(false).opacity(0).transparent(true).sound(SoundType::grass).render_type(RenderType::cross).collision(CollisionType::none).needs_support(true),
-    BlockProperties().id(BlockID::farmland).tool(item::ToolType::shovel, item::ToolTier::no_tier).hardness(0.6f).texture(86).sound(SoundType::dirt).drops(std::bind(fixed_drop, std::placeholders::_1, item::ItemStack(BlockID::dirt, 1))),
-    BlockProperties().id(BlockID::furnace).tool(item::ToolType::pickaxe, item::ToolTier::wood).hardness(3.5f).texture(44).sound(SoundType::stone).render_type(RenderType::full_special),
-    BlockProperties().id(BlockID::lit_furnace).tool(item::ToolType::pickaxe, item::ToolTier::wood).hardness(3.5f).texture(61).sound(SoundType::stone).render_type(RenderType::full_special),
-    BlockProperties().id(BlockID::standing_sign).tool(item::ToolType::axe, item::ToolTier::no_tier).hardness(1.0f).texture(4).solid(false).opacity(0).transparent(false).sound(SoundType::wood).render_type(RenderType::cross).collision(CollisionType::none),
-    BlockProperties().id(BlockID::wooden_door).tool(item::ToolType::axe, item::ToolTier::no_tier).hardness(3.0f).texture(81).solid(false).opacity(0).transparent(true).sound(SoundType::wood).render_type(RenderType::special).aabb(door_aabb),
-    BlockProperties().id(BlockID::ladder).tool(item::ToolType::axe, item::ToolTier::no_tier).hardness(0.4f).texture(83).solid(false).opacity(0).transparent(true).sound(SoundType::wood).render_type(RenderType::special).collision(CollisionType::none),
-    BlockProperties().id(BlockID::rail).tool(item::ToolType::pickaxe, item::ToolTier::no_tier).hardness(0.7f).texture(128).opacity(0).transparent(true).solid(false).sound(SoundType::metal).aabb(flat_aabb).render_type(RenderType::flat_ground).collision(CollisionType::none).needs_support(true),
-    BlockProperties().id(BlockID::stone_stairs).tool(item::ToolType::pickaxe, item::ToolTier::wood).hardness(2.0f).texture(16).solid(false).sound(SoundType::stone),
-    BlockProperties().id(BlockID::wall_sign).tool(item::ToolType::pickaxe, item::ToolTier::no_tier).hardness(1.0f).texture(4).solid(false).opacity(0).transparent(false).sound(SoundType::wood).render_type(RenderType::cross).collision(CollisionType::none),
-    BlockProperties().id(BlockID::lever).hardness(0.5f).texture(96).solid(false).opacity(0).transparent(true).sound(SoundType::wood).render_type(RenderType::special).collision(CollisionType::none).aabb(flat_aabb),
-    BlockProperties().id(BlockID::stone_pressure_plate).tool(item::ToolType::pickaxe, item::ToolTier::no_tier).hardness(0.5f).texture(0).solid(false).opacity(0).transparent(true).sound(SoundType::stone).aabb(flat_aabb).render_type(RenderType::flat_ground).collision(CollisionType::none).needs_support(true),
-    BlockProperties().id(BlockID::iron_door).tool(item::ToolType::pickaxe, item::ToolTier::no_tier).hardness(5.0f).texture(82).solid(false).opacity(0).transparent(true).sound(SoundType::metal).render_type(RenderType::special).aabb(door_aabb),
-    BlockProperties().id(BlockID::wooden_pressure_plate).tool(item::ToolType::pickaxe, item::ToolTier::no_tier).hardness(0.5f).texture(4).solid(false).opacity(0).transparent(true).sound(SoundType::wood).aabb(flat_aabb).render_type(RenderType::flat_ground).collision(CollisionType::none).needs_support(true),
-    BlockProperties().id(BlockID::redstone_ore).tool(item::ToolType::pickaxe, item::ToolTier::iron).hardness(3.0f).texture(51).sound(SoundType::stone).drops(std::bind(random_range_drop, std::placeholders::_1, item::ItemStack(+ItemID::redstone_dust, 1), 4, 5)),
-    BlockProperties().id(BlockID::lit_redstone_ore).tool(item::ToolType::pickaxe, item::ToolTier::iron).texture(51).sound(SoundType::stone).luminance(9).drops(std::bind(random_range_drop, std::placeholders::_1, item::ItemStack(+ItemID::redstone_dust, 1), 4, 5)),
-    BlockProperties().id(BlockID::unlit_redstone_torch).hardness(0.0f).texture(115).solid(false).opacity(0).transparent(true).luminance(0).sound(SoundType::stone).aabb(torch_aabb).render_type(RenderType::special).collision(CollisionType::none).needs_support(true),
-    BlockProperties().id(BlockID::redstone_torch).hardness(0.0f).texture(99).solid(false).opacity(0).transparent(true).luminance(7).sound(SoundType::stone).aabb(torch_aabb).render_type(RenderType::special).collision(CollisionType::none).needs_support(true),
-    BlockProperties().id(BlockID::stone_button).tool(item::ToolType::pickaxe, item::ToolTier::no_tier).hardness(0.5f).texture(0).solid(false).opacity(0).transparent(false).sound(SoundType::stone).aabb(flat_aabb).render_type(RenderType::special).collision(CollisionType::none),
-    BlockProperties().id(BlockID::snow_layer).tool(item::ToolType::shovel, item::ToolTier::wood).hardness(0.1f).texture(66).solid(false).opacity(0).transparent(false).sound(SoundType::cloth).aabb(snow_layer_aabb).render_type(RenderType::special).collision(CollisionType::none).drops(std::bind(no_drop, std::placeholders::_1)).destroy(snow_layer_destroy).needs_support(true),
-    BlockProperties().id(BlockID::ice).tool(item::ToolType::pickaxe, item::ToolTier::no_tier).hardness(0.5f).texture(67).solid(true).opacity(3).transparent(true).sound(SoundType::glass).slipperiness(0.98f).drops(std::bind(no_drop, std::placeholders::_1)).destroy(std::bind(melt_destroy, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3)),
-    BlockProperties().id(BlockID::snow_block).tool(item::ToolType::shovel, item::ToolTier::wood).hardness(0.2f).texture(66).solid(false).opacity(0).transparent(true).sound(SoundType::cloth).render_type(RenderType::full).collision(CollisionType::none),
-    BlockProperties().id(BlockID::cactus).hardness(0.4f).texture(70).solid(false).opacity(0).transparent(true).sound(SoundType::cloth).aabb(cactus_aabb).render_type(RenderType::special).nonflat(true),
-    BlockProperties().id(BlockID::clay).tool(item::ToolType::shovel, item::ToolTier::no_tier).hardness(0.6f).texture(72).sound(SoundType::dirt),
-    BlockProperties().id(BlockID::reeds).hardness(0.0f).texture(73).solid(false).opacity(0).transparent(true).sound(SoundType::grass).render_type(RenderType::cross).collision(CollisionType::none).needs_support(true),
-    BlockProperties().id(BlockID::jukebox).tool(item::ToolType::pickaxe, item::ToolTier::no_tier).hardness(2.0f).texture(74).sound(SoundType::wood).render_type(RenderType::full_special),
-    BlockProperties().id(BlockID::fence).tool(item::ToolType::axe, item::ToolTier::no_tier).hardness(2.0f).texture(4).solid(false).opacity(0).transparent(true).sound(SoundType::wood).render_type(RenderType::special),
-    BlockProperties().id(BlockID::pumpkin).tool(item::ToolType::axe, item::ToolTier::no_tier).hardness(1.0f).texture(118).opacity(0).sound(SoundType::wood).render_type(RenderType::full_special),
-    BlockProperties().id(BlockID::netherrack).tool(item::ToolType::pickaxe, item::ToolTier::wood).hardness(0.4f).texture(103).sound(SoundType::stone),
-    BlockProperties().id(BlockID::soul_sand).tool(item::ToolType::shovel, item::ToolTier::no_tier).hardness(0.5f).texture(104).sound(SoundType::sand),
-    BlockProperties().id(BlockID::glowstone).tool(item::ToolType::pickaxe, item::ToolTier::no_tier).hardness(0.3f).texture(105).sound(SoundType::glass).luminance(15),
-    BlockProperties().id(BlockID::portal).hardness(-1.0f).texture(14).solid(false).opacity(0).transparent(true).luminance(11).sound(SoundType::glass).render_type(RenderType::special).collision(CollisionType::none),
-    BlockProperties().id(BlockID::lit_pumpkin).tool(item::ToolType::axe, item::ToolTier::no_tier).hardness(1.0f).texture(120).opacity(0).sound(SoundType::wood).render_type(RenderType::full_special),
-    BlockProperties().id(BlockID::cake).hardness(0.5f).texture(121).opacity(0).sound(SoundType::wood).render_type(RenderType::full_special),
-    BlockProperties().id(BlockID::unpowered_repeater).hardness(0.0f).texture(131).opacity(0).sound(SoundType::wood).render_type(RenderType::flat_ground),
-    BlockProperties().id(BlockID::powered_repeater).hardness(0.0f).texture(147).opacity(0).sound(SoundType::wood).luminance(10).render_type(RenderType::flat_ground),
+    BlockProperties().id(BlockID::air).material(Materials::AIR).opacity(0).solid(false).transparent(true).collision(CollisionType::none).valid_item(false),
+    BlockProperties().id(BlockID::stone).material(Materials::ROCK).tool(item::ToolType::pickaxe, item::ToolTier::wood).hardness(1.5f).texture(0).sound(SoundType::stone).drops(std::bind(fixed_drop, std::placeholders::_1, item::ItemStack(BlockID::cobblestone, 1))),
+    BlockProperties().id(BlockID::grass).material(Materials::GROUND).tool(item::ToolType::shovel, item::ToolTier::no_tier).hardness(0.6f).texture(202).sound(SoundType::grass).render_type(RenderType::full_special).drops(std::bind(fixed_drop, std::placeholders::_1, item::ItemStack(BlockID::dirt, 1))),
+    BlockProperties().id(BlockID::dirt).material(Materials::GROUND).tool(item::ToolType::shovel, item::ToolTier::no_tier).hardness(0.5f).texture(2).sound(SoundType::dirt),
+    BlockProperties().id(BlockID::cobblestone).material(Materials::ROCK).tool(item::ToolType::pickaxe, item::ToolTier::wood).hardness(2.0f).texture(16).sound(SoundType::stone),
+    BlockProperties().id(BlockID::planks).material(Materials::WOOD).tool(item::ToolType::axe, item::ToolTier::no_tier).hardness(2.0f).texture(4).sound(SoundType::wood),
+    BlockProperties().id(BlockID::sapling).material(Materials::PLANTS).tool(item::ToolType::none, item::ToolTier::no_tier).hardness(0.0f).texture(15).sound(SoundType::grass).opacity(0).solid(false).transparent(true).render_type(RenderType::cross).collision(CollisionType::none),
+    BlockProperties().id(BlockID::bedrock).material(Materials::ROCK).tool(item::ToolType::pickaxe, item::ToolTier::diamond).hardness(-1.0f).texture(17).sound(SoundType::stone).blast_resistance(-1),
+    BlockProperties().id(BlockID::flowing_water).material(Materials::WATER).hardness(100.0f).texture(206).fluid(true).base_fluid(BlockID::water).flow_fluid(BlockID::flowing_water).drain_rate(1).neighbor_changed(fluid_neighbor_update).added(flowing_fluid_added).tick_on_load(true).tick_rate(5).tick(flowing_fluid_tick).opacity(1).solid(false).transparent(true).render_type(RenderType::special).collision(CollisionType::fluid).blast_resistance(500),
+    BlockProperties().id(BlockID::water).material(Materials::WATER).hardness(100.0f).texture(205).fluid(true).base_fluid(BlockID::water).flow_fluid(BlockID::flowing_water).drain_rate(1).neighbor_changed(stationary_fluid_neighbor_update).added(fluid_added).opacity(1).solid(false).transparent(true).render_type(RenderType::special).collision(CollisionType::fluid).blast_resistance(500),
+    BlockProperties().id(BlockID::flowing_lava).material(Materials::LAVA).hardness(0.0f).texture(238).fluid(true).base_fluid(BlockID::lava).flow_fluid(BlockID::flowing_lava).drain_rate(2).neighbor_changed(fluid_neighbor_update).added(flowing_fluid_added).tick_on_load(true).tick_rate(30).tick(flowing_fluid_tick).opacity(1).luminance(15).solid(false).render_type(RenderType::special).collision(CollisionType::fluid).blast_resistance(500),
+    BlockProperties().id(BlockID::lava).material(Materials::LAVA).hardness(100.0f).texture(237).fluid(true).base_fluid(BlockID::lava).flow_fluid(BlockID::flowing_lava).drain_rate(2).neighbor_changed(stationary_fluid_neighbor_update).added(fluid_added).tick_on_load(true).opacity(1).luminance(15).solid(false).render_type(RenderType::special).collision(CollisionType::fluid).blast_resistance(500),
+    BlockProperties().id(BlockID::sand).material(Materials::SAND).tool(item::ToolType::shovel, item::ToolTier::no_tier).hardness(0.5f).texture(18).sound(SoundType::sand).tick_rate(3).tick(falling_block_tick).added(schedule_update).neighbor_changed(schedule_update),
+    BlockProperties().id(BlockID::gravel).material(Materials::SAND).tool(item::ToolType::shovel, item::ToolTier::no_tier).hardness(0.6f).texture(19).sound(SoundType::dirt).tick_rate(3).tick(falling_block_tick).added(schedule_update).neighbor_changed(schedule_update),
+    BlockProperties().id(BlockID::gold_ore).material(Materials::ROCK).tool(item::ToolType::pickaxe, item::ToolTier::stone).hardness(3.0f).texture(32).sound(SoundType::stone),
+    BlockProperties().id(BlockID::iron_ore).material(Materials::ROCK).tool(item::ToolType::pickaxe, item::ToolTier::stone).hardness(3.0f).texture(33).sound(SoundType::stone),
+    BlockProperties().id(BlockID::coal_ore).material(Materials::ROCK).tool(item::ToolType::pickaxe, item::ToolTier::stone).hardness(3.0f).texture(34).sound(SoundType::stone).drops(std::bind(fixed_drop, std::placeholders::_1, item::ItemStack(+ItemID::coal, 1))),
+    BlockProperties().id(BlockID::wood).material(Materials::WOOD).tool(item::ToolType::axe, item::ToolTier::no_tier).hardness(2.0f).texture(20).sound(SoundType::wood).render_type(RenderType::full_special),
+    BlockProperties().id(BlockID::leaves).material(Materials::LEAVES).hardness(0.2f).texture(186).sound(SoundType::grass).opacity(1).transparent(true).render_type(RenderType::special).nonflat(true).drops(std::bind(random_range_drop, std::placeholders::_1, item::ItemStack(+BlockID::sapling, 1), 0, 1)),
+    BlockProperties().id(BlockID::sponge).material(Materials::SPONGE).hardness(0.6f).texture(48).sound(SoundType::grass),
+    BlockProperties().id(BlockID::glass).material(Materials::GLASS).hardness(0.3f).texture(49).sound(SoundType::glass).opacity(0).transparent(true).drops(std::bind(no_drop, std::placeholders::_1)),
+    BlockProperties().id(BlockID::lapis_ore).material(Materials::ROCK).tool(item::ToolType::pickaxe, item::ToolTier::stone).hardness(3.0f).texture(160).sound(SoundType::stone).drops(std::bind(random_range_drop, std::placeholders::_1, item::ItemStack(+ItemID::dye, 1, 4), 4, 8)),
+    BlockProperties().id(BlockID::lapis_block).material(Materials::ROCK).tool(item::ToolType::pickaxe, item::ToolTier::stone).hardness(3.0f).texture(144).sound(SoundType::stone),
+    BlockProperties().id(BlockID::dispenser).material(Materials::ROCK).tool(item::ToolType::pickaxe, item::ToolTier::wood).hardness(3.5f).texture(46).sound(SoundType::stone).render_type(RenderType::full_special),
+    BlockProperties().id(BlockID::sandstone).material(Materials::ROCK).tool(item::ToolType::pickaxe, item::ToolTier::wood).hardness(0.8f).texture(176).sound(SoundType::stone).render_type(RenderType::full_special),
+    BlockProperties().id(BlockID::note_block).material(Materials::WOOD).tool(item::ToolType::axe, item::ToolTier::no_tier).hardness(0.8f).texture(74).sound(SoundType::wood),
+    BlockProperties().id(BlockID::bed).material(Materials::CLOTH).hardness(0.2f).texture(134).transparent(true).solid(false).opacity(0).sound(SoundType::stone).render_type(RenderType::special).valid_item(false),
+    BlockProperties().id(BlockID::golden_rail).material(Materials::CIRCUITS).tool(item::ToolType::pickaxe, item::ToolTier::no_tier).texture(163).opacity(0).transparent(true).solid(false).sound(SoundType::metal).aabb(flat_aabb).render_type(RenderType::flat_ground).collision(CollisionType::none).needs_support(true),
+    BlockProperties().id(BlockID::detector_rail).material(Materials::CIRCUITS).tool(item::ToolType::pickaxe, item::ToolTier::no_tier).texture(179).opacity(0).transparent(true).solid(false).sound(SoundType::metal).aabb(flat_aabb).render_type(RenderType::flat_ground).collision(CollisionType::none).needs_support(true),
+    BlockProperties().id(BlockID::sticky_piston).material(Materials::CIRCUITS).tool(item::ToolType::pickaxe, item::ToolTier::no_tier).state(0x0B).texture(106).solid(false).sound(SoundType::stone).render_type(RenderType::full_special),
+    BlockProperties().id(BlockID::cobweb).material(Materials::ROCK).tool(item::ToolType::sword, item::ToolTier::wood).texture(11).solid(false).opacity(0).transparent(true).sound(SoundType::stone).render_type(RenderType::cross).collision(CollisionType::none),
+    BlockProperties().id(BlockID::tallgrass).material(Materials::ROCK).texture(55).solid(false).opacity(0).transparent(true).sound(SoundType::grass).render_type(RenderType::cross).collision(CollisionType::none).needs_support(true),
+    BlockProperties().id(BlockID::deadbush).material(Materials::ROCK).texture(55).solid(false).opacity(0).transparent(true).sound(SoundType::grass).render_type(RenderType::cross).collision(CollisionType::none).needs_support(true),
+    BlockProperties().id(BlockID::piston).material(Materials::ROCK).tool(item::ToolType::pickaxe, item::ToolTier::no_tier).state(3).texture(108).solid(false).sound(SoundType::stone).render_type(RenderType::full_special),
+    BlockProperties().id(BlockID::piston_head).material(Materials::ROCK).tool(item::ToolType::pickaxe, item::ToolTier::no_tier).texture(107).solid(false).sound(SoundType::stone).valid_item(false),
+    BlockProperties().id(BlockID::wool).material(Materials::ROCK).hardness(0.8f).texture(64).sound(SoundType::cloth).render_type(RenderType::full_special),
+    BlockProperties().id(BlockID::piston_extension).material(Materials::ROCK).texture(0).solid(false).sound(SoundType::stone).valid_item(false),
+    BlockProperties().id(BlockID::dandelion).material(Materials::PLANTS).hardness(0.0f).texture(13).solid(false).opacity(0).transparent(true).sound(SoundType::grass).aabb(flower_aabb).render_type(RenderType::cross).collision(CollisionType::none).needs_support(true),
+    BlockProperties().id(BlockID::rose).material(Materials::PLANTS).hardness(0.0f).texture(12).solid(false).opacity(0).transparent(true).sound(SoundType::grass).aabb(flower_aabb).render_type(RenderType::cross).collision(CollisionType::none).needs_support(true),
+    BlockProperties().id(BlockID::brown_mushroom).material(Materials::PLANTS).hardness(0.0f).texture(29).solid(false).opacity(0).transparent(true).sound(SoundType::grass).aabb(mushroom_aabb).render_type(RenderType::cross).collision(CollisionType::none).needs_support(true),
+    BlockProperties().id(BlockID::red_mushroom).material(Materials::PLANTS).hardness(0.0f).texture(28).solid(false).opacity(0).transparent(true).sound(SoundType::grass).aabb(mushroom_aabb).render_type(RenderType::cross).collision(CollisionType::none).needs_support(true),
+    BlockProperties().id(BlockID::gold_block).material(Materials::IRON).tool(item::ToolType::pickaxe, item::ToolTier::iron).hardness(3.0f).texture(23).sound(SoundType::metal),
+    BlockProperties().id(BlockID::iron_block).material(Materials::IRON).tool(item::ToolType::pickaxe, item::ToolTier::iron).hardness(5.0f).texture(22).sound(SoundType::metal),
+    BlockProperties().id(BlockID::double_stone_slab).material(Materials::ROCK).tool(item::ToolType::pickaxe, item::ToolTier::wood).hardness(2.0f).texture(6).sound(SoundType::stone).render_type(RenderType::full_special),
+    BlockProperties().id(BlockID::stone_slab).material(Materials::ROCK).tool(item::ToolType::pickaxe, item::ToolTier::wood).hardness(2.0f).texture(6).opacity(0).solid(false).transparent(true).sound(SoundType::stone).aabb(slab_aabb).render_type(RenderType::slab),
+    BlockProperties().id(BlockID::bricks).material(Materials::ROCK).tool(item::ToolType::pickaxe, item::ToolTier::wood).hardness(2.0f).texture(7).sound(SoundType::stone),
+    BlockProperties().id(BlockID::tnt).material(Materials::TNT).hardness(0.0f).texture(8).sound(SoundType::grass).render_type(RenderType::full_special).destroy(spawn_tnt_destroy).drops(std::bind(no_drop, std::placeholders::_1)),
+    BlockProperties().id(BlockID::bookshelf).material(Materials::WOOD).tool(item::ToolType::axe, item::ToolTier::no_tier).hardness(1.5f).texture(35).sound(SoundType::wood).render_type(RenderType::full_special),
+    BlockProperties().id(BlockID::mossy_cobblestone).material(Materials::ROCK).tool(item::ToolType::pickaxe, item::ToolTier::wood).hardness(2.0f).texture(36).sound(SoundType::stone),
+    BlockProperties().id(BlockID::obsidian).material(Materials::ROCK).tool(item::ToolType::pickaxe, item::ToolTier::diamond).hardness(10.0f).texture(37).sound(SoundType::stone).blast_resistance(-1),
+    BlockProperties().id(BlockID::torch).material(Materials::CIRCUITS).hardness(0.0f).texture(80).solid(false).opacity(0).transparent(true).luminance(14).sound(SoundType::wood).aabb(torch_aabb).render_type(RenderType::special).collision(CollisionType::none).needs_support(true),
+    BlockProperties().id(BlockID::fire).material(Materials::FIRE).hardness(0.0f).texture(31).solid(false).opacity(0).transparent(true).luminance(15).sound(SoundType::cloth),
+    BlockProperties().id(BlockID::mob_spawner).material(Materials::ROCK).tool(item::ToolType::pickaxe, item::ToolTier::wood).hardness(5.0f).texture(65).solid(false).opacity(0).transparent(true).sound(SoundType::metal).drops(std::bind(no_drop, std::placeholders::_1)),
+    BlockProperties().id(BlockID::oak_stairs).material(Materials::WOOD).tool(item::ToolType::axe, item::ToolTier::no_tier).hardness(2.0f).texture(4).solid(false).sound(SoundType::wood),
+    BlockProperties().id(BlockID::chest).material(Materials::WOOD).tool(item::ToolType::axe, item::ToolTier::no_tier).hardness(2.5f).texture(27).sound(SoundType::wood).render_type(RenderType::full_special).added(chest_added).destroy(chest_destroy),
+    BlockProperties().id(BlockID::redstone_wire).material(Materials::CIRCUITS).hardness(0.0f).texture(164).solid(false).opacity(0).transparent(true).sound(SoundType::stone).aabb(flat_aabb).render_type(RenderType::flat_ground).valid_item(false).collision(CollisionType::none).needs_support(true),
+    BlockProperties().id(BlockID::diamond_ore).material(Materials::ROCK).tool(item::ToolType::pickaxe, item::ToolTier::iron).hardness(3.0f).texture(50).sound(SoundType::stone).drops(std::bind(fixed_drop, std::placeholders::_1, item::ItemStack(+ItemID::diamond, 1))),
+    BlockProperties().id(BlockID::diamond_block).material(Materials::IRON).tool(item::ToolType::pickaxe, item::ToolTier::iron).hardness(5.0f).texture(24).sound(SoundType::metal),
+    BlockProperties().id(BlockID::crafting_table).material(Materials::WOOD).tool(item::ToolType::axe, item::ToolTier::no_tier).hardness(2.5f).texture(59).sound(SoundType::wood).render_type(RenderType::full_special),
+    BlockProperties().id(BlockID::wheat).material(Materials::PLANTS).hardness(0.0f).texture(95).solid(false).opacity(0).transparent(true).sound(SoundType::grass).render_type(RenderType::cross).collision(CollisionType::none).needs_support(true),
+    BlockProperties().id(BlockID::farmland).material(Materials::GROUND).tool(item::ToolType::shovel, item::ToolTier::no_tier).hardness(0.6f).texture(86).sound(SoundType::dirt).drops(std::bind(fixed_drop, std::placeholders::_1, item::ItemStack(BlockID::dirt, 1))),
+    BlockProperties().id(BlockID::furnace).material(Materials::ROCK).tool(item::ToolType::pickaxe, item::ToolTier::wood).hardness(3.5f).texture(44).sound(SoundType::stone).render_type(RenderType::full_special),
+    BlockProperties().id(BlockID::lit_furnace).material(Materials::ROCK).tool(item::ToolType::pickaxe, item::ToolTier::wood).hardness(3.5f).texture(61).sound(SoundType::stone).render_type(RenderType::full_special),
+    BlockProperties().id(BlockID::standing_sign).material(Materials::WOOD).tool(item::ToolType::axe, item::ToolTier::no_tier).hardness(1.0f).texture(4).solid(false).opacity(0).transparent(false).sound(SoundType::wood).render_type(RenderType::cross).collision(CollisionType::none),
+    BlockProperties().id(BlockID::wooden_door).material(Materials::WOOD).tool(item::ToolType::axe, item::ToolTier::no_tier).hardness(3.0f).texture(81).solid(false).opacity(0).transparent(true).sound(SoundType::wood).render_type(RenderType::special).aabb(door_aabb),
+    BlockProperties().id(BlockID::ladder).material(Materials::WOOD).tool(item::ToolType::axe, item::ToolTier::no_tier).hardness(0.4f).texture(83).solid(false).opacity(0).transparent(true).sound(SoundType::wood).render_type(RenderType::special).collision(CollisionType::none),
+    BlockProperties().id(BlockID::rail).material(Materials::CIRCUITS).tool(item::ToolType::pickaxe, item::ToolTier::no_tier).hardness(0.7f).texture(128).opacity(0).transparent(true).solid(false).sound(SoundType::metal).aabb(flat_aabb).render_type(RenderType::flat_ground).collision(CollisionType::none).needs_support(true),
+    BlockProperties().id(BlockID::stone_stairs).material(Materials::ROCK).tool(item::ToolType::pickaxe, item::ToolTier::wood).hardness(2.0f).texture(16).solid(false).sound(SoundType::stone),
+    BlockProperties().id(BlockID::wall_sign).material(Materials::WOOD).tool(item::ToolType::pickaxe, item::ToolTier::no_tier).hardness(1.0f).texture(4).solid(false).opacity(0).transparent(false).sound(SoundType::wood).render_type(RenderType::cross).collision(CollisionType::none),
+    BlockProperties().id(BlockID::lever).material(Materials::CIRCUITS).hardness(0.5f).texture(96).solid(false).opacity(0).transparent(true).sound(SoundType::wood).render_type(RenderType::special).collision(CollisionType::none).aabb(flat_aabb),
+    BlockProperties().id(BlockID::stone_pressure_plate).material(Materials::CIRCUITS).tool(item::ToolType::pickaxe, item::ToolTier::no_tier).hardness(0.5f).texture(0).solid(false).opacity(0).transparent(true).sound(SoundType::stone).aabb(flat_aabb).render_type(RenderType::flat_ground).collision(CollisionType::none).needs_support(true),
+    BlockProperties().id(BlockID::iron_door).material(Materials::IRON).tool(item::ToolType::pickaxe, item::ToolTier::no_tier).hardness(5.0f).texture(82).solid(false).opacity(0).transparent(true).sound(SoundType::metal).render_type(RenderType::special).aabb(door_aabb),
+    BlockProperties().id(BlockID::wooden_pressure_plate).material(Materials::CIRCUITS).tool(item::ToolType::pickaxe, item::ToolTier::no_tier).hardness(0.5f).texture(4).solid(false).opacity(0).transparent(true).sound(SoundType::wood).aabb(flat_aabb).render_type(RenderType::flat_ground).collision(CollisionType::none).needs_support(true),
+    BlockProperties().id(BlockID::redstone_ore).material(Materials::ROCK).tool(item::ToolType::pickaxe, item::ToolTier::iron).hardness(3.0f).texture(51).sound(SoundType::stone).drops(std::bind(random_range_drop, std::placeholders::_1, item::ItemStack(+ItemID::redstone_dust, 1), 4, 5)),
+    BlockProperties().id(BlockID::lit_redstone_ore).material(Materials::ROCK).tool(item::ToolType::pickaxe, item::ToolTier::iron).texture(51).sound(SoundType::stone).luminance(9).drops(std::bind(random_range_drop, std::placeholders::_1, item::ItemStack(+ItemID::redstone_dust, 1), 4, 5)),
+    BlockProperties().id(BlockID::unlit_redstone_torch).material(Materials::CIRCUITS).hardness(0.0f).texture(115).solid(false).opacity(0).transparent(true).luminance(0).sound(SoundType::stone).aabb(torch_aabb).render_type(RenderType::special).collision(CollisionType::none).needs_support(true),
+    BlockProperties().id(BlockID::redstone_torch).material(Materials::CIRCUITS).hardness(0.0f).texture(99).solid(false).opacity(0).transparent(true).luminance(7).sound(SoundType::stone).aabb(torch_aabb).render_type(RenderType::special).collision(CollisionType::none).needs_support(true),
+    BlockProperties().id(BlockID::stone_button).material(Materials::CIRCUITS).tool(item::ToolType::pickaxe, item::ToolTier::no_tier).hardness(0.5f).texture(0).solid(false).opacity(0).transparent(false).sound(SoundType::stone).aabb(flat_aabb).render_type(RenderType::special).collision(CollisionType::none),
+    BlockProperties().id(BlockID::snow_layer).material(Materials::SNOW_LAYER).tool(item::ToolType::shovel, item::ToolTier::wood).hardness(0.1f).texture(66).solid(false).opacity(0).transparent(false).sound(SoundType::cloth).aabb(snow_layer_aabb).render_type(RenderType::special).collision(CollisionType::none).drops(std::bind(no_drop, std::placeholders::_1)).destroy(snow_layer_destroy).needs_support(true),
+    BlockProperties().id(BlockID::ice).material(Materials::ICE).tool(item::ToolType::pickaxe, item::ToolTier::no_tier).hardness(0.5f).texture(67).solid(true).opacity(3).transparent(true).sound(SoundType::glass).slipperiness(0.98f).drops(std::bind(no_drop, std::placeholders::_1)).destroy(std::bind(melt_destroy, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3)),
+    BlockProperties().id(BlockID::snow_block).material(Materials::SNOW).tool(item::ToolType::shovel, item::ToolTier::wood).hardness(0.2f).texture(66).solid(false).opacity(0).transparent(true).sound(SoundType::cloth).render_type(RenderType::full).collision(CollisionType::none),
+    BlockProperties().id(BlockID::cactus).material(Materials::CACTUS).hardness(0.4f).texture(70).solid(false).opacity(0).transparent(true).sound(SoundType::cloth).aabb(cactus_aabb).render_type(RenderType::special).nonflat(true),
+    BlockProperties().id(BlockID::clay).material(Materials::CLAY).tool(item::ToolType::shovel, item::ToolTier::no_tier).hardness(0.6f).texture(72).sound(SoundType::dirt),
+    BlockProperties().id(BlockID::reeds).material(Materials::PLANTS).hardness(0.0f).texture(73).solid(false).opacity(0).transparent(true).sound(SoundType::grass).render_type(RenderType::cross).collision(CollisionType::none).needs_support(true),
+    BlockProperties().id(BlockID::jukebox).material(Materials::WOOD).tool(item::ToolType::pickaxe, item::ToolTier::no_tier).hardness(2.0f).texture(74).sound(SoundType::wood).render_type(RenderType::full_special),
+    BlockProperties().id(BlockID::fence).material(Materials::WOOD).tool(item::ToolType::axe, item::ToolTier::no_tier).hardness(2.0f).texture(4).solid(false).opacity(0).transparent(true).sound(SoundType::wood).render_type(RenderType::special),
+    BlockProperties().id(BlockID::pumpkin).material(Materials::PUMPKIN).tool(item::ToolType::axe, item::ToolTier::no_tier).hardness(1.0f).texture(118).opacity(0).sound(SoundType::wood).render_type(RenderType::full_special),
+    BlockProperties().id(BlockID::netherrack).material(Materials::ROCK).tool(item::ToolType::pickaxe, item::ToolTier::wood).hardness(0.4f).texture(103).sound(SoundType::stone),
+    BlockProperties().id(BlockID::soul_sand).material(Materials::SAND).tool(item::ToolType::shovel, item::ToolTier::no_tier).hardness(0.5f).texture(104).sound(SoundType::sand),
+    BlockProperties().id(BlockID::glowstone).material(Materials::GLASS).tool(item::ToolType::pickaxe, item::ToolTier::no_tier).hardness(0.3f).texture(105).sound(SoundType::glass).luminance(15),
+    BlockProperties().id(BlockID::portal).material(Materials::PORTAL).hardness(-1.0f).texture(14).solid(false).opacity(0).transparent(true).luminance(11).sound(SoundType::glass).render_type(RenderType::special).collision(CollisionType::none),
+    BlockProperties().id(BlockID::lit_pumpkin).material(Materials::PUMPKIN).tool(item::ToolType::axe, item::ToolTier::no_tier).hardness(1.0f).texture(120).opacity(0).sound(SoundType::wood).render_type(RenderType::full_special),
+    BlockProperties().id(BlockID::cake).material(Materials::CAKE).hardness(0.5f).texture(121).opacity(0).sound(SoundType::wood).render_type(RenderType::full_special),
+    BlockProperties().id(BlockID::unpowered_repeater).material(Materials::CIRCUITS).hardness(0.0f).texture(131).opacity(0).sound(SoundType::wood).render_type(RenderType::flat_ground),
+    BlockProperties().id(BlockID::powered_repeater).material(Materials::CIRCUITS).hardness(0.0f).texture(147).opacity(0).sound(SoundType::wood).luminance(10).render_type(RenderType::flat_ground),
     // Reserved for a fully white block.
     BlockProperties().id(BlockID::reserved).texture(0).solid(false).opacity(0).transparent(true).luminance(15).sound(SoundType::cloth),
 
