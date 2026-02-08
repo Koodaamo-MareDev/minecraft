@@ -13,6 +13,8 @@
 #include <gui/gui_dirtscreen.hpp>
 #include <gui/gui_container.hpp>
 #include <gui/gui_crafting.hpp>
+#include <gui/gui_smelting.hpp>
+#include <world/tile_entity/tile_entity_furnace.hpp>
 #include <util/debuglog.hpp>
 
 namespace Crapper
@@ -1579,6 +1581,12 @@ namespace Crapper
             Gui::set_gui(gui);
             break;
         }
+        case 2:
+        {
+            GuiSmelting *gui = new GuiSmelting(&remote_world->player, nullptr, window_id, nullptr);
+            Gui::set_gui(gui);
+            break;
+        }
         default:
             throw std::runtime_error("Received invalid inventory type " + std::to_string(inventory_type));
         }
@@ -1710,6 +1718,28 @@ namespace Crapper
             }
             for (size_t i = 0; i < items.size(); i++)
                 debug::print("[1] Set slot %d in window %d to item %d\n", i, window_id, items[i].id);
+        }
+    }
+
+    void MinecraftClient::handleUpdateProgressBar(ByteBuffer &buffer)
+    {
+        // Read progress bar update
+        uint8_t window_id = buffer.readByte();
+        int16_t progress_id = buffer.readShort();
+        int16_t progress = buffer.readShort();
+        if (buffer.underflow)
+            return;
+        Gui *gui = Gui::get_gui();
+        if (gui && gui->window_id == window_id)
+        {
+            GuiSmelting *smelting_gui = dynamic_cast<GuiSmelting *>(gui);
+            if (smelting_gui)
+            {
+                if (progress_id == 0)
+                    smelting_gui->cook_time_percent = std::min(100, int(progress) * 100 / 200);
+                else if (progress_id == 1)
+                    smelting_gui->burn_time_percent = std::min(100, int(progress) * 100 / 200);
+            }
         }
     }
 
@@ -2015,6 +2045,11 @@ namespace Crapper
         {
             // Handle packet 0x68 (inventory)
             handleWindowItems(buffer);
+            break;
+        }
+        case 0x69:
+        {
+            handleUpdateProgressBar(buffer);
             break;
         }
         case 0x6A:
