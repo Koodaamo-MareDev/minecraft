@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <unistd.h>
 #include <ported/Random.hpp>
+#include <ported/SystemTime.hpp>
 #include <crapper/client.hpp>
 #include <filesystem>
 
@@ -1272,7 +1273,7 @@ void World::save(Progress *prog)
         int spawn_y = spawn_ch ? skycast(Vec3i(spawn_pos.x, 0, spawn_pos.z), spawn_ch) : spawn_pos.y;
         level_data->setTag("SpawnY", new NBTTagInt(spawn_y < 0 ? this->spawn_pos.y : spawn_y));
         level_data->setTag("SpawnZ", new NBTTagInt(spawn_pos.z));
-        level_data->setTag("LastPlayed", new NBTTagLong(time(nullptr) * 1000LL));
+        level_data->setTag("LastPlayed", new NBTTagLong(javaport::System::currentTimeMillis()));
         level_data->setTag("LevelName", new NBTTagString("Wii World"));
         level_data->setTag("RandomSeed", new NBTTagLong(seed));
         level_data->setTag("version", new NBTTagInt(19132));
