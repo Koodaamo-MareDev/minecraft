@@ -192,6 +192,7 @@ void World::update_chunks()
             }
             if (chunk->state != ChunkState::done)
                 continue;
+            chunk->tick_tile_entities();
 
             if (!chunk->lit_state && light_up_calls < 5)
             {

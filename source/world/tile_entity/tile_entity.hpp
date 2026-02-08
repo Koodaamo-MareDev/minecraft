@@ -7,6 +7,8 @@
 
 #include <world/chunk.hpp>
 
+class World;
+
 class TileEntity
 {
 public:
@@ -21,8 +23,10 @@ public:
     virtual std::string id() = 0;
 
     virtual ~TileEntity() = default;
-    
+
     virtual void remove();
+
+    virtual void tick(World *world) {}
 
     template <typename T>
     static void register_ctor(const std::string &name)
