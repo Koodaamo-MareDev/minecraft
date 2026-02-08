@@ -185,10 +185,10 @@ uint32_t get_face_texture_index(Block *block, int face)
     case BlockID::furnace:
     case BlockID::lit_furnace:
     {
-        int block_direction = block->meta % 6;
+        int block_direction = block->meta & 3;
         if (face == FACE_NY || face == FACE_PY)
-            return blockid == BlockID::dispenser ? 62 : 0;
-        if (face == facingmap[block_direction])
+            return 62;
+        if (face == directionmap[block_direction])
             return get_default_texture_index(blockid);
         return 45;
     }
