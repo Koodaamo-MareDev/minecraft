@@ -23,7 +23,7 @@ namespace crafting
         return result;
     }
 
-    void crafting::Input::trim(size_t width, size_t height, const std::vector<item::ItemStack> &input_items)
+    void Input::trim(size_t width, size_t height, const std::vector<item::ItemStack> &input_items)
     {
         this->items = input_items;
 
