@@ -33,11 +33,18 @@ namespace input
             joysticks[JOY_RIGHT].y = float(int(data->exp.classic.rjs.pos.y) - int(data->exp.classic.rjs.center.y)) * 2 / (int(data->exp.classic.rjs.max.y) - 2 - int(data->exp.classic.rjs.min.y));
 
             // Apply deadzone
-            if (joysticks[JOY_LEFT].magnitude() < 0.1f)
+            if (joysticks[JOY_LEFT].magnitude() < deadzone)
             {
                 joysticks[JOY_LEFT].x = 0;
                 joysticks[JOY_LEFT].y = 0;
             }
+
+            if (joysticks[JOY_RIGHT].magnitude() < deadzone)
+            {
+                joysticks[JOY_RIGHT].x = 0;
+                joysticks[JOY_RIGHT].y = 0;
+            }
+
             WPAD_Expansion(0, &data->exp);
             uint32_t classic_btn_h = WPAD_ButtonsHeld(0);
             uint32_t classic_btn_d = WPAD_ButtonsDown(0);
