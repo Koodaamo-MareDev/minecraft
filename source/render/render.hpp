@@ -57,9 +57,9 @@ int render_face(Vec3i pos, uint8_t face, uint32_t texture_index, Block *block = 
 
 int render_back_face(Vec3i pos, uint8_t face, uint32_t texture_index, Block *block = nullptr, uint8_t min_y = 0, uint8_t max_y = 16);
 
-void render_single_block(Block &selected_block, bool transparency);
+void render_single_block(Block &selected_block);
 
-void render_single_block_at(Block &selected_block, Vec3i pos, bool transparency);
+void render_single_block_at(Block &selected_block, Vec3i pos);
 
 void render_single_item(uint32_t texture_index, bool transparency, uint8_t light = 0xFF);
 

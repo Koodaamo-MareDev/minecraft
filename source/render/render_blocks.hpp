@@ -6,11 +6,11 @@
 
 class Block;
 
-int render_block(Block *block, const Vec3i &pos, bool transparent);
-int render_cube(Block *block, const Vec3i &pos, bool transparent);
-int render_inverted_cube(Block *block, const Vec3i &pos, bool transparent);
-int render_cube_special(Block *block, const Vec3i &pos, bool transparent);
-int render_inverted_cube_special(Block *block, const Vec3i &pos, bool transparent);
+int render_block(Block *block, const Vec3i &pos);
+int render_cube(Block *block, const Vec3i &pos);
+int render_inverted_cube(Block *block, const Vec3i &pos);
+int render_cube_special(Block *block, const Vec3i &pos);
+int render_inverted_cube_special(Block *block, const Vec3i &pos);
 int render_special(Block *block, const Vec3i &pos);
 int render_flat_ground(Block *block, const Vec3i &pos);
 int render_snow_layer(Block *block, const Vec3i &pos);
@@ -18,7 +18,6 @@ int render_chest(Block *block, const Vec3i &pos);
 int render_torch(Block *block, const Vec3i &pos);
 int render_torch_with_angle(Block *block, const Vec3f &vertex_pos, float ax, float az);
 int render_cactus(Block *block, const Vec3i &pos);
-int render_leaves(Block *block, const Vec3i &pos);
 int render_door(Block *block, const Vec3i &pos);
 int render_cross(Block *block, const Vec3i &pos);
 int render_slab(Block *block, const Vec3i &pos);

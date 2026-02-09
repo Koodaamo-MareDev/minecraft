@@ -455,31 +455,31 @@ int render_back_face(Vec3i pos, uint8_t face, uint32_t texture_index, Block *blo
     return 4;
 }
 
-void render_single_block(Block &selected_block, bool transparency)
+void render_single_block(Block &selected_block)
 {
     // Precalculate the vertex count. Set position to Y = -16 to render "outside the world"
-    int vertexCount = render_block(&selected_block, Vec3i(0, -16, 0), transparency);
+    int vertexCount = render_block(&selected_block, Vec3i(0, -16, 0));
 
     // Start drawing the block
     GX_BeginGroup(GX_QUADS, vertexCount);
 
     // Render the block. Set position to Y = -16 to render "outside the world"
-    render_block(&selected_block, Vec3i(0, -16, 0), transparency);
+    render_block(&selected_block, Vec3i(0, -16, 0));
 
     // End the group
     GX_EndGroup();
 }
 
-void render_single_block_at(Block &selected_block, Vec3i pos, bool transparency)
+void render_single_block_at(Block &selected_block, Vec3i pos)
 {
     // Precalculate the vertex count. Set position to Y = -16 to render "outside the world"
-    int vertexCount = render_block(&selected_block, pos, transparency);
+    int vertexCount = render_block(&selected_block, pos);
 
     // Start drawing the block
     GX_BeginGroup(GX_QUADS, vertexCount);
 
     // Render the block. Set position to Y = -16 to render "outside the world"
-    render_block(&selected_block, pos, transparency);
+    render_block(&selected_block, pos);
 
     // End the group
     GX_EndGroup();

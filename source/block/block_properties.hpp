@@ -42,6 +42,7 @@ enum class RenderType : uint8_t
     flat_ground,
     slab,
     special,
+    fluid,
 };
 
 enum class CollisionType : uint8_t
@@ -369,14 +370,9 @@ public:
         uint8_t light;
     };
 
-    void set_visibility(uint8_t flag)
-    {
-        this->visibility_flags = (this->visibility_flags & ~(0x40)) | (flag << 6);
-    }
-
     uint8_t get_visibility()
     {
-        return this->visibility_flags & (0x40);
+        return id && !properties(id).m_fluid;
     }
 
     uint8_t get_opacity(uint8_t face)
@@ -388,12 +384,6 @@ public:
     {
         this->visibility_flags &= ~(1 << face);
         this->visibility_flags |= (flag << face);
-    }
-
-    void set_blockid(BlockID value)
-    {
-        this->id = uint8_t(value);
-        this->set_visibility(value != BlockID::air && !properties(value).m_fluid);
     }
 
     int8_t get_cast_skylight()

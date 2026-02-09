@@ -1515,16 +1515,7 @@ namespace Crapper
         for (uint16_t i = 0; i < count; i++)
         {
             Vec3i pos = Vec3i(x + ((coords[i] >> 12) & 0xF), coords[i] & 0xFF, z + ((coords[i] >> 8) & 0xF));
-            Chunk *chunk = remote_world->get_chunk_from_pos(pos);
-            if (!chunk)
-            {
-                debug::print("Could not change block at %d %d %d as chunk doesn't exist!\n", pos.x, pos.y, pos.z);
-                continue;
-            }
-            Block *block = chunk->get_block(pos);
-            block->set_blockid(BlockID(types[i]));
-            block->meta = metas[i];
-            remote_world->mark_block_dirty(pos);
+            remote_world->set_block_and_meta_at(pos, BlockID(types[i]), metas[i]);
         }
     }
 

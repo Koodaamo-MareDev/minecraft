@@ -193,8 +193,7 @@ void Gui::draw_item(int x, int y, item::ItemStack stack, gertex::GXView &viewpor
             GX_LoadPosMtxImm(tmp_matrix, GX_PNMTX0);
 
             // Draw the block
-            render_single_block(block, false);
-            render_single_block(block, true);
+            render_single_block(block);
         }
         else
         {

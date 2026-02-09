@@ -238,7 +238,8 @@ void Model::render_handitem(ModelBox *box, item::ItemStack &item, Vec3f offset, 
             use_texture(terrain_texture);
 
             // Render as a block
-            render_single_block(selected_block, transparency);
+            if (transparency == properties(item.id).m_transparent)
+                render_single_block(selected_block);
 
             gertex::set_state(state);
             return;

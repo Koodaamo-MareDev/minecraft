@@ -571,7 +571,7 @@ void World::edit_blocks()
         // If destroying, the result block is air.
         if (finish_destroying)
         {
-            result_block.set_blockid(BlockID::air);
+            result_block.blockid = BlockID::air;
             result_block.meta = 0;
         }
 
@@ -604,7 +604,7 @@ void World::edit_blocks()
                 if (new_blockid == BlockID::stone_slab && editable_block->blockid == BlockID::stone_slab && held_block.meta == editable_block->meta && (result_pos.y - player.raycast_target_pos.y) == 0)
                 {
                     // Turn bottom slab into double slab
-                    result_block.set_blockid(BlockID::double_stone_slab);
+                    result_block.blockid = BlockID::double_stone_slab;
                 }
                 else if (editable_block->blockid != BlockID::air && !properties(editable_block->id).m_fluid)
                 {
@@ -1026,8 +1026,8 @@ void World::draw_scene(bool opaque)
             // Setup TEV for decal rendering
             GX_SetNumTevStages(1);
             GX_SetTevOp(GX_TEVSTAGE0, GX_DECAL);
-
-            render_single_block(targeted_block_copy, !opaque);
+            if (opaque != properties(targeted_block_copy.id).m_transparent)
+                render_single_block(targeted_block_copy);
 
             // Reset texture index override
             override_texture_index(-1);
@@ -1109,13 +1109,8 @@ void World::draw_selected_block()
             // Transform the selected block position
             transform_view_screen(gertex::get_view_matrix(), selectedBlockPos, guVector{.5f, .5f, .5f}, guVector{10, -45, 0});
 
-            // Opaque pass
-            GX_SetZMode(GX_TRUE, GX_ALWAYS, GX_TRUE);
-            render_single_block(selected_block, false);
-
-            // Transparent pass
-            GX_SetZMode(GX_FALSE, GX_ALWAYS, GX_TRUE);
-            render_single_block(selected_block, true);
+            GX_SetZMode(properties(selected_block.id).m_transparent ? GX_FALSE : GX_TRUE, GX_ALWAYS, GX_TRUE);
+            render_single_block(selected_block);
             return;
         }
 
@@ -1867,7 +1862,7 @@ void World::set_block_at(const Vec3i &pos, BlockID id)
     {
         if (block->blockid == id)
             return;
-        block->set_blockid(id);
+        block->blockid = id;
         block->meta = 0;
         BlockProperties &prop = properties(id);
         if (id != BlockID::air && prop.m_added)
@@ -1896,7 +1891,7 @@ void World::set_block_and_meta_at(const Vec3i &pos, BlockID id, uint8_t meta)
     {
         if (block->blockid == id && block->meta == meta)
             return;
-        block->set_blockid(id);
+        block->blockid = id;
         block->meta = meta;
         BlockProperties &prop = properties(id);
         if (id != BlockID::air && prop.m_added)

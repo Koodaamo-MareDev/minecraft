@@ -114,7 +114,7 @@ void GuiTitleScreen::draw()
             logo_block_z[i] = logo_block_speed[i] = 0;
         Vec3f logo_block_pos = Vec3f(((int(i) % 38) - 19) * .89, -(int(i) / 38), logo_block_z[i]);
         transform_view(gertex::get_view_matrix(), logo_block_pos, Vec3f(.89, 1, .4), Vec3f(90, 0, 0));
-        render_single_block(block, false);
+        render_single_block(block);
     }
 
     // Return back to GUI rendering

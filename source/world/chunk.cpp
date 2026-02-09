@@ -540,8 +540,8 @@ void Chunk::load(NBTTagCompound &stream)
         uint32_t index1 = ix | (iz << 4) | (iy << 8);
         uint32_t index2 = index1 | 0x100;
 
-        blockstates[index1].set_blockid((BlockID)blocks[in_index]);
-        blockstates[index2].set_blockid((BlockID)blocks[in_index | 1]);
+        blockstates[index1].id = (blocks[in_index]);
+        blockstates[index2].id = (blocks[in_index | 1]);
 
         blockstates[index1].meta = data[i] & 0xF;
         blockstates[index2].meta = (data[i] >> 4) & 0xF;

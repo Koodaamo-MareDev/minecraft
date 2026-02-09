@@ -62,7 +62,7 @@ void ChunkProviderOverworld::provide_chunk(Chunk *chunk)
     Block *block = chunk->blockstates;
     for (int32_t i = 0; i < 16 * 16 * WORLD_HEIGHT; i++, block++)
     {
-        block->set_blockid(blocks[i]);
+        block->blockid = blocks[i];
     }
 
     // Fix snowy grass
@@ -121,7 +121,7 @@ void ChunkProviderOverworld::plant_tree(Vec3i pos, int height)
         return;
 
     // Place dirt below tree
-    base_block->set_blockid(BlockID::dirt);
+    base_block->blockid = BlockID::dirt;
 
     // Place wide part of leaves
     for (int x = -2; x <= 2; x++)
@@ -212,7 +212,7 @@ void ChunkProviderOverworld::generate_flowers(Vec3i pos, javaport::Random &rng)
             block = chunk->get_block(flower_pos);
             if (block->blockid != BlockID::air)
                 continue;
-            block->set_blockid((flower_value & 1) ? BlockID::dandelion : BlockID::rose);
+            block->blockid = (flower_value & 1) ? BlockID::dandelion : BlockID::rose;
         }
     }
 }
@@ -231,7 +231,7 @@ void ChunkProviderOverworld::generate_vein(Vec3i pos, BlockID id, javaport::Rand
                     Block *block = world->get_block_at(pos);
                     if (block && block->blockid == BlockID::stone)
                     {
-                        block->set_blockid(id);
+                        block->blockid = id;
                     }
                 }
             }

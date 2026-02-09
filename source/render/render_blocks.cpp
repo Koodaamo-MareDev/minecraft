@@ -1,50 +1,38 @@
 #include "render_blocks.hpp"
 
+#include <functional>
 #include <world/world.hpp>
 #include <world/chunk.hpp>
 #include <block/blocks.hpp>
 #include <render/render.hpp>
 
-int render_block(Block *block, const Vec3i &pos, bool transparent)
+static std::map<RenderType, std::function<int(Block *, const Vec3i &)>> render_functions = {
+    {RenderType::full, render_cube},
+    {RenderType::full_special, render_cube_special},
+    {RenderType::cross, render_cross},
+    {RenderType::flat_ground, render_flat_ground},
+    {RenderType::slab, render_slab},
+    {RenderType::special, render_special},
+    {RenderType::fluid, [](Block *, const Vec3i &)
+     { return 0; }},
+};
+
+int render_block(Block *block, const Vec3i &pos)
 {
-    if (!block->get_visibility() || properties(block->id).m_fluid || transparent != properties(block->id).m_transparent)
+    switch (block->blockid)
+    {
+    case BlockID::air:
         return 0;
-    if (transparent)
-    {
-        switch (properties(block->id).m_render_type)
-        {
-        case RenderType::cross:
-            return render_cross(block, pos);
-        case RenderType::special:
-            return render_special(block, pos);
-        case RenderType::flat_ground:
-            return render_flat_ground(block, pos);
-        case RenderType::slab:
-            return render_slab(block, pos);
-        default:
-            break;
-        }
+    case BlockID::chest:
+        return render_chest(block, pos);
+    case BlockID::snow_layer:
+        return render_snow_layer(block, pos);
+    default:
+        return render_functions[properties(block->id).m_render_type](block, pos);
     }
-    else
-    {
-        switch (block->blockid)
-        {
-        case BlockID::chest:
-            return render_chest(block, pos);
-        case BlockID::snow_layer:
-            return render_snow_layer(block, pos);
-        default:
-            break;
-        }
-    }
-    if (properties(block->id).m_render_type == RenderType::full_special)
-    {
-        return render_cube_special(block, pos, transparent);
-    }
-    return render_cube(block, pos, transparent);
 }
 
-int render_cube(Block *block, const Vec3i &pos, bool transparent)
+int render_cube(Block *block, const Vec3i &pos)
 {
     int vertexCount = 0;
     for (uint8_t face = 0; face < 6; face++)
@@ -55,7 +43,7 @@ int render_cube(Block *block, const Vec3i &pos, bool transparent)
     return vertexCount;
 }
 
-int render_inverted_cube(Block *block, const Vec3i &pos, bool transparent)
+int render_inverted_cube(Block *block, const Vec3i &pos)
 {
     int vertexCount = 0;
     for (uint8_t face = 0; face < 6; face++)
@@ -66,7 +54,7 @@ int render_inverted_cube(Block *block, const Vec3i &pos, bool transparent)
     return vertexCount;
 }
 
-int render_inverted_cube_special(Block *block, const Vec3i &pos, bool transparent)
+int render_inverted_cube_special(Block *block, const Vec3i &pos)
 {
     int vertexCount = 0;
     for (uint8_t face = 0; face < 6; face++)
@@ -77,7 +65,7 @@ int render_inverted_cube_special(Block *block, const Vec3i &pos, bool transparen
     return vertexCount;
 }
 
-int render_cube_special(Block *block, const Vec3i &pos, bool transparent)
+int render_cube_special(Block *block, const Vec3i &pos)
 {
     int vertexCount = 0;
     for (uint8_t face = 0; face < 6; face++)
@@ -102,8 +90,6 @@ int render_special(Block *block, const Vec3i &pos)
         return render_door(block, pos);
     case BlockID::cactus:
         return render_cactus(block, pos);
-    case BlockID::leaves:
-        return render_leaves(block, pos);
     default:
         return 0;
     }
@@ -417,10 +403,6 @@ int render_cactus(Block *block, const Vec3i &pos)
     GX_VertexLit({vertex_pos + Vec3f{-.5, -.5, -.4375}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NZ);
 
     return vertexCount;
-}
-int render_leaves(Block *block, const Vec3i &pos)
-{
-    return render_cube_special(block, pos, !render_fast_leaves);
 }
 int render_cross(Block *block, const Vec3i &pos)
 {

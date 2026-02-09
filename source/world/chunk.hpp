@@ -158,7 +158,7 @@ public:
      */
     void set_block(const Vec3i &pos, BlockID block_id)
     {
-        this->blockstates[(pos.x & 0xF) | ((pos.y & MAX_WORLD_Y) << 8) | ((pos.z & 0xF) << 4)].set_blockid(block_id);
+        this->blockstates[(pos.x & 0xF) | ((pos.y & MAX_WORLD_Y) << 8) | ((pos.z & 0xF) << 4)].blockid = block_id;
     }
 
     /**
@@ -170,7 +170,7 @@ public:
     {
         if (block_to_chunk_pos(pos) != Vec2i(this->x, this->z))
             return;
-        this->blockstates[(pos.x & 0xF) | ((pos.y & MAX_WORLD_Y) << 8) | ((pos.z & 0xF) << 4)].set_blockid(block_id);
+        this->blockstates[(pos.x & 0xF) | ((pos.y & MAX_WORLD_Y) << 8) | ((pos.z & 0xF) << 4)].blockid = block_id;
     }
 
     /**
@@ -182,9 +182,8 @@ public:
     void replace_air(const Vec3i &position, BlockID id)
     {
         Block *block = this->get_block(position);
-        if (block->blockid != BlockID::air)
-            return;
-        block->set_blockid(id);
+        if (!block->blockid)
+            block->blockid = id;
     }
 
     /**
@@ -196,9 +195,8 @@ public:
     void try_replace_air(const Vec3i &position, BlockID id)
     {
         Block *block = this->try_get_block(position);
-        if (!block || block->blockid)
-            return;
-        block->set_blockid(id);
+        if (block && !block->blockid)
+            block->blockid = id;
     }
 
     int32_t player_taxicab_distance();

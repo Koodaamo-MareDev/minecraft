@@ -521,13 +521,13 @@ void EntityFallingBlock::render(float partial_ticks, bool transparency)
         // Prepare the transformation matrix
         Vec3f chunk_pos = Vec3f(int_pos.x & ~0xF, int_pos.y & ~0xF, int_pos.z & ~0xF) + Vec3f(0.5);
         transform_view(gertex::get_view_matrix(), chunk_pos);
-        render_single_block_at(block_state, int_pos, transparency);
+        render_single_block_at(block_state, int_pos);
     }
     else
     {
         // Prepare the transformation matrix
         transform_view(gertex::get_view_matrix(), get_position(partial_ticks) + Vec3f(0, 0.5, 0));
-        render_single_block(block_state, transparency);
+        render_single_block(block_state);
     }
 }
 
@@ -575,8 +575,7 @@ void EntityExplosiveBlock::render(float partial_ticks, bool transparency)
     if ((fuse / 5) % 2 == 1)
         use_texture(white_texture);
 
-    render_single_block(block_state, false);
-    render_single_block(block_state, true);
+    render_single_block(block_state);
 
     use_texture(terrain_texture);
 }
@@ -833,7 +832,7 @@ void EntityItem::render(float partial_ticks, bool transparency)
                 transform_view(gertex::get_view_matrix(), entity_position + anim_offset + dupe_offset * i, Vec3f(0.25), item_rot, true);
                 BlockProperties props = properties(block.id);
                 if (bool(props.m_transparent) == transparency)
-                    render_single_block(block, props.m_transparent);
+                    render_single_block(block);
             }
             else
             {

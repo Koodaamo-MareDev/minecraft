@@ -7,6 +7,9 @@
 #include <util/lock.hpp>
 #include <world/chunk.hpp>
 #include <world/world.hpp>
+
+extern bool render_fast_leaves;
+
 namespace ChunkRenderer
 {
     static uint8_t vbo_buffer[64000 * VERTEX_ATTR_LENGTH] __attribute__((aligned(32)));
@@ -117,7 +120,9 @@ namespace ChunkRenderer
                 for (int _x = 0; _x < 16; _x++, block++)
                 {
                     Vec3i blockpos = Vec3i(_x, _y, _z) + section_offset;
-                    expected_vertex_count += render_block(block, blockpos, transparent);
+                    BlockProperties &props = properties(block->id);
+                    if (transparent == props.m_transparent)
+                        expected_vertex_count += render_block(block, blockpos);
                 }
             }
         }
