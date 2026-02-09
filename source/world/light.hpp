@@ -10,22 +10,18 @@ class World;
 class LightEngine
 {
 private:
-    static void update(const Vec3i &update);
-
     static lwp_t thread_handle;
     static bool thread_active;
-    static bool use_skylight;
     static std::deque<Vec3i> pending_updates;
     static World *current_world;
 
 public:
-    static void update_optimized(const Vec3i &start);
+    static void update(const Vec3i &start);
     static void init(World *world);
     static void deinit();
     static void loop();
     static void reset();
     static void post(const Vec3i &location);
-    static void enable_skylight(bool enabled);
     static bool busy();
 };
 enum LightType

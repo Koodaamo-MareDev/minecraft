@@ -1642,9 +1642,6 @@ void World::set_hell(bool hell)
         GX_InvVtxCache();
     }
 
-    // Disable sky light in hell
-    LightEngine::enable_skylight(!hell);
-
     this->hell = hell;
 }
 
