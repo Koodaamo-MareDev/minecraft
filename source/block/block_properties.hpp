@@ -350,7 +350,12 @@ inline BlockProperties &properties(uint8_t id)
 class Block
 {
 public:
-    uint8_t id = 0;
+    union
+    {
+        uint8_t id;
+        BlockID blockid;
+    };
+
     uint8_t visibility_flags = 0;
     uint8_t meta = 0;
     union
@@ -363,11 +368,6 @@ public:
 
         uint8_t light;
     };
-
-    BlockID get_blockid()
-    {
-        return BlockID(this->id);
-    }
 
     void set_visibility(uint8_t flag)
     {

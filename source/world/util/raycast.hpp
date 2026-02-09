@@ -51,7 +51,7 @@ inline int checkabove(Vec3i pos, Chunk *chunk = nullptr, World *world = nullptr)
         return pos.y;
     // Starting from the y coordinate, cast a ray up that stops at the first (partially) opaque block.
     pos.y++;
-    while (pos.y < MAX_WORLD_Y && (block = chunk->get_block(pos)) && properties(block->get_blockid()).m_collision == CollisionType::none)
+    while (pos.y < MAX_WORLD_Y && (block = chunk->get_block(pos)) && properties(block->blockid).m_collision == CollisionType::none)
         pos.y++;
     // This should return MAX_WORLD_Y at most which means the ray hit the world height limit
     return pos.y;
@@ -64,7 +64,7 @@ inline int checkbelow(Vec3i pos, Chunk *chunk = nullptr, World *world = nullptr)
         return pos.y;
     // Starting from the y coordinate, cast a ray down that stops at the first (partially) opaque block.
     pos.y--;
-    while (pos.y > 0 && (block = chunk->get_block(pos)) && properties(block->get_blockid()).m_collision == CollisionType::none)
+    while (pos.y > 0 && (block = chunk->get_block(pos)) && properties(block->blockid).m_collision == CollisionType::none)
         pos.y--;
     // This should return 0 at most which means the ray hit the bedrock
     return pos.y;
@@ -77,7 +77,7 @@ inline int skycast_safe(Vec3i pos, Chunk *chunk = nullptr, World *world = nullpt
         return -9999;
     // Starting from world height limit, cast a ray down that stops at the first (partially) opaque block.
     pos.y = MAX_WORLD_Y;
-    while (pos.y > 0 && (block = chunk->get_block(pos)) && !get_block_opacity(block->get_blockid()))
+    while (pos.y > 0 && (block = chunk->get_block(pos)) && !get_block_opacity(block->blockid))
         pos.y--;
     // If the cast went out of the world bounds, tell it to the caller by returning -9999
     if (!block)
@@ -186,7 +186,7 @@ inline bool raycast(
             Block *block = world->get_block_at(block_pos);
             if (block)
             {
-                BlockID blockid = block->get_blockid();
+                BlockID blockid = block->blockid;
                 if (blockid != BlockID::air && !is_fluid(blockid))
                 {
                     if (output)
@@ -312,7 +312,7 @@ inline bool raycast_inverse(
             Block *block = world->get_block_at(block_pos);
             if (block)
             {
-                BlockID blockid = block->get_blockid();
+                BlockID blockid = block->blockid;
                 if (blockid == BlockID::air || is_fluid(blockid))
                 {
                     if (output)
@@ -510,7 +510,7 @@ inline bool raycast_precise(
             Block *block = world->get_block_at(block_pos);
             if (block)
             {
-                BlockID blockid = block->get_blockid();
+                BlockID blockid = block->blockid;
                 if (blockid != BlockID::air && !is_fluid(blockid))
                 {
                     AABB aabb;
@@ -642,7 +642,7 @@ inline void explode_raycast(Vec3f origin, Vec3f direction, float intensity, Worl
         Block *block = world->get_block_at(block_pos);
         if (block)
         {
-            if (block->get_blockid() != BlockID::air)
+            if (block->blockid != BlockID::air)
             {
                 float blast_resistance = properties(block->id).m_blast_resistance;
                 if (blast_resistance < 0)
@@ -650,7 +650,7 @@ inline void explode_raycast(Vec3f origin, Vec3f direction, float intensity, Worl
                 intensity -= (blast_resistance + 0.3) * 0.3;
                 if (intensity <= 0)
                     break;
-                if (block->get_blockid() == BlockID::tnt)
+                if (block->blockid == BlockID::tnt)
                 {
                     world->add_entity(new EntityExplosiveBlock(*block, block_pos, rand() % 20 + 10));
                 }

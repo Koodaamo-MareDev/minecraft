@@ -226,7 +226,7 @@ void World::tick_blocks()
         if ((block_tick.ticks & 0x7FFFFFFF) > this->ticks)
             break;
         Block *block = get_block_at(block_tick.pos);
-        if (block && block->get_blockid() == block_tick.block_id)
+        if (block && block->blockid == block_tick.block_id)
         {
             BlockProperties &props = properties(block->id);
             if (props.m_tick)
@@ -563,7 +563,7 @@ void World::edit_blocks()
     player.raycast_target_found = raycast_precise(camera.position, angles_to_vector(camera.rot.x, camera.rot.y), 4, &player.raycast_target_pos, &player.raycast_target_face, player.raycast_target_bounds, this);
     if (player.raycast_target_found && (finish_destroying || should_place_block))
     {
-        BlockID new_blockid = finish_destroying ? BlockID::air : held_block.get_blockid();
+        BlockID new_blockid = finish_destroying ? BlockID::air : held_block.blockid;
 
         // The block that the result of the action will be stored in temporarily.
         Block result_block = held_block;
@@ -590,7 +590,7 @@ void World::edit_blocks()
                 // Handle slab corner cases
 
                 Block *targeted_block = get_block_at(player.raycast_target_pos);
-                if (player.raycast_target_face.y == 1 && new_blockid == BlockID::stone_slab && targeted_block->get_blockid() == BlockID::stone_slab && held_block.meta == targeted_block->meta)
+                if (player.raycast_target_face.y == 1 && new_blockid == BlockID::stone_slab && targeted_block->blockid == BlockID::stone_slab && held_block.meta == targeted_block->meta)
                 {
                     // Adjust position to the block being targeted if we're facing the top face of a bottom slab
                     result_pos = player.raycast_target_pos;
@@ -601,12 +601,12 @@ void World::edit_blocks()
                 // 1. Both the held block and the editable block are slabs of the same type.
                 // 2. The block being placed is on the same vertical level as the targeted block.
                 // This prevents the off-by-one issue when placing the top half between two bottom slabs.
-                if (new_blockid == BlockID::stone_slab && editable_block->get_blockid() == BlockID::stone_slab && held_block.meta == editable_block->meta && (result_pos.y - player.raycast_target_pos.y) == 0)
+                if (new_blockid == BlockID::stone_slab && editable_block->blockid == BlockID::stone_slab && held_block.meta == editable_block->meta && (result_pos.y - player.raycast_target_pos.y) == 0)
                 {
                     // Turn bottom slab into double slab
                     result_block.set_blockid(BlockID::double_stone_slab);
                 }
-                else if (editable_block->get_blockid() != BlockID::air && !properties(editable_block->id).m_fluid)
+                else if (editable_block->blockid != BlockID::air && !properties(editable_block->id).m_fluid)
                 {
                     should_place_block = false;
                 }
@@ -614,7 +614,7 @@ void World::edit_blocks()
                 // Block use handlers
                 if (!finish_destroying && should_place_block)
                 {
-                    switch (targeted_block->get_blockid())
+                    switch (targeted_block->blockid)
                     {
                     case BlockID::crafting_table:
                     {
@@ -693,9 +693,9 @@ void World::edit_blocks()
                 bool success = place_block(result_pos, player.raycast_target_pos, &held_block, face_num);
                 if (success)
                 {
-                    if (result_block.get_blockid() != BlockID::air)
+                    if (result_block.blockid != BlockID::air)
                     {
-                        set_block_and_meta_at(result_pos, result_block.get_blockid(), result_block.meta);
+                        set_block_and_meta_at(result_pos, result_block.blockid, result_block.meta);
                     }
                     if (!is_remote())
                     {
@@ -760,7 +760,7 @@ void World::save_and_clean_chunk(Chunk *chunk)
 
 void World::destroy_block(const Vec3i pos, Block *old_block)
 {
-    BlockID old_blockid = old_block->get_blockid();
+    BlockID old_blockid = old_block->blockid;
     set_block_at(pos, BlockID::air);
     notify_at(pos);
 
@@ -813,7 +813,7 @@ bool World::place_block(const Vec3i pos, const Vec3i targeted, Block *new_block,
 
     // Check if the block has collision
     bool intersects_entity = false;
-    if (properties(new_block->get_blockid()).m_solid)
+    if (properties(new_block->blockid).m_solid)
     {
         // Ensure no entities are in the way
         for (int x = -1; !intersects_entity && x <= 1; x++)
@@ -838,7 +838,7 @@ bool World::place_block(const Vec3i pos, const Vec3i targeted, Block *new_block,
 
     if (!intersects_entity && new_block->id != BlockID::air)
     {
-        Sound sound = get_mine_sound(new_block->get_blockid());
+        Sound sound = get_mine_sound(new_block->blockid);
         sound.volume = 0.4f;
         sound.pitch *= 0.8f;
         sound.position = Vec3f(pos.x, pos.y, pos.z);
@@ -998,7 +998,7 @@ void World::draw_scene(bool opaque)
     {
         Chunk *targeted_chunk = get_chunk_from_pos(player.raycast_target_pos);
         Block *targeted_block = targeted_chunk ? targeted_chunk->get_block(player.raycast_target_pos) : nullptr;
-        if (targeted_block && targeted_block->get_blockid() != BlockID::air)
+        if (targeted_block && targeted_block->blockid != BlockID::air)
         {
             // Create a copy of the targeted block for rendering
             Block targeted_block_copy = *targeted_block;
@@ -1494,7 +1494,7 @@ void World::update_player()
 #endif
     Vec3i block_pos = player.get_head_blockpos();
     Block *block = get_block_at(block_pos);
-    if (block && properties(block->id).m_fluid && block_pos.y + 2 - get_fluid_height(this, block_pos, block->get_blockid()) >= player.aabb.min.y + player.y_offset)
+    if (block && properties(block->id).m_fluid && block_pos.y + 2 - get_fluid_height(this, block_pos, block->blockid) >= player.aabb.min.y + player.y_offset)
     {
         player.in_fluid = properties(block->id).m_base_fluid;
     }
@@ -1514,7 +1514,7 @@ void World::update_player()
             last_targeted_block = targeted_block;
         }
 
-        if (targeted_block && targeted_block->get_blockid() != BlockID::air)
+        if (targeted_block && targeted_block->blockid != BlockID::air)
         {
             if (is_remote() && player.mining_tick == 0)
             {
@@ -1543,7 +1543,7 @@ void World::update_player()
                     }
 
                     // Play the mining sound
-                    Sound sound = get_mine_sound(targeted_block->get_blockid());
+                    Sound sound = get_mine_sound(targeted_block->blockid);
                     sound.pitch *= 0.5f;
                     sound.volume = 0.15f;
                     sound.position = Vec3f(player.raycast_target_pos.x, player.raycast_target_pos.y, player.raycast_target_pos.z);
@@ -1556,7 +1556,7 @@ void World::update_player()
                     particle.type = PTYPE_BLOCK_BREAK;
                     particle.size = 8;
                     particle.brightness = 0xFF;
-                    int texture_index = get_default_texture_index(targeted_block->get_blockid());
+                    int texture_index = get_default_texture_index(targeted_block->blockid);
                     int u = PARTICLE_X(texture_index);
                     int v = PARTICLE_Y(texture_index);
 
@@ -1608,7 +1608,7 @@ void World::update_player()
                 }
 
                 // Increase the mining progress
-                player.mining_progress += properties(targeted_block->get_blockid()).get_break_multiplier(*player.selected_item, player.on_ground, basefluid(player.in_fluid) == BlockID::water);
+                player.mining_progress += properties(targeted_block->blockid).get_break_multiplier(*player.selected_item, player.on_ground, basefluid(player.in_fluid) == BlockID::water);
             }
             else
             {
@@ -1833,7 +1833,7 @@ BlockID World::get_block_id_at(const Vec3i &position, BlockID default_id)
     Block *block = get_block_at(position);
     if (!block)
         return default_id;
-    return block->get_blockid();
+    return block->blockid;
 }
 
 Block *World::get_block_at(const Vec3i &position)
@@ -1865,7 +1865,7 @@ void World::set_block_at(const Vec3i &pos, BlockID id)
     Block *block = get_block_at(pos);
     if (block)
     {
-        if (block->get_blockid() == id)
+        if (block->blockid == id)
             return;
         block->set_blockid(id);
         block->meta = 0;
@@ -1894,7 +1894,7 @@ void World::set_block_and_meta_at(const Vec3i &pos, BlockID id, uint8_t meta)
     Block *block = get_block_at(pos);
     if (block)
     {
-        if (block->get_blockid() == id && block->meta == meta)
+        if (block->blockid == id && block->meta == meta)
             return;
         block->set_blockid(id);
         block->meta = meta;

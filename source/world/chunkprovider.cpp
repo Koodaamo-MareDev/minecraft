@@ -116,7 +116,7 @@ void ChunkProviderOverworld::plant_tree(Vec3i pos, int height)
     Block *base_block = world->get_block_at(pos - Vec3i(0, 1, 0));
     if (!base_block)
         return;
-    BlockID base_id = base_block->get_blockid();
+    BlockID base_id = base_block->blockid;
     if (base_id != BlockID::grass && base_id != BlockID::dirt)
         return;
 
@@ -207,10 +207,10 @@ void ChunkProviderOverworld::generate_flowers(Vec3i pos, javaport::Random &rng)
         if (flower_pos.y >= 64)
         {
             Block *block = chunk->get_block(flower_pos - Vec3i(0, 1, 0));
-            if (block->get_blockid() != BlockID::grass)
+            if (block->blockid != BlockID::grass)
                 continue;
             block = chunk->get_block(flower_pos);
-            if (block->get_blockid() != BlockID::air)
+            if (block->blockid != BlockID::air)
                 continue;
             block->set_blockid((flower_value & 1) ? BlockID::dandelion : BlockID::rose);
         }
@@ -229,7 +229,7 @@ void ChunkProviderOverworld::generate_vein(Vec3i pos, BlockID id, javaport::Rand
                 {
                     Vec3i pos(x, y, z);
                     Block *block = world->get_block_at(pos);
-                    if (block && block->get_blockid() == BlockID::stone)
+                    if (block && block->blockid == BlockID::stone)
                     {
                         block->set_blockid(id);
                     }
@@ -254,7 +254,7 @@ void ChunkProviderOverworld::generate_ore_type(Vec3i pos, BlockID id, int count,
         x = rng.nextInt(3) - 1;
         y = rng.nextInt(3) - 1;
         z = rng.nextInt(3) - 1;
-        if (block && block->get_blockid() == id && (x | y | z) != 0)
+        if (block && block->blockid == id && (x | y | z) != 0)
         {
             offset_pos = Vec3i(x + offset_pos.x, y + offset_pos.y, z + offset_pos.z);
             generate_vein(offset_pos, id, rng);

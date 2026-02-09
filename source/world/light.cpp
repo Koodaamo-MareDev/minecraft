@@ -168,7 +168,7 @@ void LightEngine::update(const Vec3i &start)
 
         if (!block->id || can_see_through(properties(block->id)))
         {
-            int8_t opacity = std::max<int8_t>(get_block_opacity(block->get_blockid()), 1);
+            int8_t opacity = std::max<int8_t>(get_block_opacity(block->blockid), 1);
 
             for (int i = 0; i < 6; i++)
             {

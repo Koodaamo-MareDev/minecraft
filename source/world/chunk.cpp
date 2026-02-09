@@ -95,7 +95,7 @@ void Chunk::light_up()
             pos.y = 0;
             for (Block *block = low_block; block < max_height_block; block += 256, pos.y++)
             {
-                if (get_block_luminance(block->get_blockid()))
+                if (get_block_luminance(block->blockid))
                 {
                     LightEngine::post(pos);
                 }
@@ -785,7 +785,7 @@ void Chunk::read()
         Vec3i block_pos = pos + Vec3i(i & 0xF, (i >> 8) & 0x7F, (i >> 4) & 0xF);
         BlockProperties &prop = properties(block->id);
         if (prop.m_tick_on_load)
-            world->schedule_block_update(block_pos, block->get_blockid(), 0);
+            world->schedule_block_update(block_pos, block->blockid, 0);
     }
 
     // Mark chunk as dirty

@@ -114,14 +114,14 @@ void EntityPhysical::tick()
                     continue;
                 if (!block->intersects(fluid_aabb, block_pos))
                     continue;
-                if (block->get_blockid() == BlockID::cobweb)
+                if (block->blockid == BlockID::cobweb)
                     cobweb_movement = true;
-                if (!is_fluid(block->get_blockid()))
+                if (!is_fluid(block->blockid))
                     continue;
-                if (y + 1 - get_fluid_height(world, block_pos, block->get_blockid()) >= max.y)
+                if (y + 1 - get_fluid_height(world, block_pos, block->blockid) >= max.y)
                     continue;
                 fluid_velocity = fluid_velocity + get_fluid_direction(world, block, block_pos);
-                BlockID base_fluid = basefluid(block->get_blockid());
+                BlockID base_fluid = basefluid(block->blockid);
                 if (base_fluid == BlockID::water)
                     water_movement = true;
                 if (base_fluid == BlockID::lava)
@@ -446,10 +446,10 @@ void EntityFallingBlock::tick()
     {
         Vec3i int_pos = get_foot_blockpos();
         Block *block = world->get_block_at(int_pos);
-        if (block && (block->get_blockid() == BlockID::air || properties(block->id).m_fluid))
+        if (block && (block->blockid == BlockID::air || properties(block->id).m_fluid))
         {
             // Update the block
-            world->set_block_and_meta_at(int_pos, block_state.get_blockid(), block_state.meta);
+            world->set_block_and_meta_at(int_pos, block_state.blockid, block_state.meta);
             world->notify_at(int_pos);
             dead = true;
         }

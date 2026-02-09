@@ -182,7 +182,7 @@ public:
     void replace_air(const Vec3i &position, BlockID id)
     {
         Block *block = this->get_block(position);
-        if (block->get_blockid() != BlockID::air)
+        if (block->blockid != BlockID::air)
             return;
         block->set_blockid(id);
     }
@@ -196,7 +196,7 @@ public:
     void try_replace_air(const Vec3i &position, BlockID id)
     {
         Block *block = this->try_get_block(position);
-        if (!block || block->get_blockid() != BlockID::air)
+        if (!block || block->blockid)
             return;
         block->set_blockid(id);
     }

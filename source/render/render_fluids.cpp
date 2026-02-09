@@ -65,7 +65,7 @@ Vec3f get_fluid_direction(World *world, Block *block, Vec3i pos)
     if ((fluid_level & 7) == 0)
         return Vec3f(0.0, -1.0, 0.0);
 
-    BlockID block_id = block->get_blockid();
+    BlockID block_id = block->blockid;
 
     // Used to check block types around the fluid
     Block *neighbors[6];
@@ -78,7 +78,7 @@ Vec3f get_fluid_direction(World *world, Block *block, Vec3i pos)
     {
         if (i == FACE_NY || i == FACE_PY)
             continue;
-        if (neighbors[i] && is_same_fluid(neighbors[i]->get_blockid(), block_id))
+        if (neighbors[i] && is_same_fluid(neighbors[i]->blockid, block_id))
         {
             direction_set = true;
             if (get_fluid_meta_level(neighbors[i]) < fluid_level)
@@ -96,7 +96,7 @@ Vec3f get_fluid_direction(World *world, Block *block, Vec3i pos)
 
 int render_fluid(Block *block, const Vec3i &pos, World *world)
 {
-    BlockID block_id = block->get_blockid();
+    BlockID block_id = block->blockid;
 
     int faceCount = 0;
     Vec3i local_pos = {pos.x & 0xF, pos.y & 0xF, pos.z & 0xF};
@@ -117,7 +117,7 @@ int render_fluid(Block *block, const Vec3i &pos, World *world)
         world->get_neighbors(pos, neighbors);
     for (int x = 0; x < 6; x++)
     {
-        neighbor_ids[x] = neighbors[x] ? neighbors[x]->get_blockid() : BlockID::air;
+        neighbor_ids[x] = neighbors[x] ? neighbors[x]->blockid : BlockID::air;
     }
 
     if (!base3d_is_drawing)

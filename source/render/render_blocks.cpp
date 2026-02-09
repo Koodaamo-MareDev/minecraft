@@ -27,7 +27,7 @@ int render_block(Block *block, const Vec3i &pos, bool transparent)
     }
     else
     {
-        switch (block->get_blockid())
+        switch (block->blockid)
         {
         case BlockID::chest:
             return render_chest(block, pos);
@@ -50,7 +50,7 @@ int render_cube(Block *block, const Vec3i &pos, bool transparent)
     for (uint8_t face = 0; face < 6; face++)
     {
         if (block->get_opacity(face))
-            vertexCount += render_face(pos, face, get_default_texture_index(block->get_blockid()), block);
+            vertexCount += render_face(pos, face, get_default_texture_index(block->blockid), block);
     }
     return vertexCount;
 }
@@ -61,7 +61,7 @@ int render_inverted_cube(Block *block, const Vec3i &pos, bool transparent)
     for (uint8_t face = 0; face < 6; face++)
     {
         if (block->get_opacity(face))
-            vertexCount += render_back_face(pos, face, get_default_texture_index(block->get_blockid()), block);
+            vertexCount += render_back_face(pos, face, get_default_texture_index(block->blockid), block);
     }
     return vertexCount;
 }
@@ -90,7 +90,7 @@ int render_cube_special(Block *block, const Vec3i &pos, bool transparent)
 
 int render_special(Block *block, const Vec3i &pos)
 {
-    switch (block->get_blockid())
+    switch (block->blockid)
     {
     case BlockID::torch:
     case BlockID::unlit_redstone_torch:
@@ -114,7 +114,7 @@ int render_flat_ground(Block *block, const Vec3i &pos)
     uint8_t lighting = block->light;
     Vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
     Vec3f vertex_pos(local_pos.x, local_pos.y, local_pos.z);
-    uint32_t texture_index = get_default_texture_index(block->get_blockid());
+    uint32_t texture_index = get_default_texture_index(block->blockid);
     GX_VertexLit({vertex_pos + Vec3f{0.5, -.4375, -.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PY);
     GX_VertexLit({vertex_pos + Vec3f{0.5, -.4375, 0.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PY);
     GX_VertexLit({vertex_pos + Vec3f{-.5, -.4375, 0.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PY);
@@ -126,7 +126,7 @@ int render_snow_layer(Block *block, const Vec3i &pos)
 {
     Vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
     Vec3f vertex_pos(local_pos.x, local_pos.y, local_pos.z);
-    uint32_t texture_index = get_default_texture_index(block->get_blockid());
+    uint32_t texture_index = get_default_texture_index(block->blockid);
     int vertexCount = 4;
 
     // Top
@@ -139,7 +139,7 @@ int render_snow_layer(Block *block, const Vec3i &pos)
             render_world->get_neighbors(pos, neighbors);
         for (int i = 0; i < 6; i++)
         {
-            neighbor_ids[i] = neighbors[i] ? neighbors[i]->get_blockid() : BlockID::air;
+            neighbor_ids[i] = neighbors[i] ? neighbors[i]->blockid : BlockID::air;
         }
     }
 
@@ -208,7 +208,7 @@ int render_torch(Block *block, const Vec3i &pos)
 int render_torch_with_angle(Block *block, const Vec3f &vertex_pos, float ax, float az)
 {
     uint8_t lighting = block->light;
-    uint32_t texture_index = get_default_texture_index(block->get_blockid());
+    uint32_t texture_index = get_default_texture_index(block->blockid);
 
     // Negative X side
     GX_VertexLit({vertex_pos + Vec3f{-.0625f + ax, -.5f, -.5f + az}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NX);
@@ -245,7 +245,7 @@ int render_door(Block *block, const Vec3i &pos)
     Vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
     Vec3f vertex_pos = Vec3f(local_pos.x, local_pos.y, local_pos.z) - Vec3f(0.5);
 
-    uint32_t texture_index = get_default_texture_index(block->get_blockid());
+    uint32_t texture_index = get_default_texture_index(block->blockid);
     bool replace_texture = texture_index != properties(block->id).m_texture_index;
     bool top_half = block->meta & 8;
     bool open = block->meta & 4;
@@ -369,7 +369,7 @@ int render_cactus(Block *block, const Vec3i &pos)
     uint8_t lighting = block->light;
     Vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
     Vec3f vertex_pos(local_pos.x, local_pos.y, local_pos.z);
-    uint32_t texture_index = get_default_texture_index(block->get_blockid());
+    uint32_t texture_index = get_default_texture_index(block->blockid);
     uint32_t top_texture_index = texture_index - 1;
     uint32_t bottom_texture_index = texture_index + 1;
     int vertexCount = 16;
@@ -427,7 +427,7 @@ int render_cross(Block *block, const Vec3i &pos)
     uint8_t lighting = block->light;
     Vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
     Vec3f vertex_pos(local_pos.x, local_pos.y, local_pos.z);
-    uint32_t texture_index = get_default_texture_index(block->get_blockid());
+    uint32_t texture_index = get_default_texture_index(block->blockid);
 
     // Front face
 
@@ -465,7 +465,7 @@ int render_slab(Block *block, const Vec3i &pos)
     Vec3f vertex_pos(local_pos.x, local_pos.y, local_pos.z);
 
     // Check for texture overrides
-    uint32_t texture_index = get_default_texture_index(block->get_blockid());
+    uint32_t texture_index = get_default_texture_index(block->blockid);
     uint32_t top_index = texture_index;
     uint32_t side_index = top_index - 1;
     uint32_t bottom_index = top_index;
@@ -539,7 +539,7 @@ int render_slab(Block *block, const Vec3i &pos)
 int get_chest_texture_index(Block *block, const Vec3i &pos, uint8_t face)
 {
     // Check for texture overrides
-    uint32_t texture_index = get_default_texture_index(block->get_blockid());
+    uint32_t texture_index = get_default_texture_index(block->blockid);
     if (texture_index != properties(block->id).m_texture_index)
         return texture_index;
 
@@ -559,7 +559,7 @@ int get_chest_texture_index(Block *block, const Vec3i &pos, uint8_t face)
     }
 
     if (std::none_of(neighbors, neighbors + 4, [](Block *block)
-                     { return block && block->get_blockid() == BlockID::chest; }))
+                     { return block && block->blockid == BlockID::chest; }))
     {
         // Single chest
         uint8_t direction = FACE_PZ;
@@ -575,10 +575,10 @@ int get_chest_texture_index(Block *block, const Vec3i &pos, uint8_t face)
 
     // Double chest
 
-    if ((face != FACE_NZ && face != FACE_PZ) && neighbors[0]->get_blockid() != BlockID::chest && neighbors[1]->get_blockid() != BlockID::chest)
+    if ((face != FACE_NZ && face != FACE_PZ) && neighbors[0]->blockid != BlockID::chest && neighbors[1]->blockid != BlockID::chest)
     {
         // X axis
-        bool half = neighbors[2]->get_blockid() == BlockID::chest;
+        bool half = neighbors[2]->blockid == BlockID::chest;
         uint8_t other_flags = neighbors[half ? 2 : 3]->visibility_flags;
         uint8_t direction = FACE_PX;
         if ((!(block->visibility_flags & (1 << FACE_PX)) || !(other_flags & (1 << FACE_PX))) && (block->visibility_flags & (1 << FACE_NX)) && (other_flags & (1 << FACE_NX)))
@@ -589,10 +589,10 @@ int get_chest_texture_index(Block *block, const Vec3i &pos, uint8_t face)
 
         return 26 + (face == direction ? 16 : 32) - half;
     }
-    else if ((face != FACE_NX && face != FACE_PX) && neighbors[2]->get_blockid() != BlockID::chest && neighbors[3]->get_blockid() != BlockID::chest)
+    else if ((face != FACE_NX && face != FACE_PX) && neighbors[2]->blockid != BlockID::chest && neighbors[3]->blockid != BlockID::chest)
     {
         // Z axis
-        bool half = neighbors[0]->get_blockid() == BlockID::chest;
+        bool half = neighbors[0]->blockid == BlockID::chest;
 
         uint8_t other_flags = neighbors[half ? 0 : 1]->visibility_flags;
         uint8_t direction = FACE_PZ;
