@@ -978,6 +978,8 @@ void EntityLiving::tick()
     {
         hurt_ticks--;
     }
+    if (in_water)
+        fall_distance = 0;
     if (on_ground)
     {
         if (fall_distance > 0)
