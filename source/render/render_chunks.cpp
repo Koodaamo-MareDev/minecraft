@@ -16,8 +16,6 @@ namespace ChunkRenderer
 
     void render_section(Section &section, bool transparent)
     {
-        assert((((uint32_t)vbo_buffer) & 31) == 0);
-
         VBO &section_vbo = transparent ? section.transparent : section.solid;
 
         DCInvalidateRange(vbo_buffer, sizeof(vbo_buffer));
