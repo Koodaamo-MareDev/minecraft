@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <fstream>
 #include <nbt/nbt.hpp>
+#include <miniz/miniz.h>
 #include <mcregion.hpp>
 #include <world/world.hpp>
 #include <world/util/coord.hpp>

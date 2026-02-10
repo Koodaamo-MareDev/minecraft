@@ -8,12 +8,6 @@
 #include <iostream>
 #include <bit>
 #include <ported/ByteBuffer.hpp>
-#include <miniz/miniz.h> // For compression and decompression (RFC 1950 and RFC 1952)
-
-// Gzip format constants for compression and decompression
-constexpr size_t GZIP_HEADER_SIZE = 10;
-constexpr size_t GZIP_FOOTER_SIZE = 8;
-constexpr uint8_t GZIP_HEADER[GZIP_HEADER_SIZE] = {0x1F, 0x8B, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03};
 
 class NBTTagCompound;
 

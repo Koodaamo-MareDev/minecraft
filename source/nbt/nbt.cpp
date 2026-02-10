@@ -1,5 +1,12 @@
 #include "nbt.hpp"
 
+#include <miniz/miniz.h> // For compression and decompression (RFC 1950 and RFC 1952)
+
+// Gzip format constants for compression and decompression
+constexpr size_t GZIP_HEADER_SIZE = 10;
+constexpr size_t GZIP_FOOTER_SIZE = 8;
+constexpr uint8_t GZIP_HEADER[GZIP_HEADER_SIZE] = {0x1F, 0x8B, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03};
+
 uint32_t byteswap(uint32_t x)
 {
     return ((x & 0xFF) << 24) | ((x & 0xFF00) << 8) | ((x & 0xFF0000) >> 8) | ((x & 0xFF000000) >> 24);
@@ -164,7 +171,7 @@ NBTTagCompound *NBTBase::readGZip(ByteBuffer &buffer)
                 delete base;
                 throw std::runtime_error("Root tag is not a compound tag");
             }
-            
+
             return (NBTTagCompound *)base;
         }
         else
