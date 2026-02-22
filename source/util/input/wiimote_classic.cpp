@@ -26,6 +26,7 @@ namespace input
         WPADData *data = WPAD_Data(0);
         if (data->exp.type == WPAD_EXP_CLASSIC)
         {
+            WPAD_Expansion(0, &data->exp);
             joysticks[JOY_LEFT].x = float(int(data->exp.classic.ljs.pos.x) - int(data->exp.classic.ljs.center.x)) * 2 / (int(data->exp.classic.ljs.max.x) - 2 - int(data->exp.classic.ljs.min.x));
             joysticks[JOY_LEFT].y = float(int(data->exp.classic.ljs.pos.y) - int(data->exp.classic.ljs.center.y)) * 2 / (int(data->exp.classic.ljs.max.y) - 2 - int(data->exp.classic.ljs.min.y));
 
@@ -45,7 +46,6 @@ namespace input
                 joysticks[JOY_RIGHT].y = 0;
             }
 
-            WPAD_Expansion(0, &data->exp);
             uint32_t classic_btn_h = WPAD_ButtonsHeld(0);
             uint32_t classic_btn_d = WPAD_ButtonsDown(0);
 
