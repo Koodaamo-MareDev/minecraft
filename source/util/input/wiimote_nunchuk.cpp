@@ -18,6 +18,7 @@ namespace input
     void WiimoteNunchuk::scan()
     {
         WPADData *data = WPAD_Data(0);
+        WPAD_Expansion(0, &data->exp);
         if (data->exp.type == WPAD_EXP_NUNCHUK)
         {
             buttons_down = 0;
