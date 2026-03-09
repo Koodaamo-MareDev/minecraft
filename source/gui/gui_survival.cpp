@@ -5,8 +5,11 @@
 #include <util/input/input.hpp>
 #include <crafting/recipe_manager.hpp>
 
+static PlayerModel player_model = PlayerModel();
+
 GuiSurvival::GuiSurvival(EntityPhysical *owner, inventory::Container *container) : GuiGenericContainer(owner, container, 0, "Inventory")
 {
+    memcpy(&player_model.texture, &player_texture, sizeof(GXTexObj));
     gertex::GXView viewport = gertex::get_state().view;
 
     int start_x = (viewport.width - width) / 2;
@@ -57,6 +60,59 @@ void GuiSurvival::draw()
 
     // Draw the background
     draw_textured_quad(inventory_texture, start_x, start_y, 512, 512, 0, 0, 256, 256);
+
+    GX_SetZMode(GX_TRUE, GX_GREATER, GX_TRUE);
+
+    gertex::GXState old_state = gertex::get_state();
+
+    gertex::set_color_format(0, GX_INDEX8);
+
+    gertex::set_color_add(GXColor{0, 0, 0, 0});
+    gertex::set_color_mul(GXColor{255, 255, 255, 255});
+
+    float player_x = start_x + 102;
+    float player_y = start_y + 150;
+    float cur_off_x = player_x - cursor_x;
+    float cur_off_y = player_y - 100 - cursor_y;
+
+    gertex::GXMatrix tmp;                             // Matrix that stores the active operation before applying it.
+    gertex::GXMatrix mtx = gertex::get_view_matrix(); // Matrix that stores the accumulated changes.
+
+    guMtxTrans(tmp.mtx, -player_x, -player_y, 50.0f);
+    guMtxConcat(mtx.mtx, tmp.mtx, mtx.mtx);
+
+    float scale = 60.0f;
+    guMtxScale(tmp.mtx, scale, scale, scale);
+    guMtxConcat(mtx.mtx, tmp.mtx, mtx.mtx);
+
+    guMtxRotDeg(tmp.mtx, 'z', 180.0f);
+    guMtxConcat(mtx.mtx, tmp.mtx, mtx.mtx);
+
+    guMtxRotDeg(tmp.mtx, 'y', 180.0f);
+    guMtxConcat(mtx.mtx, tmp.mtx, mtx.mtx);
+
+    player_model.head_rot.x = std::atan(cur_off_y / 40.0f) * -20.0f;
+    guMtxRotDeg(tmp.mtx, 'x', player_model.head_rot.x * 0.5f);
+    guMtxConcat(mtx.mtx, tmp.mtx, mtx.mtx);
+
+    player_model.head_rot.y = std::atan(cur_off_x / 40.0f) * -20.0f;
+    guMtxRotDeg(tmp.mtx, 'y', player_model.head_rot.y * 0.5f);
+    guMtxConcat(mtx.mtx, tmp.mtx, mtx.mtx);
+
+    guMtxTrans(tmp.mtx, 0, -1.62f, 0.0f);
+    guMtxConcat(mtx.mtx, tmp.mtx, mtx.mtx);
+
+    player_model.pose(0);
+
+    gertex::use_matrix(mtx);
+
+    use_texture(player_texture);
+    player_model.raw_render();
+
+    // Restore state
+    gertex::set_state(old_state);
+
+    GX_SetZMode(GX_TRUE, GX_ALWAYS, GX_TRUE);
 
     // Enable backface culling for the items
     GX_SetCullMode(GX_CULL_BACK);
