@@ -19,9 +19,9 @@ static void draw_busy_gui()
     GX_Flush();
 
     // Use 0 fractional bits for the position data, because we're drawing in pixel space
-    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, 0);
+    gertex::set_pos_precision(GX_S16, 0);
     // Enable direct colors
-    GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
+    gertex::set_color_format(0, GX_DIRECT);
     // Turn alpha updates on
     GX_SetAlphaUpdate(GX_TRUE);
     // Disable depth testing for GUI elements
@@ -31,16 +31,11 @@ static void draw_busy_gui()
     // Use normal blending
     gertex::set_blending(gertex::GXBlendMode::normal);
 
-    // Reset the orthogonal position matrix and push it onto the stack
     gertex::ortho(gertex::get_state().view);
-    gertex::push_matrix();
 
     // Draw the GUI elements
     Gui::get_gui()->draw();
 
-    // Restore the orthogonal position matrix
-    gertex::pop_matrix();
-    gertex::load_pos_matrix();
     GX_SetDrawDone();
 
     GX_CopyDisp(frameBuffer[fb], GX_TRUE);

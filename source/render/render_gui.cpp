@@ -141,6 +141,8 @@ vfloat_t text_width_3d(std::string text)
 
 void draw_text_3d(Vec3f pos, std::string text, GXColor color)
 {
+    gertex::GXState state = gertex::get_state();
+
     text = str::utf8_to_cp437(text);
     Camera &camera = get_camera();
 
@@ -148,11 +150,8 @@ void draw_text_3d(Vec3f pos, std::string text, GXColor color)
     Vec3f right_vec = -angles_to_vector(0, camera.rot.y + 90);
     Vec3f up_vec = -angles_to_vector(camera.rot.x + 90, camera.rot.y);
 
-    // Enable direct colors
-    GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
-
-    // Use floats for vertex positions
-    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_F32, 0);
+    gertex::set_color_format(0, GX_DIRECT);
+    gertex::set_pos_precision(GX_F32, 0);
 
     use_texture(font_texture);
 
@@ -213,11 +212,7 @@ void draw_text_3d(Vec3f pos, std::string text, GXColor color)
         x_offset += font_tile_widths[c];
     }
 
-    // Restore fixed point format
-    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, BASE3D_POS_FRAC_BITS);
-    
-    // Restore indexed colors
-    GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
+    gertex::set_state(state);
 }
 
 int draw_colored_quad(int32_t x, int32_t y, int32_t w, int32_t h, uint8_t r, uint8_t g, uint8_t b, uint8_t a, float scale)
@@ -234,6 +229,10 @@ int draw_colored_quad(int32_t x, int32_t y, int32_t w, int32_t h, uint8_t r, uin
 
 int fill_screen_texture(GXTexObj &texture, gertex::GXView &view, vfloat_t u1, vfloat_t v1, vfloat_t u2, vfloat_t v2, float scale)
 {
+    gertex::GXState state = gertex::get_state();
+    gertex::set_pos_precision(GX_S16, 0);
+    gertex::set_color_format(0, GX_DIRECT);
+
     use_texture(texture);
     float scale_u = 1.;// / GX_GetTexObjWidth(&texture);
     float scale_v = 1.;// / GX_GetTexObjHeight(&texture);
@@ -263,6 +262,8 @@ int fill_screen_texture(GXTexObj &texture, gertex::GXView &view, vfloat_t u1, vf
         }
     }
     GX_EndGroup();
+
+    gertex::set_state(state);
 
     return 4 * cols * rows;
 }

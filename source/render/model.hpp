@@ -66,7 +66,9 @@ public:
 
     void prepare();
 
-    virtual void render(vfloat_t distance, float partial_ticks, bool transparency);
+    void raw_render();
+    virtual void pose(vfloat_t distance_traveled) {}
+    virtual void render(float partial_ticks, bool transparency);
     void render_handitem(ModelBox *box, item::ItemStack &item, Vec3f pos, Vec3f rot, Vec3f scale, bool transparency);
 
     ModelBox *add_box(Vec3f pos, Vec3f size, uint16_t uv_off_x, uint16_t uv_off_y, vfloat_t inflate)
@@ -112,7 +114,7 @@ public:
         leg4->set_pos(Vec3f(2, 16, -4));
     }
 
-    void render(vfloat_t distance, float partial_ticks, bool transparency) override
+    void pose(vfloat_t distance) override
     {
         head->set_rot(head_rot - rot);
         float leg_rot = std::cos(distance * 0.6662f) * 1.4f * speed / M_DTOR;
@@ -121,7 +123,6 @@ public:
         leg2->set_rot(Vec3f(leg_rot2, 0, 0));
         leg3->set_rot(Vec3f(leg_rot2, 0, 0));
         leg4->set_rot(Vec3f(leg_rot, 0, 0));
-        Model::render(distance, partial_ticks, transparency);
     }
 };
 
@@ -153,23 +154,24 @@ public:
         right_leg->set_pos(Vec3f(2, 12, 0));
     }
 
-    void render(vfloat_t distance, float partial_ticks, bool transparency) override
+    void render(float partial_ticks, bool transparency) override
     {
-        float arm_rot = std::cos(distance * 0.6662f) * speed / M_DTOR;
-        float arm_rot2 = std::cos(distance * 0.6662f + M_PI) * speed / M_DTOR;
+        // The player should not render in the transparent pass
+        if (!transparency)
+            Model::render(partial_ticks, transparency);
+
+        render_handitem(right_arm, equipment[0], Vec3f(0, 0, 0), Vec3f(0, 0, 0), Vec3f(1.0), transparency);
+    }
+
+    void pose(vfloat_t distance_traveled) override
+    {
+        float arm_rot = std::cos(distance_traveled * 0.6662f) * speed / M_DTOR;
+        float arm_rot2 = std::cos(distance_traveled * 0.6662f + M_PI) * speed / M_DTOR;
         head->set_rot(head_rot - rot);
         left_arm->set_rot(Vec3f(arm_rot, 0, 0));
         right_arm->set_rot(Vec3f(arm_rot2, 0, 0));
         left_leg->set_rot(Vec3f(arm_rot * 1.4, 0, 0));
         right_leg->set_rot(Vec3f(arm_rot2 * 1.4, 0, 0));
-
-        // The player should not render in the transparent pass
-        if (!transparency)
-            Model::render(distance, partial_ticks, transparency);
-
-        gertex::GXState state = gertex::get_state();
-        render_handitem(right_arm, equipment[0], Vec3f(0, 0, 0), Vec3f(0, 0, 0), Vec3f(1.0), transparency);
-        gertex::set_state(state);
     }
 };
 

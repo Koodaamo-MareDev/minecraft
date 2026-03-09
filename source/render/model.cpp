@@ -81,7 +81,7 @@ void ModelBox::prepare()
     display_list_size = GX_EndDispList();
     if (!display_list_size || vtxcount != 24)
     {
-        free(display_list);
+        delete[] display_list;
         display_list = nullptr;
         display_list_size = 0;
         return;
@@ -91,9 +91,6 @@ void ModelBox::prepare()
 }
 void ModelBox::render()
 {
-    // Use floats for vertex positions
-    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_F32, 0);
-
     if (display_list && display_list_size)
     {
         gertex::GXMatrix pos_mtx = gertex::get_matrix();
@@ -125,13 +122,26 @@ void Model::prepare()
     ready = true;
 }
 
-void Model::render(vfloat_t distance, float partialTicks, bool transparency)
+void Model::raw_render()
 {
     prepare();
-    use_texture(texture);
-    Camera &camera = get_camera();
+
+    gertex::GXState state = gertex::get_state();
+
+    // Use floats for vertex positions
+    gertex::set_pos_precision(GX_F32, 0);
+
+    for (auto &box : boxes)
+    {
+        box->render();
+    }
+
+    gertex::set_state(state);
+}
+
+void Model::render(float partialTicks, bool transparency)
+{
     /*
-     *
      * The Y offset (1.5 + 1 / 128) is a shared offset for all entity models.
      * As to why this specific offset is used, it appears to be a historical
      * value chosen to align models correctly in the world. It likely accounts
@@ -145,14 +155,10 @@ void Model::render(vfloat_t distance, float partialTicks, bool transparency)
      * subtracting the model's position, we effectively convert the position.
      * In short, we go from -CameraPosition to CameraPosition - ModelPosition
      */
+    Camera &camera = get_camera();
     transform_view(gertex::get_view_matrix(), Vec3f(camera.position) * 2 - (Vec3f(pos.x, pos.y + 1.5078125F, pos.z)), Vec3f(1), rot, false);
-    for (auto &box : boxes)
-    {
-        box->render();
-    }
-
-    // Restore fixed point format
-    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, BASE3D_POS_FRAC_BITS);
+    use_texture(texture);
+    raw_render();
 }
 
 void Model::render_handitem(ModelBox *box, item::ItemStack &item, Vec3f offset, Vec3f offset_rot, Vec3f scale, bool transparency)
@@ -178,8 +184,9 @@ void Model::render_handitem(ModelBox *box, item::ItemStack &item, Vec3f offset, 
         return true;
     };
     gertex::GXState state = gertex::get_state();
+
     // Use fixed point format for vertex positions
-    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, BASE3D_POS_FRAC_BITS);
+    gertex::set_pos_precision(GX_S16, BASE3D_POS_FRAC_BITS);
 
     // Setup matrices for rendering the item
     transform_view(gertex::get_view_matrix(), pos + Vec3f(0, 1.5078125F, 0), Vec3f(-1), this->rot, false);

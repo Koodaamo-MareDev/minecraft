@@ -57,9 +57,11 @@ int render_face(Vec3i pos, uint8_t face, uint32_t texture_index, Block *block = 
 
 int render_back_face(Vec3i pos, uint8_t face, uint32_t texture_index, Block *block = nullptr, uint8_t min_y = 0, uint8_t max_y = 16);
 
+void render_single_block_at(Block &selected_block, Vec3i pos);
+
 void render_single_block(Block &selected_block);
 
-void render_single_block_at(Block &selected_block, Vec3i pos);
+void render_block_as_item(Block &selected_block);
 
 void render_single_item(uint32_t texture_index, bool transparency, uint8_t light = 0xFF);
 
@@ -70,6 +72,8 @@ Vec3f angles_to_vector(float x, float y);
 Vec3f vector_to_angles(const Vec3f &vec);
 
 bool is_cube_visible(const Frustum &frustum, const Vec3f &center, float size);
+
+gertex::GXProjMatrix create_offset_perspective(const gertex::GXView &view, float x_pixel, float y_pixel);
 
 void build_frustum(const Camera &cam, Frustum &frustum);
 
@@ -84,8 +88,6 @@ GXColor get_sky_color(bool cave_darkness = true);
 GXColor get_fog_color();
 
 GXColor get_lightmap_color(uint8_t light);
-
-void draw_particle(Camera &camera, Vec3f pos, uint32_t texture_index, float size, uint8_t brightness);
 
 void draw_particles(Camera &camera, Particle *particles, int count);
 

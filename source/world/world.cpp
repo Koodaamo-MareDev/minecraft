@@ -940,8 +940,8 @@ void World::draw_scene(bool opaque)
     // Use terrain texture
     use_texture(terrain_texture);
 
-    // Enable indexed colors
-    GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
+    gertex::set_color_format(0, GX_INDEX8);
+    gertex::set_pos_precision(GX_S16, BASE3D_POS_FRAC_BITS);
 
     std::deque<std::pair<Section *, VBO *>> sections_to_draw;
 
@@ -1039,12 +1039,11 @@ void World::draw_scene(bool opaque)
         }
     }
 
-    // Enable direct colors
-    GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
-
     // Draw block outlines
     if (!opaque && player.raycast_target_found)
     {
+        gertex::set_color_format(0, GX_DIRECT);
+
         GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
         Vec3f outline_pos = player.raycast_target_pos;
 
@@ -1087,7 +1086,7 @@ void World::draw_selected_block()
     }
 
     // Enable indexed colors
-    GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
+    gertex::set_color_format(0, GX_INDEX8);
 
     // Specify the selected block offset
     Vec3f selectedBlockPos = Vec3f(+.625f, -.75f, -.75f) + Vec3f(-player.view_bob_screen_offset.x, player.view_bob_screen_offset.y, 0);

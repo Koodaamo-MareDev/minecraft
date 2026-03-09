@@ -1,5 +1,7 @@
 #include "gertex.hpp"
 #include <new>
+#include <stdexcept>
+
 namespace gertex
 {
     GXState state;
@@ -165,6 +167,44 @@ namespace gertex
         }
     }
 
+    uint8_t get_color_format(uint8_t index)
+    {
+        if (index > 1)
+            throw std::out_of_range("Color format index out of range");
+
+        return state.color_formats[index];
+    }
+
+    void set_color_format(uint8_t index, uint8_t format)
+    {
+        if (index > 1)
+            throw std::out_of_range("Color format index out of range");
+
+        state.color_formats[index] = format;
+        uint8_t color_fmt = static_cast<uint8_t>(format);
+        GX_SetVtxDesc(GX_VA_CLR0 + index, color_fmt);
+    }
+
+    void set_vertex_format(GXVertexFormat &format)
+    {
+        state.vertex_format = format;
+        GX_SetVtxAttrFmtv(GX_VTXFMT0, state.vertex_format.desc);
+    }
+
+    GXVertexFormat get_vertex_format()
+    {
+        return state.vertex_format;
+    }
+
+    void set_pos_precision(uint8_t precision, uint8_t frac_bits)
+    {
+        state.vertex_format.pos().compsize = precision;
+        state.vertex_format.pos().frac = frac_bits;
+
+        // No need for a full update here
+        GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, precision, frac_bits);
+    }
+
     void set_color_add(GXColor color)
     {
         state.color_add = color;
@@ -205,6 +245,9 @@ namespace gertex
     {
         set_fog(fog);
         set_blending(blend_mode);
+        set_color_format(0, color_formats[0]);
+        set_color_format(1, color_formats[1]);
+        set_vertex_format(vertex_format);
         set_color_add(color_add);
         set_color_mul(color_multiply);
         set_alpha_cutoff(alpha_cutoff);
@@ -337,14 +380,7 @@ namespace gertex
 
         GX_ClearVtxDesc();
         GX_SetVtxDesc(GX_VA_POS, GX_DIRECT);
-        GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
-        GX_SetVtxDesc(GX_VA_CLR1, GX_INDEX8);
         GX_SetVtxDesc(GX_VA_TEX0, GX_DIRECT);
-
-        GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_F32, 0);
-        GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_CLR0, GX_CLR_RGBA, GX_RGBA8, 0);
-        GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_CLR1, GX_CLR_RGBA, GX_RGBA8, 0);
-        GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_TEX0, GX_TEX_ST, GX_F32, 0);
 
         tev_reset();
         GX_SetZCompLoc(GX_FALSE);

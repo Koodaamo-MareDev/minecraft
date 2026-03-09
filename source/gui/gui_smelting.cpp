@@ -55,7 +55,7 @@ void GuiSmelting::draw()
     int start_y = (viewport.aspect_correction * viewport.height - height) / 2;
 
     // Enable direct colors
-    GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
+    gertex::set_color_format(0, GX_DIRECT);
 
     // Disable backface culling for the background
     GX_SetCullMode(GX_CULL_NONE);
@@ -97,7 +97,7 @@ void GuiSmelting::draw()
     if (highlighted_slot)
     {
         // Enable direct colors
-        GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
+        gertex::set_color_format(0, GX_DIRECT);
 
         // Reset the position matrix
         gertex::use_matrix(gui_item_matrix);
@@ -111,7 +111,7 @@ void GuiSmelting::draw()
         GX_SetCullMode(GX_CULL_BACK);
 
         // Enable indexed colors
-        GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
+        gertex::set_color_format(0, GX_INDEX8);
 
         // Draw the item in hand
         draw_item(cursor_x - 16, cursor_y - 16, item_in_hand, viewport);

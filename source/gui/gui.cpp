@@ -92,8 +92,12 @@ void Gui::draw_text(int x, int y, std::string text, GXColor color)
 {
     text = str::utf8_to_cp437(text);
 
+    gertex::GXState state = gertex::get_state();
+
+    gertex::set_pos_precision(GX_S16, 0);
+
     // Enable direct colors
-    GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
+    gertex::set_color_format(0, GX_DIRECT);
 
     gertex::use_matrix(gui_item_matrix);
 
@@ -153,6 +157,7 @@ void Gui::draw_text(int x, int y, std::string text, GXColor color)
         // Move the cursor to the next column
         x_offset += font_tile_widths[c] * 2;
     }
+    gertex::set_state(state);
 }
 
 void Gui::draw_text_with_shadow(int x, int y, std::string str, GXColor color)
@@ -168,15 +173,17 @@ void Gui::draw_item(int x, int y, item::ItemStack stack, gertex::GXView &viewpor
     if (stack.empty())
         return;
 
+    gertex::GXState state = gertex::get_state();
+
     // Enable backface culling for blocks
     GX_SetCullMode(GX_CULL_BACK);
 
     // Enable indexed colors
-    GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
+    gertex::set_color_format(0, GX_INDEX8);
 
     // Draw the item
     item::Item item = stack.as_item();
-    Mtx tmp_matrix;
+    gertex::GXMatrix tmp_matrix;
 
     if (item.is_block())
     {
@@ -188,34 +195,32 @@ void Gui::draw_item(int x, int y, item::ItemStack stack, gertex::GXView &viewpor
         if (!properties(item.id).m_fluid && (properties(item.id).m_nonflat || render_type == RenderType::full || render_type == RenderType::full_special || render_type == RenderType::slab))
         {
             // Translate the block to the correct position
-            guMtxCopy(gui_block_matrix.mtx, tmp_matrix);
-            guMtxTransApply(tmp_matrix, tmp_matrix, x + 16, (y + 16) / viewport.aspect_correction, 0.0f);
-            GX_LoadPosMtxImm(tmp_matrix, GX_PNMTX0);
+            guMtxCopy(gui_block_matrix.mtx, tmp_matrix.mtx);
+            guMtxTransApply(tmp_matrix.mtx, tmp_matrix.mtx, x + 16, (y + 16) / viewport.aspect_correction, 0.0f);
+            gertex::use_matrix(tmp_matrix);
 
             // Draw the block
-            render_single_block(block);
+            render_block_as_item(block);
         }
         else
         {
-            guMtxCopy(gui_item_matrix.mtx, tmp_matrix);
-            guMtxTransApply(tmp_matrix, tmp_matrix, x + 16, (y + 16) / viewport.aspect_correction, 0.0f);
-            GX_LoadPosMtxImm(tmp_matrix, GX_PNMTX0);
+            guMtxCopy(gui_item_matrix.mtx, tmp_matrix.mtx);
+            guMtxTransApply(tmp_matrix.mtx, tmp_matrix.mtx, x + 16, (y + 16) / viewport.aspect_correction, 0.0f);
+            gertex::use_matrix(tmp_matrix);
 
             int texture_index = get_default_texture_index(BlockID(block.id));
             render_single_item(texture_index, false);
-            render_single_item(texture_index, true);
         }
     }
     else
     {
         use_texture(items_texture);
-        guMtxCopy(gui_item_matrix.mtx, tmp_matrix);
-        guMtxTransApply(tmp_matrix, tmp_matrix, x + 16, (y + 16) / viewport.aspect_correction, 0.0f);
-        GX_LoadPosMtxImm(tmp_matrix, GX_PNMTX0);
+        guMtxCopy(gui_item_matrix.mtx, tmp_matrix.mtx);
+        guMtxTransApply(tmp_matrix.mtx, tmp_matrix.mtx, x + 16, (y + 16) / viewport.aspect_correction, 0.0f);
+        gertex::use_matrix(tmp_matrix);
 
         int texture_index = stack.get_texture_index();
         render_single_item(texture_index, false);
-        render_single_item(texture_index, true);
     }
 
     // Draw the item count if it's greater than 1
@@ -225,6 +230,8 @@ void Gui::draw_item(int x, int y, item::ItemStack stack, gertex::GXView &viewpor
         int count_width = text_width(count_str);
         draw_text_with_shadow(x + 34 - count_width, y + 17, count_str);
     }
+
+    gertex::set_state(state);
 }
 
 void Gui::draw_container(int x, int y, inventory::Container &Container, gertex::GXView &viewport)

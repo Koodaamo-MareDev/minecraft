@@ -89,6 +89,14 @@ namespace gertex
         multiply2
     };
 
+    enum class GXColorFormat : uint8_t
+    {
+        none = GX_NONE,
+        direct = GX_DIRECT,
+        index8 = GX_INDEX8,
+        index16 = GX_INDEX16
+    };
+
     struct GXMatrix
     {
         Mtx mtx;
@@ -109,6 +117,30 @@ namespace gertex
         }
     };
 
+    class GXVertexFormat
+    {
+    public:
+        GXVtxAttrFmt &pos() { return desc[0]; }
+        GXVtxAttrFmt &col0() { return desc[1]; }
+        GXVtxAttrFmt &col1() { return desc[2]; }
+        GXVtxAttrFmt &tex() { return desc[3]; }
+
+        GXVertexFormat()
+        {
+            desc[0] = {GX_VA_POS, GX_POS_XYZ, GX_F32, 0};
+            desc[1] = {GX_VA_CLR0, GX_CLR_RGBA, GX_RGBA8, 0};
+            desc[2] = {GX_VA_CLR1, GX_CLR_RGBA, GX_RGBA8, 0};
+            desc[3] = {GX_VA_TEX0, GX_TEX_ST, GX_F32, 0};
+            for (size_t i = 4; i < GX_MAX_VTXATTRFMT_LISTSIZE; i++)
+            {
+                desc[i] = {GX_VA_NULL, GX_VA_NULL, GX_VA_NULL, GX_VA_NULL};
+            }
+        }
+
+        // Don't touch
+        GXVtxAttrFmt desc[GX_MAX_VTXATTRFMT_LISTSIZE] = {};
+    };
+
     class GXState
     {
     public:
@@ -118,6 +150,8 @@ namespace gertex
         GXView view = GXView();
         GXFog fog = {false, GXFogType::none, 0.0f, 0.0f, CAMERA_NEAR, CAMERA_FAR, GXColor{0, 0, 0, 0xFF}};
         GXBlendMode blend_mode = GXBlendMode::none;
+        uint8_t color_formats[2] = {GX_NONE, GX_INDEX8};
+        GXVertexFormat vertex_format = GXVertexFormat();
         GXColor color_multiply = {0xFF, 0xFF, 0xFF, 0xFF};
         GXColor color_add = {0, 0, 0, 0xFF};
         uint8_t alpha_cutoff = 0;
@@ -146,6 +180,11 @@ namespace gertex
     void perspective(GXView view);
     void ortho(GXView view);
     void set_blending(GXBlendMode mode);
+    void set_color_format(uint8_t index, uint8_t format);
+    uint8_t get_color_format(uint8_t index);
+    void set_vertex_format(GXVertexFormat &format);
+    GXVertexFormat get_vertex_format();
+    void set_pos_precision(uint8_t precision, uint8_t frac_bits = 0);
     void set_color_add(GXColor color);
     GXColor get_color_add();
     void set_color_mul(GXColor color);

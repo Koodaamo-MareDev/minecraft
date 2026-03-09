@@ -78,8 +78,8 @@ void GuiTitleScreen::draw()
     Gui::draw_buttons();
 
     gertex::GXState state = gertex::get_state();
-    GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
-    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, BASE3D_POS_FRAC_BITS);
+    gertex::set_color_format(0, GX_INDEX8);
+    gertex::set_pos_precision(GX_S16, BASE3D_POS_FRAC_BITS);
 
     // We want to render the blocks in perspective mode
     state.view.fov = 70;
@@ -119,8 +119,6 @@ void GuiTitleScreen::draw()
 
     // Return back to GUI rendering
     GX_SetZMode(GX_TRUE, GX_ALWAYS, GX_TRUE);
-    GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
-    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, 0);
     gertex::set_state(state);
 
     float sintime = std::sin(M_PI * (javaport::System::currentTimeMillis() % 2000) / 500.0f);

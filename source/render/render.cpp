@@ -300,7 +300,7 @@ void get_face(Vec3i pos, uint8_t face, uint32_t texture_index, Block *block, uin
     uint8_t lighting[4] = {light_val, light_val, light_val, light_val};
     Vertex16 vertices[4];
     uint8_t index = 0;
-#define SMOOTH(ao_tgt)   \
+#define SMOOTH(ao_tgt)                                 \
     if (render_world && render_world->smooth_lighting) \
     smooth_light(pos, face, cube_vertex_offsets[face][index], block, lighting[index], ao_tgt[index])
     if ((face & ~1) != FACE_NY)
@@ -455,23 +455,13 @@ int render_back_face(Vec3i pos, uint8_t face, uint32_t texture_index, Block *blo
     return 4;
 }
 
-void render_single_block(Block &selected_block)
-{
-    // Precalculate the vertex count. Set position to Y = -16 to render "outside the world"
-    int vertexCount = render_block(&selected_block, Vec3i(0, -16, 0));
-
-    // Start drawing the block
-    GX_BeginGroup(GX_QUADS, vertexCount);
-
-    // Render the block. Set position to Y = -16 to render "outside the world"
-    render_block(&selected_block, Vec3i(0, -16, 0));
-
-    // End the group
-    GX_EndGroup();
-}
-
 void render_single_block_at(Block &selected_block, Vec3i pos)
 {
+    gertex::GXState state = gertex::get_state();
+
+    gertex::set_pos_precision(GX_S16, BASE3D_POS_FRAC_BITS);
+    gertex::set_color_format(0, GX_INDEX8);
+
     // Precalculate the vertex count. Set position to Y = -16 to render "outside the world"
     int vertexCount = render_block(&selected_block, pos);
 
@@ -483,6 +473,35 @@ void render_single_block_at(Block &selected_block, Vec3i pos)
 
     // End the group
     GX_EndGroup();
+
+    gertex::set_state(state);
+}
+
+void render_single_block(Block &selected_block)
+{
+    render_single_block_at(selected_block, Vec3i(0, -16, 0));
+}
+
+void render_block_as_item(Block &selected_block)
+{
+    gertex::GXState state = gertex::get_state();
+
+    gertex::set_pos_precision(GX_S16, 0);
+    gertex::set_color_format(0, GX_INDEX8);
+
+    // Precalculate the vertex count. Set position to Y = -16 to render "outside the world"
+    int vertexCount = render_block(&selected_block, Vec3i(0, -16, 0));
+
+    // Start drawing the block
+    GX_BeginGroup(GX_QUADS, vertexCount);
+
+    // Render the block. Set position to Y = -16 to render "outside the world"
+    render_block(&selected_block, Vec3i(0, -16, 0));
+
+    // End the group
+    GX_EndGroup();
+
+    gertex::set_state(state);
 }
 
 void render_single_item(uint32_t texture_index, bool transparency, uint8_t light)
@@ -570,6 +589,35 @@ bool is_cube_visible(const Frustum &frustum, const Vec3f &center, float size)
     }
 
     return true; // At least partially visible
+}
+
+gertex::GXProjMatrix create_offset_perspective(const gertex::GXView &view, float x_pixel, float y_pixel)
+{
+    gertex::GXProjMatrix projection;
+
+    float aspect = view.width / (view.aspect_correction * view.height);
+
+    float top = tanf(view.fov * M_PI / 360.0f) * view.near;
+    float bottom = -top;
+    float right = top * aspect;
+    float left = -right;
+
+    // pixel -> normalized device coords
+    float ndcX = (2.0f * x_pixel / view.width) - 1.0f;
+    float ndcY = 1.0f - (2.0f * y_pixel / view.height);
+
+    // shift projection center
+    float shiftX = -ndcX * right;
+    float shiftY = -ndcY * top;
+
+    left += shiftX;
+    right += shiftX;
+    top += shiftY;
+    bottom += shiftY;
+
+    guFrustum(projection.mtx, top, bottom, left, right, view.near, view.far);
+
+    return projection;
 }
 
 void transform_view(gertex::GXMatrix view, guVector world_pos, guVector object_scale, guVector object_rot, bool load)
@@ -694,38 +742,12 @@ void transform_view_screen(gertex::GXMatrix view, guVector screen_pos, guVector 
     gertex::use_matrix(modelview, load);
 }
 
-void draw_particle(Camera &camera, Vec3f pos, uint32_t texture_index, float size, uint8_t brightness)
-{
-    // Enable indexed colors
-    GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
-
-    GX_BeginGroup(GX_QUADS, 4);
-    for (int i = 0; i < 4; i++)
-    {
-        int x = (i == 0 || i == 3);
-        int y = (i > 1);
-        guVector vertex{(x - 0.5f) * size, (y - 0.5f) * size, 0};
-
-        Mtx44 rot_mtx;
-
-        // Rotate the vertex
-        guMtxRotDeg(rot_mtx, 'x', camera.rot.x);
-        guVecMultiply(rot_mtx, &vertex, &vertex);
-        guMtxRotDeg(rot_mtx, 'y', camera.rot.y);
-        guVecMultiply(rot_mtx, &vertex, &vertex);
-
-        // Translate the vertex
-        vertex.x += pos.x;
-        vertex.y += pos.y;
-        vertex.z += pos.z;
-
-        GX_VertexLit(Vertex(vertex, TEXTURE_X(texture_index) + x * 4, TEXTURE_Y(texture_index) + y * 4), brightness);
-    }
-    GX_EndGroup();
-}
-
 void draw_particles(Camera &camera, Particle *particles, int count)
 {
+    gertex::GXState state = gertex::get_state();
+
+    // Use floats for vertex positions
+    gertex::set_pos_precision(GX_F32, 0);
 
     // Bake vertex properties
     Mtx44 rot_mtx;
@@ -762,18 +784,15 @@ void draw_particles(Camera &camera, Particle *particles, int count)
         if (t == PTYPE_BLOCK_BREAK || t == PTYPE_GENERIC)
         {
             // Enable indexed colors
-            GX_SetVtxDesc(GX_VA_CLR0, GX_INDEX8);
+            gertex::set_color_format(0, GX_INDEX8);
         }
         else if (t == PTYPE_TINY_SMOKE)
         {
             // Enable direct colors
-            GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
+            gertex::set_color_format(0, GX_DIRECT);
         }
 
         use_texture(t == 0 ? terrain_texture : particles_texture);
-
-        // Use floats for vertex positions
-        GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_F32, 0);
 
         GX_BeginGroup(GX_QUADS, visible_count << 2);
 
@@ -821,10 +840,8 @@ void draw_particles(Camera &camera, Particle *particles, int count)
         }
 
         GX_EndGroup();
-
-        // Restore default vertex format
-        GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, BASE3D_POS_FRAC_BITS);
     }
+    gertex::set_state(state);
 }
 
 Vec3f cross(const Vec3f &a, const Vec3f &b)
@@ -896,7 +913,7 @@ void draw_frustum(const Camera &cam)
     // Draw each frustum face using GX
 
     // Use floats for vertex positions
-    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_F32, 0);
+    gertex::set_pos_precision(GX_F32, 0);
 
     auto draw_quad = [](Vec3f a, Vec3f b, Vec3f c, Vec3f d, uint8_t r, uint8_t g, uint8_t bcol)
     {
@@ -1168,7 +1185,7 @@ void draw_sunrise()
     GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_FALSE);
 
     // Use floats for vertex positions
-    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_F32, 0);
+    gertex::set_pos_precision(GX_F32, 0);
 
     use_texture(white_texture);
 
@@ -1226,10 +1243,10 @@ void draw_sky()
     float sky_alpha = get_sky_multiplier();
     if (sky_alpha > 0.0f)
     {
-        GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
+        gertex::set_color_format(0, GX_DIRECT);
 
         // Use short vertex positions with no fractional bits
-        GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, 0);
+        gertex::set_pos_precision(GX_S16, 0);
 
         // Use default blend mode
         gertex::set_blending(gertex::GXBlendMode::normal);
@@ -1264,11 +1281,11 @@ void draw_sky()
     }
 
     // Use short vertex positions with fractional bits
-    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, BASE3D_POS_FRAC_BITS);
+    gertex::set_pos_precision(GX_S16, BASE3D_POS_FRAC_BITS);
 
     // Prepare rendering the celestial bodies
     gertex::GXMatrix celestial_rotated_view;
-    GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
+    gertex::set_color_format(0, GX_DIRECT);
 
     guVector axis{1, 0, 0};
     guMtxRotAxisDeg(celestial_rotated_view.mtx, &axis, get_celestial_angle() * 360.0f);
@@ -1307,7 +1324,7 @@ void draw_sky()
     GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_FALSE);
 
     // Here we use 0 fractional bits for the position data, because we're drawing large objects.
-    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, 0);
+    gertex::set_pos_precision(GX_S16, 0);
     constexpr float scale = 1.0f / BASE3D_POS_FRAC;
     // Clouds texture is massive.
     size = 2048.0f * scale;

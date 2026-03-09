@@ -228,7 +228,6 @@ void MainGameLoop()
             if (current_world->player.in_fluid == BlockID::air && !current_world->hell)
                 draw_sky();
 
-            GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, BASE3D_POS_FRAC_BITS);
             current_world->draw(get_camera());
 
             use_texture(terrain_texture);
@@ -546,13 +545,13 @@ void HandleGUI(gertex::GXView &viewport)
 {
     gertex::ortho(viewport);
     // Use 0 fractional bits for the position data, because we're drawing in pixel space.
-    GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_S16, 0);
+    gertex::set_pos_precision(GX_S16, 0);
 
     // Disable fog
     gertex::use_fog(false);
 
     // Enable direct colors
-    GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
+    gertex::set_color_format(0, GX_DIRECT);
 
     // Draw GUI elements
     GX_SetZMode(GX_TRUE, GX_ALWAYS, GX_TRUE);
@@ -851,7 +850,7 @@ void DrawHUD(gertex::GXView &viewport)
     }
 
     // Enable direct colors
-    GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
+    gertex::set_color_format(0, GX_DIRECT);
 
     // Draw the hotbar background
     draw_textured_quad(gui_texture, (viewport.width - 364) / 2, corrected_height - 44, 364, 44, 0, 0, 182, 22);
@@ -872,7 +871,7 @@ void DrawHUD(gertex::GXView &viewport)
     gertex::load_pos_matrix();
 
     // Enable direct colors as the previous call to draw_item may have changed the color mode
-    GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
+    gertex::set_color_format(0, GX_DIRECT);
 
     // Draw the player's health above the hotbar. The texture size is 9x9 but they overlap by 1 pixel.
     int health = current_world->player.health;
@@ -919,7 +918,7 @@ void DrawGUI(gertex::GXView &viewport)
     gertex::load_pos_matrix();
 
     // Enable direct colors
-    GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
+    gertex::set_color_format(0, GX_DIRECT);
 
     if (!Gui::get_gui()->use_cursor())
         return;

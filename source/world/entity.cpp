@@ -24,8 +24,8 @@ PathFinding pathfinder;
 constexpr int item_pickup_ticks = 2;
 constexpr int item_lifetime = 6000;
 
-CreeperModel creeper_model = CreeperModel();
-PlayerModel player_model = PlayerModel();
+static CreeperModel creeper_model = CreeperModel();
+static PlayerModel player_model = PlayerModel();
 
 bool EntityPhysical::collides(EntityPhysical *other)
 {
@@ -717,8 +717,8 @@ void EntityCreeper::render(float partial_ticks, bool transparency)
     {
         gertex::set_color_add(std::sin(fuse + partial_ticks * 0.1) > 0 ? GXColor{0, 0, 0, 0xFF} : GXColor{0xFF, 0xFF, 0xFF, 0xFF});
     }
-
-    creeper_model.render(accumulated_walk_distance - walk_speed * (1 - partial_ticks), partial_ticks, transparency);
+    creeper_model.pose(accumulated_walk_distance - walk_speed * (1 - partial_ticks));
+    creeper_model.render(partial_ticks, transparency);
 #ifdef DEBUG
     if (follow_entity)
     {
@@ -1273,13 +1273,13 @@ void EntityPlayerMp::render(float partial_ticks, bool transparency)
         gertex::use_fog(false);
 
         // Enable direct colors
-        GX_SetVtxDesc(GX_VA_CLR0, GX_DIRECT);
+        gertex::set_color_format(0, GX_DIRECT);
 
         // Render through walls
         GX_SetZMode(GX_FALSE, GX_ALWAYS, GX_FALSE);
 
         // Use floats for vertex positions (this will later be restored to fixed point by draw_text_3d)
-        GX_SetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_POS_XYZ, GX_F32, 0);
+        gertex::set_pos_precision(GX_F32, 0);
 
         // Use solid white as the texture
         use_texture(white_texture);
@@ -1313,5 +1313,6 @@ void EntityPlayerMp::render(float partial_ticks, bool transparency)
     {
         player_model.equipment[i] = equipment[i];
     }
-    player_model.render(accumulated_walk_distance - walk_speed * (1 - partial_ticks), partial_ticks, transparency);
+    player_model.pose(accumulated_walk_distance - walk_speed * (1 - partial_ticks));
+    player_model.render(partial_ticks, transparency);
 }
