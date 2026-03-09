@@ -39,7 +39,7 @@ namespace input
             MAP_BUTTON(WPAD_NUNCHUK_BUTTON_Z, BUTTON_PLACE, data->btns_h, buttons_held);
             MAP_BUTTON(WPAD_BUTTON_A, BUTTON_JUMP, data->btns_h, buttons_held);
             MAP_BUTTON(WPAD_BUTTON_B, BUTTON_MINE, data->btns_h, buttons_held);
-            MAP_BUTTON(WPAD_BUTTON_DOWN, BUTTON_TOGGLE_SNEAK, data->btns_h, buttons_held);
+            MAP_BUTTON(WPAD_BUTTON_UP, BUTTON_TOGGLE_SNEAK, data->btns_h, buttons_held);
             MAP_BUTTON(WPAD_BUTTON_2, BUTTON_TOGGLE_PAUSE, data->btns_h, buttons_held);
             MAP_BUTTON(WPAD_BUTTON_MINUS, BUTTON_HOTBAR_LEFT, data->btns_h, buttons_held);
             MAP_BUTTON(WPAD_BUTTON_PLUS, BUTTON_HOTBAR_RIGHT, data->btns_h, buttons_held);
@@ -50,22 +50,33 @@ namespace input
             MAP_BUTTON(WPAD_NUNCHUK_BUTTON_Z, BUTTON_PLACE, data->btns_d, buttons_down);
             MAP_BUTTON(WPAD_BUTTON_A, BUTTON_JUMP, data->btns_d, buttons_down);
             MAP_BUTTON(WPAD_BUTTON_B, BUTTON_MINE, data->btns_d, buttons_down);
-            MAP_BUTTON(WPAD_BUTTON_DOWN, BUTTON_TOGGLE_SNEAK, data->btns_d, buttons_down);
+            MAP_BUTTON(WPAD_BUTTON_UP, BUTTON_TOGGLE_SNEAK, data->btns_d, buttons_down);
             MAP_BUTTON(WPAD_BUTTON_2, BUTTON_TOGGLE_PAUSE, data->btns_d, buttons_down);
             MAP_BUTTON(WPAD_BUTTON_MINUS, BUTTON_HOTBAR_LEFT, data->btns_d, buttons_down);
             MAP_BUTTON(WPAD_BUTTON_PLUS, BUTTON_HOTBAR_RIGHT, data->btns_d, buttons_down);
             MAP_BUTTON(WPAD_BUTTON_A, BUTTON_CONFIRM, data->btns_d, buttons_down);
             MAP_BUTTON(WPAD_BUTTON_B, BUTTON_CANCEL, data->btns_d, buttons_down);
 
+            if ((data->btns_d & WPAD_BUTTON_DOWN))
+            {
+                user_hide_pointer = !user_hide_pointer;
+                if (user_hide_pointer)
+                {
+                    pointer_visible = false;
+                    joysticks[JOY_RIGHT].x = 0;
+                    joysticks[JOY_RIGHT].y = 0;
+                }
+            }
+
             // Handle IR pointer
-            if (data->ir.valid)
+            if (data->ir.valid && !user_hide_pointer)
             {
                 pointer_visible = true;
 
                 pointer_position.x = data->ir.x / data->ir.vres[0];
                 pointer_position.y = data->ir.y / data->ir.vres[1];
 
-                joysticks[JOY_RIGHT].x = (pointer_position.x - 0.5f) * 2; // Scale to [-1, 1]
+                joysticks[JOY_RIGHT].x = (pointer_position.x - 0.5f) * 2;  // Scale to [-1, 1]
                 joysticks[JOY_RIGHT].y = (pointer_position.y - 0.5f) * -2; // Scale to [-1, 1] and invert
 
                 if (joysticks[JOY_RIGHT].magnitude() < 0.125)
@@ -83,8 +94,11 @@ namespace input
                     joysticks[JOY_RIGHT] = joysticks[JOY_RIGHT] * 2;
                 }
             }
-            else
+            else if (!data->ir.valid)
             {
+                // Pointer has gone offscreen - reset the flag automatically.
+                user_hide_pointer = false;
+
                 pointer_visible = false;
                 joysticks[JOY_RIGHT].x = 0;
                 joysticks[JOY_RIGHT].y = 0;

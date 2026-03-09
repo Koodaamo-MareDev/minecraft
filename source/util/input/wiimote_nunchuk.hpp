@@ -14,6 +14,9 @@ namespace input
         float get_pointer_x() const override { return pointer_position.x; }
         float get_pointer_y() const override { return pointer_position.y; }
         bool connected() const override;
+    private:
+        // For better UX when user wants to lock the cursor
+        bool user_hide_pointer = false;
     };
 }
 
