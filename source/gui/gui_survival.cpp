@@ -9,7 +9,8 @@ static PlayerModel player_model = PlayerModel();
 
 GuiSurvival::GuiSurvival(EntityPhysical *owner, inventory::Container *container) : GuiGenericContainer(owner, container, 0, "Inventory")
 {
-    memcpy(&player_model.texture, &player_texture, sizeof(GXTexObj));
+    player_model.texture = &player_texture;
+
     gertex::GXView viewport = gertex::get_state().view;
 
     int start_x = (viewport.width - width) / 2;

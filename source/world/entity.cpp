@@ -589,7 +589,7 @@ EntityCreeper::EntityCreeper(const Vec3f &position) : EntityExplosive(), EntityL
     this->height = 1.7;
     this->walk_sound = false;
     this->gravity = 0.08;
-    memcpy(&creeper_model.texture, &creeper_texture, sizeof(GXTexObj));
+    creeper_model.texture = &creeper_texture;
     teleport(position);
 }
 
@@ -1129,8 +1129,8 @@ EntityPlayer::EntityPlayer(const Vec3f &position) : EntityLiving()
     this->y_offset = 1.62;
     this->y_size = 0;
     this->drag_phase = DragPhase::before_friction;
-    this->type = 48; // Mob - Not sure if this is correct as there is no player entity "type". Java uses instanceof to check if an entity is a player which is not possible in C++
-    memcpy(&player_model.texture, &player_texture, sizeof(GXTexObj));
+    this->type = 48; // Mob - Not sure if this is correct as there is no player entity "type".
+    player_model.texture = &player_texture;
     teleport(position);
 }
 

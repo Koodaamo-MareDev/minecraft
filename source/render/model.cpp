@@ -157,7 +157,8 @@ void Model::render(float partialTicks, bool transparency)
      */
     Camera &camera = get_camera();
     transform_view(gertex::get_view_matrix(), Vec3f(camera.position) * 2 - (Vec3f(pos.x, pos.y + 1.5078125F, pos.z)), Vec3f(1), rot, false);
-    use_texture(texture);
+    if (texture)
+        use_texture(*texture);
     raw_render();
 }
 

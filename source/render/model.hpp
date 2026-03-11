@@ -56,7 +56,7 @@ class Model
 public:
     Vec3f pos = Vec3f(0, 0, 0);
     Vec3f rot = Vec3f(0, 0, 0);
-    GXTexObj texture;
+    GXTexObj *texture = nullptr;
     std::vector<ModelBox *> boxes;
     bool ready = false;
     Model() {}
