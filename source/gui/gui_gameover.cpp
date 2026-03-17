@@ -67,7 +67,7 @@ void GuiGameOver::respawn()
     world->player.teleport(world->spawn_pos);
 
     // Reset camera rotation
-    get_camera().rot = Vec3f(0, 0, 0);
+    get_camera().transform.set_rotation(Vec3f(0, 0, 0));
 
     // Reset player state
     world->player.dead = false;

@@ -97,10 +97,15 @@ void GuiTitleScreen::draw()
     Block block = {.id = uint8_t(BlockID::stone), .visibility_flags = 0x7F, .meta = 0, .light = 0xFF};
 
     Camera &camera = get_camera();
-    camera.rot = Vec3f(15, 0, 0);
-    camera.position = Vec3f(-0.4, -17.6, 21.6);
+    camera.transform.set_rotation(Vec3f(15, 0, 0));
+    camera.transform.set_position(Vec3f(-0.4, -17.6, 21.6));
+    camera.update();
 
     // Render the logo blocks
+    Transform transform;
+    transform.set_rotation({90, 0, 0});
+    transform.set_scale({0.89, 0.4, 1});
+
     use_texture(terrain_texture);
     for (size_t i = 0; i < logo.size(); i++)
     {
@@ -112,8 +117,12 @@ void GuiTitleScreen::draw()
         logo_block_speed[i] *= 0.729f;
         if (logo_block_z[i] < 0)
             logo_block_z[i] = logo_block_speed[i] = 0;
-        Vec3f logo_block_pos = Vec3f(((int(i) % 38) - 19) * .89, -(int(i) / 38), logo_block_z[i]);
-        transform_view(gertex::get_view_matrix(), logo_block_pos, Vec3f(.89, 1, .4), Vec3f(90, 0, 0));
+        transform.set_position({((int(i) % 38) - 19) * .89f, -(float)(int(i) / 38), logo_block_z[i]});
+
+        Mtx modelview;
+        guMtxConcat(camera.view, transform.get_matrix(), modelview);
+        gertex::use_matrix(modelview);
+
         render_single_block(block);
     }
 
@@ -126,7 +135,14 @@ void GuiTitleScreen::draw()
     float scale = 144.0f / std::max(text_width(splash_text), 72);
 
     // Prepare the splash text matrix
-    transform_view_screen(gertex::get_view_matrix(), Vec3f((viewport.width - 128), viewport.height * 0.25f, 0), Vec3f(scale * (1 + std::abs(sintime) * 0.125f)), Vec3f(0, 0, 20));
+    transform.set_position({viewport.width - 128.0f, viewport.height * 0.25f, 0});
+    transform.set_rotation({0.0f, 0.0f, 20.0f});
+    transform.set_scale(Vec3f(scale * (1 + std::abs(sintime) * 0.125f)));
+
+    gertex::GXMatrix matrix = gertex::get_view_matrix();
+    guMtxConcat(matrix.mtx, transform.get_matrix(), matrix.mtx);
+
+    gertex::use_matrix(matrix);
 
     gertex::GXMatrix old_item_matrix;
     guMtxCopy(gui_item_matrix.mtx, old_item_matrix.mtx);

@@ -20,8 +20,6 @@ void set_render_world(World *world)
 Camera &get_camera()
 {
     static Camera camera = {
-        {0.0, 0.0, 0.0},     // Camera rotation
-        {0.0, 0.0, 0.0},     // Camera position
         90.0,                // Field of view
         1.0,                 // Aspect ratio
         gertex::CAMERA_NEAR, // Near clipping plane
@@ -620,128 +618,6 @@ gertex::GXProjMatrix create_offset_perspective(const gertex::GXView &view, float
     return projection;
 }
 
-void transform_view(gertex::GXMatrix view, guVector world_pos, guVector object_scale, guVector object_rot, bool load)
-{
-    Mtx model, modelview;
-    Mtx offset;
-    Mtx posmtx;
-    Mtx scalemtx;
-    Mtx rotx;
-    Mtx roty;
-    Mtx rotz;
-    Mtx objrotx;
-    Mtx objroty;
-    Mtx objrotz;
-    guVector axis; // Axis to rotate on
-
-    Camera &camera = get_camera();
-
-    // Reset matrices
-    guMtxIdentity(model);
-    guMtxIdentity(offset);
-    guMtxIdentity(posmtx);
-    guMtxIdentity(scalemtx);
-    guMtxIdentity(rotz);
-    guMtxIdentity(roty);
-    guMtxIdentity(rotx);
-
-    // Position the chunks on the screen
-    guMtxTrans(offset, -world_pos.x, -world_pos.y, -world_pos.z);
-    guMtxTrans(posmtx, camera.position.x, camera.position.y, camera.position.z);
-
-    // Scale the object
-    guMtxScale(scalemtx, object_scale.x, object_scale.y, object_scale.z);
-    guMtxInverse(scalemtx, scalemtx);
-
-    // Rotate object
-    axis.x = 0;
-    axis.y = 0;
-    axis.z = 1;
-    guMtxRotAxisDeg(objrotz, &axis, -object_rot.z);
-    axis.x = 0;
-    axis.y = 1;
-    axis.z = 0;
-    guMtxRotAxisDeg(objroty, &axis, -object_rot.y);
-    axis.x = 1;
-    axis.y = 0;
-    axis.z = 0;
-    guMtxRotAxisDeg(objrotx, &axis, -object_rot.x);
-
-    // Rotate view
-    axis.x = 1;
-    axis.y = 0;
-    axis.z = 0;
-    guMtxRotAxisDeg(rotx, &axis, camera.rot.x);
-    axis.x = 0;
-    axis.y = 1;
-    axis.z = 0;
-    guMtxRotAxisDeg(roty, &axis, camera.rot.y);
-    axis.x = 0;
-    axis.y = 0;
-    axis.z = 1;
-    guMtxRotAxisDeg(rotz, &axis, camera.rot.z);
-
-    // Apply matrices
-    guMtxConcat(objrotz, objroty, objroty);
-    guMtxConcat(objroty, objrotx, objrotx);
-    guMtxConcat(objrotx, scalemtx, scalemtx);
-    guMtxConcat(scalemtx, posmtx, posmtx);
-    guMtxConcat(posmtx, offset, offset);
-    guMtxConcat(offset, rotz, rotz);
-    guMtxConcat(rotz, roty, roty);
-    guMtxConcat(roty, rotx, model);
-    guMtxInverse(model, model);
-    guMtxConcat(model, view.mtx, modelview);
-    gertex::use_matrix(modelview, load);
-}
-
-void transform_view_screen(gertex::GXMatrix view, guVector screen_pos, guVector object_scale, guVector object_rot, bool load)
-{
-    Mtx model, modelview;
-    Mtx posmtx;
-    Mtx scalemtx;
-    Mtx objrotx;
-    Mtx objroty;
-    Mtx objrotz;
-
-    // Reset matrices
-    guMtxIdentity(model);
-    guMtxIdentity(posmtx);
-
-    // Position the object on the screen
-    guMtxTrans(posmtx, -screen_pos.x, -screen_pos.y, -screen_pos.z);
-
-    // Scale the object
-    guMtxScale(scalemtx, object_scale.x, object_scale.y, object_scale.z);
-    guMtxInverse(scalemtx, scalemtx);
-
-    guVector axis; // Axis to rotate on
-
-    // Rotate object
-    axis.x = 0;
-    axis.y = 0;
-    axis.z = 1;
-    guMtxRotAxisDeg(objrotz, &axis, object_rot.z);
-    axis.x = 0;
-    axis.y = 1;
-    axis.z = 0;
-    guMtxRotAxisDeg(objroty, &axis, object_rot.y);
-    axis.x = 1;
-    axis.y = 0;
-    axis.z = 0;
-    guMtxRotAxisDeg(objrotx, &axis, object_rot.x);
-
-    // Apply matrices
-    guMtxConcat(objrotz, objroty, objroty);
-    guMtxConcat(objroty, objrotx, objrotx);
-    guMtxConcat(objrotx, scalemtx, scalemtx);
-    guMtxConcat(scalemtx, posmtx, posmtx);
-    guMtxConcat(posmtx, model, model);
-    guMtxInverse(model, model);
-    guMtxConcat(model, view.mtx, modelview);
-    gertex::use_matrix(modelview, load);
-}
-
 void draw_particles(Camera &camera, Particle *particles, int count)
 {
     gertex::GXState state = gertex::get_state();
@@ -750,7 +626,8 @@ void draw_particles(Camera &camera, Particle *particles, int count)
     gertex::set_pos_precision(GX_F32, 0);
 
     // Bake vertex properties
-    Mtx44 rot_mtx;
+    Mtx rot_mtx;
+    guVector rot_vec = camera.transform.get_rotation();
     Vertex vertices[4];
     for (int i = 0; i < 4; i++)
     {
@@ -758,9 +635,9 @@ void draw_particles(Camera &camera, Particle *particles, int count)
         int y = (i > 1);
         guVector vertex{(x - 0.5f), (y - 0.5f), 0};
 
-        guMtxRotDeg(rot_mtx, 'x', camera.rot.x);
+        guMtxRotDeg(rot_mtx, 'x', rot_vec.x);
         guVecMultiply(rot_mtx, &vertex, &vertex);
-        guMtxRotDeg(rot_mtx, 'y', camera.rot.y);
+        guMtxRotDeg(rot_mtx, 'y', rot_vec.y);
         guVecMultiply(rot_mtx, &vertex, &vertex);
 
         vertices[i] = Vertex(vertex, (x << 2) * BASE3D_PIXEL_UV_SCALE, (y << 2) * BASE3D_PIXEL_UV_SCALE);
@@ -890,11 +767,11 @@ void draw_frustum(const Camera &cam)
     float farW = farH * cam.aspect;
 
     // Camera orientation vectors
-    Vec3f forward = rotate_vector(Vec3f(0, 0, -1), cam.rot);
-    Vec3f up = rotate_vector(Vec3f(0, 1, 0), cam.rot);
+    Vec3f forward = rotate_vector(Vec3f(0, 0, -1), cam.transform.get_rotation());
+    Vec3f up = rotate_vector(Vec3f(0, 1, 0), cam.transform.get_rotation());
     Vec3f right = cross(forward, up).normalize();
 
-    Vec3f camPos = cam.position;
+    Vec3f camPos = cam.transform.get_position();
 
     Vec3f nearCenter = camPos + forward * cam.near;
     Vec3f farCenter = camPos + forward * cam.far;
@@ -956,11 +833,11 @@ void build_frustum(const Camera &cam, Frustum &frustum)
     float farH = tan(cam.fov * 0.5f * M_DTOR) * cam.far;
     float farW = farH * cam.aspect;
 
-    Vec3f forward = rotate_vector(Vec3f(0, 0, -1), cam.rot);
-    Vec3f up = rotate_vector(Vec3f(0, 1, 0), cam.rot);
+    Vec3f forward = rotate_vector(Vec3f(0, 0, -1), cam.transform.get_rotation());
+    Vec3f up = rotate_vector(Vec3f(0, 1, 0), cam.transform.get_rotation());
     Vec3f right = cross(forward, up).normalize();
 
-    Vec3f camPos = cam.position;
+    Vec3f camPos = cam.transform.get_position();
     Vec3f nearCenter = camPos + forward * cam.near;
     Vec3f farCenter = camPos + forward * cam.far;
 
@@ -1100,11 +977,12 @@ GXColor get_sky_color(bool cave_darkness)
         return GXColor{0x20, 0, 0, 0xFF};
 
     Camera &camera = get_camera();
+    Vec3f cam_pos = camera.transform.get_position();
 
-    float elevation_brightness = std::pow(std::clamp((camera.position.y) * 0.03125, 0.0, 1.0), 2.0);
-    if (camera.position.y < -500.0)
+    float elevation_brightness = std::pow(std::clamp((cam_pos.y) * 0.03125, 0.0, 1.0), 2.0);
+    if (cam_pos.y < -500.0)
     {
-        elevation_brightness = std::clamp((camera.position.y + 500.0) / -250.0, 0.0, 1.0);
+        elevation_brightness = std::clamp((cam_pos.y + 500.0) / -250.0, 0.0, 1.0);
     }
     float sky_multiplier = get_sky_multiplier();
     float brightness = elevation_brightness * sky_multiplier;
@@ -1189,16 +1067,19 @@ void draw_sunrise()
 
     use_texture(white_texture);
 
-    gertex::GXMatrix mtx_tmp;
-    gertex::GXMatrix mtx;
-    guVector axis{1, 0, 0};
-    guMtxRotAxisDeg(mtx.mtx, &axis, 90.0f);
     float celestial_angle = get_celestial_angle();
-    axis = {0, 0, 1};
-    guMtxRotAxisDeg(mtx_tmp.mtx, &axis, celestial_angle > 0.5f ? 180.0f : 0.0f);
-    guMtxConcat(mtx.mtx, mtx_tmp.mtx, mtx.mtx);
-    transform_view(mtx, get_camera().position);
 
+    Camera &camera = get_camera();
+
+    Transform transform;
+    transform.set_position(camera.transform.get_position());
+    transform.set_rotation({-90.0f, 0.0f, celestial_angle > 0.5f ? 180.0f : 0.0f});
+
+    gertex::use_matrix(camera.apply_transform(transform));
+
+    /*
+    transform_view(mtx, get_camera().position);
+    */
     uint8_t quality = 16;
     float centerX = 0.0f;
     float centerY = 100.0f;
@@ -1240,6 +1121,8 @@ void draw_sky()
     // Draw sunrise
     draw_sunrise();
 
+    Camera &camera = get_camera();
+
     float sky_alpha = get_sky_multiplier();
     if (sky_alpha > 0.0f)
     {
@@ -1252,7 +1135,10 @@ void draw_sky()
         gertex::set_blending(gertex::GXBlendMode::normal);
         gertex::set_alpha_cutoff(0);
 
-        transform_view(gertex::get_view_matrix(), get_camera().position);
+        Transform transform;
+        transform.set_position(camera.transform.get_position());
+
+        gertex::use_matrix(camera.apply_transform(transform));
 
         float sky_dist = FOG_DISTANCE * 2 / BASE3D_POS_FRAC;
         GXColor sky_color = get_sky_color();
@@ -1284,14 +1170,14 @@ void draw_sky()
     gertex::set_pos_precision(GX_S16, BASE3D_POS_FRAC_BITS);
 
     // Prepare rendering the celestial bodies
-    gertex::GXMatrix celestial_rotated_view;
     gertex::set_color_format(0, GX_DIRECT);
 
-    guVector axis{1, 0, 0};
-    guMtxRotAxisDeg(celestial_rotated_view.mtx, &axis, get_celestial_angle() * 360.0f);
-    guMtxConcat(gertex::get_view_matrix().mtx, celestial_rotated_view.mtx, celestial_rotated_view.mtx);
+    Transform star_transform;
+    star_transform.set_position(camera.transform.get_position());
+    star_transform.set_rotation({get_celestial_angle() * 360.0f, 0.0f, 0.0f});
 
-    transform_view(celestial_rotated_view, get_camera().position);
+    gertex::use_matrix(camera.apply_transform(star_transform));
+
     draw_stars();
     float size = 30.0f;
     float dist = 98.0f;
@@ -1332,8 +1218,10 @@ void draw_sky()
     // The clouds are placed at y=108
     dist = 108.0f * scale;
 
-    // Reset transform
-    transform_view(gertex::get_view_matrix(), guVector{0, 0, 0});
+    Transform clouds_transform;
+    clouds_transform.set_position({0, 0, 0});
+
+    gertex::use_matrix(camera.apply_transform(clouds_transform));
 
     // Clouds are moving at a speed of 0.05 blocks per tick.
     float uv_offset = (render_world->ticks % 40960 + render_world->partial_ticks) * 0.05f / 2048.0f;

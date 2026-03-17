@@ -519,14 +519,19 @@ void EntityFallingBlock::render(float partial_ticks, bool transparency)
     if (on_ground || fall_time <= 1)
     {
         // Prepare the transformation matrix
-        Vec3f chunk_pos = Vec3f(int_pos.x & ~0xF, int_pos.y & ~0xF, int_pos.z & ~0xF) + Vec3f(0.5);
-        transform_view(gertex::get_view_matrix(), chunk_pos);
+        Transform block_transform;
+        block_transform.set_position({(int_pos.x & ~15) + 0.5f, (int_pos.y & ~15) + 0.5f, (int_pos.z & ~15) + 0.5f});
+
+        gertex::use_matrix(get_camera().apply_transform(block_transform));
+
         render_single_block_at(block_state, int_pos);
     }
     else
     {
         // Prepare the transformation matrix
-        transform_view(gertex::get_view_matrix(), get_position(partial_ticks) + Vec3f(0, 0.5, 0));
+        Transform block_transform;
+        block_transform.set_position(get_position(partial_ticks) + Vec3f(0, 0.5, 0));
+        gertex::use_matrix(get_camera().apply_transform(block_transform));
         render_single_block(block_state);
     }
 }
@@ -569,8 +574,10 @@ void EntityExplosiveBlock::render(float partial_ticks, bool transparency)
         block_state.light = block_at_pos->light;
     block_state.visibility_flags = 0x7F;
 
-    // Draw the selected block
-    transform_view(gertex::get_view_matrix(), get_position(partial_ticks));
+    Transform block_transform;
+    block_transform.set_position(get_position(partial_ticks));
+
+    gertex::use_matrix(get_camera().apply_transform(block_transform));
 
     if ((fuse / 5) % 2 == 1)
         use_texture(white_texture);
@@ -818,9 +825,14 @@ void EntityItem::render(float partial_ticks, bool transparency)
 
     Vec3f anim_offset = Vec3f(0, std::sin((ticks_existed + partial_ticks) * M_1_PI * 0.25) * 0.125 + 0.125, 0);
     Vec3f dupe_offset = Vec3f(0.0625);
+
     // Draw the item (twice if there are multiple items)
     for (int i = 0; i <= multi; i++)
     {
+        Transform transform;
+        transform.set_position(entity_position + anim_offset + dupe_offset * i + Vec3f(0, 0.125, 0));
+        transform.set_scale({0.5f, 0.5f, 0.5f});
+
         if (item.is_block())
         {
             use_texture(terrain_texture);
@@ -829,7 +841,13 @@ void EntityItem::render(float partial_ticks, bool transparency)
             {
                 // Draw the block
                 item_rot.y = (ticks_existed + partial_ticks) * 4;
-                transform_view(gertex::get_view_matrix(), entity_position + anim_offset + dupe_offset * i, Vec3f(0.25), item_rot, true);
+
+                transform.set_position(entity_position + anim_offset + dupe_offset * i + Vec3f(0, 0.25, 0));
+                transform.set_rotation(item_rot);
+                transform.set_scale({0.25f, 0.25f, 0.25f});
+
+                gertex::use_matrix(get_camera().apply_transform(transform));
+
                 BlockProperties props = properties(block.id);
                 if (bool(props.m_transparent) == transparency)
                     render_single_block(block);
@@ -838,7 +856,10 @@ void EntityItem::render(float partial_ticks, bool transparency)
             {
                 // Draw the item
                 item_rot.z = 180;
-                transform_view(gertex::get_view_matrix(), entity_position + anim_offset + dupe_offset * i + Vec3f(0, 0.125, 0), Vec3f(0.5), item_rot, true);
+
+                transform.set_rotation(item_rot);
+
+                gertex::use_matrix(get_camera().apply_transform(transform));
 
                 if (transparency)
                     render_single_item(get_default_texture_index(BlockID(block.id)), true, light_level);
@@ -850,8 +871,9 @@ void EntityItem::render(float partial_ticks, bool transparency)
 
             // Draw the item
             item_rot.z = 180;
-            transform_view(gertex::get_view_matrix(), entity_position + anim_offset + dupe_offset * i + Vec3f(0, 0.125, 0), Vec3f(0.5), item_rot, true);
+            transform.set_rotation(item_rot);
 
+            gertex::use_matrix(get_camera().apply_transform(transform));
             if (transparency)
                 render_single_item(item_stack.get_texture_index(), true, light_level);
         }
@@ -1178,7 +1200,9 @@ void EntityPlayerLocal::hurt(int16_t damage)
 {
     EntityPlayer::hurt(damage);
     health_update_tick = 10;
-    get_camera().rot.z += 8; // Tilt the camera a bit
+    guVector rot = rotation;
+    rot.z += 8;
+    get_camera().transform.set_rotation(rot); // Tilt the camera a bit
 }
 
 void EntityPlayerLocal::tick()
@@ -1194,10 +1218,11 @@ void EntityPlayerLocal::tick()
             {
                 // Update the cursor position based on the left stick
                 Vec3f left_stick = dev->get_left_stick();
-                movement.x = left_stick.x * sin(DegToRad(camera.rot.y + 90));
-                movement.z = left_stick.x * cos(DegToRad(camera.rot.y + 90));
-                movement.x -= left_stick.y * sin(DegToRad(camera.rot.y));
-                movement.z -= left_stick.y * cos(DegToRad(camera.rot.y));
+                float y_rot = camera.transform.get_rotation().y;
+                movement.x = left_stick.x * sin(DegToRad(y_rot + 90));
+                movement.z = left_stick.x * cos(DegToRad(y_rot + 90));
+                movement.x -= left_stick.y * sin(DegToRad(y_rot));
+                movement.z -= left_stick.y * cos(DegToRad(y_rot));
                 movement.y = 0;
                 if (movement.magnitude() > 1)
                 {
@@ -1268,7 +1293,12 @@ void EntityPlayerMp::render(float partial_ticks, bool transparency)
     // The name tag should render in the transparent pass
     if (transparency)
     {
-        transform_view(gertex::get_view_matrix(), entity_position, Vec3f(1), Vec3f(0, 0, 0), true);
+        Camera &camera = get_camera();
+
+        Transform transform;
+        transform.set_position(entity_position);
+
+        gertex::use_matrix(camera.apply_transform(transform));
 
         gertex::use_fog(false);
 
@@ -1288,9 +1318,9 @@ void EntityPlayerMp::render(float partial_ticks, bool transparency)
         Vec3f bg_size = Vec3f(0.25);
         bg_size.x *= (text_width_3d(player_name) + 2) * 0.125;
         bg_size.y += 0.03125;
-        Camera &camera = get_camera();
-        Vec3f right_vec = -angles_to_vector(0, camera.rot.y + 90);
-        Vec3f up_vec = -angles_to_vector(camera.rot.x + 90, camera.rot.y);
+        Vec3f cam_rot = camera.transform.get_rotation();
+        Vec3f right_vec = -angles_to_vector(0, cam_rot.y + 90);
+        Vec3f up_vec = -angles_to_vector(cam_rot.x + 90, cam_rot.y);
         draw_colored_sprite_3d(white_texture, Vec3f(0, 2.375, 0), bg_size, Vec3f(0, -0.03125 * 0.5, 0), right_vec, up_vec, 0, 0, 1, 1, GXColor{0, 0, 0, 0x3F});
 
         // Render partially transparent name tag (as seen behind walls)

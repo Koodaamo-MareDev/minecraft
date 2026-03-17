@@ -156,7 +156,19 @@ void Model::render(float partialTicks, bool transparency)
      * In short, we go from -CameraPosition to CameraPosition - ModelPosition
      */
     Camera &camera = get_camera();
-    transform_view(gertex::get_view_matrix(), Vec3f(camera.position) * 2 - (Vec3f(pos.x, pos.y + 1.5078125F, pos.z)), Vec3f(1), rot, false);
+
+    Transform transform;
+    transform.set_rotation(rot);
+    transform.set_position({(float)pos.x, (float)pos.y + 1.5078125F, (float)pos.z});
+
+    Mtx modelview;
+    Mtx transform_matrix;
+    guMtxInverse(transform.get_matrix(), transform_matrix);
+    guMtxConcat(camera.view, transform_matrix, modelview);
+    gertex::use_matrix(modelview);
+    /*
+    transform_view(gertex::get_view_matrix(), Vec3f(camera.transform.get_position()) * 2 - (Vec3f(pos.x, pos.y + 1.5078125F, pos.z)), Vec3f(1), rot, false);
+    */
     if (texture)
         use_texture(*texture);
     raw_render();
@@ -190,7 +202,20 @@ void Model::render_handitem(ModelBox *box, item::ItemStack &item, Vec3f offset, 
     gertex::set_pos_precision(GX_S16, BASE3D_POS_FRAC_BITS);
 
     // Setup matrices for rendering the item
+    Camera &camera = get_camera();
+
+    Transform transform;
+    transform.set_rotation(rot);
+    transform.set_position({(float)pos.x, (float)pos.y + 1.5078125F, (float)pos.z});
+    transform.set_scale({-1.0f, -1.0f, -1.0f});
+
+    Mtx modelview;
+    guMtxConcat(camera.view, transform.get_matrix(), modelview);
+    gertex::use_matrix(modelview, false);
+
+    /*
     transform_view(gertex::get_view_matrix(), pos + Vec3f(0, 1.5078125F, 0), Vec3f(-1), this->rot, false);
+    */
     gertex::GXMatrix pos_mtx = gertex::get_matrix();
     guMtxApplyTrans(pos_mtx.mtx, pos_mtx.mtx, -(box->pos.x) / 16, (box->pos.y) / 16, -(box->pos.z) / 16);
     Mtx tmp_mtx;

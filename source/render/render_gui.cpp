@@ -147,8 +147,9 @@ void draw_text_3d(Vec3f pos, std::string text, GXColor color)
     Camera &camera = get_camera();
 
     Vec3f char_size = Vec3f(0.25);
-    Vec3f right_vec = -angles_to_vector(0, camera.rot.y + 90);
-    Vec3f up_vec = -angles_to_vector(camera.rot.x + 90, camera.rot.y);
+    guVector cam_rot = camera.transform.get_rotation();
+    Vec3f right_vec = -angles_to_vector(0, cam_rot.y + 90);
+    Vec3f up_vec = -angles_to_vector(cam_rot.x + 90, cam_rot.y);
 
     gertex::set_color_format(0, GX_DIRECT);
     gertex::set_pos_precision(GX_F32, 0);

@@ -17,6 +17,8 @@
 #include <render/texanim.hpp>
 #include <world/particle.hpp>
 #include <gertex/gertex.hpp>
+#include <render/transform.hpp>
+#include <render/camera.hpp>
 
 extern uint8_t light_map[1024];
 
@@ -31,15 +33,6 @@ struct Frustum
     Plane planes[6]; // Six planes of the frustum
 };
 
-struct Camera
-{
-    Vec3f rot;       // Camera rotation (in degrees)
-    Vec3f position;  // Camera position
-    vfloat_t fov;    // Field of view (in degrees)
-    vfloat_t aspect; // Aspect ratio
-    vfloat_t near;   // Near clipping plane
-    vfloat_t far;    // Far clipping plane
-};
 
 class World;
 
@@ -76,10 +69,6 @@ bool is_cube_visible(const Frustum &frustum, const Vec3f &center, float size);
 gertex::GXProjMatrix create_offset_perspective(const gertex::GXView &view, float x_pixel, float y_pixel);
 
 void build_frustum(const Camera &cam, Frustum &frustum);
-
-void transform_view(gertex::GXMatrix view, guVector world_pos, guVector object_scale = guVector{1, 1, 1}, guVector object_rot = guVector{0, 0, 0}, bool load = true);
-
-void transform_view_screen(gertex::GXMatrix view, guVector screen_pos, guVector object_scale = guVector{1, 1, 1}, guVector object_rot = guVector{0, 0, 0}, bool load = true);
 
 void draw_sky();
 

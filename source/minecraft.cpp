@@ -723,15 +723,14 @@ void UpdateCamera()
     }
     current_world->player.view_bob_offset = Vec3f::lerp(current_world->player.view_bob_offset, target_view_bob_offset, 0.035);
     current_world->player.view_bob_screen_offset = Vec3f::lerp(current_world->player.view_bob_screen_offset, target_view_bob_screen_offset, 0.035);
-    camera.position = current_world->player.view_bob_offset + player.get_position(std::fmod(current_world->partial_ticks, 1));
-    camera.rot.x = player.rotation.x;
-    camera.rot.y = player.rotation.y;
-    camera.rot.z = lerpf(camera.rot.z, 0, current_world->delta_time * 5);
-    if (camera.rot.z < 0.1)
+    camera.transform.set_position(current_world->player.view_bob_offset + player.get_position(std::fmod(current_world->partial_ticks, 1)));
+    float roll = lerpf(camera.transform.get_rotation().z, 0, current_world->delta_time * 5);
+    if (roll < 0.1)
     {
-        camera.rot.z = 0;
+        roll = 0;
     }
-
+    camera.transform.set_rotation(Vec3f(player.rotation.x, player.rotation.y, roll));
+    camera.update();
     current_world->update_frustum(camera);
 }
 
@@ -748,7 +747,7 @@ void UpdateFog()
     if (block)
         fog_light_multiplier = lerpf(fog_light_multiplier, std::pow(0.9f, (15.0f - block->sky_light)), 0.05f);
 
-    fog_depth_multiplier = lerpf(fog_depth_multiplier, std::min(std::max(camera.position.y, 24.) / 36., 1.0), 0.05f);
+    fog_depth_multiplier = lerpf(fog_depth_multiplier, std::min(std::max(camera.transform.get_position().y, 24.f) / 36., 1.0), 0.05f);
 
     float fog_multiplier = current_world->hell ? 0.5f : 1.0f;
     if (current_world->player.in_fluid == BlockID::lava)

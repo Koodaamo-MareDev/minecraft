@@ -118,7 +118,7 @@ bool World::tick()
     }
 
     if (m_sound_system)
-        m_sound_system->update(angles_to_vector(0, get_camera().rot.y + 90), player.get_position(std::fmod(partial_ticks, 1)), true);
+        m_sound_system->update(angles_to_vector(0, get_camera().transform.get_rotation().y + 90), player.get_position(std::fmod(partial_ticks, 1)), true);
 
     last_entity_tick = ticks;
 
@@ -469,7 +469,7 @@ void World::calculate_visibility()
 
     std::deque<SectionNode> section_queue;
     std::deque<Section *> visited;
-    Vec3f fpos = get_camera().position;
+    Vec3f fpos = get_camera().transform.get_position();
     SectionNode entry;
     entry.sect = section_at(Vec3i(int(fpos.x), int(fpos.y), int(fpos.z)));
 
@@ -560,7 +560,9 @@ void World::edit_blocks()
     Block held_block = player.selected_item->as_item().is_block() ? Block{uint8_t(player.selected_item->id & 0xFF), 0x7F, uint8_t(player.selected_item->meta & 0xFF)} : Block{};
     bool finish_destroying = should_destroy_block && player.mining_progress >= 1.0f;
 
-    player.raycast_target_found = raycast_precise(camera.position, angles_to_vector(camera.rot.x, camera.rot.y), 4, &player.raycast_target_pos, &player.raycast_target_face, player.raycast_target_bounds, this);
+    Vec3f cam_rot = camera.transform.get_rotation();
+    Vec3f cam_pos = camera.transform.get_position();
+    player.raycast_target_found = raycast_precise(cam_pos, angles_to_vector(cam_rot.x, cam_rot.y), 4, &player.raycast_target_pos, &player.raycast_target_face, player.raycast_target_bounds, this);
     if (player.raycast_target_found && (finish_destroying || should_place_block))
     {
         BlockID new_blockid = finish_destroying ? BlockID::air : held_block.blockid;
@@ -910,7 +912,9 @@ void World::draw(Camera &camera)
     GX_SetCullMode(GX_CULL_BACK);
 
     // Prepare the transformation matrix
-    transform_view(gertex::get_view_matrix(), Vec3f(0.5));
+    Transform transform;
+    transform.set_position({0.5f, 0.5f, 0.5f});
+    gertex::use_matrix(camera.apply_transform(transform));
 
     // Prepare opaque rendering parameters
     GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
@@ -985,12 +989,18 @@ void World::draw_scene(bool opaque)
         chunk->render_entities(partial_ticks, !opaque);
     }
 
+    Camera &camera = get_camera();
+
     // Draw the vbos
     for (std::pair<Section *, VBO *> &pair : sections_to_draw)
     {
         Section *&sect = pair.first;
         VBO *&buffer = pair.second;
-        transform_view(gertex::get_view_matrix(), Vec3f(sect->x, sect->y, sect->z) + Vec3f(0.5));
+
+        Transform transform;
+        transform.set_position({sect->x + 0.5f, sect->y + 0.5f, sect->z + 0.5f});
+        gertex::use_matrix(camera.apply_transform(transform));
+
         GX_CallDispList(buffer->buffer, buffer->length);
     }
 
@@ -1014,11 +1024,13 @@ void World::draw_scene(bool opaque)
 
             // Apply the transformation for the block breaking animation
             Vec3f adjusted_offset = Vec3f(player.raycast_target_pos.x, player.raycast_target_pos.y, player.raycast_target_pos.z) + Vec3f(0.5);
-            Vec3f towards_camera = Vec3f(get_camera().position) - adjusted_offset;
+            Vec3f towards_camera = Vec3f(get_camera().transform.get_position()) - adjusted_offset;
             towards_camera.fast_normalize();
             towards_camera = towards_camera * 0.002;
 
-            transform_view(gertex::get_view_matrix(), adjusted_offset + towards_camera);
+            Transform transform;
+            transform.set_position(adjusted_offset + towards_camera);
+            gertex::use_matrix(camera.apply_transform(transform));
 
             // Override texture index for the block breaking animation
             override_texture_index(240 + (int)(player.mining_progress * 10.0f));
@@ -1047,7 +1059,7 @@ void World::draw_scene(bool opaque)
         GX_SetZMode(GX_TRUE, GX_LEQUAL, GX_TRUE);
         Vec3f outline_pos = player.raycast_target_pos;
 
-        Vec3f towards_camera = Vec3f(get_camera().position) - outline_pos;
+        Vec3f towards_camera = Vec3f(get_camera().transform.get_position()) - outline_pos;
         towards_camera.fast_normalize();
         towards_camera = towards_camera * 0.002;
 
@@ -1059,7 +1071,10 @@ void World::draw_scene(bool opaque)
         relative_target_bounds.min = b_min - floor_b_min;
         relative_target_bounds.max = b_max - floor_b_min;
 
-        transform_view(gertex::get_view_matrix(), floor_b_min + towards_camera);
+        Transform transform;
+        transform.set_position(floor_b_min + towards_camera);
+
+        gertex::use_matrix(camera.apply_transform(transform));
 
         // Draw the block outline
         draw_bounds(&relative_target_bounds);
@@ -1106,7 +1121,15 @@ void World::draw_selected_block()
             // Render as a block
 
             // Transform the selected block position
-            transform_view_screen(gertex::get_view_matrix(), selectedBlockPos, guVector{.5f, .5f, .5f}, guVector{10, -45, 0});
+            Transform transform;
+            transform.set_position(selectedBlockPos);
+            transform.set_rotation({10, -45, 0});
+            transform.set_scale({0.5f, 0.5f, 0.5f});
+
+            gertex::GXMatrix matrix = gertex::get_view_matrix();
+            guMtxConcat(matrix.mtx, transform.get_matrix(), matrix.mtx);
+
+            gertex::use_matrix(matrix);
 
             GX_SetZMode(properties(selected_block.id).m_transparent ? GX_FALSE : GX_TRUE, GX_ALWAYS, GX_TRUE);
             render_single_block(selected_block);
@@ -1137,7 +1160,15 @@ void World::draw_selected_block()
     // Render as an item
 
     // Transform the selected block position
-    transform_view_screen(gertex::get_view_matrix(), selectedBlockPos, guVector{.75f, .75f, .75f}, guVector{10, 45, 180});
+    Transform transform;
+    transform.set_position(selectedBlockPos);
+    transform.set_rotation({10, 45, 180});
+    transform.set_scale({0.75f, 0.75f, 0.75f});
+
+    gertex::GXMatrix matrix = gertex::get_view_matrix();
+    guMtxConcat(matrix.mtx, transform.get_matrix(), matrix.mtx);
+
+    gertex::use_matrix(matrix);
 
     uint16_t tex_x = PARTICLE_X(texture_index);
     uint16_t tex_y = PARTICLE_Y(texture_index);
