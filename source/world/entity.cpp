@@ -850,7 +850,7 @@ void EntityItem::render(float partial_ticks, bool transparency)
     Vec3f item_rot = Vec3f(0, 0, 0);
 
     // Get the direction towards the player
-    item_rot.y = world->player.rotation.y + 180;
+    item_rot.y = -world->player.rotation.y + 180;
 
     // Lock the item rotation to the y-axis
     item_rot.x = 0;
