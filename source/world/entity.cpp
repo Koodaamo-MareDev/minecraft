@@ -419,7 +419,10 @@ bool EntityPathfinder::simple_pathfind(Vec3f target)
 {
     bool changed = false;
     if (path.size() > 0)
+    {
         changed = (target - path[path.size() - 1]).sqr_magnitude() > 2;
+        changed |= (get_position(0) - path[path.size() - 1]).sqr_magnitude() > 2;
+    }
     changed |= path_index >= path.size();
 
     if (changed)

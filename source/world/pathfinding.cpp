@@ -73,7 +73,17 @@ find_path(
         int rel_y = pos.y - from.y;
 
         if (rel_y == 0)
+        {
+            Vec3i min = Vec3i{std::min(from.x, pos.x), std::min(from.y, pos.y), std::min(from.z, pos.z)};
+            Vec3i max = Vec3i{std::max(from.x, pos.x), std::max(from.y, pos.y), std::max(from.z, pos.z)};
+
+            for (int x = min.x; x <= max.x; x++)
+                for (int z = min.z; z <= max.z; z++)
+                    for (int y = min.y; y < max.y; y++)
+                        if (is_solid(Vec3i{x, y, z}))
+                            return false;
             return has_ground(pos);
+        }
 
         if (rel_y > 0)
         {
@@ -83,7 +93,7 @@ find_path(
         }
         else
         {
-            for (int y = 0; y > -3; y--)
+            for (int y = 0; y > -10; y--)
                 if (has_ground(pos + Vec3i{0, y, 0}) && valid_pos(from + Vec3i{0, -y, 0}))
                     return true;
         }
