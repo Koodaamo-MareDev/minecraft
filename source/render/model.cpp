@@ -157,18 +157,14 @@ void Model::render(float partialTicks, bool transparency)
      */
     Camera &camera = get_camera();
 
+    Vec3f render_pos = pos;
+    render_pos.y += 1.5078125F;
+
     Transform transform;
     transform.set_rotation(rot);
-    transform.set_position({(float)pos.x, (float)pos.y + 1.5078125F, (float)pos.z});
+    transform.set_position((Vec3f(camera.transform.get_position()) * 2) - render_pos);
 
-    Mtx modelview;
-    Mtx transform_matrix;
-    guMtxInverse(transform.get_matrix(), transform_matrix);
-    guMtxConcat(camera.view, transform_matrix, modelview);
-    gertex::use_matrix(modelview);
-    /*
-    transform_view(gertex::get_view_matrix(), Vec3f(camera.transform.get_position()) * 2 - (Vec3f(pos.x, pos.y + 1.5078125F, pos.z)), Vec3f(1), rot, false);
-    */
+    gertex::use_matrix(camera.apply_transform(transform));
     if (texture)
         use_texture(*texture);
     raw_render();
