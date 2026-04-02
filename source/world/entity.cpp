@@ -754,7 +754,7 @@ void EntityCreeper::render(float partial_ticks, bool transparency)
     creeper_model.head_rot = Vec3f(entity_rotation.x, entity_rotation.y, 0);
 
     // Draw the creeper
-    gertex::set_color_mul(get_lightmap_color(light_level));
+    gertex::set_color_mul(get_lightmap_color(light_level) * (14 / 16.));
 
     if (fuse < creeper_fuse)
     {
@@ -1371,7 +1371,7 @@ void EntityPlayerMp::render(float partial_ticks, bool transparency)
     player_model.rot = Vec3f(0, body_rotation_y, 0);
     player_model.head_rot = Vec3f(entity_rotation.x, entity_rotation.y, 0);
 
-    gertex::set_color_mul(get_lightmap_color(light_level));
+    gertex::set_color_mul(get_lightmap_color(light_level) * (14 / 16.));
     for (size_t i = 0; i < 5; i++)
     {
         player_model.equipment[i] = equipment[i];
