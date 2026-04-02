@@ -1323,7 +1323,7 @@ void EntityPlayerMp::render(float partial_ticks, bool transparency)
         return;
 
     // Get the player's position and rotation
-    Vec3f entity_position = get_position(partial_ticks);
+    Vec3f entity_position = get_position(partial_ticks) - Vec3f(0, y_offset, 0);
     Vec3f entity_rotation = get_rotation(partial_ticks);
 
     // The name tag should render in the transparent pass
