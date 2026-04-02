@@ -1082,11 +1082,6 @@ void EntityLiving::render(float partial_ticks, bool transparency)
 {
     if (!chunk)
         return;
-    if (!dynamic_cast<EntityPlayer *>(this))
-    {
-        EntityPhysical::render(partial_ticks, transparency);
-        return;
-    }
     Vec3f entity_position = get_position(partial_ticks);
     Vec3f entity_rotation = get_rotation(partial_ticks);
     Vec3i block_pos = entity_position.round();
