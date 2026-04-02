@@ -19,8 +19,6 @@
 #include <util/input/input.hpp>
 #include <nbt/serializers.hpp>
 
-PathFinding pathfinder;
-
 constexpr int item_pickup_ticks = 2;
 constexpr int item_lifetime = 6000;
 
@@ -417,10 +415,60 @@ void EntityPhysical::move_and_check_collisions()
         velocity.z = 0;
 }
 
-Vec3f EntityPathfinder::simple_pathfind(Vec3f target)
+bool EntityPathfinder::simple_pathfind(Vec3f target)
 {
-    pathfinder.current_world = world;
-    return pathfinder.simple_pathfind(Vec3f(position.x, aabb.min.y, position.z), target, path);
+    bool changed = false;
+    if (path.size() > 0)
+        changed = (target - path[path.size() - 1]).sqr_magnitude() > 2;
+    changed |= path_index >= path.size();
+
+    if (changed)
+    {
+        std::vector<Vec3i> new_path = find_path(world, this, target, 48, 3);
+        if (new_path.size() > path.size() - path_index)
+        {
+            path = new_path;
+            path_index = 1;
+        }
+    }
+    return path_index < path.size();
+}
+
+void EntityPathfinder::tick()
+{
+    if (world->is_remote())
+        return;
+
+    if (ticks_existed % 20 == 0)
+    {
+        Vec3f target = Vec3f(std::floor(follow_entity->position.x), std::floor(follow_entity->aabb.min.y), std::floor(follow_entity->position.z));
+        Vec3i target_i = Vec3i(target.x, target.y, target.z);
+        target.y = std::min(target_i.y, checkbelow(target_i, nullptr, world) + 1);
+        simple_pathfind(target);
+    }
+
+    if (path_index < path.size())
+    {
+        Vec3f off(0.5 * std::ceil(width), 0, 0.5 * std::ceil(width));
+        Vec3i target = path[path_index];
+        Vec3f target_f = Vec3f(target.x, target.y, target.z);
+        if (path_index + 1 < path.size())
+        {
+            Vec3i second = path[path_index + 1];
+            if (target.z != second.z && target.x != second.x)
+                target_f = (Vec3f(target + second) * 0.5);
+            target_f.y = target.y;
+        }
+        goal = off + target_f;
+        Vec3f move = goal - get_position(0);
+        if (move.sqr_magnitude() < width - 1e-4)
+            path_index++;
+        movement = Vec3f(move.x, 0, move.z).fast_normalize() * 0.5 + Vec3f(0, move.y > 0.25, 0);
+    }
+    else
+    {
+        movement = Vec3f(0, 0, 0);
+    }
 }
 
 EntityFallingBlock::EntityFallingBlock(Block block_state, const Vec3i &position) : EntityPhysical(), block_state(block_state)
@@ -642,19 +690,7 @@ void EntityCreeper::tick()
         if (sqrdistance < 512 && sqrdistance > 0.5)
         {
             rotation = vector_to_angles(direction.fast_normalize());
-            if (ticks_existed % 4 == 0)
-            {
-                Vec3f target = Vec3f(std::floor(follow_entity->position.x), std::floor(follow_entity->aabb.min.y), std::floor(follow_entity->position.z));
-
-                Vec3i target_i = Vec3i(target.x, target.y, target.z);
-                int below = checkbelow(target_i) + 1;
-                if (target.y - below < 3)
-                {
-                    target.y = below;
-                }
-                Vec3f move = simple_pathfind(target);
-                movement = Vec3f(move.x, 0, move.z).fast_normalize() * 0.5 + Vec3f(0, move.y > 0.25, 0);
-            }
+            EntityPathfinder::tick();
         }
         // Explode if the player is too close
         if (sqrdistance < 6.25)
@@ -729,28 +765,30 @@ void EntityCreeper::render(float partial_ticks, bool transparency)
 #ifdef DEBUG
     if (follow_entity)
     {
-        block_t block_state;
+        Block block_state;
         block_state.id = 50; // Fire
         block_state.visibility_flags = 0x7F;
         block_state.meta = 0;
         block_state.light = 0xFF;
         use_texture(terrain_texture);
+        Transform block_transform;
+
         for (size_t i = 0; i < path.size(); i++)
         {
             Vec3i path_pos = path[i];
-            Vec3f chunk_pos = Vec3f(path_pos.x & ~0xF, path_pos.y & ~0xF, path_pos.z & ~0xF);
-            transform_view(gertex::get_view_matrix(), chunk_pos);
-            render_single_block_at(block_state, path_pos, false);
-            render_single_block_at(block_state, path_pos, true);
+            Vec3f chunk_pos = Vec3f(path_pos.x & ~0xF, path_pos.y & ~0xF, path_pos.z & ~0xF) + Vec3f(0.5, 0.5, 0.5);
+            block_transform.set_position(chunk_pos);
+            gertex::use_matrix(get_camera().apply_transform(block_transform));
+            render_single_block_at(block_state, path_pos);
         }
         Vec3i path_pos = Vec3i(std::floor(follow_entity->position.x), std::floor(follow_entity->aabb.min.y), std::floor(follow_entity->position.z));
         int below = checkbelow(path_pos) + 1;
         path_pos.y = below;
         block_state.id = 56; // Diamond block
-        Vec3f chunk_pos = Vec3f(path_pos.x & ~0xF, path_pos.y & ~0xF, path_pos.z & ~0xF);
-        transform_view(gertex::get_view_matrix(), chunk_pos);
-        render_single_block_at(block_state, path_pos, false);
-        render_single_block_at(block_state, path_pos, true);
+        Vec3f chunk_pos = Vec3f(path_pos.x & ~0xF, path_pos.y & ~0xF, path_pos.z & ~0xF) + Vec3f(0.5, 0.5, 0.5);
+        block_transform.set_position(chunk_pos);
+        gertex::use_matrix(get_camera().apply_transform(block_transform));
+        render_single_block_at(block_state, path_pos);
     }
 #endif
 }

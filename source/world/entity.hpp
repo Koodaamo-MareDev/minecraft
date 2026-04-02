@@ -10,6 +10,7 @@
 #include <block/block_properties.hpp>
 #include <render/model.hpp>
 #include <item/inventory.hpp>
+#include "pathfinding.hpp"
 #include "nbt/nbt.hpp"
 
 constexpr vfloat_t ENTITY_GRAVITY = 9.8f;
@@ -177,9 +178,12 @@ class EntityPathfinder : virtual public EntityPhysical
 public:
     EntityPathfinder() {}
     EntityPhysical *follow_entity = nullptr;
-    std::deque<Vec3i> path;
-    Vec3i last_goal = Vec3i(0, 0, 0);
-    Vec3f simple_pathfind(Vec3f target);
+    size_t path_index = 0;
+    std::vector<Vec3i> path;
+    Vec3f goal = Vec3f(0, -1, 0);
+    bool simple_pathfind(Vec3f target);
+
+    virtual void tick();
 };
 
 class EntityExplosive : virtual public EntityPhysical
