@@ -37,12 +37,4 @@ struct LightNode
     LightType type;
 };
 
-struct ChunkCache
-{
-    Chunk *chunks[3][3]; // [dx+1][dz+1]
-    int base_cx;
-    int base_cz;
-};
-
-// namespace light_engine
 #endif

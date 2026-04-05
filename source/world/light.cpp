@@ -1,5 +1,6 @@
 #include "light.hpp"
 #include <world/chunk.hpp>
+#include <world/chunk_cache.hpp>
 #include <math/vec3i.hpp>
 #include <block/blocks.hpp>
 #include <block/block_properties.hpp>
@@ -92,23 +93,6 @@ void LightEngine::post(const Vec3i &location)
     if (!chunk)
         return;
     pending_updates.push_back(location);
-}
-
-static ChunkCache build_chunk_cache(World *world, int cx, int cz)
-{
-    ChunkCache cache{};
-    cache.base_cx = cx;
-    cache.base_cz = cz;
-
-    for (int dz = -1; dz <= 1; dz++)
-    {
-        for (int dx = -1; dx <= 1; dx++)
-        {
-            cache.chunks[dx + 1][dz + 1] =
-                world->get_chunk(cx + dx, cz + dz);
-        }
-    }
-    return cache;
 }
 
 inline Block *get_block_cached(
