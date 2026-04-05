@@ -284,7 +284,7 @@ void Chunk::refresh_section_visibility(int index)
         if (!block->id)
             continue;
 
-        BlockProperties prop = properties(block->id);
+        BlockProperties &prop = properties(block->id);
 
         if (prop.m_fluid || prop.m_transparent)
             continue;
