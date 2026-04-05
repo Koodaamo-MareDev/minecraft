@@ -201,6 +201,7 @@ public:
 class EntityFallingBlock : virtual public EntityPhysical
 {
 public:
+    bool placed = false;
     uint16_t fall_time = 0;
     Block block_state;
     EntityFallingBlock(Block block_state, const Vec3i &position);

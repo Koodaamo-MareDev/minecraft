@@ -474,7 +474,7 @@ void EntityPathfinder::tick()
     }
 }
 
-EntityFallingBlock::EntityFallingBlock(Block block_state, const Vec3i &position) : EntityPhysical(), block_state(block_state)
+EntityFallingBlock::EntityFallingBlock(Block block_state, const Vec3i &position) : EntityPhysical()
 {
     teleport(Vec3f(position.x, position.y, position.z) + Vec3f(0.5, 0, 0.5));
     this->walk_sound = false;
@@ -483,6 +483,8 @@ EntityFallingBlock::EntityFallingBlock(Block block_state, const Vec3i &position)
     this->simulate_offline = true;
     this->width = 0.999;
     this->height = 0.999;
+    this->block_state = block_state;
+    this->block_state.visibility_flags = 0x7F;
 }
 void EntityFallingBlock::tick()
 {
@@ -490,7 +492,7 @@ void EntityFallingBlock::tick()
     EntityPhysical::tick();
     if (world->is_remote())
         return;
-    if (dead)
+    if (placed)
         return;
 
     if (on_ground)
@@ -502,7 +504,7 @@ void EntityFallingBlock::tick()
             // Update the block
             world->set_block_and_meta_at(int_pos, block_state.blockid, block_state.meta);
             world->notify_at(int_pos);
-            dead = true;
+            placed = true;
         }
         else
         {
@@ -514,14 +516,11 @@ void EntityFallingBlock::tick()
     // Remove the entity after 30 seconds
     if (fall_time > 600)
     {
-        dead = true;
+        placed = true;
 
         // Drop the block as an item
-        if (world && !world->is_remote())
-        {
-            item::ItemStack item = properties(block_state.id).m_drops(block_state);
-            world->spawn_drop(get_foot_blockpos(), &block_state, item);
-        }
+        item::ItemStack item = properties(block_state.id).m_drops(block_state);
+        world->spawn_drop(get_foot_blockpos(), &block_state, item);
     }
 }
 
@@ -559,32 +558,15 @@ void EntityFallingBlock::render(float partial_ticks, bool transparency)
 
     // Prepare the block state
     Vec3i int_pos = Vec3i(std::floor(position.x), std::floor(position.y + 0.5), std::floor(position.z));
-    Block *block_at_pos = chunk->get_block(int_pos);
-    if (!chunk->light_update_count && fall_time && block_at_pos && !properties(block_at_pos->id).m_solid)
+    Block *block_at_pos = world->get_block_at(int_pos);
+    if (fall_time && block_at_pos && !properties(block_at_pos->id).m_solid)
         block_state.light = block_at_pos->light;
-    block_state.visibility_flags = 0x7F;
 
+    Transform block_transform;
+    block_transform.set_position(get_position(partial_ticks) + Vec3f(0, 0.5, 0));
+    gertex::use_matrix(get_camera().apply_transform(block_transform));
     use_texture(terrain_texture);
-
-    // Draw the selected block
-    if (on_ground || fall_time <= 1)
-    {
-        // Prepare the transformation matrix
-        Transform block_transform;
-        block_transform.set_position({(int_pos.x & ~15) + 0.5f, (int_pos.y & ~15) + 0.5f, (int_pos.z & ~15) + 0.5f});
-
-        gertex::use_matrix(get_camera().apply_transform(block_transform));
-
-        render_single_block_at(block_state, int_pos);
-    }
-    else
-    {
-        // Prepare the transformation matrix
-        Transform block_transform;
-        block_transform.set_position(get_position(partial_ticks) + Vec3f(0, 0.5, 0));
-        gertex::use_matrix(get_camera().apply_transform(block_transform));
-        render_single_block(block_state);
-    }
+    render_single_block(block_state);
 }
 
 EntityExplosiveBlock::EntityExplosiveBlock(Block block_state, const Vec3i &position, uint16_t fuse) : EntityFallingBlock(block_state, position), EntityExplosive()
