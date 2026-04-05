@@ -199,7 +199,7 @@ void MainGameLoop()
 
         GetInput();
 
-        for (uint32_t i = current_world->last_entity_tick, count = 0; i < current_world->ticks && count < 10; i++, count++)
+        for (uint32_t count = 0; current_world->last_tick < current_world->ticks && count < 10; current_world->last_tick++, count++)
         {
             update_textures();
 

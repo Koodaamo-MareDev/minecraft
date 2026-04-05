@@ -120,8 +120,6 @@ bool World::tick()
     if (m_sound_system)
         m_sound_system->update(angles_to_vector(0, get_camera().transform.get_rotation().y + 90), player.get_position(std::fmod(partial_ticks, 1)), true);
 
-    last_entity_tick = ticks;
-
     if (player.dead && loaded)
     {
         player.velocity = Vec3f(0, 0, 0);
@@ -1357,8 +1355,7 @@ bool World::load()
 
     // For now, these are the only values we care about
     ticks = level_data->getLong("Time");
-    last_entity_tick = ticks;
-    last_fluid_tick = ticks;
+    last_tick = ticks;
     time_of_day = ticks % 24000;
 
     spawn_pos.x = level_data->getInt("SpawnX");
