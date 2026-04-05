@@ -15,6 +15,7 @@
 #include <util/constants.hpp>
 #include <block/block_properties.hpp>
 #include <world/entity.hpp>
+#include <world/chunk_cache.hpp>
 
 enum class ChunkState : uint8_t
 {
@@ -212,7 +213,7 @@ public:
     void update_height_map(Vec3i pos);
     void light_up();
     void recalculate_height_map();
-    void recalculate_visibility(Block *block, Vec3i pos);
+    void recalculate_visibility(Block *block, const Vec3i &pos, ChunkCache &cache);
     void refresh_section_block_visibility(int index);
     static void init_floodfill_startpoints();
     void vbo_visibility_flood_fill(Vec3i pos);

@@ -106,6 +106,8 @@ bool World::tick()
             return false;
         }
     }
+    if (section_updates_in_tick)
+        try_update_sections();
     update_entities();
     calculate_visibility();
     update_chunks();
@@ -155,19 +157,9 @@ bool World::tick()
 
 void World::update()
 {
-    uint64_t start_time = time_get();
-    try
-    {
-        // Limit to 6ms per update
-        do
-        {
-            current_update_phase = update_sections(current_update_phase);
-        } while (time_diff_us(start_time, time_get()) < 6000);
-    }
-    catch (const std::exception &e)
-    {
-        throw std::runtime_error("Section update failed: " + std::string(e.what()));
-    }
+    if (!section_updates_in_tick)
+        try_update_sections();
+
     edit_blocks();
     m_particle_system.update(delta_time);
 }
@@ -212,6 +204,23 @@ void World::update_chunks()
     {
         tick_blocks();
         prepare_chunks(1);
+    }
+}
+
+void World::try_update_sections()
+{
+    uint64_t start_time = time_get();
+    try
+    {
+        // Limit to 6ms per update
+        do
+        {
+            current_update_phase = update_sections(current_update_phase);
+        } while (time_diff_us(start_time, time_get()) < 6000);
+    }
+    catch (const std::exception &e)
+    {
+        throw std::runtime_error("Section update failed: " + std::string(e.what()));
     }
 }
 

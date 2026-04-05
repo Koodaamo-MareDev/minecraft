@@ -152,6 +152,7 @@ void MainGameLoop()
     render_fast_leaves = fast_leaves;
     current_world->sync_chunk_updates = ((int)config.get("sync_chunk_updates", 0) != 0);
     current_world->smooth_lighting = smooth_lighting;
+    current_world->section_updates_in_tick = vsync;
 
     // Generate a "unique" username based on the device ID
     uint32_t dev_id = 0;

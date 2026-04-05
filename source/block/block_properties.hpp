@@ -21,6 +21,15 @@
 #define FACE_PZ 5
 #define RENDER_FLAG_VISIBLE 6
 
+#define VIS_MIN (1)
+#define VIS_NX (VIS_MIN)
+#define VIS_PX (VIS_MIN << FACE_PX)
+#define VIS_NY (VIS_MIN << FACE_NY)
+#define VIS_PY (VIS_MIN << FACE_PY)
+#define VIS_NZ (VIS_MIN << FACE_NZ)
+#define VIS_PZ (VIS_MIN << FACE_PZ)
+#define VIS_MAX (1 << RENDER_FLAG_VISIBLE)
+
 enum class SoundType : uint8_t
 {
     none,
@@ -408,5 +417,10 @@ public:
         return properties(id).intersects(pos, this, other);
     }
 };
+
+inline static bool visible(uint8_t id)
+{
+    return id && !block_properties[id].m_fluid;
+}
 
 #endif

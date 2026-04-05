@@ -116,24 +116,27 @@ void Chunk::recalculate_height_map()
         }
 }
 
-void Chunk::recalculate_visibility(Block *block, Vec3i pos)
+void Chunk::recalculate_visibility(Block *block, const Vec3i &pos, ChunkCache &cache)
 {
     Block *neighbors[6];
-    world->get_neighbors(pos, neighbors);
+    get_neighbors_cached(cache, pos.x, pos.y, pos.z, neighbors);
     uint8_t visibility = 0x40;
+    bool is_transparent = properties(block->id).m_transparent;
+    bool transparent_leaves = (!render_fast_leaves && block->id == BlockID::leaves);
     for (int i = 0; i < 6; i++)
     {
-        Block *other_block = neighbors[i];
-        if (!other_block || !other_block->get_visibility())
+        Block *neighbor = neighbors[i];
+        if (!neighbor || !visible(neighbor->id))
         {
             visibility |= 1 << i;
             continue;
         }
+        BlockProperties &neighbor_prop = properties(neighbor->id);
 
-        if (other_block->id != block->id || !properties(block->id).m_transparent || (!render_fast_leaves && block->id == BlockID::leaves))
+        if (!is_transparent || transparent_leaves || neighbor->id != block->id)
         {
-            RenderType other_rt = properties(other_block->id).m_render_type;
-            visibility |= ((other_rt != RenderType::full && other_rt != RenderType::full_special) || properties(other_block->id).m_transparent) << i;
+            RenderType other_rt = neighbor_prop.m_render_type;
+            visibility |= (neighbor_prop.m_transparent || (other_rt != RenderType::full && other_rt != RenderType::full_special)) << i;
         }
     }
     block->visibility_flags = visibility;
@@ -142,6 +145,7 @@ void Chunk::recalculate_visibility(Block *block, Vec3i pos)
 // recalculates the blockstates of a section
 void Chunk::refresh_section_block_visibility(int index)
 {
+    ChunkCache cache = build_chunk_cache(world, x, z);
     Vec3i chunk_pos(this->x * 16, index * 16, this->z * 16);
 
     Block *block = this->get_block(chunk_pos); // Gets the first block of the section
@@ -151,10 +155,10 @@ void Chunk::refresh_section_block_visibility(int index)
         {
             for (int x = 0; x < 16; x++, block++)
             {
-                if (!block->get_visibility())
+                if (!visible(block->id))
                     continue;
                 Vec3i pos = Vec3i(x, y, z);
-                this->recalculate_visibility(block, chunk_pos + pos);
+                this->recalculate_visibility(block, chunk_pos + pos, cache);
             }
         }
     }
@@ -307,6 +311,8 @@ void Chunk::refresh_section_visibility(int index)
     for (uint32_t i = 0; i < floodfill_start_points.size(); i++)
     {
         Vec3i pos = floodfill_start_points[i];
+        if (floodfill_grid[pos.x | (pos.y << 8) | (pos.z << 4)] != 1)
+            continue;
 
         // Reset the flood fill state
         floodfill_counter = 0;

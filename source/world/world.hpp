@@ -71,6 +71,7 @@ public:
     SectionUpdatePhase current_update_phase = SectionUpdatePhase::BLOCK_VISIBILITY;
     bool sync_chunk_updates = false;
     bool smooth_lighting = false;
+    bool section_updates_in_tick = false;
 
     std::map<int32_t, EntityPhysical *> world_entities;
     std::deque<Chunk *> chunks;
@@ -98,6 +99,7 @@ public:
     void update();
     void update_frustum(Camera &camera);
     void update_chunks();
+    void try_update_sections();
     SectionUpdatePhase update_sections(SectionUpdatePhase phase);
     void calculate_visibility();
     void tick_blocks();

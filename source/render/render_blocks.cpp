@@ -35,10 +35,10 @@ int render_block(Block *block, const Vec3i &pos)
 int render_cube(Block *block, const Vec3i &pos)
 {
     int vertexCount = 0;
-    for (uint8_t face = 0; face < 6; face++)
+    for (uint8_t face = VIS_MIN, i = 0; face != VIS_MAX; face <<= 1, i++)
     {
-        if (block->get_opacity(face))
-            vertexCount += render_face(pos, face, get_default_texture_index(block->blockid), block);
+        if ((block->visibility_flags & face))
+            vertexCount += render_face(pos, i, get_default_texture_index(block->blockid), block);
     }
     return vertexCount;
 }
@@ -46,10 +46,10 @@ int render_cube(Block *block, const Vec3i &pos)
 int render_inverted_cube(Block *block, const Vec3i &pos)
 {
     int vertexCount = 0;
-    for (uint8_t face = 0; face < 6; face++)
+    for (uint8_t face = VIS_MIN, i = 0; face != VIS_MAX; face <<= 1, i++)
     {
-        if (block->get_opacity(face))
-            vertexCount += render_back_face(pos, face, get_default_texture_index(block->blockid), block);
+        if ((block->visibility_flags & face))
+            vertexCount += render_back_face(pos, i, get_default_texture_index(block->blockid), block);
     }
     return vertexCount;
 }
@@ -57,10 +57,10 @@ int render_inverted_cube(Block *block, const Vec3i &pos)
 int render_inverted_cube_special(Block *block, const Vec3i &pos)
 {
     int vertexCount = 0;
-    for (uint8_t face = 0; face < 6; face++)
+    for (uint8_t face = VIS_MIN, i = 0; face != VIS_MAX; face <<= 1, i++)
     {
-        if (block->get_opacity(face))
-            vertexCount += render_back_face(pos, face, get_face_texture_index(block, face), block);
+        if ((block->visibility_flags & face))
+            vertexCount += render_back_face(pos, i, get_face_texture_index(block, i), block);
     }
     return vertexCount;
 }
@@ -68,10 +68,10 @@ int render_inverted_cube_special(Block *block, const Vec3i &pos)
 int render_cube_special(Block *block, const Vec3i &pos)
 {
     int vertexCount = 0;
-    for (uint8_t face = 0; face < 6; face++)
+    for (uint8_t face = VIS_MIN, i = 0; face != VIS_MAX; face <<= 1, i++)
     {
-        if (block->get_opacity(face))
-            vertexCount += render_face(pos, face, get_face_texture_index(block, face), block);
+        if ((block->visibility_flags & face))
+            vertexCount += render_face(pos, i, get_face_texture_index(block, i), block);
     }
     return vertexCount;
 }
@@ -129,25 +129,25 @@ int render_snow_layer(Block *block, const Vec3i &pos)
         }
     }
 
-    if (block->get_opacity(FACE_NX) && neighbor_ids[FACE_NX] != BlockID::snow_layer)
+    if ((block->visibility_flags & VIS_NX) && neighbor_ids[FACE_NX] != BlockID::snow_layer)
     {
         // Negative X
         render_face(pos, FACE_NX, texture_index, block, 0, 2);
         vertexCount += 4;
     }
-    if (block->get_opacity(FACE_PX) && neighbor_ids[FACE_PX] != BlockID::snow_layer)
+    if ((block->visibility_flags & VIS_PX) && neighbor_ids[FACE_PX] != BlockID::snow_layer)
     {
         // Positive X
         render_face(pos, FACE_PX, texture_index, block, 0, 2);
         vertexCount += 4;
     }
-    if (block->get_opacity(FACE_NZ) && neighbor_ids[FACE_NZ] != BlockID::snow_layer)
+    if ((block->visibility_flags & VIS_NZ) && neighbor_ids[FACE_NZ] != BlockID::snow_layer)
     {
         // Negative Z
         render_face(pos, FACE_NZ, texture_index, block, 0, 2);
         vertexCount += 4;
     }
-    if (block->get_opacity(FACE_PZ) && neighbor_ids[FACE_PZ] != BlockID::snow_layer)
+    if ((block->visibility_flags & VIS_PZ) && neighbor_ids[FACE_PZ] != BlockID::snow_layer)
     {
         // Positive Z
         render_face(pos, FACE_PZ, texture_index, block, 0, 2);
@@ -159,10 +159,10 @@ int render_snow_layer(Block *block, const Vec3i &pos)
 int render_chest(Block *block, const Vec3i &pos)
 {
     int vertexCount = 0;
-    for (uint8_t face = 0; face < 6; face++)
+    for (uint8_t face = VIS_MIN, i = 0; face != VIS_MAX; face <<= 1, i++)
     {
-        if (block->get_opacity(face))
-            vertexCount += render_face(pos, face, get_chest_texture_index(block, pos, face), block);
+        if ((block->visibility_flags & face))
+            vertexCount += render_face(pos, i, get_chest_texture_index(block, pos, i), block);
     }
     return vertexCount;
 }
@@ -373,7 +373,7 @@ int render_cactus(Block *block, const Vec3i &pos)
     GX_VertexLit({vertex_pos + Vec3f{-.4375, -.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NX);
 
     // Bottom face
-    if (block->get_opacity(FACE_NY))
+    if ((block->visibility_flags & VIS_NY))
     {
         GX_VertexLit({vertex_pos + Vec3f{-.5, -.5, -.5}, TEXTURE_NX(bottom_texture_index), TEXTURE_PY(bottom_texture_index)}, lighting, FACE_NY);
         GX_VertexLit({vertex_pos + Vec3f{-.5, -.5, 0.5}, TEXTURE_NX(bottom_texture_index), TEXTURE_NY(bottom_texture_index)}, lighting, FACE_NY);
@@ -381,7 +381,7 @@ int render_cactus(Block *block, const Vec3i &pos)
         GX_VertexLit({vertex_pos + Vec3f{0.5, -.5, -.5}, TEXTURE_PX(bottom_texture_index), TEXTURE_PY(bottom_texture_index)}, lighting, FACE_NY);
         vertexCount += 4;
     }
-    if (block->get_opacity(FACE_PY))
+    if ((block->visibility_flags & VIS_PY))
     {
         // Top face
         GX_VertexLit({vertex_pos + Vec3f{0.5, .5, -.5}, TEXTURE_NX(top_texture_index), TEXTURE_PY(top_texture_index)}, lighting, FACE_PY);
@@ -487,21 +487,21 @@ int render_slab(Block *block, const Vec3i &pos)
     if (top_half)
     {
         vertex_pos = vertex_pos + Vec3f(0, 0.5, 0);
-        if (!block->get_opacity(FACE_PY))
+        if (!(block->visibility_flags & VIS_PY))
             render_top = false;
     }
     else
     {
-        if (!block->get_opacity(FACE_NY))
+        if (!(block->visibility_flags & VIS_NY))
             render_bottom = false;
     }
     bool faces[6] = {
-        block->get_opacity(FACE_NX) != 0,
-        block->get_opacity(FACE_PX) != 0,
+        (block->visibility_flags & VIS_NX) != 0,
+        (block->visibility_flags & VIS_PX) != 0,
         render_bottom,
         render_top,
-        block->get_opacity(FACE_NZ) != 0,
-        block->get_opacity(FACE_PZ) != 0};
+        (block->visibility_flags & VIS_NZ) != 0,
+        (block->visibility_flags & VIS_PZ) != 0};
 
     for (int i = 0; i < 6; i++)
     {
@@ -545,11 +545,11 @@ int get_chest_texture_index(Block *block, const Vec3i &pos, uint8_t face)
     {
         // Single chest
         uint8_t direction = FACE_PZ;
-        if (!(block->visibility_flags & (1 << FACE_PZ)) && (block->visibility_flags & (1 << FACE_NZ)))
+        if (!(block->visibility_flags & (VIS_PZ)) && (block->visibility_flags & (VIS_NZ)))
             direction = FACE_NZ;
-        if (!(block->visibility_flags & (1 << FACE_NX)) && (block->visibility_flags & (1 << FACE_PX)))
+        if (!(block->visibility_flags & (VIS_NX)) && (block->visibility_flags & (VIS_PX)))
             direction = FACE_PX;
-        if (!(block->visibility_flags & (1 << FACE_PX)) && (block->visibility_flags & (1 << FACE_NX)))
+        if (!(block->visibility_flags & (VIS_PX)) && (block->visibility_flags & (VIS_NX)))
             direction = FACE_NX;
 
         return 26 + (face == direction);
@@ -563,7 +563,7 @@ int get_chest_texture_index(Block *block, const Vec3i &pos, uint8_t face)
         bool half = neighbors[2]->blockid == BlockID::chest;
         uint8_t other_flags = neighbors[half ? 2 : 3]->visibility_flags;
         uint8_t direction = FACE_PX;
-        if ((!(block->visibility_flags & (1 << FACE_PX)) || !(other_flags & (1 << FACE_PX))) && (block->visibility_flags & (1 << FACE_NX)) && (other_flags & (1 << FACE_NX)))
+        if ((!(block->visibility_flags & (VIS_PX)) || !(other_flags & (VIS_PX))) && (block->visibility_flags & (VIS_NX)) && (other_flags & (VIS_NX)))
             direction = FACE_NX;
 
         if (face == FACE_NX)
@@ -578,7 +578,7 @@ int get_chest_texture_index(Block *block, const Vec3i &pos, uint8_t face)
 
         uint8_t other_flags = neighbors[half ? 0 : 1]->visibility_flags;
         uint8_t direction = FACE_PZ;
-        if ((!(block->visibility_flags & (1 << FACE_PZ)) || !(other_flags & (1 << FACE_PZ))) && (block->visibility_flags & (1 << FACE_NZ)) && (other_flags & (1 << FACE_NZ)))
+        if ((!(block->visibility_flags & (VIS_PZ)) || !(other_flags & (VIS_PZ))) && (block->visibility_flags & (VIS_NZ)) && (other_flags & (VIS_NZ)))
             direction = FACE_NZ;
 
         if (face == FACE_PZ)
