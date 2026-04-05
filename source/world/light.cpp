@@ -95,31 +95,6 @@ void LightEngine::post(const Vec3i &location)
     pending_updates.push_back(location);
 }
 
-inline Block *get_block_cached(
-    ChunkCache &cache,
-    int x, int y, int z,
-    Chunk *&out_chunk)
-{
-    if (y < 0 || y > MAX_WORLD_Y)
-        return nullptr;
-
-    int cx = x >> 4;
-    int cz = z >> 4;
-
-    int dx = cx - cache.base_cx;
-    int dz = cz - cache.base_cz;
-
-    if ((unsigned)(dx + 1) > 2 || (unsigned)(dz + 1) > 2)
-        return nullptr;
-
-    Chunk *chunk = cache.chunks[dx + 1][dz + 1];
-    if (!chunk)
-        return nullptr;
-
-    out_chunk = chunk;
-    return &chunk->blockstates[(y << 8) | ((z & 15) << 4) | (x & 15)];
-}
-
 void LightEngine::update(const Vec3i &start)
 {
     int start_cx = start.x >> 4;
