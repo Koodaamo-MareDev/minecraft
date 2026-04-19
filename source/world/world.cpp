@@ -14,7 +14,6 @@
 #include <render/render.hpp>
 #include <render/render_chunks.hpp>
 #include <world/particle.hpp>
-#include <mcregion.hpp>
 #include <util/lock.hpp>
 #include <world/util/raycast.hpp>
 #include <nbt/nbt.hpp>
@@ -53,7 +52,6 @@ World::World()
 World::~World()
 {
     LightEngine::deinit();
-    mcr::cleanup();
     deinit_chunk_manager();
     set_remote(false);
     if (tick_mutex != LWP_MUTEX_NULL)
@@ -1738,8 +1736,8 @@ bool World::add_chunk(int32_t x, int32_t z)
     Chunk *chunk = new Chunk(x, z, this);
 
     // Check if the chunk exists in the region file
-    mcr::Region *region = mcr::get_region(x >> 5, z >> 5);
-    if (region->locations[(x & 31) | ((z & 31) << 5)] != 0)
+    mcr::Region &region = region_cache.get(x >> 5, z >> 5);
+    if (region.locations[(x & 31) | ((z & 31) << 5)] != 0)
         chunk->state = ChunkState::loading;
 
     // Send the chunk to the chunk manager

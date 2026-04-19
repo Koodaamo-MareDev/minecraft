@@ -2,7 +2,7 @@
 #define MCREGION_HPP
 
 #include <cstdint>
-#include <deque>
+#include <vector>
 #include <fstream>
 
 namespace mcr
@@ -17,21 +17,15 @@ namespace mcr
         uint32_t last_modified[1024] = {0};
         uint32_t allocate(uint32_t size, uint16_t index);
 
-        std::fstream &open();
-        void close();
-        bool is_open();
-
-    private:
-        std::fstream file;
+        std::fstream open();
+        Region(int32_t x, int32_t z);
     };
 
-    Region *get_region(int32_t x, int32_t z);
-
-    std::deque<Region *> &get_regions();
-
-    void close_redundant_region(mcr::Region *exclude);
-    
-    void cleanup();
+    struct RegionCache
+    {
+        mcr::Region &get(int32_t x, int32_t z);
+        std::vector<Region> regions;
+    };
 } // namespace mcr
 
 #endif

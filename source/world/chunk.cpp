@@ -589,15 +589,11 @@ void Chunk::write()
 {
     // Write the chunk using mcregion format
 
-    mcr::Region *region = mcr::get_region(x >> 5, z >> 5);
-    if (!region)
-    {
-        throw std::runtime_error("Failed to get region for chunk " + std::to_string(x) + ", " + std::to_string(z));
-    }
+    mcr::Region &region = world->region_cache.get(x >> 5, z >> 5);
 
-    std::fstream &chunk_file = region->open();
+    std::fstream region_file = region.open();
 
-    if (!chunk_file.is_open())
+    if (!region_file.is_open())
     {
         throw std::runtime_error("Failed to open region file for writing");
     }
@@ -632,7 +628,7 @@ void Chunk::write()
     uint16_t offset = (x & 0x1F) | ((z & 0x1F) << 5);
 
     // Allocate the buffer in file
-    uint32_t chunk_offset = region->allocate(buffer.size() + 5, offset);
+    uint32_t chunk_offset = region.allocate(buffer.size() + 5, offset);
     if (chunk_offset == 0)
     {
         throw std::runtime_error("Failed to allocate space for chunk");
@@ -644,13 +640,13 @@ void Chunk::write()
     uint32_t loc = (((buffer.size() + 5 + 4095) >> 12) & 0xFF) | (chunk_offset << 8);
 
     // Write the chunk location
-    chunk_file.seekp(offset << 2);
-    chunk_file.write(reinterpret_cast<char *>(&loc), sizeof(uint32_t));
+    region_file.seekp(offset << 2);
+    region_file.write(reinterpret_cast<char *>(&loc), sizeof(uint32_t));
 
     // Write the timestamp
     uint32_t timestamp = 1000; // TODO: Get the current time
-    chunk_file.seekp((offset << 2) | 4096);
-    chunk_file.write(reinterpret_cast<char *>(&timestamp), sizeof(uint32_t));
+    region_file.seekp((offset << 2) | 4096);
+    region_file.write(reinterpret_cast<char *>(&timestamp), sizeof(uint32_t));
 
     // Get the length of the compressed data
     uint32_t length = compressed_size + 1;
@@ -659,65 +655,65 @@ void Chunk::write()
     uint8_t compression = 2;
 
     // Write the chunk header
-    chunk_file.seekp(chunk_offset << 12);
-    chunk_file.write(reinterpret_cast<char *>(&length), sizeof(uint32_t));
-    chunk_file.write(reinterpret_cast<char *>(&compression), sizeof(uint8_t));
+    region_file.seekp(chunk_offset << 12);
+    region_file.write(reinterpret_cast<char *>(&length), sizeof(uint32_t));
+    region_file.write(reinterpret_cast<char *>(&compression), sizeof(uint8_t));
 
     // Write the compressed data
-    chunk_file.write(reinterpret_cast<char *>(buffer.ptr()), buffer.size());
-    chunk_file.flush();
+    region_file.write(reinterpret_cast<char *>(buffer.ptr()), buffer.size());
+    region_file.flush();
 
-    uint32_t pos = chunk_file.seekg(0, std::ios::end).tellg();
+    uint32_t pos = region_file.seekg(0, std::ios::end).tellg();
     if ((pos & 0xFFF) != 0)
     {
-        chunk_file.seekp(pos | 0xFFF);
+        region_file.seekp(pos | 0xFFF);
         uint8_t padding = 0;
-        chunk_file.write(reinterpret_cast<char *>(&padding), 1);
+        region_file.write(reinterpret_cast<char *>(&padding), 1);
     }
 
-    chunk_file.flush();
+    region_file.flush();
 }
 
 void Chunk::read()
 {
-    mcr::Region *region = mcr::get_region(x >> 5, z >> 5);
+    mcr::Region &region = world->region_cache.get(x >> 5, z >> 5);
 
     // Calculate the offset of the chunk in the file
     uint16_t offset = (x & 0x1F) | ((z & 0x1F) << 5);
 
     // Check if the chunk is stored in the region
-    if (region->locations[offset] == 0)
+    if (region.locations[offset] == 0)
     {
         return;
     }
 
     // Get the location data
-    uint32_t loc = region->locations[offset];
+    uint32_t loc = region.locations[offset];
 
     // Calculate the offset of the chunk in the file
     uint32_t chunk_offset = loc >> 8;
 
     // Open the region file
-    std::fstream &chunk_file = region->open();
-    if (!chunk_file.is_open())
+    std::fstream region_file = region.open();
+    if (!region_file.is_open())
     {
         printf("Failed to open region file for reading\n");
         return;
     }
 
     // Read the chunk header
-    chunk_file.seekg(chunk_offset << 12);
+    region_file.seekg(chunk_offset << 12);
     uint32_t length;
     uint8_t compression;
-    chunk_file.read(reinterpret_cast<char *>(&length), sizeof(uint32_t));
-    chunk_file.read(reinterpret_cast<char *>(&compression), sizeof(uint8_t));
+    region_file.read(reinterpret_cast<char *>(&length), sizeof(uint32_t));
+    region_file.read(reinterpret_cast<char *>(&compression), sizeof(uint8_t));
 
     if (length >= 0x100000) // 1MB
     {
         printf("Resetting chunk because its length is too large: %u\n", length);
 
         // Erase the chunk from the region
-        region->locations[offset] = 0;
+        region.locations[offset] = 0;
 
         // Regenerate the chunk
         this->state = ChunkState::empty;
@@ -726,7 +722,7 @@ void Chunk::read()
 
     // Read the compressed data
     ByteBuffer buffer(length - 1);
-    chunk_file.read(reinterpret_cast<char *>(buffer.ptr()), length - 1);
+    region_file.read(reinterpret_cast<char *>(buffer.ptr()), length - 1);
 
     NBTTagCompound *compound = nullptr;
     try

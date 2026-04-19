@@ -14,6 +14,7 @@
 #include "sound.hpp"
 #include <item/inventory.hpp>
 #include <block/block_tick.hpp>
+#include <mcregion.hpp>
 
 class Chunk;
 class EntityPhysical;
@@ -80,6 +81,7 @@ public:
     mutex_t chunk_mutex = LWP_MUTEX_NULL;
     lwp_t chunk_manager_thread_handle = LWP_THREAD_NULL;
     bool run_chunk_manager = false;
+    mcr::RegionCache region_cache;
 
     Frustum *frustum = nullptr;
     Crapper::MinecraftClient *client = nullptr;

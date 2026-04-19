@@ -1,7 +1,7 @@
 #include "mcregion.hpp"
 #include <fstream>
+#include <filesystem>
 
-uint32_t open_file_count = 0;
 /**
  * Allocates the first available block of size `size` for chunk at index `index`.
  * @param size The size of the block to allocate.
@@ -63,8 +63,7 @@ uint32_t mcr::Region::allocate(uint32_t size, uint16_t index)
     // If no block was found, allocate at the end of the file.
     if (result_block == 0)
     {
-        if (!file.is_open())
-            open();
+        std::fstream file = open();
         result_block = (file.seekp(0, std::ios::end).tellp() + 4095LL) >> 12;
 
         // If the file is empty, start at block 2.
@@ -93,23 +92,12 @@ uint32_t mcr::Region::allocate(uint32_t size, uint16_t index)
 /**
  * Opens the region file for reading and writing.
  */
-std::fstream &mcr::Region::open()
+std::fstream mcr::Region::open()
 {
-    // Return the file if it is already open.
-    if (file.is_open())
-    {
-        return file;
-    }
-
-    while (open_file_count >= MAX_OPEN_FILES)
-    {
-        close_redundant_region(this);
-    }
-
     std::string region_path = "region/r." + std::to_string(x) + "." + std::to_string(z) + ".mcr";
 
     // Attempt to open the file in read/write mode.
-    file.open(region_path, std::ios::in | std::ios::out | std::ios::binary);
+    std::fstream file(region_path, std::ios::in | std::ios::out | std::ios::binary);
     if (!file.is_open())
     {
         // Create the file if it does not exist.
@@ -119,40 +107,12 @@ std::fstream &mcr::Region::open()
         // Reopen in read/write mode
         file.open(region_path, std::ios::in | std::ios::out | std::ios::binary);
     }
-    if (file.is_open())
-    {
-        open_file_count++;
-    }
 
     return file;
 }
 
-/**
- * Closes the region file.
- */
-void mcr::Region::close()
+mcr::Region::Region(int32_t x, int32_t z) : x(x), z(z)
 {
-    // Close the file if it is open.
-    if (file.is_open())
-    {
-        file.close();
-        if (open_file_count > 0)
-            open_file_count--;
-    }
-}
-
-bool mcr::Region::is_open()
-{
-    return file.is_open();
-}
-
-/**
- * Returns a reference to the deque of regions.
- */
-std::deque<mcr::Region *> &mcr::get_regions()
-{
-    static std::deque<mcr::Region *> regions;
-    return regions;
 }
 
 /**
@@ -160,60 +120,34 @@ std::deque<mcr::Region *> &mcr::get_regions()
  * @param x The x coordinate of the region.
  * @param z The z coordinate of the region.
  */
-mcr::Region *mcr::get_region(int32_t x, int32_t z)
+
+mcr::Region &mcr::RegionCache::get(int32_t x, int32_t z)
 {
     // Search for the region in the deque.
-    for (mcr::Region *region : get_regions())
+    for (mcr::Region &region : regions)
     {
-        if (region->x == x && region->z == z)
+        if (region.x == x && region.z == z)
         {
             return region;
         }
     }
+    if (regions.size() >= MAX_OPEN_FILES)
+    {
+        throw std::runtime_error("Too many open files");
+    }
 
-    std::ifstream region_file("region/r." + std::to_string(x) + "." + std::to_string(z) + ".mcr", std::ios::binary);
+    mcr::Region &region = regions.emplace_back(x, z);
+    std::fstream region_file = region.open();
 
-    // If the file does not exist, create a new region.
+    // If the file does not exist, return as is.
     if (!region_file.is_open())
     {
-        mcr::Region *new_region = new mcr::Region();
-        new_region->x = x;
-        new_region->z = z;
-        get_regions().push_back(new_region);
-        return new_region;
+        return region;
     }
 
     // Read the region file.
-    mcr::Region *region = new mcr::Region();
-    region->x = x;
-    region->z = z;
-    region_file.read(reinterpret_cast<char *>(region->locations), sizeof(region->locations));
-    region_file.read(reinterpret_cast<char *>(region->last_modified), sizeof(region->last_modified));
-    region_file.close();
-    get_regions().push_back(region);
+    region_file.read(reinterpret_cast<char *>(region.locations), sizeof(region.locations));
+    region_file.read(reinterpret_cast<char *>(region.last_modified), sizeof(region.last_modified));
 
     return region;
-}
-
-void mcr::close_redundant_region(mcr::Region *exclude)
-{
-    // Close the first region that is not the excluded region.
-    for (mcr::Region *region : get_regions())
-    {
-        if (region != exclude && region->is_open())
-        {
-            region->close();
-            return;
-        }
-    }
-}
-
-void mcr::cleanup()
-{
-    for (mcr::Region *&region : mcr::get_regions())
-    {
-        region->close();
-        delete region;
-    }
-    mcr::get_regions().clear();
 }
