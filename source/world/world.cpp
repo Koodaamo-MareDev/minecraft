@@ -1782,11 +1782,11 @@ void World::init_chunk_manager(ChunkProvider *chunk_provider)
         {
             while (world->pending_chunks.empty())
             {
-                usleep(10000);
                 if (!world->run_chunk_manager)
                 {
                     return NULL;
                 }
+                usleep(10000);
             }
             Chunk *chunk = world->pending_chunks.back();
             switch (chunk->state)
