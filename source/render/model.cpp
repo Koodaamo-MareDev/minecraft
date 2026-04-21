@@ -77,9 +77,9 @@ void ModelBox::prepare()
         GX_VertexLitF(faces[i], 255); // Default to full brightness
     }
 
-    uint32_t vtxcount = GX_EndGroup();
+    GX_EndGroup();
     display_list_size = GX_EndDispList();
-    if (!display_list_size || vtxcount != 24)
+    if (!display_list_size)
     {
         delete[] display_list;
         display_list = nullptr;

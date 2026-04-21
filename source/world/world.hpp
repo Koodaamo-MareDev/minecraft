@@ -25,35 +25,6 @@ class Frustum;
 class TileEntity;
 struct Progress;
 
-enum class SectionUpdatePhase : uint8_t
-{
-    BLOCK_VISIBILITY = 0,   // Update visibility of blocks in a section
-    SECTION_VISIBILITY = 1, // Update visibility of sections in world
-    SOLID = 2,              // Update solid VBOs
-    TRANSPARENT = 3,        // Update transparent VBOs
-    FLUSH = 4,              // Flush all VBOs
-    COUNT = 5               // Total number of phases
-};
-
-inline SectionUpdatePhase operator++(SectionUpdatePhase &phase, int)
-{
-    SectionUpdatePhase old_phase = phase;
-    if (uint8_t(old_phase) + 1 >= uint8_t(SectionUpdatePhase::COUNT))
-        phase = SectionUpdatePhase::BLOCK_VISIBILITY;
-    else
-        phase = SectionUpdatePhase(uint8_t(old_phase) + 1);
-    return old_phase;
-};
-
-inline SectionUpdatePhase &operator++(SectionUpdatePhase &phase)
-{
-    if (uint8_t(phase) + 1 >= uint8_t(SectionUpdatePhase::COUNT))
-        phase = SectionUpdatePhase::BLOCK_VISIBILITY;
-    else
-        phase = SectionUpdatePhase(uint8_t(phase) + 1);
-    return phase;
-}
-
 class World
 {
 public:
@@ -69,8 +40,7 @@ public:
     bool hell = false;
     int64_t seed = 0;
     ChunkProvider *chunk_provider = nullptr;
-    SectionUpdatePhase current_update_phase = SectionUpdatePhase::BLOCK_VISIBILITY;
-    bool sync_chunk_updates = false;
+    bool sync_section_updates = false;
     bool smooth_lighting = false;
     bool section_updates_in_tick = false;
 
@@ -102,7 +72,7 @@ public:
     void update_frustum(Camera &camera);
     void update_chunks();
     void try_update_sections();
-    SectionUpdatePhase update_sections(SectionUpdatePhase phase);
+    bool update_sections();
     void calculate_visibility();
     void tick_blocks();
     void schedule_block_update(const Vec3i &pos, BlockID id, int ticks);

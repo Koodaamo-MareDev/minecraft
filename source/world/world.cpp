@@ -192,6 +192,24 @@ void World::update_chunks()
                 light_up_calls++;
                 chunk->light_up();
             }
+            if (!sync_section_updates)
+                continue;
+            for (uint8_t i = 0; i < VERTICAL_SECTION_COUNT; i++)
+            {
+                Section &current = chunk->sections[i];
+                if (current.solid != current.cached_solid)
+                {
+                    current.cached_solid.clear();
+
+                    current.cached_solid = current.solid;
+                }
+                if (current.transparent != current.cached_transparent)
+                {
+                    current.cached_transparent.clear();
+
+                    current.cached_transparent = current.transparent;
+                }
+            }
         }
     }
     for (Chunk *&chunk : to_remove)
@@ -213,7 +231,8 @@ void World::try_update_sections()
         // Limit to 6ms per update
         do
         {
-            current_update_phase = update_sections(current_update_phase);
+            if (!update_sections())
+                break;
         } while (time_diff_us(start_time, time_get()) < 6000);
     }
     catch (const std::exception &e)
@@ -254,13 +273,10 @@ void World::schedule_block_update(const Vec3i &pos, BlockID id, int ticks)
     scheduled_updates.insert(block_tick);
 }
 
-SectionUpdatePhase World::update_sections(SectionUpdatePhase phase)
+bool World::update_sections()
 {
-    // Buffer to hold VBOs that need to be flushed
-    static std::vector<Section *> vbos_to_flush;
-
-    // Pointer to the current VBO being processed
-    static Section *curr_section = nullptr;
+    constexpr size_t max_updates = 1;
+    size_t update_count = 0;
 
     // Gets the VBO at the given position
     auto section_at = [this](const Vec3i &pos) -> Section *
@@ -279,151 +295,99 @@ SectionUpdatePhase World::update_sections(SectionUpdatePhase phase)
         return &chunk->sections[pos.y >> 4];
     };
 
-    // Process the current VBO based on the phase
-    switch (phase)
+    auto has_nearby_sections = [section_at](int x, int y, int z) -> bool
     {
-    case SectionUpdatePhase::BLOCK_VISIBILITY:
-    {
+        for (int i = 0; i < 6; i++)
+        {
+            Vec3i neighbor_pos = Vec3i(x, y, z) + face_offsets[i] * 16;
+            if (!section_at(neighbor_pos))
+                return false;
+        }
+        return true;
+    };
+    std::deque<Chunk *> chunks = this->chunks;
+    std::sort(chunks.begin(), chunks.end(), [](Chunk *a, Chunk *b)
+              { return a->player_taxicab_distance() < b->player_taxicab_distance(); });
+    for (size_t i = 0; i < max_updates && update_count < max_updates; i++)
         for (Chunk *&chunk : chunks)
         {
-            if (chunk && chunk->state == ChunkState::done && !chunk->light_update_count)
-            {
-                // Check if chunk has other chunks around it.
-                bool surrounding = true;
-                for (int i = 0; i < 6; i++)
-                {
-                    // Skip the top and bottom faces
-                    if (i == 2)
-                        i = 4;
-                    // Check if the surrounding chunk exists and has no lighting updates pending
-                    Chunk *surrounding_chunk = get_chunk(chunk->x + face_offsets[i].x, chunk->z + face_offsets[i].z);
-                    if (!surrounding_chunk || surrounding_chunk->light_update_count || surrounding_chunk->state != ChunkState::done)
-                    {
-                        surrounding = false;
-                        break;
-                    }
-                }
-                // If the chunk has no surrounding chunks, skip it.
-                if (!surrounding)
-                    continue;
-                for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
-                {
-                    Section &other_section = chunk->sections[j];
-                    if (other_section.visible && other_section.dirty && (!curr_section || *other_section.chunk < *curr_section->chunk))
-                    {
-                        // If the current section is not set or the other section is closer to the player, set it as the current section
-                        curr_section = &other_section;
-                    }
-                }
-            }
-        }
-
-        if (!curr_section)
-        {
-            // If no section was set, skip to the next phase
-            break;
-        }
-
-        // Recalculate the visibility of the section
-        curr_section->chunk->refresh_section_block_visibility(curr_section->y >> 4);
-
-        break;
-    }
-    case SectionUpdatePhase::SECTION_VISIBILITY:
-        if (!curr_section)
-            break;
-        curr_section->chunk->refresh_section_visibility(curr_section->y >> 4);
-        break;
-    case SectionUpdatePhase::SOLID:
-        if (!curr_section)
-            break;
-        ChunkRenderer::render_section(*curr_section, false);
-        break;
-    case SectionUpdatePhase::TRANSPARENT:
-        if (!curr_section)
-            break;
-        ChunkRenderer::render_section(*curr_section, true);
-        // Clear the section's dirty flag
-        curr_section->dirty = false;
-
-        // Add the section to the flush buffer
-        vbos_to_flush.push_back(curr_section);
-
-        // Reset the section pointer
-        curr_section = nullptr;
-        break;
-    case SectionUpdatePhase::FLUSH:
-    {
-        // Flush cached buffers
-        std::vector<Section *> skipped_sections;
-        for (Section *current : vbos_to_flush)
-        {
-            if (current->dirty)
+            if (!chunk || chunk->state != ChunkState::done)
                 continue;
-            if (sync_chunk_updates)
+            for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
             {
-                bool updated_neighbors = true;
-                for (int i = 0; i < 6; i++)
-                {
-                    Vec3i neighbor_pos = Vec3i(current->x, current->y, current->z) + face_offsets[i] * 16;
-                    Section *neighbor = section_at(neighbor_pos);
-                    if (!neighbor || !neighbor->visible)
-                        continue;
+                Section &current = chunk->sections[j];
+                if (!current.dirty)
+                    continue;
 
-                    if (neighbor->dirty || neighbor->chunk->light_update_count)
+                bool processed = true;
+                switch (current.phase)
+                {
+                case SectionUpdatePhase::BLOCK_VISIBILITY:
+                    chunk->refresh_section_block_visibility(j);
+                    break;
+                case SectionUpdatePhase::SOLID:
+                    if (chunk->light_pending || !current.visible)
                     {
-                        // Redo this section
-                        curr_section = neighbor;
-                        updated_neighbors = false;
+                        processed = false;
                         break;
                     }
-                }
 
-                if (!updated_neighbors)
+                    ChunkRenderer::render_section(current, false);
+                    break;
+                case SectionUpdatePhase::TRANSPARENT:
+                    if (chunk->light_pending || !current.visible)
+                    {
+                        processed = false;
+                        break;
+                    }
+                    ChunkRenderer::render_section(current, true);
+                    break;
+                case SectionUpdatePhase::FLUSH:
+                    if (sync_section_updates)
+                        break;
+
+                    // Apply the new buffers.
+                    if (current.solid != current.cached_solid)
+                    {
+                        current.cached_solid.clear();
+
+                        current.cached_solid = current.solid;
+                    }
+                    if (current.transparent != current.cached_transparent)
+                    {
+                        current.cached_transparent.clear();
+
+                        current.cached_transparent = current.transparent;
+                    }
+                    break;
+                case SectionUpdatePhase::SECTION_VISIBILITY:
+                    if (!has_nearby_sections(current.x, current.y, current.z))
+                    {
+                        processed = false;
+                        break;
+                    }
+                    chunk->refresh_section_visibility(j);
+
+                    if (current.has_updated)
+                        current.dirty = false;
+
+                    current.has_updated = true;
+                    break;
+                default:
+                    processed = false;
+                    break;
+                }
+                if (processed)
                 {
-                    // If the neighbors are not up-to-date, skip this section
-                    skipped_sections.push_back(current);
-                    continue;
+                    current.phase++;
+                    if (++update_count > max_updates)
+                        break;
                 }
             }
-
-            if (current->solid != current->cached_solid)
-            {
-                // Clear the cached buffer
-                current->cached_solid.clear();
-
-                // Set the cached buffer to the new buffer
-                current->cached_solid = current->solid;
-            }
-            if (current->transparent != current->cached_transparent)
-            {
-                // Clear the cached buffer
-                current->cached_transparent.clear();
-
-                // Set the cached buffer to the new buffer
-                current->cached_transparent = current->transparent;
-            }
-            current->has_updated = true;
+            if (update_count >= max_updates)
+                break;
         }
-        vbos_to_flush.clear();
-
-        // Add back the sections that had to be skipped
-        for (Section *skipped : skipped_sections)
-        {
-            vbos_to_flush.push_back(skipped);
-        }
-        break;
-    }
-    default:
-        break;
-    }
-    if (phase++ != SectionUpdatePhase::FLUSH && !curr_section)
-    {
-        // Skip to flush phase if no section is set
-        phase = SectionUpdatePhase::FLUSH;
-    }
-
-    return phase;
+    return update_count > 0;
 }
 
 /**
@@ -1786,7 +1750,7 @@ void World::init_chunk_manager(ChunkProvider *chunk_provider)
                 {
                     return NULL;
                 }
-                usleep(10000);
+                usleep(1000);
             }
             Chunk *chunk = world->pending_chunks.back();
             switch (chunk->state)

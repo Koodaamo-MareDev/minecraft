@@ -150,9 +150,8 @@ void MainGameLoop()
     bool vsync = ((int)config.get("vsync", 0) != 0);
     bool fast_leaves = ((int)config.get("fast_leaves", 0) != 0);
     render_fast_leaves = fast_leaves;
-    current_world->sync_chunk_updates = ((int)config.get("sync_chunk_updates", 0) != 0);
+    current_world->sync_section_updates = ((int)config.get("sync_chunk_updates", 0) != 0);
     current_world->smooth_lighting = smooth_lighting;
-    current_world->section_updates_in_tick = vsync;
 
     // Generate a "unique" username based on the device ID
     uint32_t dev_id = 0;
@@ -244,10 +243,10 @@ void MainGameLoop()
 #endif
         VIDEO_SetNextFramebuffer(frameBuffer[fb]);
         VIDEO_Flush();
-        if (vsync)
+        if (vsync && (frameCounter & 1) == 0)
             VIDEO_WaitVSync(); // Wait for vertical sync - if the frame lasts too long (which it often does) it will kill the frame rate
         else
-            usleep(1000); // Give other tasks a chance to run - 1 ms seems sufficient
+            usleep(2000); // Give other tasks a chance to run - 1 ms seems sufficient
 
         // Swap buffers
         fb ^= 1;

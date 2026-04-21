@@ -29,6 +29,35 @@ enum class ChunkState : uint8_t
     invalid = 0xFF,
 };
 
+enum class SectionUpdatePhase : uint8_t
+{
+    BLOCK_VISIBILITY = 0,   // Update visibility of blocks in a section
+    SOLID = 1,              // Update solid VBOs
+    TRANSPARENT = 2,        // Update transparent VBOs
+    FLUSH = 3,              // Flush all VBOs
+    SECTION_VISIBILITY = 4, // Update visibility of sections in world
+    COUNT = 5               // Total number of phases
+};
+
+inline SectionUpdatePhase operator++(SectionUpdatePhase &phase, int)
+{
+    SectionUpdatePhase old_phase = phase;
+    if (uint8_t(old_phase) + 1 >= uint8_t(SectionUpdatePhase::COUNT))
+        phase = SectionUpdatePhase::BLOCK_VISIBILITY;
+    else
+        phase = SectionUpdatePhase(uint8_t(old_phase) + 1);
+    return old_phase;
+};
+
+inline SectionUpdatePhase &operator++(SectionUpdatePhase &phase)
+{
+    if (uint8_t(phase) + 1 >= uint8_t(SectionUpdatePhase::COUNT))
+        phase = SectionUpdatePhase::BLOCK_VISIBILITY;
+    else
+        phase = SectionUpdatePhase(uint8_t(phase) + 1);
+    return phase;
+}
+
 inline Vec2i block_to_chunk_pos(const Vec3i &pos)
 {
     return Vec2i((pos.x & ~0xF) >> 4, (pos.z & ~0xF) >> 4);
@@ -100,6 +129,8 @@ public:
     bool has_solid_fluid = false;
     bool has_transparent_fluid = false;
 
+    SectionUpdatePhase phase = SectionUpdatePhase::SECTION_VISIBILITY;
+
     bool has_updated = false;
 };
 
@@ -120,7 +151,7 @@ public:
     uint8_t terrain_map[16 * 16] = {0};
     Section sections[VERTICAL_SECTION_COUNT] = {0};
     uint8_t has_fluid_updates[VERTICAL_SECTION_COUNT] = {1};
-    uint32_t light_update_count = 0;
+    bool light_pending = false;
     std::vector<EntityPhysical *> entities;
     std::vector<TileEntity *> tile_entities;
 

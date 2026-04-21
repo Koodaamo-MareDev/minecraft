@@ -124,11 +124,7 @@ namespace ChunkRenderer
                 }
             }
         }
-        uint16_t result_vertex_count = GX_EndGroup();
-        if (result_vertex_count != expected_vertex_count)
-        {
-            throw std::runtime_error("Vertex count mismatch: " + std::to_string(expected_vertex_count) + " != " + std::to_string(result_vertex_count));
-        }
+        GX_EndGroup();
         return expected_vertex_count;
     }
 
@@ -153,11 +149,7 @@ namespace ChunkRenderer
                 }
             }
         }
-        uint16_t result_vertex_count = GX_EndGroup();
-        if (result_vertex_count != expected_vertex_count)
-        {
-            throw std::runtime_error("Vertex count mismatch: " + std::to_string(expected_vertex_count) + " != " + std::to_string(result_vertex_count));
-        }
+        GX_EndGroup();
         return expected_vertex_count;
     }
 

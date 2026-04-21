@@ -24,6 +24,8 @@ bool LightEngine::thread_active = false;
 World *LightEngine::current_world = nullptr;
 std::deque<Vec3i> LightEngine::pending_updates;
 
+static bool busy_flag = false;
+
 void LightEngine::init(World *world)
 {
     if (thread_active)
@@ -54,27 +56,22 @@ void LightEngine::reset()
 
 bool LightEngine::busy()
 {
-    return pending_updates.size() > 0;
+    return busy_flag;
 }
 
 void LightEngine::loop()
 {
     int updates = 0;
-    uint64_t start = time_get();
+    busy_flag = true;
     while (pending_updates.size() > 0 && thread_active)
     {
         Vec3i current = pending_updates.front();
         pending_updates.pop_front();
         update(current);
         if ((++updates & 1023) == 0)
-        {
-            if (time_diff_us(start, time_get()) > 100)
-            {
-                usleep(10);
-                start = time_get();
-            }
-        }
+            return;
     }
+    busy_flag = false;
     usleep(1000);
 }
 void LightEngine::deinit()
@@ -106,6 +103,19 @@ void LightEngine::update(const Vec3i &start)
         return;
     std::deque<LightNode> stack;
     stack.push_back({start.x, start.y, start.z});
+
+    for (int i = 0; i < 3; i++)
+    {
+        for (int j = 0; j < 3; j++)
+        {
+            Chunk *chunk = cache.chunks[i][j];
+            if (!chunk)
+                continue;
+            chunk->light_pending = true;
+        }
+    }
+
+    Vec3i update_volume = {0, 0, 0};
 
     while (!stack.empty())
     {
@@ -156,21 +166,46 @@ void LightEngine::update(const Vec3i &start)
             if ((nblock = get_block_cached(cache, n.x + o.x, n.y + o.y, n.z + o.z, nchunk)))
             {
                 stack.push_back({n.x + o.x, n.y + o.y, n.z + o.z});
-
-                nchunk->sections[std::clamp((n.y + o.y) >> 4, 0, VERTICAL_SECTION_COUNT - 1)].dirty = true;
-                // Apply to neighbors if at chunk border
-                if (current_world->smooth_lighting)
-                    for (int j = 0; j < 6; j++)
-                    {
-                        const Vec3i &o2 = face_offsets[j];
-                        Chunk *nchunk2 = nullptr;
-                        if (get_block_cached(cache, n.x + o.x + o2.x, n.y + o.y + o2.y, n.z + o.z + o2.z, nchunk2) && nchunk2 != nchunk)
-                        {
-                            if ((n.y + o.y + o2.y) >> 4 != (n.y + o2.y) >> 4)
-                                nchunk2->sections[std::clamp((n.y + o.y + o2.y) >> 4, 0, VERTICAL_SECTION_COUNT - 1)].dirty = true;
-                        }
-                    }
+                update_volume.x = std::max(update_volume.x, std::abs(n.x + o.x - start.x));
+                update_volume.y = std::max(update_volume.y, std::abs(n.y + o.y - start.y));
+                update_volume.z = std::max(update_volume.z, std::abs(n.z + o.z - start.z));
             }
+        }
+    }
+    start_chunk->sections[std::clamp(start.y >> 4, 0, VERTICAL_SECTION_COUNT - 1)].dirty = true;
+
+    // Apply to neighbors if at chunk border
+    if (current_world->smooth_lighting)
+    {
+        update_volume.x++;
+        update_volume.y++;
+        update_volume.z++;
+    }
+
+    update_volume.x = (update_volume.x + 15) & ~15;
+    update_volume.y = (update_volume.y + 15) & ~15;
+    update_volume.z = (update_volume.z + 15) & ~15;
+
+    // Update the (potentially) affected sections.
+    for (int y = start.y - update_volume.y; y <= start.y + update_volume.y; y += 16)
+        for (int z = start.z - update_volume.z; z <= start.z + update_volume.z; z += 16)
+            for (int x = start.x - update_volume.x; x <= start.x + update_volume.x; x += 16)
+            {
+                Chunk *nchunk2 = nullptr;
+                if (get_block_cached(cache, x, y, z, nchunk2))
+                {
+                    nchunk2->sections[std::clamp(y >> 4, 0, VERTICAL_SECTION_COUNT - 1)].dirty = true;
+                }
+            }
+
+    for (int i = 0; i < 3; i++)
+    {
+        for (int j = 0; j < 3; j++)
+        {
+            Chunk *chunk = cache.chunks[i][j];
+            if (!chunk)
+                continue;
+            chunk->light_pending = false;
         }
     }
 }

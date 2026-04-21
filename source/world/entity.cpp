@@ -46,7 +46,7 @@ bool EntityPhysical::can_remove()
     if (int_pos.y < 0 || int_pos.y >= 256)
         return false;
     Section &vbo = curr_chunk->sections[int_pos.y >> 4];
-    if (vbo.dirty || curr_chunk->light_update_count || vbo.cached_solid != vbo.solid || vbo.cached_transparent != vbo.transparent)
+    if (vbo.dirty || curr_chunk->light_pending || vbo.cached_solid != vbo.solid || vbo.cached_transparent != vbo.transparent)
         return false;
     return dead;
 }
@@ -548,7 +548,7 @@ bool EntityFallingBlock::can_remove()
     bool is_section_updated = sect.cached_solid == sect.solid && sect.cached_transparent == sect.transparent;
 
     // Ensure that the chunk doesn't have any light updates
-    return chunk->light_update_count == 0 && is_section_updated && !sect.dirty;
+    return !chunk->light_pending && is_section_updated && !sect.dirty;
 }
 
 void EntityFallingBlock::render(float partial_ticks, bool transparency)
@@ -603,7 +603,7 @@ void EntityExplosiveBlock::render(float partial_ticks, bool transparency)
     // Prepare the block state
     Vec3i int_pos = Vec3i(std::floor(position.x), std::floor(position.y + 0.5f), std::floor(position.z));
     Block *block_at_pos = chunk->get_block(int_pos);
-    if (!chunk->light_update_count && block_at_pos && !properties(block_at_pos->id).m_solid)
+    if (!chunk->light_pending && block_at_pos && !properties(block_at_pos->id).m_solid)
         block_state.light = block_at_pos->light;
     block_state.visibility_flags = 0x7F;
 
