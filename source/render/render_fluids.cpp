@@ -58,14 +58,24 @@ inline static int DrawVerticalQuad(Vertex p0, Vertex p1, Vertex p2, Vertex p3, u
     return faceCount;
 }
 
+int get_capped_fluid_level_at(World *world, Vec3i pos, BlockID src_id)
+{
+    Block *block = world->get_block_at(pos);
+    if (block && is_same_fluid(block->blockid, src_id))
+    {
+        if (block->meta >= 8)
+            return 0;
+        return block->meta & 0xF;
+    }
+    return -1;
+}
+
 Vec3f get_fluid_direction(World *world, Block *block, Vec3i pos)
 {
 
-    uint8_t fluid_level = get_fluid_meta_level(block);
+    uint8_t fluid_level = get_capped_fluid_level_at(world, pos, block->blockid);
     if ((fluid_level & 7) == 0)
         return Vec3f(0.0, -1.0, 0.0);
-
-    BlockID block_id = block->blockid;
 
     // Used to check block types around the fluid
     Block *neighbors[6];
@@ -73,24 +83,41 @@ Vec3f get_fluid_direction(World *world, Block *block, Vec3i pos)
 
     Vec3f direction = Vec3f(0.0, 0.0, 0.0);
 
-    bool direction_set = false;
     for (int i = 0; i < 6; i++)
     {
         if (i == FACE_NY || i == FACE_PY)
             continue;
-        if (neighbors[i] && is_same_fluid(neighbors[i]->blockid, block_id))
+        if (neighbors[i])
         {
-            direction_set = true;
-            if (get_fluid_meta_level(neighbors[i]) < fluid_level)
-                direction = direction - Vec3f(face_offsets[i].x, 0, face_offsets[i].z);
-            else if (get_fluid_meta_level(neighbors[i]) > fluid_level)
-                direction = direction + Vec3f(face_offsets[i].x, 0, face_offsets[i].z);
-            else
-                direction_set = false;
+            int fl = get_capped_fluid_level_at(world, pos + face_offsets[i], neighbors[i]->blockid);
+            if (fl >= 0)
+            {
+                direction = direction + Vec3f(face_offsets[i].x, 0, face_offsets[i].z) * (fl - fluid_level);
+            }
+            else if (fl < 0 && pos.y > 0 && !is_solid(neighbors[i]->blockid))
+            {
+                fl = get_capped_fluid_level_at(world, pos + face_offsets[i] + Vec3i(0, -1, 0), neighbors[i][-256].blockid);
+                if (fl >= 0)
+                {
+                    direction = direction + Vec3f(face_offsets[i].x, 0, face_offsets[i].z) * (fl - fluid_level + 8);
+                }
+            }
         }
     }
-    if (!direction_set)
-        direction.y = -1.0;
+
+    if (block->meta >= 8)
+    {
+        for (int i = 0; i < 6; i++)
+        {
+            if (i == FACE_NY || i == FACE_PY)
+                continue;
+            if (neighbors[i] && ((neighbors[i][0].visibility_flags & (1 << (i ^ 1))) || (pos.y < MAX_WORLD_Y && (neighbors[i][256].visibility_flags & (1 << (i ^ 1))))))
+            {
+                direction.y -= 6.0;
+                break;
+            }
+        }
+    }
     return direction.fast_normalize();
 }
 
