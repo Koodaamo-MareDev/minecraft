@@ -2,27 +2,34 @@
 #define _LIGHT_HPP_
 
 #include <math/vec3i.hpp>
-#include <world/chunk.hpp>
-#include <world/util/coord.hpp>
+#include <util/worker_thread.hpp>
 #include <cstdint>
-#include <ogc/gu.h>
+#include <deque>
+
 class World;
 class LightEngine
 {
 private:
-    static lwp_t thread_handle;
-    static bool thread_active;
-    static std::deque<Vec3i> pending_updates;
-    static World *current_world;
+    bool busy_flag = false;
+    bool thread_active = true;
+    World *world;
+    std::deque<Vec3i> pending_updates;
+    WorkerThread worker;
+
+    void process(const Vec3i &start);
 
 public:
-    static void update(const Vec3i &start);
-    static void init(World *world);
-    static void deinit();
-    static void loop();
-    static void reset();
-    static void post(const Vec3i &location);
-    static bool busy();
+    LightEngine(World *world = nullptr) : world(world) {}
+
+    void start(World *world = nullptr);
+    void stop();
+    void restart();
+
+    void post(const Vec3i &location);
+
+    bool busy();
+
+    void update_loop();
 };
 enum LightType
 {

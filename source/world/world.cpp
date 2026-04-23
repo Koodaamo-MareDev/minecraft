@@ -41,17 +41,17 @@ World::World(std::string name)
     std::string region_path = save_path + "/region";
     fs::create_directories(region_path);
     fs::current_path(save_path);
-    LightEngine::init(this);
+    light_engine.start(this);
 }
 
 World::World()
 {
-    LightEngine::init(this);
+    light_engine.start(this);
 }
 
 World::~World()
 {
-    LightEngine::deinit();
+    light_engine.stop();
     deinit_chunk_manager();
     set_remote(false);
     if (tick_mutex != LWP_MUTEX_NULL)
@@ -231,9 +231,9 @@ void World::try_update_sections()
         // Limit to 6ms per update
         do
         {
-            if (!update_sections())
+            if (!update_sections() || true)
                 break;
-        } while (time_diff_us(start_time, time_get()) < 6000);
+        } while (time_diff_us(start_time, time_get()) < 5000);
     }
     catch (const std::exception &e)
     {
@@ -1626,7 +1626,7 @@ void World::set_hell(bool hell)
         return;
 
     // Stop processing any light updates
-    LightEngine::reset();
+    light_engine.restart();
     if (hell)
     {
         // Set the light map to the nether light map
@@ -1681,7 +1681,7 @@ void World::save_chunk(Chunk *chunk)
 
 bool World::add_chunk(int32_t x, int32_t z)
 {
-    if (!run_chunk_manager || pending_chunks.size() + chunks.size() >= CHUNK_COUNT)
+    if (!chunk_manager.active() || pending_chunks.size() + chunks.size() >= CHUNK_COUNT)
         return false;
     Lock chunk_lock(chunk_mutex);
 
@@ -1712,113 +1712,18 @@ bool World::add_chunk(int32_t x, int32_t z)
 
 void World::deinit_chunk_manager()
 {
-    if (chunk_manager_thread_handle == LWP_THREAD_NULL)
-        return;
-
-    // Tell the chunk manager thread to stop
-    run_chunk_manager = false;
-
-    LWP_JoinThread(chunk_manager_thread_handle, NULL);
-    chunk_manager_thread_handle = LWP_THREAD_NULL;
-
-    // Cleanup the chunk mutex
-    Lock::destroy(chunk_mutex);
+    if (chunk_manager.active())
+        chunk_manager.stop();
 }
 
 void World::init_chunk_manager(ChunkProvider *chunk_provider)
 {
-    if (chunk_manager_thread_handle != LWP_THREAD_NULL)
-        return;
-
     // Chunk provider can be null if something else will be providing the chunks.
     // This should only happen when in a remote world which means that chunks are
     // provided via the network code. In such a case, don't start the thread.
     if (!chunk_provider)
-    {
         return;
-    }
-    auto chunk_manager_thread = [](void *arg) -> void *
-    {
-        World *world = (World *)arg;
-        ChunkProvider *provider = world->chunk_provider;
-        world->run_chunk_manager = true;
-        while (world->run_chunk_manager || !world->pending_chunks.empty())
-        {
-            while (world->pending_chunks.empty())
-            {
-                if (!world->run_chunk_manager)
-                {
-                    return NULL;
-                }
-                usleep(1000);
-            }
-            Chunk *chunk = world->pending_chunks.back();
-            switch (chunk->state)
-            {
-            case ChunkState::loading:
-            case ChunkState::empty:
-            {
-                // Generate the base terrain for the chunk
-                provider->provide_chunk(chunk);
-            }
-            // Fall to the next case immediately: features
-            case ChunkState::features:
-            {
-                // Move the chunk to the active list
-                Lock chunk_lock(world->chunk_mutex);
-                world->chunks.push_back(chunk);
-                world->pending_chunks.erase(std::find(world->pending_chunks.begin(), world->pending_chunks.end(), chunk));
-                uint64_t key = uint32_pair(chunk->x, chunk->z);
-                world->chunk_cache.insert_or_assign(key, chunk);
-                chunk_lock.unlock();
-
-                // Finish the chunk with features
-                provider->populate_chunk(chunk);
-                break;
-            }
-            case ChunkState::saving:
-            {
-                try
-                {
-                    chunk->write();
-                }
-                catch (std::runtime_error &e)
-                {
-                    debug::print("Failed to save chunk: %s\n", e.what());
-                }
-            }
-            // Fall to removal case after saving
-            case ChunkState::invalid:
-            {
-                Lock chunk_lock(world->chunk_mutex);
-                world->pending_chunks.erase(std::find(world->pending_chunks.begin(), world->pending_chunks.end(), chunk));
-                delete chunk;
-                break;
-            }
-            default:
-            {
-                // Empty the queue to avoid a rare deadlock
-                if (!world->run_chunk_manager)
-                {
-                    Lock chunk_lock(world->chunk_mutex);
-                    world->pending_chunks.erase(std::find(world->pending_chunks.begin(), world->pending_chunks.end(), chunk));
-                    delete chunk;
-                }
-                break;
-            }
-            }
-
-            usleep(100);
-        }
-        return NULL;
-    };
-
-    LWP_CreateThread(&chunk_manager_thread_handle,
-                     chunk_manager_thread,
-                     this,
-                     NULL,
-                     0,
-                     50);
+    chunk_manager.start(this);
 }
 
 BlockID World::get_block_id_at(const Vec3i &position, BlockID default_id)
@@ -1936,7 +1841,7 @@ void World::mark_block_dirty(const Vec3i &pos)
     if (!chunk)
         return;
     chunk->update_height_map(pos);
-    LightEngine::post(pos);
+    light_engine.post(pos);
 }
 
 TileEntity *World::get_tile_entity(const Vec3i &position)

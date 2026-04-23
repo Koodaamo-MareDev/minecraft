@@ -90,7 +90,7 @@ void Chunk::light_up()
 
             // Update top-most block under daylight
             Vec3i pos = Vec3i((i & 15) | (this->x << 4), height_map[i], ((i >> 4) & 15) | (this->z << 4));
-            LightEngine::post(pos);
+            world->light_engine.post(pos);
 
             // Update block lights
             pos.y = 0;
@@ -98,7 +98,7 @@ void Chunk::light_up()
             {
                 if (get_block_luminance(block->blockid))
                 {
-                    LightEngine::post(pos);
+                    world->light_engine.post(pos);
                 }
             }
         }

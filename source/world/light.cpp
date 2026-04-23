@@ -19,39 +19,24 @@
 #include <set>
 #include <ported/SystemTime.hpp>
 
-lwp_t LightEngine::thread_handle = 0;
-bool LightEngine::thread_active = false;
-World *LightEngine::current_world = nullptr;
-std::deque<Vec3i> LightEngine::pending_updates;
-
-static bool busy_flag = false;
-
-void LightEngine::init(World *world)
+void *light_engine_thread(LightEngine *engine)
 {
-    if (thread_active)
-        return;
-    thread_active = true;
-    current_world = world;
-    auto light_engine_thread = [](void *) -> void *
-    {
-        while (thread_active)
-        {
-            loop();
-        }
-        return NULL;
-    };
-
-    LWP_CreateThread(&thread_handle,
-                     light_engine_thread,
-                     NULL,
-                     NULL,
-                     64 * 1024,
-                     50);
+    engine->update_loop();
+    return nullptr;
 }
 
-void LightEngine::reset()
+void LightEngine::start(World *world)
 {
-    pending_updates.clear();
+    if (!this->world && world)
+        this->world = world;
+    thread_active = true;
+    worker.submit(light_engine_thread, this);
+}
+
+void LightEngine::restart()
+{
+    stop();
+    start();
 }
 
 bool LightEngine::busy()
@@ -59,45 +44,42 @@ bool LightEngine::busy()
     return busy_flag;
 }
 
-void LightEngine::loop()
+void LightEngine::update_loop()
 {
-    int updates = 0;
-    busy_flag = true;
-    while (pending_updates.size() > 0 && thread_active)
+    while (thread_active)
     {
-        Vec3i current = pending_updates.front();
-        pending_updates.pop_front();
-        update(current);
-        if ((++updates & 1023) == 0)
-            return;
+        while (thread_active && pending_updates.size() > 0)
+        {
+            Vec3i current = pending_updates.front();
+            pending_updates.pop_front();
+            process(current);
+            usleep(500);
+        }
+        usleep(500);
     }
-    busy_flag = false;
-    usleep(1000);
 }
-void LightEngine::deinit()
+
+void LightEngine::stop()
 {
-    if (thread_active)
-    {
-        thread_active = false;
-        pending_updates.clear();
-        LWP_JoinThread(thread_handle, NULL);
-    }
+    thread_active = false;
+    pending_updates.clear();
+    worker.wait();
 }
 
 void LightEngine::post(const Vec3i &location)
 {
-    Chunk *chunk = current_world->get_chunk_from_pos(location);
+    Chunk *chunk = world->get_chunk_from_pos(location);
     if (!chunk)
         return;
     pending_updates.push_back(location);
 }
 
-void LightEngine::update(const Vec3i &start)
+void LightEngine::process(const Vec3i &start)
 {
     int start_cx = start.x >> 4;
     int start_cz = start.z >> 4;
 
-    ChunkCache cache = build_chunk_cache(current_world, start_cx, start_cz);
+    ChunkCache cache = build_chunk_cache(world, start_cx, start_cz);
     Chunk *start_chunk = cache.chunks[1][1];
     if (!start_chunk)
         return;
@@ -132,7 +114,7 @@ void LightEngine::update(const Vec3i &start)
         uint8_t sky = 0;
         uint8_t torch = properties(block->id).m_luminance;
 
-        if (!current_world->hell && n.y >= chunk->height_map[(n.z & 15) << 4 | (n.x & 15)])
+        if (!world->hell && n.y >= chunk->height_map[(n.z & 15) << 4 | (n.x & 15)])
             sky = 0xF;
 
         if (!block->id || can_see_through(properties(block->id)))
@@ -175,7 +157,7 @@ void LightEngine::update(const Vec3i &start)
     start_chunk->sections[std::clamp(start.y >> 4, 0, VERTICAL_SECTION_COUNT - 1)].dirty = true;
 
     // Apply to neighbors if at chunk border
-    if (current_world->smooth_lighting)
+    if (world->smooth_lighting)
     {
         update_volume.x++;
         update_volume.y++;

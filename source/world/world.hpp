@@ -15,6 +15,8 @@
 #include <item/inventory.hpp>
 #include <block/block_tick.hpp>
 #include <mcregion.hpp>
+#include <world/chunk_manager.hpp>
+#include <world/light.hpp>
 
 class Chunk;
 class EntityPhysical;
@@ -49,8 +51,8 @@ public:
     std::map<uint64_t, Chunk *> chunk_cache;
     std::deque<Chunk *> pending_chunks;
     mutex_t chunk_mutex = LWP_MUTEX_NULL;
-    lwp_t chunk_manager_thread_handle = LWP_THREAD_NULL;
-    bool run_chunk_manager = false;
+    ChunkManager chunk_manager;
+    LightEngine light_engine;
     mcr::RegionCache region_cache;
 
     Frustum *frustum = nullptr;

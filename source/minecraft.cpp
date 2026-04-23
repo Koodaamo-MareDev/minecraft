@@ -243,7 +243,7 @@ void MainGameLoop()
 #endif
         VIDEO_SetNextFramebuffer(frameBuffer[fb]);
         VIDEO_Flush();
-        if (vsync && (frameCounter & 1) == 0)
+        if (vsync)
             VIDEO_WaitVSync(); // Wait for vertical sync - if the frame lasts too long (which it often does) it will kill the frame rate
         else
             usleep(2000); // Give other tasks a chance to run - 1 ms seems sufficient
