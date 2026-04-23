@@ -45,6 +45,12 @@ void ChunkManager::update_loop()
         {
             // Generate the base terrain for the chunk
             world->chunk_provider->provide_chunk(chunk);
+
+            // Move the chunk to the active list
+            world->chunks.push_back(chunk);
+            world->pending_chunks.erase(std::find(world->pending_chunks.begin(), world->pending_chunks.end(), chunk));
+            uint64_t key = uint32_pair(chunk->x, chunk->z);
+            world->chunk_cache.insert_or_assign(key, chunk);
             break;
         }
         case ChunkState::empty:
