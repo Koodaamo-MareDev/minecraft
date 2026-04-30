@@ -1,5 +1,6 @@
 #include "render.hpp"
 #include <render/render_blocks.hpp>
+#include <gertex/displaylist.hpp>
 
 #include <ported/Random.hpp>
 
@@ -7,6 +8,8 @@
 #include <world/world.hpp>
 
 #include <new>
+
+mutex_t render_mutex = LWP_MUTEX_NULL;
 
 const GXColor sky_color = {0x88, 0xBB, 0xFF, 0xFF};
 
@@ -289,14 +292,14 @@ inline uint8_t get_face_light_index(Vec3i pos, uint8_t face, Block *default_bloc
     return other_block->light;
 }
 
-void get_face(Vec3i pos, uint8_t face, uint32_t texture_index, Block *block, uint8_t min_y, uint8_t max_y, Vertex16 *out_vertices, uint8_t *out_lighting, uint8_t *out_ao)
+void get_face(Vec3i pos, uint8_t face, uint32_t texture_index, Block *block, uint8_t min_y, uint8_t max_y, gertex::Vertex16 *out_vertices, uint8_t *out_lighting, uint8_t *out_ao)
 {
     Vec3i vertex_pos((pos.x & 0xF) << BASE3D_POS_FRAC_BITS, (pos.y & 0xF) << BASE3D_POS_FRAC_BITS, (pos.z & 0xF) << BASE3D_POS_FRAC_BITS);
     uint8_t light_val = get_face_light_index(pos, face, block);
     uint8_t ao[4] = {0, 0, 0, 0};
     uint8_t ao_no_op[4] = {0, 0, 0, 0};
     uint8_t lighting[4] = {light_val, light_val, light_val, light_val};
-    Vertex16 vertices[4];
+    gertex::Vertex16 vertices[4];
     uint8_t index = 0;
 #define SMOOTH(ao_tgt)                                 \
     if (render_world && render_world->smooth_lighting) \
@@ -309,17 +312,23 @@ void get_face(Vec3i pos, uint8_t face, uint32_t texture_index, Block *block, uin
         max_y = (max_y & 0xF) ? max_y : 0;
         uint8_t *ao_min_target = min_y ? ao_no_op : ao;
         uint8_t *ao_max_target = max_y ? ao_no_op : ao;
+        Vec3i v_pos;
+
         SMOOTH(ao_min_target);
-        vertices[index] = {vertex_pos + (min_y ? vertical_add(cube_vertices[face][index], min_y) : cube_vertices16[face][index]), TEXTURE_NX(texture_index), TEXTURE_PY(texture_index) - min_y * BASE3D_PIXEL_UV_SCALE};
+        v_pos = vertex_pos + (min_y ? vertical_add(cube_vertices[face][index], min_y) : cube_vertices16[face][index]);
+        vertices[index] = {.x = int16_t(v_pos.x), .y = int16_t(v_pos.y), .z = int16_t(v_pos.z), .u = float(TEXTURE_NX(texture_index)), .v = float(TEXTURE_PY(texture_index) - min_y * BASE3D_PIXEL_UV_SCALE)};
         index++;
         SMOOTH(ao_max_target);
-        vertices[index] = {vertex_pos + (max_y ? vertical_add(cube_vertices[face][index], max_y) : cube_vertices16[face][index]), TEXTURE_NX(texture_index), TEXTURE_PY(texture_index) - max_y_orig * BASE3D_PIXEL_UV_SCALE};
+        v_pos = vertex_pos + (max_y ? vertical_add(cube_vertices[face][index], max_y) : cube_vertices16[face][index]);
+        vertices[index] = {.x = int16_t(v_pos.x), .y = int16_t(v_pos.y), .z = int16_t(v_pos.z), .u = float(TEXTURE_NX(texture_index)), .v = float(TEXTURE_PY(texture_index) - max_y_orig * BASE3D_PIXEL_UV_SCALE)};
         index++;
         SMOOTH(ao_max_target);
-        vertices[index] = {vertex_pos + (max_y ? vertical_add(cube_vertices[face][index], max_y) : cube_vertices16[face][index]), TEXTURE_PX(texture_index), TEXTURE_PY(texture_index) - max_y_orig * BASE3D_PIXEL_UV_SCALE};
+        v_pos = vertex_pos + (max_y ? vertical_add(cube_vertices[face][index], max_y) : cube_vertices16[face][index]);
+        vertices[index] = {.x = int16_t(v_pos.x), .y = int16_t(v_pos.y), .z = int16_t(v_pos.z), .u = float(TEXTURE_PX(texture_index)), .v = float(TEXTURE_PY(texture_index) - max_y_orig * BASE3D_PIXEL_UV_SCALE)};
         index++;
         SMOOTH(ao_min_target);
-        vertices[index] = {vertex_pos + (min_y ? vertical_add(cube_vertices[face][index], min_y) : cube_vertices16[face][index]), TEXTURE_PX(texture_index), TEXTURE_PY(texture_index) - min_y * BASE3D_PIXEL_UV_SCALE};
+        v_pos = vertex_pos + (min_y ? vertical_add(cube_vertices[face][index], min_y) : cube_vertices16[face][index]);
+        vertices[index] = {.x = int16_t(v_pos.x), .y = int16_t(v_pos.y), .z = int16_t(v_pos.z), .u = float(TEXTURE_PX(texture_index)), .v = float(TEXTURE_PY(texture_index) - min_y * BASE3D_PIXEL_UV_SCALE)};
     }
     else
     {
@@ -329,33 +338,43 @@ void get_face(Vec3i pos, uint8_t face, uint32_t texture_index, Block *block, uin
         uint8_t *ao_target = ao;
         if ((min_y && face == FACE_NY) || (max_y && face == FACE_PY))
             ao_target = ao_no_op;
+        Vec3i v_pos;
+
         if (face == FACE_NY)
         {
             SMOOTH(ao_target);
-            vertices[index] = {vertex_pos + (min_y ? vertical_add(cube_vertices[face][index], min_y) : cube_vertices16[face][index]), TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)};
+            v_pos = vertex_pos + (min_y ? vertical_add(cube_vertices[face][index], min_y) : cube_vertices16[face][index]);
+            vertices[index] = {.x = int16_t(v_pos.x), .y = int16_t(v_pos.y), .z = int16_t(v_pos.z), .u = float(TEXTURE_NX(texture_index)), .v = float(TEXTURE_PY(texture_index))};
             index++;
             SMOOTH(ao_target);
-            vertices[index] = {vertex_pos + (min_y ? vertical_add(cube_vertices[face][index], min_y) : cube_vertices16[face][index]), TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)};
+            v_pos = vertex_pos + (min_y ? vertical_add(cube_vertices[face][index], min_y) : cube_vertices16[face][index]);
+            vertices[index] = {.x = int16_t(v_pos.x), .y = int16_t(v_pos.y), .z = int16_t(v_pos.z), .u = float(TEXTURE_NX(texture_index)), .v = float(TEXTURE_NY(texture_index))};
             index++;
             SMOOTH(ao_target);
-            vertices[index] = {vertex_pos + (min_y ? vertical_add(cube_vertices[face][index], min_y) : cube_vertices16[face][index]), TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)};
+            v_pos = vertex_pos + (min_y ? vertical_add(cube_vertices[face][index], min_y) : cube_vertices16[face][index]);
+            vertices[index] = {.x = int16_t(v_pos.x), .y = int16_t(v_pos.y), .z = int16_t(v_pos.z), .u = float(TEXTURE_PX(texture_index)), .v = float(TEXTURE_NY(texture_index))};
             index++;
             SMOOTH(ao_target);
-            vertices[index] = {vertex_pos + (min_y ? vertical_add(cube_vertices[face][index], min_y) : cube_vertices16[face][index]), TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)};
+            v_pos = vertex_pos + (min_y ? vertical_add(cube_vertices[face][index], min_y) : cube_vertices16[face][index]);
+            vertices[index] = {.x = int16_t(v_pos.x), .y = int16_t(v_pos.y), .z = int16_t(v_pos.z), .u = float(TEXTURE_PX(texture_index)), .v = float(TEXTURE_PY(texture_index))};
         }
         else
         {
             SMOOTH(ao_target);
-            vertices[index] = {vertex_pos + (max_y ? vertical_add(cube_vertices[face][index], max_y) : cube_vertices16[face][index]), TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)};
+            v_pos = vertex_pos + (max_y ? vertical_add(cube_vertices[face][index], max_y) : cube_vertices16[face][index]);
+            vertices[index] = {.x = int16_t(v_pos.x), .y = int16_t(v_pos.y), .z = int16_t(v_pos.z), .u = float(TEXTURE_NX(texture_index)), .v = float(TEXTURE_PY(texture_index))};
             index++;
             SMOOTH(ao_target);
-            vertices[index] = {vertex_pos + (max_y ? vertical_add(cube_vertices[face][index], max_y) : cube_vertices16[face][index]), TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)};
+            v_pos = vertex_pos + (max_y ? vertical_add(cube_vertices[face][index], max_y) : cube_vertices16[face][index]);
+            vertices[index] = {.x = int16_t(v_pos.x), .y = int16_t(v_pos.y), .z = int16_t(v_pos.z), .u = float(TEXTURE_NX(texture_index)), .v = float(TEXTURE_NY(texture_index))};
             index++;
             SMOOTH(ao_target);
-            vertices[index] = {vertex_pos + (max_y ? vertical_add(cube_vertices[face][index], max_y) : cube_vertices16[face][index]), TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)};
+            v_pos = vertex_pos + (max_y ? vertical_add(cube_vertices[face][index], max_y) : cube_vertices16[face][index]);
+            vertices[index] = {.x = int16_t(v_pos.x), .y = int16_t(v_pos.y), .z = int16_t(v_pos.z), .u = float(TEXTURE_PX(texture_index)), .v = float(TEXTURE_NY(texture_index))};
             index++;
             SMOOTH(ao_target);
-            vertices[index] = {vertex_pos + (max_y ? vertical_add(cube_vertices[face][index], max_y) : cube_vertices16[face][index]), TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)};
+            v_pos = vertex_pos + (max_y ? vertical_add(cube_vertices[face][index], max_y) : cube_vertices16[face][index]);
+            vertices[index] = {.x = int16_t(v_pos.x), .y = int16_t(v_pos.y), .z = int16_t(v_pos.z), .u = float(TEXTURE_PX(texture_index)), .v = float(TEXTURE_PY(texture_index))};
         }
     }
 #undef SMOOTH
@@ -382,19 +401,11 @@ void get_face(Vec3i pos, uint8_t face, uint32_t texture_index, Block *block, uin
     }
 }
 
-int render_face(Vec3i pos, uint8_t face, uint32_t texture_index, Block *block, uint8_t min_y, uint8_t max_y)
+int render_face(gertex::DisplayList<gertex::Vertex16> *list, Vec3i pos, uint8_t face, uint32_t texture_index, Block *block, uint8_t min_y, uint8_t max_y)
 {
-    if (!base3d_is_drawing || face >= 6)
-    {
-        Vertex16 tmp;
-        // This is just a dummy call to GX_Vertex to keep buffer size up to date.
-        for (int i = 0; i < 4; i++)
-            GX_VertexLit16(tmp, 0, 0);
-        return 4;
-    }
     uint8_t ao[4] = {0, 0, 0, 0};
     uint8_t lighting[4] = {0, 0, 0, 0};
-    Vertex16 vertices[4];
+    gertex::Vertex16 vertices[4];
     uint8_t index = 0;
     get_face(pos, face, texture_index, block, min_y, max_y, vertices, lighting, ao);
     if (texture_index >= 240 && texture_index < 250)
@@ -407,29 +418,26 @@ int render_face(Vec3i pos, uint8_t face, uint32_t texture_index, Block *block, u
         face = FACE_PY;
     }
     index = (ao[0] + ao[3] > ao[1] + ao[2]);
-    GX_VertexLit16(vertices[index], lighting[index], face + ao[index]);
+    for (int i = 0; i < 4; i++)
+    {
+        vertices[i].i = lighting[i];
+        vertices[i].nrm = face + ao[i];
+    }
+    list->put(vertices[index]);
     index = (index + 1) & 3;
-    GX_VertexLit16(vertices[index], lighting[index], face + ao[index]);
+    list->put(vertices[index]);
     index = (index + 1) & 3;
-    GX_VertexLit16(vertices[index], lighting[index], face + ao[index]);
+    list->put(vertices[index]);
     index = (index + 1) & 3;
-    GX_VertexLit16(vertices[index], lighting[index], face + ao[index]);
+    list->put(vertices[index]);
     return 4;
 }
 
-int render_back_face(Vec3i pos, uint8_t face, uint32_t texture_index, Block *block, uint8_t min_y, uint8_t max_y)
+int render_back_face(gertex::DisplayList<gertex::Vertex16> *list, Vec3i pos, uint8_t face, uint32_t texture_index, Block *block, uint8_t min_y, uint8_t max_y)
 {
-    if (!base3d_is_drawing || face >= 6)
-    {
-        static Vertex16 tmp;
-        // This is just a dummy call to GX_Vertex to keep buffer size up to date.
-        for (int i = 0; i < 4; i++)
-            GX_VertexLit16(tmp, 0, 0);
-        return 4;
-    }
     uint8_t ao[4] = {0, 0, 0, 0};
     uint8_t lighting[4] = {0, 0, 0, 0};
-    Vertex16 vertices[4];
+    gertex::Vertex16 vertices[4];
     uint8_t index = 0;
     get_face(pos, face, texture_index, block, min_y, max_y, vertices, lighting, ao);
     if (texture_index >= 240 && texture_index < 250)
@@ -443,63 +451,43 @@ int render_back_face(Vec3i pos, uint8_t face, uint32_t texture_index, Block *blo
     }
     // Reverse the order of vertices for back face rendering (3 - index)
     index = (ao[0] + ao[3] > ao[1] + ao[2]);
-    GX_VertexLit16(vertices[3 - index], lighting[3 - index], face + ao[3 - index]);
+    for (int i = 0; i < 4; i++)
+    {
+        vertices[i].i = lighting[i];
+        vertices[i].nrm = face + ao[i];
+    }
+    list->put(vertices[3 - index]);
     index = (index + 1) & 3;
-    GX_VertexLit16(vertices[3 - index], lighting[3 - index], face + ao[3 - index]);
+    list->put(vertices[3 - index]);
     index = (index + 1) & 3;
-    GX_VertexLit16(vertices[3 - index], lighting[3 - index], face + ao[3 - index]);
+    list->put(vertices[3 - index]);
     index = (index + 1) & 3;
-    GX_VertexLit16(vertices[3 - index], lighting[3 - index], face + ao[3 - index]);
+    list->put(vertices[3 - index]);
     return 4;
 }
 
-void render_single_block_at(Block &selected_block, Vec3i pos)
+void render_single_block_at(Block &selected_block, const Vec3i &pos, uint8_t frac_bits)
 {
     gertex::GXState state = gertex::get_state();
-
-    gertex::set_pos_precision(GX_S16, BASE3D_POS_FRAC_BITS);
+    gertex::set_pos_precision(GX_S16, frac_bits);
     gertex::set_color_format(0, GX_INDEX8);
 
-    // Precalculate the vertex count. Set position to Y = -16 to render "outside the world"
-    int vertexCount = render_block(&selected_block, pos);
-
-    // Start drawing the block
-    GX_BeginGroup(GX_QUADS, vertexCount);
-
-    // Render the block. Set position to Y = -16 to render "outside the world"
-    render_block(&selected_block, pos);
-
-    // End the group
-    GX_EndGroup();
+    gertex::DisplayListBuffered16 list(128, VERTEX_ATTR_LENGTH);
+    list.begin(GX_QUADS);
+    render_block(&list, &selected_block, pos);
+    list.flush();
 
     gertex::set_state(state);
 }
 
 void render_single_block(Block &selected_block)
 {
-    render_single_block_at(selected_block, Vec3i(0, -16, 0));
+    render_single_block_at(selected_block, Vec3i(0, -16, 0), BASE3D_POS_FRAC_BITS);
 }
 
 void render_block_as_item(Block &selected_block)
 {
-    gertex::GXState state = gertex::get_state();
-
-    gertex::set_pos_precision(GX_S16, 0);
-    gertex::set_color_format(0, GX_INDEX8);
-
-    // Precalculate the vertex count. Set position to Y = -16 to render "outside the world"
-    int vertexCount = render_block(&selected_block, Vec3i(0, -16, 0));
-
-    // Start drawing the block
-    GX_BeginGroup(GX_QUADS, vertexCount);
-
-    // Render the block. Set position to Y = -16 to render "outside the world"
-    render_block(&selected_block, Vec3i(0, -16, 0));
-
-    // End the group
-    GX_EndGroup();
-
-    gertex::set_state(state);
+    render_single_block_at(selected_block, Vec3i(0, -16, 0), 0);
 }
 
 void render_single_item(uint32_t texture_index, bool transparency, uint8_t light)

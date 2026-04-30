@@ -104,8 +104,6 @@ bool World::tick()
             return false;
         }
     }
-    if (section_updates_in_tick)
-        try_update_sections();
     update_entities();
     calculate_visibility();
     update_chunks();
@@ -155,9 +153,6 @@ bool World::tick()
 
 void World::update()
 {
-    if (!section_updates_in_tick)
-        try_update_sections();
-
     edit_blocks();
     m_particle_system.update(delta_time);
 }
@@ -231,7 +226,7 @@ void World::try_update_sections()
         // Limit to 6ms per update
         do
         {
-            if (!update_sections() || true)
+            if (!update_sections())
                 break;
         } while (time_diff_us(start_time, time_get()) < 5000);
     }
@@ -325,6 +320,11 @@ bool World::update_sections()
                 switch (current.phase)
                 {
                 case SectionUpdatePhase::BLOCK_VISIBILITY:
+                    if (!has_nearby_sections(current.x, current.y, current.z))
+                    {
+                        processed = false;
+                        break;
+                    }
                     chunk->refresh_section_block_visibility(j);
                     break;
                 case SectionUpdatePhase::SOLID:
@@ -345,21 +345,22 @@ bool World::update_sections()
                     ChunkRenderer::render_section(current, true);
                     break;
                 case SectionUpdatePhase::FLUSH:
-                    if (sync_section_updates)
-                        break;
-
-                    // Apply the new buffers.
-                    if (current.solid != current.cached_solid)
+                    if (!sync_section_updates)
                     {
-                        current.cached_solid.clear();
+                        Lock lock(render_mutex);
+                        // Apply the new buffers.
+                        if (current.solid != current.cached_solid)
+                        {
+                            current.cached_solid.clear();
 
-                        current.cached_solid = current.solid;
-                    }
-                    if (current.transparent != current.cached_transparent)
-                    {
-                        current.cached_transparent.clear();
+                            current.cached_solid = current.solid;
+                        }
+                        if (current.transparent != current.cached_transparent)
+                        {
+                            current.cached_transparent.clear();
 
-                        current.cached_transparent = current.transparent;
+                            current.cached_transparent = current.transparent;
+                        }
                     }
                     break;
                 case SectionUpdatePhase::SECTION_VISIBILITY:

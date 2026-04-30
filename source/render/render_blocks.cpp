@@ -5,78 +5,79 @@
 #include <world/chunk.hpp>
 #include <block/blocks.hpp>
 #include <render/render.hpp>
+#include <gertex/displaylist.hpp>
 
-static std::map<RenderType, std::function<int(Block *, const Vec3i &)>> render_functions = {
+static std::map<RenderType, std::function<int(gertex::DisplayList<gertex::Vertex16> *list, Block *, const Vec3i &)>> render_functions = {
     {RenderType::full, render_cube},
     {RenderType::full_special, render_cube_special},
     {RenderType::cross, render_cross},
     {RenderType::flat_ground, render_flat_ground},
     {RenderType::slab, render_slab},
     {RenderType::special, render_special},
-    {RenderType::fluid, [](Block *, const Vec3i &)
+    {RenderType::fluid, [](gertex::DisplayList<gertex::Vertex16> *list, Block *, const Vec3i &)
      { return 0; }},
 };
 
-int render_block(Block *block, const Vec3i &pos)
+int render_block(gertex::DisplayList<gertex::Vertex16> *list, Block *block, const Vec3i &pos)
 {
     switch (block->blockid)
     {
     case BlockID::air:
         return 0;
     case BlockID::chest:
-        return render_chest(block, pos);
+        return render_chest(list, block, pos);
     case BlockID::snow_layer:
-        return render_snow_layer(block, pos);
+        return render_snow_layer(list, block, pos);
     default:
-        return render_functions[properties(block->id).m_render_type](block, pos);
+        return render_functions[properties(block->id).m_render_type](list, block, pos);
     }
 }
 
-int render_cube(Block *block, const Vec3i &pos)
+int render_cube(gertex::DisplayList<gertex::Vertex16> *list, Block *block, const Vec3i &pos)
 {
     int vertexCount = 0;
     for (uint8_t face = VIS_MIN, i = 0; face != VIS_MAX; face <<= 1, i++)
     {
         if ((block->visibility_flags & face))
-            vertexCount += render_face(pos, i, get_default_texture_index(block->blockid), block);
+            vertexCount += render_face(list, pos, i, get_default_texture_index(block->blockid), block);
     }
     return vertexCount;
 }
 
-int render_inverted_cube(Block *block, const Vec3i &pos)
+int render_inverted_cube(gertex::DisplayList<gertex::Vertex16> *list, Block *block, const Vec3i &pos)
 {
     int vertexCount = 0;
     for (uint8_t face = VIS_MIN, i = 0; face != VIS_MAX; face <<= 1, i++)
     {
         if ((block->visibility_flags & face))
-            vertexCount += render_back_face(pos, i, get_default_texture_index(block->blockid), block);
+            vertexCount += render_back_face(list, pos, i, get_default_texture_index(block->blockid), block);
     }
     return vertexCount;
 }
 
-int render_inverted_cube_special(Block *block, const Vec3i &pos)
+int render_inverted_cube_special(gertex::DisplayList<gertex::Vertex16> *list, Block *block, const Vec3i &pos)
 {
     int vertexCount = 0;
     for (uint8_t face = VIS_MIN, i = 0; face != VIS_MAX; face <<= 1, i++)
     {
         if ((block->visibility_flags & face))
-            vertexCount += render_back_face(pos, i, get_face_texture_index(block, i), block);
+            vertexCount += render_back_face(list, pos, i, get_face_texture_index(block, i), block);
     }
     return vertexCount;
 }
 
-int render_cube_special(Block *block, const Vec3i &pos)
+int render_cube_special(gertex::DisplayList<gertex::Vertex16> *list, Block *block, const Vec3i &pos)
 {
     int vertexCount = 0;
     for (uint8_t face = VIS_MIN, i = 0; face != VIS_MAX; face <<= 1, i++)
     {
         if ((block->visibility_flags & face))
-            vertexCount += render_face(pos, i, get_face_texture_index(block, i), block);
+            vertexCount += render_face(list, pos, i, get_face_texture_index(block, i), block);
     }
     return vertexCount;
 }
 
-int render_special(Block *block, const Vec3i &pos)
+int render_special(gertex::DisplayList<gertex::Vertex16> *list, Block *block, const Vec3i &pos)
 {
     switch (block->blockid)
     {
@@ -84,31 +85,40 @@ int render_special(Block *block, const Vec3i &pos)
     case BlockID::unlit_redstone_torch:
     case BlockID::redstone_torch:
     case BlockID::lever:
-        return render_torch(block, pos);
+        return render_torch(list, block, pos);
     case BlockID::wooden_door:
     case BlockID::iron_door:
-        return render_door(block, pos);
+        return render_door(list, block, pos);
     case BlockID::cactus:
-        return render_cactus(block, pos);
+        return render_cactus(list, block, pos);
     default:
         return 0;
     }
 }
 
-int render_flat_ground(Block *block, const Vec3i &pos)
+int render_flat_ground(gertex::DisplayList<gertex::Vertex16> *list, Block *block, const Vec3i &pos)
 {
     uint8_t lighting = block->light;
     Vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
     Vec3f vertex_pos(local_pos.x, local_pos.y, local_pos.z);
     uint32_t texture_index = get_default_texture_index(block->blockid);
-    GX_VertexLit({vertex_pos + Vec3f{0.5, -.4375, -.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PY);
-    GX_VertexLit({vertex_pos + Vec3f{0.5, -.4375, 0.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PY);
-    GX_VertexLit({vertex_pos + Vec3f{-.5, -.4375, 0.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PY);
-    GX_VertexLit({vertex_pos + Vec3f{-.5, -.4375, -.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PY);
+
+    int16_t x = local_pos.x << BASE3D_POS_FRAC_BITS;
+    int16_t y = (local_pos.y << BASE3D_POS_FRAC_BITS) - 14;
+    int16_t z = local_pos.z << BASE3D_POS_FRAC_BITS;
+
+    int16_t x1 = (local_pos.x + 1) << BASE3D_POS_FRAC_BITS;
+    int16_t z1 = (local_pos.z + 1) << BASE3D_POS_FRAC_BITS;
+
+    list->put(gertex::Vertex16{.x = x1, .y = y, .z = z, .i = lighting, .nrm = FACE_PY, .u = float(TEXTURE_NX(texture_index)), .v = float(TEXTURE_PY(texture_index))});
+    list->put(gertex::Vertex16{.x = x1, .y = y, .z = z1, .i = lighting, .nrm = FACE_PY, .u = float(TEXTURE_NX(texture_index)), .v = float(TEXTURE_NY(texture_index))});
+    list->put(gertex::Vertex16{.x = x, .y = y, .z = z1, .i = lighting, .nrm = FACE_PY, .u = float(TEXTURE_PX(texture_index)), .v = float(TEXTURE_NY(texture_index))});
+    list->put(gertex::Vertex16{.x = x, .y = y, .z = z, .i = lighting, .nrm = FACE_PY, .u = float(TEXTURE_PX(texture_index)), .v = float(TEXTURE_PY(texture_index))});
+
     return 4;
 }
 
-int render_snow_layer(Block *block, const Vec3i &pos)
+int render_snow_layer(gertex::DisplayList<gertex::Vertex16> *list, Block *block, const Vec3i &pos)
 {
     Vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
     Vec3f vertex_pos(local_pos.x, local_pos.y, local_pos.z);
@@ -116,7 +126,7 @@ int render_snow_layer(Block *block, const Vec3i &pos)
     int vertexCount = 4;
 
     // Top
-    render_face(pos, FACE_PY, texture_index, block, 0, 2);
+    render_face(list, pos, FACE_PY, texture_index, block, 0, 2);
 
     BlockID neighbor_ids[6];
     {
@@ -132,42 +142,42 @@ int render_snow_layer(Block *block, const Vec3i &pos)
     if ((block->visibility_flags & VIS_NX) && neighbor_ids[FACE_NX] != BlockID::snow_layer)
     {
         // Negative X
-        render_face(pos, FACE_NX, texture_index, block, 0, 2);
+        render_face(list, pos, FACE_NX, texture_index, block, 0, 2);
         vertexCount += 4;
     }
     if ((block->visibility_flags & VIS_PX) && neighbor_ids[FACE_PX] != BlockID::snow_layer)
     {
         // Positive X
-        render_face(pos, FACE_PX, texture_index, block, 0, 2);
+        render_face(list, pos, FACE_PX, texture_index, block, 0, 2);
         vertexCount += 4;
     }
     if ((block->visibility_flags & VIS_NZ) && neighbor_ids[FACE_NZ] != BlockID::snow_layer)
     {
         // Negative Z
-        render_face(pos, FACE_NZ, texture_index, block, 0, 2);
+        render_face(list, pos, FACE_NZ, texture_index, block, 0, 2);
         vertexCount += 4;
     }
     if ((block->visibility_flags & VIS_PZ) && neighbor_ids[FACE_PZ] != BlockID::snow_layer)
     {
         // Positive Z
-        render_face(pos, FACE_PZ, texture_index, block, 0, 2);
+        render_face(list, pos, FACE_PZ, texture_index, block, 0, 2);
         vertexCount += 4;
     }
     return vertexCount;
 }
 
-int render_chest(Block *block, const Vec3i &pos)
+int render_chest(gertex::DisplayList<gertex::Vertex16> *list, Block *block, const Vec3i &pos)
 {
     int vertexCount = 0;
     for (uint8_t face = VIS_MIN, i = 0; face != VIS_MAX; face <<= 1, i++)
     {
         if ((block->visibility_flags & face))
-            vertexCount += render_face(pos, i, get_chest_texture_index(block, pos, i), block);
+            vertexCount += render_face(list, pos, i, get_chest_texture_index(block, pos, i), block);
     }
     return vertexCount;
 }
 
-int render_torch(Block *block, const Vec3i &pos)
+int render_torch(gertex::DisplayList<gertex::Vertex16> *list, Block *block, const Vec3i &pos)
 {
     Vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
     Vec3f vertex_pos(local_pos.x, local_pos.y + 0.1875, local_pos.z);
@@ -175,57 +185,61 @@ int render_torch(Block *block, const Vec3i &pos)
     {
     case 1: // Facing east
         vertex_pos.x -= 0.125;
-        return render_torch_with_angle(block, vertex_pos, -0.4, 0);
+        return render_torch_with_angle(list, block, vertex_pos, -0.4, 0);
     case 2: // Facing west
         vertex_pos.x += 0.125;
-        return render_torch_with_angle(block, vertex_pos, 0.4, 0);
+        return render_torch_with_angle(list, block, vertex_pos, 0.4, 0);
     case 3: // Facing south
         vertex_pos.z -= 0.125;
-        return render_torch_with_angle(block, vertex_pos, 0, -0.4);
+        return render_torch_with_angle(list, block, vertex_pos, 0, -0.4);
     case 4: // Facing north
         vertex_pos.z += 0.125;
-        return render_torch_with_angle(block, vertex_pos, 0, 0.4);
+        return render_torch_with_angle(list, block, vertex_pos, 0, 0.4);
     default: // Facing up
         vertex_pos.y -= 0.1875;
-        return render_torch_with_angle(block, vertex_pos, 0, 0);
+        return render_torch_with_angle(list, block, vertex_pos, 0, 0);
     }
 }
 
-int render_torch_with_angle(Block *block, const Vec3f &vertex_pos, float ax, float az)
+int render_torch_with_angle(gertex::DisplayList<gertex::Vertex16> *list, Block *block, const Vec3f &vertex_pos, float ax, float az)
 {
     uint8_t lighting = block->light;
     uint32_t texture_index = get_default_texture_index(block->blockid);
 
     // Negative X side
-    GX_VertexLit({vertex_pos + Vec3f{-.0625f + ax, -.5f, -.5f + az}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NX);
-    GX_VertexLit({vertex_pos + Vec3f{-.0625f, 0.5f, -.5f}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_NX);
-    GX_VertexLit({vertex_pos + Vec3f{-.0625f, 0.5f, 0.5f}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_NX);
-    GX_VertexLit({vertex_pos + Vec3f{-.0625f + ax, -.5f, 0.5f + az}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NX);
+    list->put(gertex::Vertex16{.x = int16_t(-2 + vertex_pos.x * 32 + ax * 16), int16_t(vertex_pos.y * 32 - 16), int16_t(vertex_pos.z * 32 - 16 + az * 16), .i = lighting, .nrm = FACE_NX, .u = float(TEXTURE_NX(texture_index)), .v = float(TEXTURE_PY(texture_index))});
+    list->put(gertex::Vertex16{.x = int16_t(-2 + vertex_pos.x * 32), int16_t(vertex_pos.y * 32 + 16), int16_t(vertex_pos.z * 32 - 16), .i = lighting, .nrm = FACE_NX, .u = float(TEXTURE_NX(texture_index)), .v = float(TEXTURE_NY(texture_index))});
+    list->put(gertex::Vertex16{.x = int16_t(-2 + vertex_pos.x * 32), int16_t(vertex_pos.y * 32 + 16), int16_t(vertex_pos.z * 32 + 16), .i = lighting, .nrm = FACE_NX, .u = float(TEXTURE_PX(texture_index)), .v = float(TEXTURE_NY(texture_index))});
+    list->put(gertex::Vertex16{.x = int16_t(-2 + vertex_pos.x * 32 + ax * 16), int16_t(vertex_pos.y * 32 - 16), int16_t(vertex_pos.z * 32 + 16 + az * 16), .i = lighting, .nrm = FACE_NX, .u = float(TEXTURE_PX(texture_index)), .v = float(TEXTURE_PY(texture_index))});
+
     // Positive X side
-    GX_VertexLit({vertex_pos + Vec3f{0.0625f + ax, -.5f, 0.5f + az}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PX);
-    GX_VertexLit({vertex_pos + Vec3f{0.0625f, 0.5f, 0.5f}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PX);
-    GX_VertexLit({vertex_pos + Vec3f{0.0625f, 0.5f, -.5f}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PX);
-    GX_VertexLit({vertex_pos + Vec3f{0.0625f + ax, -.5f, -.5f + az}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PX);
+    list->put(gertex::Vertex16{.x = int16_t(+2 + vertex_pos.x * 32 + ax * 16), int16_t(vertex_pos.y * 32 + -16), int16_t(vertex_pos.z * 32 + 16 + az * 16), .i = lighting, .nrm = FACE_PX, .u = float(TEXTURE_PX(texture_index)), .v = float(TEXTURE_PY(texture_index))});
+    list->put(gertex::Vertex16{.x = int16_t(+2 + vertex_pos.x * 32), int16_t(vertex_pos.y * 32 + 16), int16_t(vertex_pos.z * 32 + 16), .i = lighting, .nrm = FACE_PX, .u = float(TEXTURE_PX(texture_index)), .v = float(TEXTURE_NY(texture_index))});
+    list->put(gertex::Vertex16{.x = int16_t(+2 + vertex_pos.x * 32), int16_t(vertex_pos.y * 32 + 16), int16_t(vertex_pos.z * 32 - 16), .i = lighting, .nrm = FACE_PX, .u = float(TEXTURE_NX(texture_index)), .v = float(TEXTURE_NY(texture_index))});
+    list->put(gertex::Vertex16{.x = int16_t(+2 + vertex_pos.x * 32 + ax * 16), int16_t(vertex_pos.y * 32 + -16), int16_t(vertex_pos.z * 32 - 16 + az * 16), .i = lighting, .nrm = FACE_PX, .u = float(TEXTURE_NX(texture_index)), .v = float(TEXTURE_PY(texture_index))});
+
     // Negative Z side
-    GX_VertexLit({vertex_pos + Vec3f{0.5f + ax, -.5f, -.0625f + az}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NZ);
-    GX_VertexLit({vertex_pos + Vec3f{0.5f, 0.5f, -.0625f}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_NZ);
-    GX_VertexLit({vertex_pos + Vec3f{-.5f, 0.5f, -.0625f}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_NZ);
-    GX_VertexLit({vertex_pos + Vec3f{-.5f + ax, -.5f, -.0625f + az}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NZ);
+    list->put(gertex::Vertex16{.x = int16_t(+16 + vertex_pos.x * 32 + ax * 16), int16_t(vertex_pos.y * 32 + -16), int16_t(vertex_pos.z * 32 - 2 + az * 16), .i = lighting, .nrm = FACE_NZ, .u = float(TEXTURE_PX(texture_index)), .v = float(TEXTURE_PY(texture_index))});
+    list->put(gertex::Vertex16{.x = int16_t(+16 + vertex_pos.x * 32), int16_t(vertex_pos.y * 32 + 16), int16_t(vertex_pos.z * 32 - 2), .i = lighting, .nrm = FACE_NZ, .u = float(TEXTURE_PX(texture_index)), .v = float(TEXTURE_NY(texture_index))});
+    list->put(gertex::Vertex16{.x = int16_t(-16 + vertex_pos.x * 32), int16_t(vertex_pos.y * 32 + 16), int16_t(vertex_pos.z * 32 - 2), .i = lighting, .nrm = FACE_NZ, .u = float(TEXTURE_NX(texture_index)), .v = float(TEXTURE_NY(texture_index))});
+    list->put(gertex::Vertex16{.x = int16_t(-16 + vertex_pos.x * 32 + ax * 16), int16_t(vertex_pos.y * 32 + -16), int16_t(vertex_pos.z * 32 - 2 + az * 16), .i = lighting, .nrm = FACE_NZ, .u = float(TEXTURE_NX(texture_index)), .v = float(TEXTURE_PY(texture_index))});
+
     // Positive Z side
-    GX_VertexLit({vertex_pos + Vec3f{-.5f + ax, -.5f, 0.0625f + az}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PZ);
-    GX_VertexLit({vertex_pos + Vec3f{-.5f, 0.5f, 0.0625f}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PZ);
-    GX_VertexLit({vertex_pos + Vec3f{0.5f, 0.5f, 0.0625f}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PZ);
-    GX_VertexLit({vertex_pos + Vec3f{0.5f + ax, -.5f, 0.0625f + az}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PZ);
+    list->put(gertex::Vertex16{.x = int16_t(-16 + vertex_pos.x * 32 + ax * 16), int16_t(vertex_pos.y * 32 + -16), int16_t(vertex_pos.z * 32 + 2 + az * 16), .i = lighting, .nrm = FACE_PZ, .u = float(TEXTURE_NX(texture_index)), .v = float(TEXTURE_PY(texture_index))});
+    list->put(gertex::Vertex16{.x = int16_t(-16 + vertex_pos.x * 32), int16_t(vertex_pos.y * 32 + 16), int16_t(vertex_pos.z * 32 + 2), .i = lighting, .nrm = FACE_PZ, .u = float(TEXTURE_NX(texture_index)), .v = float(TEXTURE_NY(texture_index))});
+    list->put(gertex::Vertex16{.x = int16_t(+16 + vertex_pos.x * 32), int16_t(vertex_pos.y * 32 + 16), int16_t(vertex_pos.z * 32 + 2), .i = lighting, .nrm = FACE_PZ, .u = float(TEXTURE_PX(texture_index)), .v = float(TEXTURE_NY(texture_index))});
+    list->put(gertex::Vertex16{.x = int16_t(+16 + vertex_pos.x * 32 + ax * 16), int16_t(vertex_pos.y * 32 + -16), int16_t(vertex_pos.z * 32 + 2 + az * 16), .i = lighting, .nrm = FACE_PZ, .u = float(TEXTURE_PX(texture_index)), .v = float(TEXTURE_PY(texture_index))});
+
     // Top side
-    GX_VertexLit({vertex_pos + Vec3f{0.0625f + ax * 0.375f, 0.125f, -.0625f + az * 0.375f}, TEXTURE_X(texture_index) + 9. * BASE3D_PIXEL_UV_SCALE, TEXTURE_Y(texture_index) + 8. * BASE3D_BLOCK_UV_SCALE}, lighting, FACE_PY);
-    GX_VertexLit({vertex_pos + Vec3f{0.0625f + ax * 0.375f, 0.125f, 0.0625f + az * 0.375f}, TEXTURE_X(texture_index) + 9. * BASE3D_PIXEL_UV_SCALE, TEXTURE_Y(texture_index) + 6. * BASE3D_BLOCK_UV_SCALE}, lighting, FACE_PY);
-    GX_VertexLit({vertex_pos + Vec3f{-.0625f + ax * 0.375f, 0.125f, 0.0625f + az * 0.375f}, TEXTURE_X(texture_index) + 7. * BASE3D_PIXEL_UV_SCALE, TEXTURE_Y(texture_index) + 6. * BASE3D_BLOCK_UV_SCALE}, lighting, FACE_PY);
-    GX_VertexLit({vertex_pos + Vec3f{-.0625f + ax * 0.375f, 0.125f, -.0625f + az * 0.375f}, TEXTURE_X(texture_index) + 7. * BASE3D_PIXEL_UV_SCALE, TEXTURE_Y(texture_index) + 8. * BASE3D_BLOCK_UV_SCALE}, lighting, FACE_PY);
+    list->put(gertex::Vertex16{.x = int16_t(+2 + vertex_pos.x * 32 + ax * 6), int16_t(vertex_pos.y * 32 + 4), int16_t(-2 + vertex_pos.z * 32 + az * 6), .i = lighting, .nrm = FACE_PY, .u = float(TEXTURE_X(texture_index) + 7. * BASE3D_PIXEL_UV_SCALE), .v = float(TEXTURE_Y(texture_index) + 8. * BASE3D_PIXEL_UV_SCALE)});
+    list->put(gertex::Vertex16{.x = int16_t(+2 + vertex_pos.x * 32 + ax * 6), int16_t(vertex_pos.y * 32 + 4), int16_t(+2 + vertex_pos.z * 32 + az * 6), .i = lighting, .nrm = FACE_PY, .u = float(TEXTURE_X(texture_index) + 9. * BASE3D_PIXEL_UV_SCALE), .v = float(TEXTURE_Y(texture_index) + 8. * BASE3D_PIXEL_UV_SCALE)});
+    list->put(gertex::Vertex16{.x = int16_t(-2 + vertex_pos.x * 32 + ax * 6), int16_t(vertex_pos.y * 32 + 4), int16_t(+2 + vertex_pos.z * 32 + az * 6), .i = lighting, .nrm = FACE_PY, .u = float(TEXTURE_X(texture_index) + 9. * BASE3D_PIXEL_UV_SCALE), .v = float(TEXTURE_Y(texture_index) + 6. * BASE3D_PIXEL_UV_SCALE)});
+    list->put(gertex::Vertex16{.x = int16_t(-2 + vertex_pos.x * 32 + ax * 6), int16_t(vertex_pos.y * 32 + 4), int16_t(-2 + vertex_pos.z * 32 + az * 6), .i = lighting, .nrm = FACE_PY, .u = float(TEXTURE_X(texture_index) + 7. * BASE3D_PIXEL_UV_SCALE), .v = float(TEXTURE_Y(texture_index) + 6. * BASE3D_PIXEL_UV_SCALE)});
 
     return 20;
 }
 
-int render_door(Block *block, const Vec3i &pos)
+int render_door(gertex::DisplayList<gertex::Vertex16> *list, Block *block, const Vec3i &pos)
 {
     uint8_t lighting = block->light;
     Vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
@@ -258,19 +272,19 @@ int render_door(Block *block, const Vec3i &pos)
     // Bottom face (we'll not render the bottom face of the top half)
     if (!top_half)
     {
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.min.y, door_bounds.min.z), TEXTURE_X(texture_index) + (door_bounds.min.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_Y(texture_index) + (door_bounds.min.z * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NY);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.min.y, door_bounds.max.z), TEXTURE_X(texture_index) + (door_bounds.min.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_Y(texture_index) + (door_bounds.max.z * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NY);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.min.y, door_bounds.max.z), TEXTURE_X(texture_index) + (door_bounds.max.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_Y(texture_index) + (door_bounds.max.z * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NY);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.min.y, door_bounds.min.z), TEXTURE_X(texture_index) + (door_bounds.max.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_Y(texture_index) + (door_bounds.min.z * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NY);
+        list->put(gertex::Vertex16{.x = int16_t((vertex_pos.x + door_bounds.min.x) * 16), int16_t((vertex_pos.y + door_bounds.min.y) * 16), int16_t((vertex_pos.z + door_bounds.min.z) * 16), .i = lighting, .nrm = FACE_NY, .u = float(TEXTURE_X(texture_index) + (door_bounds.min.x * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_Y(texture_index) + (door_bounds.min.z * BASE3D_BLOCK_UV_SCALE))});
+        list->put(gertex::Vertex16{.x = int16_t((vertex_pos.x + door_bounds.min.x) * 16), int16_t((vertex_pos.y + door_bounds.min.y) * 16), int16_t((vertex_pos.z + door_bounds.max.z) * 16), .i = lighting, .nrm = FACE_NY, .u = float(TEXTURE_X(texture_index) + (door_bounds.min.x * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_Y(texture_index) + (door_bounds.max.z * BASE3D_BLOCK_UV_SCALE))});
+        list->put(gertex::Vertex16{.x = int16_t((vertex_pos.x + door_bounds.max.x) * 16), int16_t((vertex_pos.y + door_bounds.min.y) * 16), int16_t((vertex_pos.z + door_bounds.max.z) * 16), .i = lighting, .nrm = FACE_NY, .u = float(TEXTURE_X(texture_index) + (door_bounds.max.x * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_Y(texture_index) + (door_bounds.max.z * BASE3D_BLOCK_UV_SCALE))});
+        list->put(gertex::Vertex16{.x = int16_t((vertex_pos.x + door_bounds.max.x) * 16), int16_t((vertex_pos.y + door_bounds.min.y) * 16), int16_t((vertex_pos.z + door_bounds.min.z) * 16), .i = lighting, .nrm = FACE_NY, .u = float(TEXTURE_X(texture_index) + (door_bounds.max.x * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_Y(texture_index) + (door_bounds.min.z * BASE3D_BLOCK_UV_SCALE))});
     }
 
     // Top face (we'll not render the top face of the bottom half)
     if (top_half)
     {
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.max.y, door_bounds.min.z), TEXTURE_X(texture_index) + (door_bounds.max.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_Y(texture_index) + (door_bounds.min.z * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PY);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.max.y, door_bounds.max.z), TEXTURE_X(texture_index) + (door_bounds.max.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_Y(texture_index) + (door_bounds.max.z * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PY);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.max.y, door_bounds.max.z), TEXTURE_X(texture_index) + (door_bounds.min.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_Y(texture_index) + (door_bounds.max.z * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PY);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.max.y, door_bounds.min.z), TEXTURE_X(texture_index) + (door_bounds.min.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_Y(texture_index) + (door_bounds.min.z * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PY);
+        list->put(gertex::Vertex16{.x = int16_t((vertex_pos.x + door_bounds.min.x) * 16), int16_t((vertex_pos.y + door_bounds.max.y) * 16), int16_t((vertex_pos.z + door_bounds.min.z) * 16), .i = lighting, .nrm = FACE_PY, .u = float(TEXTURE_X(texture_index) + (door_bounds.min.x * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_Y(texture_index) + (door_bounds.min.z * BASE3D_BLOCK_UV_SCALE))});
+        list->put(gertex::Vertex16{.x = int16_t((vertex_pos.x + door_bounds.min.x) * 16), int16_t((vertex_pos.y + door_bounds.max.y) * 16), int16_t((vertex_pos.z + door_bounds.max.z) * 16), .i = lighting, .nrm = FACE_PY, .u = float(TEXTURE_X(texture_index) + (door_bounds.min.x * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_Y(texture_index) + (door_bounds.max.z * BASE3D_BLOCK_UV_SCALE))});
+        list->put(gertex::Vertex16{.x = int16_t((vertex_pos.x + door_bounds.max.x) * 16), int16_t((vertex_pos.y + door_bounds.max.y) * 16), int16_t((vertex_pos.z + door_bounds.max.z) * 16), .i = lighting, .nrm = FACE_PY, .u = float(TEXTURE_X(texture_index) + (door_bounds.max.x * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_Y(texture_index) + (door_bounds.max.z * BASE3D_BLOCK_UV_SCALE))});
+        list->put(gertex::Vertex16{.x = int16_t((vertex_pos.x + door_bounds.max.x) * 16), int16_t((vertex_pos.y + door_bounds.max.y) * 16), int16_t((vertex_pos.z + door_bounds.min.z) * 16), .i = lighting, .nrm = FACE_PY, .u = float(TEXTURE_X(texture_index) + (door_bounds.max.x * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_Y(texture_index) + (door_bounds.min.z * BASE3D_BLOCK_UV_SCALE))});
     }
 
     bool flip_states[4] = {false, false, false, false};
@@ -286,162 +300,177 @@ int render_door(Block *block, const Vec3i &pos)
     // Negative X side
     if (flip_states[1])
     {
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.max.y, door_bounds.min.z), TEXTURE_X(texture_index) + (door_bounds.min.z * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NX);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.max.y, door_bounds.max.z), TEXTURE_X(texture_index) + (door_bounds.max.z * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NX);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.min.y, door_bounds.max.z), TEXTURE_X(texture_index) + (door_bounds.max.z * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NX);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.min.y, door_bounds.min.z), TEXTURE_X(texture_index) + (door_bounds.min.z * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NX);
+        list->put(gertex::Vertex16{.x = int16_t(vertex_pos.x + door_bounds.min.x), int16_t(vertex_pos.y + door_bounds.max.y), int16_t(vertex_pos.z + door_bounds.min.z), .i = lighting, .nrm = FACE_NX, .u = float(TEXTURE_X(texture_index) + (door_bounds.min.z * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE))});
+        list->put(gertex::Vertex16{.x = int16_t(vertex_pos.x + door_bounds.min.x), int16_t(vertex_pos.y + door_bounds.max.y), int16_t(vertex_pos.z + door_bounds.max.z), .i = lighting, .nrm = FACE_NX, .u = float(TEXTURE_X(texture_index) + (door_bounds.max.z * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE))});
+        list->put(gertex::Vertex16{.x = int16_t(vertex_pos.x + door_bounds.min.x), int16_t(vertex_pos.y + door_bounds.min.y), int16_t(vertex_pos.z + door_bounds.max.z), .i = lighting, .nrm = FACE_NX, .u = float(TEXTURE_X(texture_index) + (door_bounds.max.z * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE))});
+        list->put(gertex::Vertex16{.x = int16_t(vertex_pos.x + door_bounds.min.x), int16_t(vertex_pos.y + door_bounds.min.y), int16_t(vertex_pos.z + door_bounds.min.z), .i = lighting, .nrm = FACE_NX, .u = float(TEXTURE_X(texture_index) + (door_bounds.min.z * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE))});
     }
     else
     {
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.max.y, door_bounds.min.z), TEXTURE_PX(texture_index) - (door_bounds.min.z * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NX);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.max.y, door_bounds.max.z), TEXTURE_PX(texture_index) - (door_bounds.max.z * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NX);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.min.y, door_bounds.max.z), TEXTURE_PX(texture_index) - (door_bounds.max.z * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NX);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.min.y, door_bounds.min.z), TEXTURE_PX(texture_index) - (door_bounds.min.z * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NX);
+        list->put(gertex::Vertex16{.x = int16_t(vertex_pos.x + door_bounds.min.x), int16_t(vertex_pos.y + door_bounds.max.y), int16_t(vertex_pos.z + door_bounds.min.z), .i = lighting, .nrm = FACE_NX, .u = float(TEXTURE_PX(texture_index) - (door_bounds.min.z * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE))});
+        list->put(gertex::Vertex16{.x = int16_t(vertex_pos.x + door_bounds.min.x), int16_t(vertex_pos.y + door_bounds.max.y), int16_t(vertex_pos.z + door_bounds.max.z), .i = lighting, .nrm = FACE_NX, .u = float(TEXTURE_PX(texture_index) - (door_bounds.max.z * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE))});
+        list->put(gertex::Vertex16{.x = int16_t(vertex_pos.x + door_bounds.min.x), int16_t(vertex_pos.y + door_bounds.min.y), int16_t(vertex_pos.z + door_bounds.max.z), .i = lighting, .nrm = FACE_NX, .u = float(TEXTURE_PX(texture_index) - (door_bounds.max.z * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE))});
+        list->put(gertex::Vertex16{.x = int16_t(vertex_pos.x + door_bounds.min.x), int16_t(vertex_pos.y + door_bounds.min.y), int16_t(vertex_pos.z + door_bounds.min.z), .i = lighting, .nrm = FACE_NX, .u = float(TEXTURE_PX(texture_index) - (door_bounds.min.z * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE))});
     }
 
     // Positive X side
     if (flip_states[3])
     {
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.min.y, door_bounds.min.z), TEXTURE_X(texture_index) + (door_bounds.min.z * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PX);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.min.y, door_bounds.max.z), TEXTURE_X(texture_index) + (door_bounds.max.z * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PX);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.max.y, door_bounds.max.z), TEXTURE_X(texture_index) + (door_bounds.max.z * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PX);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.max.y, door_bounds.min.z), TEXTURE_X(texture_index) + (door_bounds.min.z * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PX);
+        list->put(gertex::Vertex16{.x = int16_t(vertex_pos.x + door_bounds.max.x), int16_t(vertex_pos.y + door_bounds.min.y), int16_t(vertex_pos.z + door_bounds.min.z), .i = lighting, .nrm = FACE_PX, .u = float(TEXTURE_X(texture_index) + (door_bounds.min.z * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE))});
+        list->put(gertex::Vertex16{.x = int16_t(vertex_pos.x + door_bounds.max.x), int16_t(vertex_pos.y + door_bounds.min.y), int16_t(vertex_pos.z + door_bounds.max.z), .i = lighting, .nrm = FACE_PX, .u = float(TEXTURE_X(texture_index) + (door_bounds.max.z * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE))});
+        list->put(gertex::Vertex16{.x = int16_t(vertex_pos.x + door_bounds.max.x), int16_t(vertex_pos.y + door_bounds.max.y), int16_t(vertex_pos.z + door_bounds.max.z), .i = lighting, .nrm = FACE_PX, .u = float(TEXTURE_X(texture_index) + (door_bounds.max.z * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE))});
+        list->put(gertex::Vertex16{.x = int16_t(vertex_pos.x + door_bounds.max.x), int16_t(vertex_pos.y + door_bounds.max.y), int16_t(vertex_pos.z + door_bounds.min.z), .i = lighting, .nrm = FACE_PX, .u = float(TEXTURE_X(texture_index) + (door_bounds.min.z * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE))});
     }
     else
     {
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.min.y, door_bounds.min.z), TEXTURE_PX(texture_index) - (door_bounds.min.z * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PX);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.min.y, door_bounds.max.z), TEXTURE_PX(texture_index) - (door_bounds.max.z * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PX);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.max.y, door_bounds.max.z), TEXTURE_PX(texture_index) - (door_bounds.max.z * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PX);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.max.y, door_bounds.min.z), TEXTURE_PX(texture_index) - (door_bounds.min.z * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PX);
+        list->put(gertex::Vertex16{.x = int16_t(vertex_pos.x + door_bounds.max.x), int16_t(vertex_pos.y + door_bounds.min.y), int16_t(vertex_pos.z + door_bounds.min.z), .i = lighting, .nrm = FACE_PX, .u = float(TEXTURE_PX(texture_index) - (door_bounds.min.z * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE))});
+        list->put(gertex::Vertex16{.x = int16_t(vertex_pos.x + door_bounds.max.x), int16_t(vertex_pos.y + door_bounds.min.y), int16_t(vertex_pos.z + door_bounds.max.z), .i = lighting, .nrm = FACE_PX, .u = float(TEXTURE_PX(texture_index) - (door_bounds.max.z * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE))});
+        list->put(gertex::Vertex16{.x = int16_t(vertex_pos.x + door_bounds.max.x), int16_t(vertex_pos.y + door_bounds.max.y), int16_t(vertex_pos.z + door_bounds.max.z), .i = lighting, .nrm = FACE_PX, .u = float(TEXTURE_PX(texture_index) - (door_bounds.max.z * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE))});
+        list->put(gertex::Vertex16{.x = int16_t(vertex_pos.x + door_bounds.max.x), int16_t(vertex_pos.y + door_bounds.max.y), int16_t(vertex_pos.z + door_bounds.min.z), .i = lighting, .nrm = FACE_PX, .u = float(TEXTURE_PX(texture_index) - (door_bounds.min.z * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE))});
     }
 
     // Negative Z side
     if (flip_states[2])
     {
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.min.y, door_bounds.min.z), TEXTURE_X(texture_index) + (door_bounds.min.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NZ);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.min.y, door_bounds.min.z), TEXTURE_X(texture_index) + (door_bounds.max.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NZ);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.max.y, door_bounds.min.z), TEXTURE_X(texture_index) + (door_bounds.max.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NZ);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.max.y, door_bounds.min.z), TEXTURE_X(texture_index) + (door_bounds.min.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NZ);
+        list->put(gertex::Vertex16{.x = int16_t(vertex_pos.x + door_bounds.min.x), int16_t(vertex_pos.y + door_bounds.min.y), int16_t(vertex_pos.z + door_bounds.min.z), .i = lighting, .nrm = FACE_NZ, .u = float(TEXTURE_X(texture_index) + (door_bounds.min.x * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE))});
+        list->put(gertex::Vertex16{.x = int16_t(vertex_pos.x + door_bounds.max.x), int16_t(vertex_pos.y + door_bounds.min.y), int16_t(vertex_pos.z + door_bounds.min.z), .i = lighting, .nrm = FACE_NZ, .u = float(TEXTURE_X(texture_index) + (door_bounds.max.x * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE))});
+        list->put(gertex::Vertex16{.x = int16_t(vertex_pos.x + door_bounds.max.x), int16_t(vertex_pos.y + door_bounds.max.y), int16_t(vertex_pos.z + door_bounds.min.z), .i = lighting, .nrm = FACE_NZ, .u = float(TEXTURE_X(texture_index) + (door_bounds.max.x * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE))});
+        list->put(gertex::Vertex16{.x = int16_t(vertex_pos.x + door_bounds.min.x), int16_t(vertex_pos.y + door_bounds.max.y), int16_t(vertex_pos.z + door_bounds.min.z), .i = lighting, .nrm = FACE_NZ, .u = float(TEXTURE_X(texture_index) + (door_bounds.min.x * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE))});
     }
     else
     {
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.min.y, door_bounds.min.z), TEXTURE_PX(texture_index) - (door_bounds.min.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NZ);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.min.y, door_bounds.min.z), TEXTURE_PX(texture_index) - (door_bounds.max.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NZ);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.max.y, door_bounds.min.z), TEXTURE_PX(texture_index) - (door_bounds.max.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NZ);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.max.y, door_bounds.min.z), TEXTURE_PX(texture_index) - (door_bounds.min.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_NZ);
+        list->put(gertex::Vertex16{.x = int16_t(vertex_pos.x + door_bounds.min.x), int16_t(vertex_pos.y + door_bounds.min.y), int16_t(vertex_pos.z + door_bounds.min.z), .i = lighting, .nrm = FACE_NZ, .u = float(TEXTURE_PX(texture_index) - (door_bounds.min.x * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE))});
+        list->put(gertex::Vertex16{.x = int16_t(vertex_pos.x + door_bounds.max.x), int16_t(vertex_pos.y + door_bounds.min.y), int16_t(vertex_pos.z + door_bounds.min.z), .i = lighting, .nrm = FACE_NZ, .u = float(TEXTURE_PX(texture_index) - (door_bounds.max.x * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE))});
+        list->put(gertex::Vertex16{.x = int16_t(vertex_pos.x + door_bounds.max.x), int16_t(vertex_pos.y + door_bounds.max.y), int16_t(vertex_pos.z + door_bounds.min.z), .i = lighting, .nrm = FACE_NZ, .u = float(TEXTURE_PX(texture_index) - (door_bounds.max.x * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE))});
+        list->put(gertex::Vertex16{.x = int16_t(vertex_pos.x + door_bounds.min.x), int16_t(vertex_pos.y + door_bounds.max.y), int16_t(vertex_pos.z + door_bounds.min.z), .i = lighting, .nrm = FACE_NZ, .u = float(TEXTURE_PX(texture_index) - (door_bounds.min.x * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE))});
     }
 
     // Positive Z side
     if (flip_states[0])
     {
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.max.y, door_bounds.max.z), TEXTURE_X(texture_index) + (door_bounds.min.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PZ);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.max.y, door_bounds.max.z), TEXTURE_X(texture_index) + (door_bounds.max.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PZ);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.min.y, door_bounds.max.z), TEXTURE_X(texture_index) + (door_bounds.max.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PZ);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.min.y, door_bounds.max.z), TEXTURE_X(texture_index) + (door_bounds.min.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PZ);
+        list->put(gertex::Vertex16{.x = int16_t(vertex_pos.x + door_bounds.min.x), int16_t(vertex_pos.y + door_bounds.max.y), int16_t(vertex_pos.z + door_bounds.max.z), .i = lighting, .nrm = FACE_PZ, .u = float(TEXTURE_X(texture_index) + (door_bounds.min.x * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE))});
+        list->put(gertex::Vertex16{.x = int16_t(vertex_pos.x + door_bounds.max.x), int16_t(vertex_pos.y + door_bounds.max.y), int16_t(vertex_pos.z + door_bounds.max.z), .i = lighting, .nrm = FACE_PZ, .u = float(TEXTURE_X(texture_index) + (door_bounds.max.x * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE))});
+        list->put(gertex::Vertex16{.x = int16_t(vertex_pos.x + door_bounds.max.x), int16_t(vertex_pos.y + door_bounds.min.y), int16_t(vertex_pos.z + door_bounds.max.z), .i = lighting, .nrm = FACE_PZ, .u = float(TEXTURE_X(texture_index) + (door_bounds.max.x * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE))});
+        list->put(gertex::Vertex16{.x = int16_t(vertex_pos.x + door_bounds.min.x), int16_t(vertex_pos.y + door_bounds.min.y), int16_t(vertex_pos.z + door_bounds.max.z), .i = lighting, .nrm = FACE_PZ, .u = float(TEXTURE_X(texture_index) + (door_bounds.min.x * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE))});
     }
     else
     {
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.max.y, door_bounds.max.z), TEXTURE_PX(texture_index) - (door_bounds.min.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PZ);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.max.y, door_bounds.max.z), TEXTURE_PX(texture_index) - (door_bounds.max.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PZ);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.max.x, door_bounds.min.y, door_bounds.max.z), TEXTURE_PX(texture_index) - (door_bounds.max.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PZ);
-        GX_VertexLit({vertex_pos + Vec3f(door_bounds.min.x, door_bounds.min.y, door_bounds.max.z), TEXTURE_PX(texture_index) - (door_bounds.min.x * BASE3D_BLOCK_UV_SCALE), TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE)}, lighting, FACE_PZ);
+        list->put(gertex::Vertex16{.x = int16_t(vertex_pos.x + door_bounds.min.x), int16_t(vertex_pos.y + door_bounds.max.y), int16_t(vertex_pos.z + door_bounds.max.z), .i = lighting, .nrm = FACE_PZ, .u = float(TEXTURE_PX(texture_index) - (door_bounds.min.x * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE))});
+        list->put(gertex::Vertex16{.x = int16_t(vertex_pos.x + door_bounds.max.x), int16_t(vertex_pos.y + door_bounds.max.y), int16_t(vertex_pos.z + door_bounds.max.z), .i = lighting, .nrm = FACE_PZ, .u = float(TEXTURE_PX(texture_index) - (door_bounds.max.x * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_PY(texture_index) - (door_bounds.max.y * BASE3D_BLOCK_UV_SCALE))});
+        list->put(gertex::Vertex16{.x = int16_t(vertex_pos.x + door_bounds.max.x), int16_t(vertex_pos.y + door_bounds.min.y), int16_t(vertex_pos.z + door_bounds.max.z), .i = lighting, .nrm = FACE_PZ, .u = float(TEXTURE_PX(texture_index) - (door_bounds.max.x * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE))});
+        list->put(gertex::Vertex16{.x = int16_t(vertex_pos.x + door_bounds.min.x), int16_t(vertex_pos.y + door_bounds.min.y), int16_t(vertex_pos.z + door_bounds.max.z), .i = lighting, .nrm = FACE_PZ, .u = float(TEXTURE_PX(texture_index) - (door_bounds.min.x * BASE3D_BLOCK_UV_SCALE)), .v = float(TEXTURE_PY(texture_index) - (door_bounds.min.y * BASE3D_BLOCK_UV_SCALE))});
     }
-
     return 20;
 }
 
-int render_cactus(Block *block, const Vec3i &pos)
+int render_cactus(gertex::DisplayList<gertex::Vertex16> *list, Block *block, const Vec3i &pos)
 {
+
     uint8_t lighting = block->light;
     Vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
-    Vec3f vertex_pos(local_pos.x, local_pos.y, local_pos.z);
     uint32_t texture_index = get_default_texture_index(block->blockid);
     uint32_t top_texture_index = texture_index - 1;
     uint32_t bottom_texture_index = texture_index + 1;
+
     int vertexCount = 16;
 
+    int16_t x = (local_pos.x << BASE3D_POS_FRAC_BITS);
+    int16_t y = (local_pos.y << BASE3D_POS_FRAC_BITS);
+    int16_t z = (local_pos.z << BASE3D_POS_FRAC_BITS);
+
+    int16_t x0 = x - 16;
+    int16_t x1 = x + 16;
+    int16_t z0 = z - 16;
+    int16_t z1 = z + 16;
+
+    int16_t y0 = y - 16;
+    int16_t y1 = y + 16;
+
     // Positive X side
-    GX_VertexLit({vertex_pos + Vec3f{0.4375, -.5, 0.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PX);
-    GX_VertexLit({vertex_pos + Vec3f{0.4375, 0.5, 0.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PX);
-    GX_VertexLit({vertex_pos + Vec3f{0.4375, 0.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PX);
-    GX_VertexLit({vertex_pos + Vec3f{0.4375, -.5, -.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PX);
+    list->put(gertex::Vertex16{.x = int16_t(x1 - 1), .y = y0, .z = z1, .i = lighting, .nrm = FACE_PX, .u = float(TEXTURE_NX(texture_index)), .v = float(TEXTURE_PY(texture_index))});
+    list->put(gertex::Vertex16{.x = int16_t(x1 - 1), .y = y1, .z = z1, .i = lighting, .nrm = FACE_PX, .u = float(TEXTURE_NX(texture_index)), .v = float(TEXTURE_NY(texture_index))});
+    list->put(gertex::Vertex16{.x = int16_t(x1 - 1), .y = y1, .z = z0, .i = lighting, .nrm = FACE_PX, .u = float(TEXTURE_PX(texture_index)), .v = float(TEXTURE_NY(texture_index))});
+    list->put(gertex::Vertex16{.x = int16_t(x1 - 1), .y = y0, .z = z0, .i = lighting, .nrm = FACE_PX, .u = float(TEXTURE_PX(texture_index)), .v = float(TEXTURE_PY(texture_index))});
 
     // Negative X side
-    GX_VertexLit({vertex_pos + Vec3f{-.4375, -.5, -.5}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NX);
-    GX_VertexLit({vertex_pos + Vec3f{-.4375, 0.5, -.5}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_NX);
-    GX_VertexLit({vertex_pos + Vec3f{-.4375, 0.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_NX);
-    GX_VertexLit({vertex_pos + Vec3f{-.4375, -.5, 0.5}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NX);
+    list->put(gertex::Vertex16{.x = int16_t(x0 + 1), .y = y0, .z = z0, .i = lighting, .nrm = FACE_NX, .u = float(TEXTURE_NX(texture_index)), .v = float(TEXTURE_PY(texture_index))});
+    list->put(gertex::Vertex16{.x = int16_t(x0 + 1), .y = y1, .z = z0, .i = lighting, .nrm = FACE_NX, .u = float(TEXTURE_NX(texture_index)), .v = float(TEXTURE_NY(texture_index))});
+    list->put(gertex::Vertex16{.x = int16_t(x0 + 1), .y = y1, .z = z1, .i = lighting, .nrm = FACE_NX, .u = float(TEXTURE_PX(texture_index)), .v = float(TEXTURE_NY(texture_index))});
+    list->put(gertex::Vertex16{.x = int16_t(x0 + 1), .y = y0, .z = z1, .i = lighting, .nrm = FACE_NX, .u = float(TEXTURE_PX(texture_index)), .v = float(TEXTURE_PY(texture_index))});
 
     // Bottom face
     if ((block->visibility_flags & VIS_NY))
     {
-        GX_VertexLit({vertex_pos + Vec3f{-.5, -.5, -.5}, TEXTURE_NX(bottom_texture_index), TEXTURE_PY(bottom_texture_index)}, lighting, FACE_NY);
-        GX_VertexLit({vertex_pos + Vec3f{-.5, -.5, 0.5}, TEXTURE_NX(bottom_texture_index), TEXTURE_NY(bottom_texture_index)}, lighting, FACE_NY);
-        GX_VertexLit({vertex_pos + Vec3f{0.5, -.5, 0.5}, TEXTURE_PX(bottom_texture_index), TEXTURE_NY(bottom_texture_index)}, lighting, FACE_NY);
-        GX_VertexLit({vertex_pos + Vec3f{0.5, -.5, -.5}, TEXTURE_PX(bottom_texture_index), TEXTURE_PY(bottom_texture_index)}, lighting, FACE_NY);
+        list->put(gertex::Vertex16{.x = x0, .y = y0, .z = z0, .i = lighting, .nrm = FACE_NY, .u = float(TEXTURE_NX(bottom_texture_index)), .v = float(TEXTURE_PY(bottom_texture_index))});
+        list->put(gertex::Vertex16{.x = x0, .y = y0, .z = z1, .i = lighting, .nrm = FACE_NY, .u = float(TEXTURE_NX(bottom_texture_index)), .v = float(TEXTURE_NY(bottom_texture_index))});
+        list->put(gertex::Vertex16{.x = x1, .y = y0, .z = z1, .i = lighting, .nrm = FACE_NY, .u = float(TEXTURE_PX(bottom_texture_index)), .v = float(TEXTURE_NY(bottom_texture_index))});
+        list->put(gertex::Vertex16{.x = x1, .y = y0, .z = z0, .i = lighting, .nrm = FACE_NY, .u = float(TEXTURE_PX(bottom_texture_index)), .v = float(TEXTURE_PY(bottom_texture_index))});
         vertexCount += 4;
     }
     if ((block->visibility_flags & VIS_PY))
     {
         // Top face
-        GX_VertexLit({vertex_pos + Vec3f{0.5, .5, -.5}, TEXTURE_NX(top_texture_index), TEXTURE_PY(top_texture_index)}, lighting, FACE_PY);
-        GX_VertexLit({vertex_pos + Vec3f{0.5, .5, 0.5}, TEXTURE_NX(top_texture_index), TEXTURE_NY(top_texture_index)}, lighting, FACE_PY);
-        GX_VertexLit({vertex_pos + Vec3f{-.5, .5, 0.5}, TEXTURE_PX(top_texture_index), TEXTURE_NY(top_texture_index)}, lighting, FACE_PY);
-        GX_VertexLit({vertex_pos + Vec3f{-.5, .5, -.5}, TEXTURE_PX(top_texture_index), TEXTURE_PY(top_texture_index)}, lighting, FACE_PY);
+        list->put(gertex::Vertex16{.x = x1, .y = y1, .z = z0, .i = lighting, .nrm = FACE_PY, .u = float(TEXTURE_NX(top_texture_index)), .v = float(TEXTURE_PY(top_texture_index))});
+        list->put(gertex::Vertex16{.x = x1, .y = y1, .z = z1, .i = lighting, .nrm = FACE_PY, .u = float(TEXTURE_NX(top_texture_index)), .v = float(TEXTURE_NY(top_texture_index))});
+        list->put(gertex::Vertex16{.x = x0, .y = y1, .z = z1, .i = lighting, .nrm = FACE_PY, .u = float(TEXTURE_PX(top_texture_index)), .v = float(TEXTURE_NY(top_texture_index))});
+        list->put(gertex::Vertex16{.x = x0, .y = y1, .z = z0, .i = lighting, .nrm = FACE_PY, .u = float(TEXTURE_PX(top_texture_index)), .v = float(TEXTURE_PY(top_texture_index))});
         vertexCount += 4;
     }
     // Positive Z side
-    GX_VertexLit({vertex_pos + Vec3f{-.5, -.5, 0.4375}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PZ);
-    GX_VertexLit({vertex_pos + Vec3f{-.5, 0.5, 0.4375}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PZ);
-    GX_VertexLit({vertex_pos + Vec3f{0.5, 0.5, 0.4375}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PZ);
-    GX_VertexLit({vertex_pos + Vec3f{0.5, -.5, 0.4375}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PZ);
+    list->put(gertex::Vertex16{.x = x0, .y = y0, .z = int16_t(z1 - 1), .i = lighting, .nrm = FACE_PZ, .u = float(TEXTURE_NX(texture_index)), .v = float(TEXTURE_PY(texture_index))});
+    list->put(gertex::Vertex16{.x = x0, .y = y1, .z = int16_t(z1 - 1), .i = lighting, .nrm = FACE_PZ, .u = float(TEXTURE_NX(texture_index)), .v = float(TEXTURE_NY(texture_index))});
+    list->put(gertex::Vertex16{.x = x1, .y = y1, .z = int16_t(z1 - 1), .i = lighting, .nrm = FACE_PZ, .u = float(TEXTURE_PX(texture_index)), .v = float(TEXTURE_NY(texture_index))});
+    list->put(gertex::Vertex16{.x = x1, .y = y0, .z = int16_t(z1 - 1), .i = lighting, .nrm = FACE_PZ, .u = float(TEXTURE_PX(texture_index)), .v = float(TEXTURE_PY(texture_index))});
 
     // Negative Z side
-    GX_VertexLit({vertex_pos + Vec3f{0.5, -.5, -.4375}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NZ);
-    GX_VertexLit({vertex_pos + Vec3f{0.5, 0.5, -.4375}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_NZ);
-    GX_VertexLit({vertex_pos + Vec3f{-.5, 0.5, -.4375}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_NZ);
-    GX_VertexLit({vertex_pos + Vec3f{-.5, -.5, -.4375}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NZ);
-
+    list->put(gertex::Vertex16{.x = x1, .y = y0, .z = int16_t(z0 + 1), .i = lighting, .nrm = FACE_NZ, .u = float(TEXTURE_NX(texture_index)), .v = float(TEXTURE_PY(texture_index))});
+    list->put(gertex::Vertex16{.x = x1, .y = y1, .z = int16_t(z0 + 1), .i = lighting, .nrm = FACE_NZ, .u = float(TEXTURE_NX(texture_index)), .v = float(TEXTURE_NY(texture_index))});
+    list->put(gertex::Vertex16{.x = x0, .y = y1, .z = int16_t(z0 + 1), .i = lighting, .nrm = FACE_NZ, .u = float(TEXTURE_PX(texture_index)), .v = float(TEXTURE_NY(texture_index))});
+    list->put(gertex::Vertex16{.x = x0, .y = y0, .z = int16_t(z0 + 1), .i = lighting, .nrm = FACE_NZ, .u = float(TEXTURE_PX(texture_index)), .v = float(TEXTURE_PY(texture_index))});
     return vertexCount;
 }
-int render_cross(Block *block, const Vec3i &pos)
+int render_cross(gertex::DisplayList<gertex::Vertex16> *list, Block *block, const Vec3i &pos)
 {
     uint8_t lighting = block->light;
     Vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
     Vec3f vertex_pos(local_pos.x, local_pos.y, local_pos.z);
     uint32_t texture_index = get_default_texture_index(block->blockid);
-
-    // Front face
+    
+    int16_t x0 = (local_pos.x << BASE3D_POS_FRAC_BITS) - 16;
+    int16_t x1 = (local_pos.x << BASE3D_POS_FRAC_BITS) + 16;
+    int16_t y0 = (local_pos.y << BASE3D_POS_FRAC_BITS) - 16;
+    int16_t y1 = (local_pos.y << BASE3D_POS_FRAC_BITS) + 16;
+    int16_t z0 = (local_pos.z << BASE3D_POS_FRAC_BITS) - 16;
+    int16_t z1 = (local_pos.z << BASE3D_POS_FRAC_BITS) + 16;
 
     // NX, NZ -> PX, PZ
-    GX_VertexLit({vertex_pos + Vec3f{-.5f, -.5f, -.5f}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NX);
-    GX_VertexLit({vertex_pos + Vec3f{-.5f, 0.5f, -.5f}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_NX);
-    GX_VertexLit({vertex_pos + Vec3f{0.5f, 0.5f, 0.5f}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_NX);
-    GX_VertexLit({vertex_pos + Vec3f{0.5f, -.5f, 0.5f}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NX);
-    // PX, NZ -> NX, PZ
-    GX_VertexLit({vertex_pos + Vec3f{0.5f, -.5f, -.5f}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NX);
-    GX_VertexLit({vertex_pos + Vec3f{0.5f, 0.5f, -.5f}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_NX);
-    GX_VertexLit({vertex_pos + Vec3f{-.5f, 0.5f, 0.5f}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_NX);
-    GX_VertexLit({vertex_pos + Vec3f{-.5f, -.5f, 0.5f}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NX);
+    list->put(gertex::Vertex16{.x = x0, .y = y0, .z = z0, .i = lighting, .nrm = FACE_NX, .u = float(TEXTURE_NX(texture_index)), .v = float(TEXTURE_PY(texture_index))});
+    list->put(gertex::Vertex16{.x = x0, .y = y1, .z = z0, .i = lighting, .nrm = FACE_NX, .u = float(TEXTURE_NX(texture_index)), .v = float(TEXTURE_NY(texture_index))});
+    list->put(gertex::Vertex16{.x = x1, .y = y1, .z = z1, .i = lighting, .nrm = FACE_NX, .u = float(TEXTURE_PX(texture_index)), .v = float(TEXTURE_NY(texture_index))});
+    list->put(gertex::Vertex16{.x = x1, .y = y0, .z = z1, .i = lighting, .nrm = FACE_NX, .u = float(TEXTURE_PX(texture_index)), .v = float(TEXTURE_PY(texture_index))});
 
-    // Back face
+    // PX, NZ -> NX, PZ
+    list->put(gertex::Vertex16{.x = x1, .y = y0, .z = z0, .i = lighting, .nrm = FACE_NX, .u = float(TEXTURE_NX(texture_index)), .v = float(TEXTURE_PY(texture_index))});
+    list->put(gertex::Vertex16{.x = x1, .y = y1, .z = z0, .i = lighting, .nrm = FACE_NX, .u = float(TEXTURE_NX(texture_index)), .v = float(TEXTURE_NY(texture_index))});
+    list->put(gertex::Vertex16{.x = x0, .y = y1, .z = z1, .i = lighting, .nrm = FACE_NX, .u = float(TEXTURE_PX(texture_index)), .v = float(TEXTURE_NY(texture_index))});
+    list->put(gertex::Vertex16{.x = x0, .y = y0, .z = z1, .i = lighting, .nrm = FACE_NX, .u = float(TEXTURE_PX(texture_index)), .v = float(TEXTURE_PY(texture_index))});
 
     // NX, PZ -> PX, NZ
-    GX_VertexLit({vertex_pos + Vec3f{-.5f, -.5f, 0.5f}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PZ);
-    GX_VertexLit({vertex_pos + Vec3f{-.5f, 0.5f, 0.5f}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PZ);
-    GX_VertexLit({vertex_pos + Vec3f{0.5f, 0.5f, -.5f}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_PZ);
-    GX_VertexLit({vertex_pos + Vec3f{0.5f, -.5f, -.5f}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_PZ);
+    list->put(gertex::Vertex16{.x = x0, .y = y0, .z = z1, .i = lighting, .nrm = FACE_PZ, .u = float(TEXTURE_NX(texture_index)), .v = float(TEXTURE_PY(texture_index))});
+    list->put(gertex::Vertex16{.x = x0, .y = y1, .z = z1, .i = lighting, .nrm = FACE_PZ, .u = float(TEXTURE_NX(texture_index)), .v = float(TEXTURE_NY(texture_index))});
+    list->put(gertex::Vertex16{.x = x1, .y = y1, .z = z0, .i = lighting, .nrm = FACE_PZ, .u = float(TEXTURE_PX(texture_index)), .v = float(TEXTURE_NY(texture_index))});
+    list->put(gertex::Vertex16{.x = x1, .y = y0, .z = z0, .i = lighting, .nrm = FACE_PZ, .u = float(TEXTURE_PX(texture_index)), .v = float(TEXTURE_PY(texture_index))});
 
     // PX, PZ -> NX, NZ
-    GX_VertexLit({vertex_pos + Vec3f{0.5f, -.5f, 0.5f}, TEXTURE_NX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NZ);
-    GX_VertexLit({vertex_pos + Vec3f{0.5f, 0.5f, 0.5f}, TEXTURE_NX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_NZ);
-    GX_VertexLit({vertex_pos + Vec3f{-.5f, 0.5f, -.5f}, TEXTURE_PX(texture_index), TEXTURE_NY(texture_index)}, lighting, FACE_NZ);
-    GX_VertexLit({vertex_pos + Vec3f{-.5f, -.5f, -.5f}, TEXTURE_PX(texture_index), TEXTURE_PY(texture_index)}, lighting, FACE_NZ);
+    list->put(gertex::Vertex16{.x = x1, .y = y0, .z = z1, .i = lighting, .nrm = FACE_NZ, .u = float(TEXTURE_NX(texture_index)), .v = float(TEXTURE_PY(texture_index))});
+    list->put(gertex::Vertex16{.x = x1, .y = y1, .z = z1, .i = lighting, .nrm = FACE_NZ, .u = float(TEXTURE_NX(texture_index)), .v = float(TEXTURE_NY(texture_index))});
+    list->put(gertex::Vertex16{.x = x0, .y = y1, .z = z0, .i = lighting, .nrm = FACE_NZ, .u = float(TEXTURE_PX(texture_index)), .v = float(TEXTURE_NY(texture_index))});
+    list->put(gertex::Vertex16{.x = x0, .y = y0, .z = z0, .i = lighting, .nrm = FACE_NZ, .u = float(TEXTURE_PX(texture_index)), .v = float(TEXTURE_PY(texture_index))});
 
     return 16;
 }
 
-int render_slab(Block *block, const Vec3i &pos)
+int render_slab(gertex::DisplayList<gertex::Vertex16> *list, Block *block, const Vec3i &pos)
 {
     Vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
     Vec3f vertex_pos(local_pos.x, local_pos.y, local_pos.z);
@@ -512,7 +541,7 @@ int render_slab(Block *block, const Vec3i &pos)
                 face_texture_index = bottom_index;
             else if (i == FACE_PY)
                 face_texture_index = top_index;
-            vertexCount += render_face(pos, i, face_texture_index, block, min_y, max_y);
+            vertexCount += render_face(list, pos, i, face_texture_index, block, min_y, max_y);
         }
     }
     return vertexCount;

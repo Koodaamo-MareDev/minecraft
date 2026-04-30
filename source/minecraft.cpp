@@ -181,6 +181,8 @@ void MainGameLoop()
             current_world->create();
         }
     }
+    Lock lock(render_mutex);
+    lock.unlock();
 
     bool in_game = true;
 
@@ -220,6 +222,7 @@ void MainGameLoop()
         state = gertex::get_state();
         gertex::perspective(state.view);
         // Draw the scene
+        lock.lock();
         if (current_world->loaded)
         {
             UpdateFog();
@@ -236,6 +239,7 @@ void MainGameLoop()
 
         HandleGUI(state.view);
         GX_DrawDone();
+        lock.unlock();
 
         GX_CopyDisp(frameBuffer[fb], GX_TRUE);
 #ifdef DEBUG
