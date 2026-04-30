@@ -164,14 +164,10 @@ void LightEngine::process(const Vec3i &start)
         update_volume.z++;
     }
 
-    update_volume.x = (update_volume.x + 15) & ~15;
-    update_volume.y = (update_volume.y + 15) & ~15;
-    update_volume.z = (update_volume.z + 15) & ~15;
-
     // Update the (potentially) affected sections.
-    for (int y = start.y - update_volume.y; y <= start.y + update_volume.y; y += 16)
-        for (int z = start.z - update_volume.z; z <= start.z + update_volume.z; z += 16)
-            for (int x = start.x - update_volume.x; x <= start.x + update_volume.x; x += 16)
+    for (int y = start.y - update_volume.y; y <= start.y + update_volume.y + 15; y += 16)
+        for (int z = start.z - update_volume.z; z <= start.z + update_volume.z + 15; z += 16)
+            for (int x = start.x - update_volume.x; x <= start.x + update_volume.x + 15; x += 16)
             {
                 Chunk *nchunk2 = nullptr;
                 if (get_block_cached(cache, x, y, z, nchunk2))
