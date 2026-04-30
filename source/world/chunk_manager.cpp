@@ -34,7 +34,7 @@ void ChunkManager::update_loop()
     while (thread_active)
     {
         world->update_sections();
-        if (world->pending_chunks.empty())
+        if (world->pending_chunks.empty() || !world->chunk_provider)
         {
             usleep(1000);
             continue;

@@ -90,7 +90,7 @@ public:
     void spawn_drop(const Vec3i &pos, const Block *old_block, item::ItemStack item);
     void create_explosion(Vec3f pos, float power);
 
-    void init_chunk_manager(ChunkProvider *chunk_provider);
+    void init_chunk_manager();
     void deinit_chunk_manager();
     void set_hell(bool hell);
     BlockID get_block_id_at(const Vec3i &position, BlockID default_id = BlockID::air);

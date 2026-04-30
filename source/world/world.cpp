@@ -75,6 +75,8 @@ void World::set_remote(bool value)
     if (value && !client)
     {
         client = new Crapper::MinecraftClient(this);
+        deinit_chunk_manager();
+        init_chunk_manager();
     }
     else if (!value && client)
     {
@@ -1344,7 +1346,7 @@ bool World::load()
     chunk_provider = new ChunkProviderOverworld(this);
 
     // Start the chunk manager using the chunk provider
-    init_chunk_manager(chunk_provider);
+    init_chunk_manager();
 
     printf("Loaded world with seed: %lld\n", seed);
 
@@ -1378,7 +1380,7 @@ void World::create()
     chunk_provider = new ChunkProviderOverworld(this);
 
     // Start the chunk manager using the chunk provider
-    init_chunk_manager(chunk_provider);
+    init_chunk_manager();
 }
 
 void World::set_sound_system(SoundSystem *sound_system)
@@ -1715,14 +1717,10 @@ void World::deinit_chunk_manager()
         chunk_manager.stop();
 }
 
-void World::init_chunk_manager(ChunkProvider *chunk_provider)
+void World::init_chunk_manager()
 {
-    // Chunk provider can be null if something else will be providing the chunks.
-    // This should only happen when in a remote world which means that chunks are
-    // provided via the network code. In such a case, don't start the thread.
-    if (!chunk_provider)
-        return;
-    chunk_manager.start(this);
+    if (!chunk_manager.active())
+        chunk_manager.start(this);
 }
 
 BlockID World::get_block_id_at(const Vec3i &position, BlockID default_id)
