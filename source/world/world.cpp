@@ -28,6 +28,7 @@
 #include <util/face_pair.hpp>
 #include <util/debuglog.hpp>
 #include <light_nether_rgba.h>
+#include <unordered_set>
 
 extern bool should_destroy_block;
 extern bool should_place_block;
@@ -441,81 +442,93 @@ void World::calculate_visibility()
         return &chunk->sections[pos.y >> 4];
     };
 
-    std::deque<SectionNode> section_queue;
-    std::deque<Section *> visited;
     Vec3f fpos = get_camera().transform.get_position();
-    SectionNode entry;
-    entry.sect = section_at(Vec3i(int(fpos.x), int(fpos.y), int(fpos.z)));
+    std::deque<SectionNode> queue;
+    std::unordered_set<Section *> visited;
+
+    SectionNode start{};
+    start.sect = section_at(Vec3i(int(fpos.x), int(fpos.y), int(fpos.z)));
+    start.from = -1;
+    std::memset(start.dirs, 0, sizeof(start.dirs));
 
     // Check if there is a VBO at the player's position
-    if (!entry.sect)
+    if (!start.sect)
         return;
 
-    // Initialize the rest of the entry node
-    entry.from = -1;
-    for (uint8_t i = 0; i < 6; i++)
-        entry.dirs[i] = 0;
-    section_queue.push_front(entry);
-    visited.push_front(entry.sect);
+    queue.push_back(start);
+    visited.insert(start.sect);
 
-    while (!section_queue.empty())
+    while (!queue.empty())
     {
-        SectionNode node = section_queue.front();
-        section_queue.pop_front();
+        SectionNode node = queue.front();
+        queue.pop_front();
 
-        // Mark the VBO as visible
         node.sect->visible = true;
 
-        auto visit = [&](Vec3i pos, int8_t through)
+        Vec3i origin(node.sect->x, node.sect->y, node.sect->z);
+
+        for (int dir = 0; dir < 6; ++dir)
         {
-            // Skip if the position is out of bounds
-            Section *next_section = section_at(pos);
-            if (!next_section)
-                return;
+            // Skip if we've already exited this node in this direction
+            if (node.dirs[dir ^ 1])
+                continue;
 
-            // Don't revisit sections we have already visited
-            if (std::find(visited.begin(), visited.end(), next_section) != visited.end())
-                return;
+            Vec3i neighbor_pos = origin + face_offsets[dir] * 16;
+            Section *neighbor = section_at(neighbor_pos);
 
+            if (!neighbor)
+                continue;
+
+            if (visited.count(neighbor))
+                continue;
+
+            int enter_face = dir ^ 1; // how we enter the neighbor
+
+            // Portal / visibility check
             if (node.from != -1)
             {
-                // Check if the node is visible from the face we entered
-                if (!(node.sect->visibility_flags & (face_pair_to_flag(node.from, through))))
-                    return;
+                // Check if we can go from entry face -> exit face
+                if (!(node.sect->visibility_flags &
+                      face_pair_to_flag(node.from, dir)))
+                {
+                    continue;
+                }
             }
 
-            Vec3f section_offset = Vec3f(pos.x + 8, pos.y + 8, pos.z + 8) - fpos;
+            // Distance check
+            Vec3f offset = Vec3f(neighbor_pos.x + 8,
+                                 neighbor_pos.y + 8,
+                                 neighbor_pos.z + 8) -
+                           fpos;
 
-            // Check if the section is within the render distance
-            if (std::abs(section_offset.x) + std::abs(section_offset.z) > RENDER_DISTANCE)
-                return;
+            if (std::abs(offset.x) + std::abs(offset.z) > RENDER_DISTANCE)
+                continue;
 
-            if (!is_cube_visible(*frustum, Vec3f(pos.x + 8, pos.y + 8, pos.z + 8), 16.0f))
+            // Frustum check
+            if (!is_cube_visible(*frustum,
+                                 Vec3f(neighbor_pos.x + 8,
+                                       neighbor_pos.y + 8,
+                                       neighbor_pos.z + 8),
+                                 16.0f))
             {
-                return;
+                continue;
             }
 
-            // Mark the section as visited
-            visited.push_front(next_section);
+            // Mark visited
+            visited.insert(neighbor);
 
-            // Prepare next node
-            SectionNode new_node;
-            new_node.sect = next_section;
-            new_node.from = through ^ 1;
+            // Build next node
+            SectionNode next{};
+            next.sect = neighbor;
+            next.from = enter_face;
 
-            // Copy the directions from the current node
-            std::memcpy(new_node.dirs, node.dirs, sizeof(new_node.dirs));
+            // Copy exit usage
+            std::memcpy(next.dirs, node.dirs, sizeof(node.dirs));
 
-            // Mark the direction we came from as visited
-            new_node.dirs[through] = 1;
+            // Mark that we used this exit direction
+            next.dirs[dir] = 1;
 
-            // Add the new node to the queue
-            section_queue.push_back(new_node);
-        };
-        Vec3i origin = Vec3i(node.sect->x, node.sect->y, node.sect->z);
-        for (uint8_t i = 0; i < 6; i++)
-        {
-            visit(origin + (face_offsets[i] * 16), i ^ 1);
+            queue.push_back(next);
         }
     }
 }
