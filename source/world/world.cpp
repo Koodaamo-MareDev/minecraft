@@ -299,6 +299,8 @@ bool World::update_sections()
     {
         for (int i = 0; i < 6; i++)
         {
+            if (i == FACE_NY || i == FACE_PY)
+                continue;
             Vec3i neighbor_pos = Vec3i(x, y, z) + face_offsets[i] * 16;
             if (!section_at(neighbor_pos))
                 return false;
