@@ -465,10 +465,6 @@ void World::calculate_visibility()
 
         auto visit = [&](Vec3i pos, int8_t through)
         {
-            // Don't revisit directions we have already visited
-            if (node.dirs[through ^ 1])
-                return;
-
             // Skip if the position is out of bounds
             Section *next_section = section_at(pos);
             if (!next_section)
