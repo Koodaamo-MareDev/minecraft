@@ -53,7 +53,8 @@ void LightEngine::update_loop()
             Vec3i current = pending_updates.front();
             pending_updates.pop_front();
             process(current);
-            usleep(100);
+            if (pending_updates.size() < 10000)
+                usleep(100);
         }
         usleep(500);
     }
@@ -71,7 +72,7 @@ void LightEngine::post(const Vec3i &location)
     Chunk *chunk = world->get_chunk_from_pos(location);
     if (!chunk)
         return;
-    while (pending_updates.size() >= 1000)
+    while (pending_updates.size() >= 10000)
         usleep(500);
     pending_updates.push_back(location);
 }
