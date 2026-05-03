@@ -1061,7 +1061,7 @@ void draw_sunrise()
 
     Transform transform;
     transform.set_position(camera.transform.get_position());
-    transform.set_rotation({-90.0f, 0.0f, celestial_angle > 0.5f ? 180.0f : 0.0f});
+    transform.set_rotation({90.0f, celestial_angle > 0.5f ? 180.0f : 0.0f, 0.0f});
 
     gertex::use_matrix(camera.apply_transform(transform));
 
