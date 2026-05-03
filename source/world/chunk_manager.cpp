@@ -34,8 +34,10 @@ void ChunkManager::update_loop()
     while (thread_active)
     {
         world->update_sections();
+        Lock lock(world->chunk_mutex);
         if (world->pending_chunks.empty() || !world->chunk_provider)
         {
+            lock.unlock();
             usleep(1000);
             continue;
         }
@@ -102,6 +104,7 @@ void ChunkManager::update_loop()
             break;
         }
         }
+        lock.unlock();
         usleep(100);
     }
 }
