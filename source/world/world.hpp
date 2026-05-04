@@ -6,6 +6,7 @@
 #include <math/vec2i.hpp>
 #include <math/vec3f.hpp>
 #include <math/math_utils.h>
+#include <ported/Random.hpp>
 #include <crapper/client.hpp>
 #include <set>
 #include <map>
@@ -54,6 +55,7 @@ public:
     ChunkManager chunk_manager;
     LightEngine light_engine;
     mcr::RegionCache region_cache;
+    javaport::Random random;
 
     Frustum *frustum = nullptr;
     Crapper::MinecraftClient *client = nullptr;
