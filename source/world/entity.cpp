@@ -520,7 +520,7 @@ void EntityFallingBlock::tick()
 
         // Drop the block as an item
         item::ItemStack item = properties(block_state.id).m_drops(block_state);
-        world->spawn_drop(get_foot_blockpos(), &block_state, item);
+        world->spawn_drop(get_foot_blockpos(), item);
     }
 }
 

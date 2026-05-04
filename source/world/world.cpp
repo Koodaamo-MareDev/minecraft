@@ -790,7 +790,7 @@ void World::destroy_block(const Vec3i pos, Block *old_block)
     // Client side block destruction - only for local play
     properties(old_blockid).m_destroy(this, pos, *old_block);
     if (properties(old_blockid).can_be_broken_with(*player.selected_item))
-        spawn_drop(pos, old_block, properties(old_blockid).m_drops(*old_block));
+        spawn_drop(pos, properties(old_blockid).m_drops(*old_block));
 }
 
 bool World::place_block(const Vec3i pos, const Vec3i targeted, Block *new_block, uint8_t face)
@@ -839,7 +839,7 @@ bool World::place_block(const Vec3i pos, const Vec3i targeted, Block *new_block,
     return !intersects_entity;
 }
 
-void World::spawn_drop(const Vec3i &pos, const Block *old_block, item::ItemStack item)
+void World::spawn_drop(const Vec3i &pos, item::ItemStack item)
 {
     if (item.empty())
         return;

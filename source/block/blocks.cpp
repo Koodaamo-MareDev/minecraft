@@ -807,7 +807,7 @@ void chest_destroy(World *world, const Vec3i &pos, const Block &old_block)
     {
         item::ItemStack &stack = chest->items[i];
         if (!stack.empty())
-            world->spawn_drop(pos, &old_block, stack);
+            world->spawn_drop(pos, stack);
     }
     chest->chunk->remove_tile_entity(chest);
 }
@@ -821,7 +821,7 @@ void furnace_destroy(World *world, const Vec3i &pos, const Block &old_block)
     {
         item::ItemStack &stack = furnace->items[i];
         if (!stack.empty())
-            world->spawn_drop(pos, &old_block, stack);
+            world->spawn_drop(pos, stack);
     }
     furnace->chunk->remove_tile_entity(furnace);
 }
