@@ -87,8 +87,8 @@ public:
 
     void add_particle(const Particle &particle);
     void play_sound(const Sound &sound);
-    void destroy_block(const Vec3i pos, Block *old_block);
-    bool place_block(const Vec3i pos, const Vec3i targeted, Block *new_block, uint8_t face);
+    void destroy_block(const Vec3i pos, BlockState *old_block);
+    bool place_block(const Vec3i pos, const Vec3i targeted, BlockState *new_block, uint8_t face);
     void spawn_drop(const Vec3i &pos, item::ItemStack item);
     void create_explosion(Vec3f pos, float power);
 
@@ -96,7 +96,7 @@ public:
     void deinit_chunk_manager();
     void set_hell(bool hell);
     BlockID get_block_id_at(const Vec3i &position, BlockID default_id = BlockID::air);
-    Block *get_block_at(const Vec3i &vec);
+    BlockState *get_block_at(const Vec3i &vec);
     uint8_t get_meta_at(const Vec3i &position);
     void set_block_at(const Vec3i &pos, BlockID id);
     void set_meta_at(const Vec3i &pos, uint8_t meta);
@@ -108,7 +108,7 @@ public:
     Chunk *get_chunk(const Vec2i &pos);
     bool add_chunk(int32_t x, int32_t z);
     void save_chunk(Chunk *chunk);
-    void get_neighbors(const Vec3i &pos, Block **neighbors);
+    void get_neighbors(const Vec3i &pos, BlockState **neighbors);
     void notify_at(const Vec3i &pos);
     void mark_block_dirty(const Vec3i &pos);
     void notify_neighbors(const Vec3i &pos);

@@ -10,7 +10,7 @@ BlockSapling::BlockSapling(uint16_t id, uint8_t texture_index) : BlockFlower(id,
 
 void BlockSapling::on_random_tick(World *world, const Vec3i &pos, javaport::Random &random)
 {
-    Block *block = world->get_block_at(pos);
+    BlockState *block = world->get_block_at(pos);
     if (block && std::max({uint8_t(block->block_light), uint8_t(block->sky_light)}) >= 9 && random.nextInt(5) == 0)
     {
         if (block->meta < 15)

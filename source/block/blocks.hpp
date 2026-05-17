@@ -11,7 +11,7 @@
 
 #define FLUID_UPDATE_REQUIRED_FLAG 0x10
 #define FLOAT_TO_FLUIDMETA(A) (int(roundf((A) * 8)))
-class Block;
+class BlockState;
 class Chunk;
 extern bool render_fast_leaves;
 
@@ -21,9 +21,9 @@ uint8_t get_block_luminance(BlockID block_id);
 
 void override_texture_index(int32_t texture_index);
 uint32_t get_default_texture_index(BlockID blockid);
-uint32_t get_face_texture_index(Block *block, int face);
+uint32_t get_face_texture_index(BlockState *block, int face);
 
-void schedule_update(World *world, const Vec3i &pos, Block &block);
+void schedule_update(World *world, const Vec3i &pos, BlockState &block);
 bool is_solid(BlockID block_id);
 int get_fluid_level_at(World *world, Vec3i pos, BlockID src_id);
 int get_min_fluid_level(World *world, Vec3i pos, BlockID src_id, int src_fluid_level, int &sources);
@@ -31,10 +31,10 @@ void set_fluid_stationary(World *world, Vec3i pos);
 void flow_fluid_later(World *world, Vec3i pos);
 int get_flow_weight(World *world, Vec3i pos, BlockID block_id, int accumulated_weight, int previous_direction);
 void get_flow_directions(World *world, Vec3i pos, BlockID block_id, bool directions[4]);
-void stationary_fluid_tick(World *world, const Vec3i &pos, Block &block);
-void flowing_fluid_tick(World *world, const Vec3i &pos, Block &block);
-void stationary_fluid_neighbor_update(World *world, const Vec3i &pos, Block &block);
-uint8_t get_fluid_meta_level(Block *block);
+void stationary_fluid_tick(World *world, const Vec3i &pos, BlockState &block);
+void flowing_fluid_tick(World *world, const Vec3i &pos, BlockState &block);
+void stationary_fluid_neighbor_update(World *world, const Vec3i &pos, BlockState &block);
+uint8_t get_fluid_meta_level(BlockState *block);
 uint8_t get_fluid_visual_level(World *world, Vec3i pos, BlockID block_id);
 
 bool can_any_fluid_replace(BlockID id);

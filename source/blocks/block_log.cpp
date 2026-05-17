@@ -38,7 +38,7 @@ void BlockLog::on_removed(World *world, const Vec3i &pos)
             for (int y = -4; y <= 4; y++)
             {
                 Chunk *c;
-                Block *block = get_block_cached(cache, pos.x + x, pos.y + y, pos.z + z, c);
+                BlockState *block = get_block_cached(cache, pos.x + x, pos.y + y, pos.z + z, c);
                 if (block && block->blockid == BlockID::leaves)
                     block->meta |= 4;
             }

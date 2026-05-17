@@ -15,7 +15,7 @@ bool BlockIce::should_render_side(World *world, const Vec3i &pos, uint8_t face)
 
 void BlockIce::on_random_tick(World *world, const Vec3i &pos, javaport::Random &random)
 {
-    Block *block = world->get_block_at(pos);
+    BlockState *block = world->get_block_at(pos);
     if (block->block_light > 11 - data.light_opacity)
         world->set_block_at(pos, BlockID::flowing_water);
 }

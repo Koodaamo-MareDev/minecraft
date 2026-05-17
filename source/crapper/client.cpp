@@ -950,10 +950,10 @@ namespace Crapper
         switch (type)
         {
         case 70:
-            entity = new EntityFallingBlock(Block{uint8_t(BlockID::sand), 0x7F, 0}, Vec3i(x / 32, y / 32, z / 32));
+            entity = new EntityFallingBlock(BlockState{uint8_t(BlockID::sand), 0x7F, 0}, Vec3i(x / 32, y / 32, z / 32));
             break;
         case 71:
-            entity = new EntityFallingBlock(Block{uint8_t(BlockID::gravel), 0x7F, 0}, Vec3i(x / 32, y / 32, z / 32));
+            entity = new EntityFallingBlock(BlockState{uint8_t(BlockID::gravel), 0x7F, 0}, Vec3i(x / 32, y / 32, z / 32));
             break;
 
         default:

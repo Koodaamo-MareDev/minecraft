@@ -41,7 +41,7 @@ void BlockStationary::on_tick(World *world, const Vec3i &pos, javaport::Random &
 
 void BlockStationary::flow_fluid_later(World *world, const Vec3i &pos)
 {
-    Block *block = world->get_block_at(pos);
+    BlockState *block = world->get_block_at(pos);
     if (block)
     {
         BlockID new_id = block_list[block->blockid]->material_type() == Materials::WATER ? BlockID::flowing_water : BlockID::flowing_lava;

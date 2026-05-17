@@ -26,7 +26,7 @@ void BlockGrass::on_random_tick(World *world, const Vec3i &pos, javaport::Random
 {
     if (world->is_remote())
         return;
-    Block *block = world->get_block_at(pos + Vec3i{0, 1, 0});
+    BlockState *block = world->get_block_at(pos + Vec3i{0, 1, 0});
     if (!block)
         return;
     uint8_t light_value = block->block_light;

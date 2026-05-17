@@ -20,7 +20,7 @@ ChunkCache build_chunk_cache(World *world, int cx, int cz)
     return cache;
 }
 
-Block *get_block_cached(
+BlockState *get_block_cached(
     ChunkCache &cache,
     int x, int y, int z,
     Chunk *&out_chunk)
@@ -45,7 +45,7 @@ Block *get_block_cached(
     return &chunk->blockstates[(y << 8) | ((z & 15) << 4) | (x & 15)];
 }
 
-void get_neighbors_cached(ChunkCache &cache, int x, int y, int z, Block **out_neighbors)
+void get_neighbors_cached(ChunkCache &cache, int x, int y, int z, BlockState **out_neighbors)
 {
     Chunk *_out_chunk;
     for (int i = 0; i < 6; i++)

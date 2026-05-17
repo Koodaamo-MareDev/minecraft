@@ -80,10 +80,10 @@ void Chunk::light_up()
         for (int i = 0; i < 256; i++)
         {
             update_height_map(Vec3i(i & 15, 0, (i >> 4) & 15));
-            Block *low_block = &blockstates[i];
-            Block *high_block = &low_block[MAX_WORLD_Y << 8];
-            Block *max_height_block = &low_block[int(height_map[i]) << 8];
-            for (Block *block = high_block; block >= max_height_block; block -= 256)
+            BlockState *low_block = &blockstates[i];
+            BlockState *high_block = &low_block[MAX_WORLD_Y << 8];
+            BlockState *max_height_block = &low_block[int(height_map[i]) << 8];
+            for (BlockState *block = high_block; block >= max_height_block; block -= 256)
             {
                 block->sky_light = 15;
             }
@@ -94,7 +94,7 @@ void Chunk::light_up()
 
             // Update block lights
             pos.y = 0;
-            for (Block *block = low_block; block < max_height_block; block += 256, pos.y++)
+            for (BlockState *block = low_block; block < max_height_block; block += 256, pos.y++)
             {
                 if (get_block_luminance(block->blockid))
                 {
@@ -116,16 +116,16 @@ void Chunk::recalculate_height_map()
         }
 }
 
-void Chunk::recalculate_visibility(Block *block, const Vec3i &pos, ChunkCache &cache)
+void Chunk::recalculate_visibility(BlockState *block, const Vec3i &pos, ChunkCache &cache)
 {
-    Block *neighbors[6];
+    BlockState *neighbors[6];
     get_neighbors_cached(cache, pos.x, pos.y, pos.z, neighbors);
     uint8_t visibility = 0x40;
     bool is_transparent = properties(block->id).m_transparent;
     bool transparent_leaves = (!render_fast_leaves && block->id == BlockID::leaves);
     for (int i = 0; i < 6; i++)
     {
-        Block *neighbor = neighbors[i];
+        BlockState *neighbor = neighbors[i];
         if (!neighbor || !visible(neighbor->id))
         {
             visibility |= 1 << i;
@@ -148,7 +148,7 @@ void Chunk::refresh_section_block_visibility(int index)
     ChunkCache cache = build_chunk_cache(world, x, z);
     Vec3i chunk_pos(this->x * 16, index * 16, this->z * 16);
 
-    Block *block = this->get_block(chunk_pos); // Gets the first block of the section
+    BlockState *block = this->get_block(chunk_pos); // Gets the first block of the section
     for (int y = 0; y < 16; y++)
     {
         for (int z = 0; z < 16; z++)
@@ -277,7 +277,7 @@ void Chunk::refresh_section_visibility(int index)
         init_floodfill_startpoints();
 
     // Rebuild the flood fill grid
-    Block *block = this->get_block(Vec3i(0, index << 4, 0));
+    BlockState *block = this->get_block(Vec3i(0, index << 4, 0));
     bool empty = true;
     for (uint32_t i = 0; i < 4096; i++, block++)
     {
@@ -782,7 +782,7 @@ void Chunk::read()
     Lock lock(world->tick_mutex);
     for (int i = 0; i < 32768; i++)
     {
-        Block *block = &this->blockstates[i];
+        BlockState *block = &this->blockstates[i];
         if (!block->id)
             continue;
         Vec3i block_pos = pos + Vec3i(i & 0xF, (i >> 8) & 0x7F, (i >> 4) & 0xF);

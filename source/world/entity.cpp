@@ -107,7 +107,7 @@ void EntityPhysical::tick()
             for (int z = min.z; z < max.z; z++)
             {
                 Vec3i block_pos = Vec3i(x, y, z);
-                Block *block = world->get_block_at(block_pos);
+                BlockState *block = world->get_block_at(block_pos);
                 if (!block)
                     continue;
                 if (!block->intersects(fluid_aabb, block_pos))
@@ -334,7 +334,7 @@ std::vector<AABB> EntityPhysical::get_colliding_aabbs(const AABB &aabb)
             for (int z = min.z; z < max.z; z++)
             {
                 Vec3i block_pos = Vec3i(x, y, z);
-                Block *block = world->get_block_at(block_pos);
+                BlockState *block = world->get_block_at(block_pos);
                 if (!block)
                     continue;
                 if (properties(block->id).m_collision == CollisionType::solid)
@@ -362,7 +362,7 @@ bool EntityPhysical::is_colliding_fluid(const AABB &aabb)
             for (int z = min.z; z < max.z; z++)
             {
                 Vec3i block_pos = Vec3i(x, y, z);
-                Block *block = world->get_block_at(block_pos);
+                BlockState *block = world->get_block_at(block_pos);
                 if (block && properties(block->id).m_collision == CollisionType::fluid && block->intersects(aabb, block_pos))
                     return true;
             }
@@ -474,7 +474,7 @@ void EntityPathfinder::tick()
     }
 }
 
-EntityFallingBlock::EntityFallingBlock(Block block_state, const Vec3i &position) : EntityPhysical()
+EntityFallingBlock::EntityFallingBlock(BlockState block_state, const Vec3i &position) : EntityPhysical()
 {
     teleport(Vec3f(position.x, position.y, position.z) + Vec3f(0.5, 0, 0.5));
     this->walk_sound = false;
@@ -498,7 +498,7 @@ void EntityFallingBlock::tick()
     if (on_ground)
     {
         Vec3i int_pos = get_foot_blockpos();
-        Block *block = world->get_block_at(int_pos);
+        BlockState *block = world->get_block_at(int_pos);
         if (block && (block->blockid == BlockID::air || properties(block->id).m_fluid))
         {
             // Update the block
@@ -558,7 +558,7 @@ void EntityFallingBlock::render(float partial_ticks, bool transparency)
 
     // Prepare the block state
     Vec3i int_pos = Vec3i(std::floor(position.x), std::floor(position.y + 0.5), std::floor(position.z));
-    Block *block_at_pos = world->get_block_at(int_pos);
+    BlockState *block_at_pos = world->get_block_at(int_pos);
     if (fall_time && block_at_pos && !properties(block_at_pos->id).m_solid)
         block_state.light = block_at_pos->light;
 
@@ -569,7 +569,7 @@ void EntityFallingBlock::render(float partial_ticks, bool transparency)
     render_single_block(block_state);
 }
 
-EntityExplosiveBlock::EntityExplosiveBlock(Block block_state, const Vec3i &position, uint16_t fuse) : EntityFallingBlock(block_state, position), EntityExplosive()
+EntityExplosiveBlock::EntityExplosiveBlock(BlockState block_state, const Vec3i &position, uint16_t fuse) : EntityFallingBlock(block_state, position), EntityExplosive()
 {
     // Randomize a tiny "jump" to the block
     javaport::Random rng;
@@ -602,7 +602,7 @@ void EntityExplosiveBlock::render(float partial_ticks, bool transparency)
 
     // Prepare the block state
     Vec3i int_pos = Vec3i(std::floor(position.x), std::floor(position.y + 0.5f), std::floor(position.z));
-    Block *block_at_pos = chunk->get_block(int_pos);
+    BlockState *block_at_pos = chunk->get_block(int_pos);
     if (!chunk->light_pending && block_at_pos && !properties(block_at_pos->id).m_solid)
         block_state.light = block_at_pos->light;
     block_state.visibility_flags = 0x7F;
@@ -822,7 +822,7 @@ void EntityItem::render(float partial_ticks, bool transparency)
     }
 
     Vec3i block_pos = entity_position.round();
-    Block *light_block = world->get_block_at(block_pos);
+    BlockState *light_block = world->get_block_at(block_pos);
     if (light_block && !properties(light_block->id).m_solid)
     {
         light_level = light_block->light;
@@ -843,7 +843,7 @@ void EntityItem::render(float partial_ticks, bool transparency)
     item::Item item = item_stack.as_item();
 
     RenderType render_type = properties(item.id).m_render_type;
-    Block block = {uint8_t(item.id & 0xFF), 0x7F, uint8_t(item_stack.meta & 0xFF), 0xF, 0xF};
+    BlockState block = {uint8_t(item.id & 0xFF), 0x7F, uint8_t(item_stack.meta & 0xFF), 0xF, 0xF};
     block.light = light_level;
 
     Vec3f anim_offset = Vec3f(0, std::sin((ticks_existed + partial_ticks) * M_1_PI * 0.25) * 0.125 + 0.125, 0);
@@ -1070,7 +1070,7 @@ void EntityLiving::render(float partial_ticks, bool transparency)
     Vec3f entity_position = get_position(partial_ticks);
     Vec3f entity_rotation = get_rotation(partial_ticks);
     Vec3i block_pos = entity_position.round();
-    Block *block = world->get_block_at(block_pos);
+    BlockState *block = world->get_block_at(block_pos);
     if (block && !properties(block->id).m_solid)
     {
         light_level = block->light;

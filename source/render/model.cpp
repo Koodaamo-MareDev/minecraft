@@ -258,7 +258,7 @@ void Model::render_handitem(ModelBox *box, item::ItemStack &item, Vec3f offset, 
     // Check if the selected item is a block
     if (item.as_item().is_block())
     {
-        Block selected_block = Block{uint8_t(item.id & 0xFF), 0x7F, uint8_t(item.meta & 0xFF)};
+        BlockState selected_block = BlockState{uint8_t(item.id & 0xFF), 0x7F, uint8_t(item.meta & 0xFF)};
         selected_block.light = 0xFF;
 
         if (!is_flat(item))

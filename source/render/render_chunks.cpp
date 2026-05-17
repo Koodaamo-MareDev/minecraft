@@ -69,7 +69,7 @@ namespace ChunkRenderer
 
         // Build the mesh from the blockstates
         Vec3i section_offset = Vec3i(section.x, section.y, section.z);
-        Block *block = &section.chunk->blockstates[section.y << 8];
+        BlockState *block = &section.chunk->blockstates[section.y << 8];
         for (int _y = 0; _y < 16; _y++)
         {
             for (int _z = 0; _z < 16; _z++)
@@ -95,7 +95,7 @@ namespace ChunkRenderer
 
         // Build the mesh from the blockstates
         Vec3i chunk_offset = Vec3i(section.x, section.y, section.z);
-        Block *block = &section.chunk->blockstates[section.y << 8];
+        BlockState *block = &section.chunk->blockstates[section.y << 8];
         for (int _y = 0; _y < 16; _y++)
         {
             for (int _z = 0; _z < 16; _z++)

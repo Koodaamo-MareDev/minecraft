@@ -16,15 +16,15 @@ BlockChest::BlockChest(uint16_t id) : BlockContainer(id, Materials::WOOD)
 
 uint8_t BlockChest::texture_index(World *world, const Vec3i &pos, uint8_t face)
 {
-    Block *block = world->get_block_at(pos);
+    BlockState *block = world->get_block_at(pos);
 
     // Bottom and top faces are always the same
     if (face == +BlockFace::NY || face == +BlockFace::PY)
         return 25;
 
-    Block *neighbors[4];
+    BlockState *neighbors[4];
     {
-        Block *tmp_neighbors[6];
+        BlockState *tmp_neighbors[6];
         if (world)
             world->get_neighbors(pos, tmp_neighbors);
         neighbors[0] = tmp_neighbors[0];
@@ -33,7 +33,7 @@ uint8_t BlockChest::texture_index(World *world, const Vec3i &pos, uint8_t face)
         neighbors[3] = tmp_neighbors[5];
     }
 
-    if (std::none_of(neighbors, neighbors + 4, [](Block *block)
+    if (std::none_of(neighbors, neighbors + 4, [](BlockState *block)
                      { return block && block->blockid == BlockID::chest; }))
     {
         // Single chest

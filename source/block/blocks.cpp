@@ -44,7 +44,7 @@ uint32_t get_default_texture_index(BlockID blockid)
     return block_texture_index >= 0 ? (block_texture_index & 0xFF) : block_properties[uint8_t(blockid)].m_texture_index;
 }
 
-uint32_t get_face_texture_index(Block *block, int face)
+uint32_t get_face_texture_index(BlockState *block, int face)
 {
     if (!block)
         return 0;
@@ -248,7 +248,7 @@ BlockID fluid_collision_result(BlockID original, BlockID target)
     return BlockID::air;
 }
 
-void schedule_update(World *world, const Vec3i &pos, Block &block)
+void schedule_update(World *world, const Vec3i &pos, BlockState &block)
 {
     BlockProperties &props = properties(block.blockid);
     world->schedule_block_update(pos, block.blockid, props.m_tick_rate);
@@ -256,7 +256,7 @@ void schedule_update(World *world, const Vec3i &pos, Block &block)
 
 int get_fluid_level_at(World *world, Vec3i pos, BlockID src_id)
 {
-    Block *block = world->get_block_at(pos);
+    BlockState *block = world->get_block_at(pos);
     if (block && is_same_fluid(block->blockid, src_id))
         return block->meta & 0xF;
     return -1;
@@ -291,7 +291,7 @@ void set_fluid_stationary(World *world, Vec3i pos)
 
 void flow_fluid_later(World *world, Vec3i pos)
 {
-    Block *block = world->get_block_at(pos);
+    BlockState *block = world->get_block_at(pos);
     if (block)
     {
         world->set_block_and_meta_at(pos, flowfluid(world->get_block_id_at(pos)), world->get_meta_at(pos));
@@ -416,7 +416,7 @@ int get_flow_weight(World *world, Vec3i pos, BlockID fluid_type, int accumulated
             neighbor_z--;
         else if (i == 3)
             neighbor_z++;
-        Block *neighbor = world->get_block_at(Vec3i(neighbor_x, pos.y, neighbor_z));
+        BlockState *neighbor = world->get_block_at(Vec3i(neighbor_x, pos.y, neighbor_z));
         if (!neighbor)
             continue;
         BlockID neighbor_id = neighbor->blockid;
@@ -453,7 +453,7 @@ void get_flow_directions(World *world, Vec3i pos, BlockID fluid_type, bool direc
             neighbor_z--;
         else if (i == 3)
             neighbor_z++;
-        Block *neighbor = world->get_block_at(Vec3i(neighbor_x, pos.y, neighbor_z));
+        BlockState *neighbor = world->get_block_at(Vec3i(neighbor_x, pos.y, neighbor_z));
         if (!neighbor)
             continue;
         BlockID neighbor_id = neighbor->blockid;
@@ -480,7 +480,7 @@ void get_flow_directions(World *world, Vec3i pos, BlockID fluid_type, bool direc
 }
 
 // TODO: Replace with get_fluid_level
-uint8_t get_fluid_meta_level(Block *block)
+uint8_t get_fluid_meta_level(BlockState *block)
 {
     if (block)
     {
@@ -496,23 +496,23 @@ uint8_t get_fluid_visual_level(World *world, Vec3i pos, BlockID block_id)
     return FLOAT_TO_FLUIDMETA(get_fluid_height(world, pos, block_id));
 }
 
-item::ItemStack default_drop(const Block &old_block)
+item::ItemStack default_drop(const BlockState &old_block)
 {
     return item::ItemStack(old_block.id, 1, old_block.meta);
 }
 
-item::ItemStack fixed_drop(const Block &old_block, item::ItemStack item)
+item::ItemStack fixed_drop(const BlockState &old_block, item::ItemStack item)
 {
     return item;
 }
 
-item::ItemStack no_drop(const Block &old_block)
+item::ItemStack no_drop(const BlockState &old_block)
 {
     return item::ItemStack(BlockID::air, 0);
 }
 
 // Randomly drops items with a count between 1 and the original count.
-item::ItemStack random_drop(const Block &old_block, item::ItemStack item)
+item::ItemStack random_drop(const BlockState &old_block, item::ItemStack item)
 {
     javaport::Random rng;
     if (item.count > 1)
@@ -520,7 +520,7 @@ item::ItemStack random_drop(const Block &old_block, item::ItemStack item)
     return item;
 }
 
-item::ItemStack random_range_drop(const Block &old_block, item::ItemStack item, uint8_t min, uint8_t max)
+item::ItemStack random_range_drop(const BlockState &old_block, item::ItemStack item, uint8_t min, uint8_t max)
 {
     javaport::Random rng;
     if (min < max)
@@ -528,9 +528,9 @@ item::ItemStack random_range_drop(const Block &old_block, item::ItemStack item, 
     return item;
 }
 
-void default_destroy(World *world, const Vec3i &pos, const Block &old_block)
+void default_destroy(World *world, const Vec3i &pos, const BlockState &old_block)
 {
-    Block *block = world->get_block_at(pos + Vec3i(0, 1, 0));
+    BlockState *block = world->get_block_at(pos + Vec3i(0, 1, 0));
     if (block && properties(block->blockid).m_needs_support)
     {
         // If the neighbor block needs support, destroy it.
@@ -538,12 +538,12 @@ void default_destroy(World *world, const Vec3i &pos, const Block &old_block)
     }
 }
 
-void stationary_fluid_tick(World *world, const Vec3i &pos, Block &block)
+void stationary_fluid_tick(World *world, const Vec3i &pos, BlockState &block)
 {
     // TODO: Lava fire spread
 }
 
-void flowing_fluid_tick(World *world, const Vec3i &pos, Block &block)
+void flowing_fluid_tick(World *world, const Vec3i &pos, BlockState &block)
 {
     BlockID orig_id = block.blockid;
     BlockProperties props = properties(orig_id);
@@ -670,7 +670,7 @@ void flowing_fluid_tick(World *world, const Vec3i &pos, Block &block)
     }
 }
 
-void fluid_harden(World *world, const Vec3i &pos, Block &block)
+void fluid_harden(World *world, const Vec3i &pos, BlockState &block)
 {
     BlockID base_fluid_id = basefluid(block.blockid);
     if (base_fluid_id != BlockID::lava)
@@ -701,12 +701,12 @@ void fluid_harden(World *world, const Vec3i &pos, Block &block)
     }
 }
 
-void fluid_neighbor_update(World *world, const Vec3i &pos, Block &block)
+void fluid_neighbor_update(World *world, const Vec3i &pos, BlockState &block)
 {
     fluid_harden(world, pos, block);
 }
 
-void stationary_fluid_neighbor_update(World *world, const Vec3i &pos, Block &block)
+void stationary_fluid_neighbor_update(World *world, const Vec3i &pos, BlockState &block)
 {
     BlockID old_id = block.blockid;
     fluid_neighbor_update(world, pos, block);
@@ -714,12 +714,12 @@ void stationary_fluid_neighbor_update(World *world, const Vec3i &pos, Block &blo
         flow_fluid_later(world, pos);
 }
 
-void fluid_added(World *world, const Vec3i &pos, Block &block)
+void fluid_added(World *world, const Vec3i &pos, BlockState &block)
 {
     fluid_harden(world, pos, block);
 }
 
-void flowing_fluid_added(World *world, const Vec3i &pos, Block &block)
+void flowing_fluid_added(World *world, const Vec3i &pos, BlockState &block)
 {
     BlockID old_id = block.blockid;
     fluid_added(world, pos, block);
@@ -727,7 +727,7 @@ void flowing_fluid_added(World *world, const Vec3i &pos, Block &block)
         schedule_update(world, pos, block);
 }
 
-void chest_added(World *world, const Vec3i &pos, Block &block)
+void chest_added(World *world, const Vec3i &pos, BlockState &block)
 {
     Chunk *chunk = world->get_chunk_from_pos(pos);
     TileEntityChest *chest_entity = new TileEntityChest;
@@ -736,7 +736,7 @@ void chest_added(World *world, const Vec3i &pos, Block &block)
     chunk->tile_entities.push_back(chest_entity);
 }
 
-void furnace_added(World *world, const Vec3i &pos, Block &block)
+void furnace_added(World *world, const Vec3i &pos, BlockState &block)
 {
     Chunk *chunk = world->get_chunk_from_pos(pos);
     TileEntityFurnace *furnace_entity = new TileEntityFurnace;
@@ -749,7 +749,7 @@ void furnace_added(World *world, const Vec3i &pos, Block &block)
     chunk->get_block(pos)->meta = facing_map[facing];
 }
 
-void falling_block_tick(World *world, const Vec3i &pos, Block &block)
+void falling_block_tick(World *world, const Vec3i &pos, BlockState &block)
 {
     BlockID block_below = world->get_block_id_at(pos + Vec3i(0, -1, 0));
     if (block_below == BlockID::air || properties(block_below).m_fluid)
@@ -760,9 +760,9 @@ void falling_block_tick(World *world, const Vec3i &pos, Block &block)
     }
 }
 
-void snow_layer_tick(World *world, const Vec3i &pos, Block &block)
+void snow_layer_tick(World *world, const Vec3i &pos, BlockState &block)
 {
-    Block *block_below = world->get_block_at(pos + Vec3i(0, -1, 0));
+    BlockState *block_below = world->get_block_at(pos + Vec3i(0, -1, 0));
     if (block_below && block_below->blockid == BlockID::grass)
     {
         block_below->meta = 1; // Set the snowy flag
@@ -771,7 +771,7 @@ void snow_layer_tick(World *world, const Vec3i &pos, Block &block)
 }
 
 // Turns broken ice into water unless it's floating in the air.
-void melt_destroy(World *world, const Vec3i &pos, const Block &old_block)
+void melt_destroy(World *world, const Vec3i &pos, const BlockState &old_block)
 {
     if (pos.y > 0)
     {
@@ -782,9 +782,9 @@ void melt_destroy(World *world, const Vec3i &pos, const Block &old_block)
     }
 }
 
-void snow_layer_destroy(World *world, const Vec3i &pos, const Block &old_block)
+void snow_layer_destroy(World *world, const Vec3i &pos, const BlockState &old_block)
 {
-    Block *block = world->get_block_at(pos - Vec3i(0, 1, 0));
+    BlockState *block = world->get_block_at(pos - Vec3i(0, 1, 0));
     if (block && block->blockid == BlockID::grass)
     {
         // If the block below is grass, reset the snowy flag.
@@ -793,12 +793,12 @@ void snow_layer_destroy(World *world, const Vec3i &pos, const Block &old_block)
     }
 }
 
-void spawn_tnt_destroy(World *world, const Vec3i &pos, const Block &old_block)
+void spawn_tnt_destroy(World *world, const Vec3i &pos, const BlockState &old_block)
 {
     world->add_entity(new EntityExplosiveBlock(old_block, pos, 80));
 }
 
-void chest_destroy(World *world, const Vec3i &pos, const Block &old_block)
+void chest_destroy(World *world, const Vec3i &pos, const BlockState &old_block)
 {
     TileEntityChest *chest = dynamic_cast<TileEntityChest *>(world->get_tile_entity(pos));
     if (!chest)
@@ -812,7 +812,7 @@ void chest_destroy(World *world, const Vec3i &pos, const Block &old_block)
     chest->chunk->remove_tile_entity(chest);
 }
 
-void furnace_destroy(World *world, const Vec3i &pos, const Block &old_block)
+void furnace_destroy(World *world, const Vec3i &pos, const BlockState &old_block)
 {
     TileEntityFurnace *furnace = dynamic_cast<TileEntityFurnace *>(world->get_tile_entity(pos));
     if (!furnace)
@@ -826,7 +826,7 @@ void furnace_destroy(World *world, const Vec3i &pos, const Block &old_block)
     furnace->chunk->remove_tile_entity(furnace);
 }
 
-void default_aabb(const Vec3i &pos, Block *block, const AABB &other, std::vector<AABB> &aabb_list)
+void default_aabb(const Vec3i &pos, BlockState *block, const AABB &other, std::vector<AABB> &aabb_list)
 {
     AABB aabb;
     aabb.min = Vec3f(pos.x, pos.y, pos.z);
@@ -835,7 +835,7 @@ void default_aabb(const Vec3i &pos, Block *block, const AABB &other, std::vector
         aabb_list.push_back(aabb);
 }
 
-void slab_aabb(const Vec3i &pos, Block *block, const AABB &other, std::vector<AABB> &aabb_list)
+void slab_aabb(const Vec3i &pos, BlockState *block, const AABB &other, std::vector<AABB> &aabb_list)
 {
     AABB aabb;
 
@@ -855,7 +855,7 @@ void slab_aabb(const Vec3i &pos, Block *block, const AABB &other, std::vector<AA
         aabb_list.push_back(aabb);
 }
 
-void torch_aabb(const Vec3i &pos, Block *block, const AABB &other, std::vector<AABB> &aabb_list)
+void torch_aabb(const Vec3i &pos, BlockState *block, const AABB &other, std::vector<AABB> &aabb_list)
 {
     AABB aabb;
     constexpr vfloat_t offset = 0.35;
@@ -886,7 +886,7 @@ void torch_aabb(const Vec3i &pos, Block *block, const AABB &other, std::vector<A
         aabb_list.push_back(aabb);
 }
 
-void mushroom_aabb(const Vec3i &pos, Block *block, const AABB &other, std::vector<AABB> &aabb_list)
+void mushroom_aabb(const Vec3i &pos, BlockState *block, const AABB &other, std::vector<AABB> &aabb_list)
 {
     AABB aabb;
     constexpr vfloat_t offset = 0.25;
@@ -900,7 +900,7 @@ void mushroom_aabb(const Vec3i &pos, Block *block, const AABB &other, std::vecto
         aabb_list.push_back(aabb);
 }
 
-void flower_aabb(const Vec3i &pos, Block *block, const AABB &other, std::vector<AABB> &aabb_list)
+void flower_aabb(const Vec3i &pos, BlockState *block, const AABB &other, std::vector<AABB> &aabb_list)
 {
     AABB aabb;
     constexpr vfloat_t offset = 0.3125;
@@ -914,7 +914,7 @@ void flower_aabb(const Vec3i &pos, Block *block, const AABB &other, std::vector<
         aabb_list.push_back(aabb);
 }
 
-void flat_aabb(const Vec3i &pos, Block *block, const AABB &other, std::vector<AABB> &aabb_list)
+void flat_aabb(const Vec3i &pos, BlockState *block, const AABB &other, std::vector<AABB> &aabb_list)
 {
     AABB aabb;
     constexpr vfloat_t width = 1.0;
@@ -927,7 +927,7 @@ void flat_aabb(const Vec3i &pos, Block *block, const AABB &other, std::vector<AA
         aabb_list.push_back(aabb);
 }
 
-void snow_layer_aabb(const Vec3i &pos, Block *block, const AABB &other, std::vector<AABB> &aabb_list)
+void snow_layer_aabb(const Vec3i &pos, BlockState *block, const AABB &other, std::vector<AABB> &aabb_list)
 {
     AABB aabb;
     constexpr vfloat_t width = 1.0;
@@ -940,7 +940,7 @@ void snow_layer_aabb(const Vec3i &pos, Block *block, const AABB &other, std::vec
         aabb_list.push_back(aabb);
 }
 
-void door_aabb(const Vec3i &pos, Block *block, const AABB &other, std::vector<AABB> &aabb_list)
+void door_aabb(const Vec3i &pos, BlockState *block, const AABB &other, std::vector<AABB> &aabb_list)
 {
     AABB aabb;
     aabb.min = Vec3f(pos.x, pos.y, pos.z);
@@ -966,7 +966,7 @@ void door_aabb(const Vec3i &pos, Block *block, const AABB &other, std::vector<AA
         aabb_list.push_back(aabb);
 }
 
-void cactus_aabb(const Vec3i &pos, Block *block, const AABB &other, std::vector<AABB> &aabb_list)
+void cactus_aabb(const Vec3i &pos, BlockState *block, const AABB &other, std::vector<AABB> &aabb_list)
 {
     AABB aabb;
     constexpr vfloat_t width = 0.875;

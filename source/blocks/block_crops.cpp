@@ -35,7 +35,7 @@ bool BlockCrops::on_use(EntityPhysical *entity, const Vec3i &pos)
 
 void BlockCrops::on_tick(World *world, const Vec3i &pos, javaport::Random &random)
 {
-    Block *block = world->get_block_at(pos);
+    BlockState *block = world->get_block_at(pos);
     if (std::max(block->light, block->sky_light) >= 9)
     {
         uint8_t meta = world->get_meta_at(pos);

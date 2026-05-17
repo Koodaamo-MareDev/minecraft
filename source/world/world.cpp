@@ -247,7 +247,7 @@ void World::tick_blocks()
         BlockTick block_tick = *scheduled_updates.begin();
         if ((block_tick.ticks & 0x7FFFFFFF) > this->ticks)
             break;
-        Block *block = get_block_at(block_tick.pos);
+        BlockState *block = get_block_at(block_tick.pos);
         if (block && block->blockid == block_tick.block_id)
         {
             BlockProperties &props = properties(block->id);
@@ -540,7 +540,7 @@ void World::edit_blocks()
     if (!player.selected_item)
         return;
 
-    Block held_block = player.selected_item->as_item().is_block() ? Block{uint8_t(player.selected_item->id & 0xFF), 0x7F, uint8_t(player.selected_item->meta & 0xFF)} : Block{};
+    BlockState held_block = player.selected_item->as_item().is_block() ? BlockState{uint8_t(player.selected_item->id & 0xFF), 0x7F, uint8_t(player.selected_item->meta & 0xFF)} : BlockState{};
     bool finish_destroying = should_destroy_block && player.mining_progress >= 1.0f;
 
     Vec3f cam_rot = camera.transform.get_rotation();
@@ -551,7 +551,7 @@ void World::edit_blocks()
         BlockID new_blockid = finish_destroying ? BlockID::air : held_block.blockid;
 
         // The block that the result of the action will be stored in temporarily.
-        Block result_block = held_block;
+        BlockState result_block = held_block;
 
         // If destroying, the result block is air.
         if (finish_destroying)
@@ -567,14 +567,14 @@ void World::edit_blocks()
         if (!finish_destroying)
             result_pos = result_pos + player.raycast_target_face;
 
-        Block *editable_block = get_block_at(result_pos);
+        BlockState *editable_block = get_block_at(result_pos);
         if (editable_block)
         {
             if (!is_remote())
             {
                 // Handle slab corner cases
 
-                Block *targeted_block = get_block_at(player.raycast_target_pos);
+                BlockState *targeted_block = get_block_at(player.raycast_target_pos);
                 if (player.raycast_target_face.y == 1 && new_blockid == BlockID::stone_slab && targeted_block->blockid == BlockID::stone_slab && held_block.meta == targeted_block->meta)
                 {
                     // Adjust position to the block being targeted if we're facing the top face of a bottom slab
@@ -645,7 +645,7 @@ void World::edit_blocks()
             {
                 // For restoring the state
 
-                Block old_editable_block = *editable_block;
+                BlockState old_editable_block = *editable_block;
 
                 destroy_block(result_pos, &old_editable_block);
                 if (is_remote())
@@ -743,7 +743,7 @@ void World::save_and_clean_chunk(Chunk *chunk)
     save_chunk(chunk);
 }
 
-void World::destroy_block(const Vec3i pos, Block *old_block)
+void World::destroy_block(const Vec3i pos, BlockState *old_block)
 {
     BlockID old_blockid = old_block->blockid;
     set_block_at(pos, BlockID::air);
@@ -793,7 +793,7 @@ void World::destroy_block(const Vec3i pos, Block *old_block)
         spawn_drop(pos, properties(old_blockid).m_drops(*old_block));
 }
 
-bool World::place_block(const Vec3i pos, const Vec3i targeted, Block *new_block, uint8_t face)
+bool World::place_block(const Vec3i pos, const Vec3i targeted, BlockState *new_block, uint8_t face)
 {
 
     // Check if the block has collision
@@ -990,11 +990,11 @@ void World::draw_scene(bool opaque)
     if (player.raycast_target_found && should_destroy_block && player.mining_tick > 0)
     {
         Chunk *targeted_chunk = get_chunk_from_pos(player.raycast_target_pos);
-        Block *targeted_block = targeted_chunk ? targeted_chunk->get_block(player.raycast_target_pos) : nullptr;
+        BlockState *targeted_block = targeted_chunk ? targeted_chunk->get_block(player.raycast_target_pos) : nullptr;
         if (targeted_block && targeted_block->blockid != BlockID::air)
         {
             // Create a copy of the targeted block for rendering
-            Block targeted_block_copy = *targeted_block;
+            BlockState targeted_block_copy = *targeted_block;
 
             // Set light to maximum for rendering
             targeted_block_copy.light = 0xFF;
@@ -1072,7 +1072,7 @@ void World::draw_selected_block()
 
     uint8_t light_value = 0;
     // Get the block at the player's position
-    Block *view_block = get_block_at(player.get_foot_blockpos());
+    BlockState *view_block = get_block_at(player.get_foot_blockpos());
     if (view_block)
     {
         // Set the light level of the selected block
@@ -1095,7 +1095,7 @@ void World::draw_selected_block()
     // Check if the selected item is a block
     if (player.selected_item->as_item().is_block())
     {
-        Block selected_block = Block{uint8_t(player.selected_item->id & 0xFF), 0x7F, uint8_t(player.selected_item->meta & 0xFF)};
+        BlockState selected_block = BlockState{uint8_t(player.selected_item->id & 0xFF), 0x7F, uint8_t(player.selected_item->meta & 0xFF)};
         selected_block.light = light_value;
         RenderType render_type = properties(selected_block.id).m_render_type;
 
@@ -1500,7 +1500,7 @@ void World::update_player()
     }
 #endif
     Vec3i block_pos = player.get_head_blockpos();
-    Block *block = get_block_at(block_pos);
+    BlockState *block = get_block_at(block_pos);
     if (block && properties(block->id).m_fluid && block_pos.y + 2 - get_fluid_height(this, block_pos, block->blockid) >= player.aabb.min.y + player.y_offset)
     {
         player.in_fluid = properties(block->id).m_base_fluid;
@@ -1512,8 +1512,8 @@ void World::update_player()
 
     if (should_destroy_block && player.mining_progress < 1.0f && player.raycast_target_found)
     {
-        static Block *last_targeted_block = nullptr;
-        Block *targeted_block = get_block_at(player.raycast_target_pos);
+        static BlockState *last_targeted_block = nullptr;
+        BlockState *targeted_block = get_block_at(player.raycast_target_pos);
         if (last_targeted_block != targeted_block)
         {
             // Reset the progress if the targeted block has changed
@@ -1738,13 +1738,13 @@ void World::init_chunk_manager()
 
 BlockID World::get_block_id_at(const Vec3i &position, BlockID default_id)
 {
-    Block *block = get_block_at(position);
+    BlockState *block = get_block_at(position);
     if (!block)
         return default_id;
     return block->blockid;
 }
 
-Block *World::get_block_at(const Vec3i &position)
+BlockState *World::get_block_at(const Vec3i &position)
 {
     if (position.y < 0 || position.y > MAX_WORLD_Y)
         return nullptr;
@@ -1756,13 +1756,13 @@ Block *World::get_block_at(const Vec3i &position)
 
 uint8_t World::get_meta_at(const Vec3i &position)
 {
-    Block *block = get_block_at(position);
+    BlockState *block = get_block_at(position);
     if (!block)
         return 0;
     return block->meta;
 }
 
-void World::get_neighbors(const Vec3i &pos, Block **neighbors)
+void World::get_neighbors(const Vec3i &pos, BlockState **neighbors)
 {
     for (int x = 0; x < 6; x++)
         neighbors[x] = get_block_at(pos + face_offsets[x]);
@@ -1770,7 +1770,7 @@ void World::get_neighbors(const Vec3i &pos, Block **neighbors)
 
 void World::set_block_at(const Vec3i &pos, BlockID id)
 {
-    Block *block = get_block_at(pos);
+    BlockState *block = get_block_at(pos);
     if (block)
     {
         if (block->blockid == id)
@@ -1786,7 +1786,7 @@ void World::set_block_at(const Vec3i &pos, BlockID id)
 
 void World::set_meta_at(const Vec3i &pos, uint8_t meta)
 {
-    Block *block = get_block_at(pos);
+    BlockState *block = get_block_at(pos);
     if (block)
     {
         if (block->meta == meta)
@@ -1799,7 +1799,7 @@ void World::set_meta_at(const Vec3i &pos, uint8_t meta)
 
 void World::set_block_and_meta_at(const Vec3i &pos, BlockID id, uint8_t meta)
 {
-    Block *block = get_block_at(pos);
+    BlockState *block = get_block_at(pos);
     if (block)
     {
         if (block->blockid == id && block->meta == meta)
@@ -1831,7 +1831,7 @@ void World::notify_neighbors(const Vec3i &pos)
     for (int i = 0; i < 6; i++)
     {
         Vec3i neighbour = pos + face_offsets[i];
-        Block *block = get_block_at(neighbour);
+        BlockState *block = get_block_at(neighbour);
         if (block)
         {
             BlockProperties &prop = properties(block->id);

@@ -7,18 +7,18 @@
 #include <render/render.hpp>
 #include <gertex/displaylist.hpp>
 
-static std::map<RenderType, std::function<int(gertex::DisplayList<gertex::Vertex16> *list, Block *, const Vec3i &)>> render_functions = {
+static std::map<RenderType, std::function<int(gertex::DisplayList<gertex::Vertex16> *list, BlockState *, const Vec3i &)>> render_functions = {
     {RenderType::full, render_cube},
     {RenderType::full_special, render_cube_special},
     {RenderType::cross, render_cross},
     {RenderType::flat_ground, render_flat_ground},
     {RenderType::slab, render_slab},
     {RenderType::special, render_special},
-    {RenderType::fluid, [](gertex::DisplayList<gertex::Vertex16> *list, Block *, const Vec3i &)
+    {RenderType::fluid, [](gertex::DisplayList<gertex::Vertex16> *list, BlockState *, const Vec3i &)
      { return 0; }},
 };
 
-int render_block(gertex::DisplayList<gertex::Vertex16> *list, Block *block, const Vec3i &pos)
+int render_block(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3i &pos)
 {
     switch (block->blockid)
     {
@@ -33,7 +33,7 @@ int render_block(gertex::DisplayList<gertex::Vertex16> *list, Block *block, cons
     }
 }
 
-int render_cube(gertex::DisplayList<gertex::Vertex16> *list, Block *block, const Vec3i &pos)
+int render_cube(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3i &pos)
 {
     int vertexCount = 0;
     for (uint8_t face = VIS_MIN, i = 0; face != VIS_MAX; face <<= 1, i++)
@@ -44,7 +44,7 @@ int render_cube(gertex::DisplayList<gertex::Vertex16> *list, Block *block, const
     return vertexCount;
 }
 
-int render_inverted_cube(gertex::DisplayList<gertex::Vertex16> *list, Block *block, const Vec3i &pos)
+int render_inverted_cube(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3i &pos)
 {
     int vertexCount = 0;
     for (uint8_t face = VIS_MIN, i = 0; face != VIS_MAX; face <<= 1, i++)
@@ -55,7 +55,7 @@ int render_inverted_cube(gertex::DisplayList<gertex::Vertex16> *list, Block *blo
     return vertexCount;
 }
 
-int render_inverted_cube_special(gertex::DisplayList<gertex::Vertex16> *list, Block *block, const Vec3i &pos)
+int render_inverted_cube_special(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3i &pos)
 {
     int vertexCount = 0;
     for (uint8_t face = VIS_MIN, i = 0; face != VIS_MAX; face <<= 1, i++)
@@ -66,7 +66,7 @@ int render_inverted_cube_special(gertex::DisplayList<gertex::Vertex16> *list, Bl
     return vertexCount;
 }
 
-int render_cube_special(gertex::DisplayList<gertex::Vertex16> *list, Block *block, const Vec3i &pos)
+int render_cube_special(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3i &pos)
 {
     int vertexCount = 0;
     for (uint8_t face = VIS_MIN, i = 0; face != VIS_MAX; face <<= 1, i++)
@@ -77,7 +77,7 @@ int render_cube_special(gertex::DisplayList<gertex::Vertex16> *list, Block *bloc
     return vertexCount;
 }
 
-int render_special(gertex::DisplayList<gertex::Vertex16> *list, Block *block, const Vec3i &pos)
+int render_special(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3i &pos)
 {
     switch (block->blockid)
     {
@@ -96,7 +96,7 @@ int render_special(gertex::DisplayList<gertex::Vertex16> *list, Block *block, co
     }
 }
 
-int render_flat_ground(gertex::DisplayList<gertex::Vertex16> *list, Block *block, const Vec3i &pos)
+int render_flat_ground(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3i &pos)
 {
     uint8_t lighting = block->light;
     Vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
@@ -118,7 +118,7 @@ int render_flat_ground(gertex::DisplayList<gertex::Vertex16> *list, Block *block
     return 4;
 }
 
-int render_snow_layer(gertex::DisplayList<gertex::Vertex16> *list, Block *block, const Vec3i &pos)
+int render_snow_layer(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3i &pos)
 {
     Vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
     Vec3f vertex_pos(local_pos.x, local_pos.y, local_pos.z);
@@ -130,7 +130,7 @@ int render_snow_layer(gertex::DisplayList<gertex::Vertex16> *list, Block *block,
 
     BlockID neighbor_ids[6];
     {
-        Block *neighbors[6];
+        BlockState *neighbors[6];
         if (render_world)
             render_world->get_neighbors(pos, neighbors);
         for (int i = 0; i < 6; i++)
@@ -166,7 +166,7 @@ int render_snow_layer(gertex::DisplayList<gertex::Vertex16> *list, Block *block,
     return vertexCount;
 }
 
-int render_chest(gertex::DisplayList<gertex::Vertex16> *list, Block *block, const Vec3i &pos)
+int render_chest(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3i &pos)
 {
     int vertexCount = 0;
     for (uint8_t face = VIS_MIN, i = 0; face != VIS_MAX; face <<= 1, i++)
@@ -177,7 +177,7 @@ int render_chest(gertex::DisplayList<gertex::Vertex16> *list, Block *block, cons
     return vertexCount;
 }
 
-int render_torch(gertex::DisplayList<gertex::Vertex16> *list, Block *block, const Vec3i &pos)
+int render_torch(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3i &pos)
 {
     Vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
     Vec3f vertex_pos(local_pos.x, local_pos.y + 0.1875, local_pos.z);
@@ -201,7 +201,7 @@ int render_torch(gertex::DisplayList<gertex::Vertex16> *list, Block *block, cons
     }
 }
 
-int render_torch_with_angle(gertex::DisplayList<gertex::Vertex16> *list, Block *block, const Vec3f &vertex_pos, float ax, float az)
+int render_torch_with_angle(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3f &vertex_pos, float ax, float az)
 {
     uint8_t lighting = block->light;
     uint32_t texture_index = get_default_texture_index(block->blockid);
@@ -239,7 +239,7 @@ int render_torch_with_angle(gertex::DisplayList<gertex::Vertex16> *list, Block *
     return 20;
 }
 
-int render_door(gertex::DisplayList<gertex::Vertex16> *list, Block *block, const Vec3i &pos)
+int render_door(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3i &pos)
 {
     uint8_t lighting = block->light;
     Vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
@@ -363,7 +363,7 @@ int render_door(gertex::DisplayList<gertex::Vertex16> *list, Block *block, const
     return 20;
 }
 
-int render_cactus(gertex::DisplayList<gertex::Vertex16> *list, Block *block, const Vec3i &pos)
+int render_cactus(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3i &pos)
 {
 
     uint8_t lighting = block->light;
@@ -429,7 +429,7 @@ int render_cactus(gertex::DisplayList<gertex::Vertex16> *list, Block *block, con
     list->put(gertex::Vertex16{.x = x0, .y = y0, .z = int16_t(z0 + 1), .i = lighting, .nrm = FACE_NZ, .u = float(TEXTURE_PX(texture_index)), .v = float(TEXTURE_PY(texture_index))});
     return vertexCount;
 }
-int render_cross(gertex::DisplayList<gertex::Vertex16> *list, Block *block, const Vec3i &pos)
+int render_cross(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3i &pos)
 {
     uint8_t lighting = block->light;
     Vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
@@ -470,7 +470,7 @@ int render_cross(gertex::DisplayList<gertex::Vertex16> *list, Block *block, cons
     return 16;
 }
 
-int render_slab(gertex::DisplayList<gertex::Vertex16> *list, Block *block, const Vec3i &pos)
+int render_slab(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3i &pos)
 {
     Vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
     Vec3f vertex_pos(local_pos.x, local_pos.y, local_pos.z);
@@ -547,7 +547,7 @@ int render_slab(gertex::DisplayList<gertex::Vertex16> *list, Block *block, const
     return vertexCount;
 }
 
-int get_chest_texture_index(Block *block, const Vec3i &pos, uint8_t face)
+int get_chest_texture_index(BlockState *block, const Vec3i &pos, uint8_t face)
 {
     // Check for texture overrides
     uint32_t texture_index = get_default_texture_index(block->blockid);
@@ -558,9 +558,9 @@ int get_chest_texture_index(Block *block, const Vec3i &pos, uint8_t face)
     if (face == FACE_NY || face == FACE_PY)
         return 25;
 
-    Block *neighbors[4];
+    BlockState *neighbors[4];
     {
-        Block *tmp_neighbors[6];
+        BlockState *tmp_neighbors[6];
         if (render_world)
             render_world->get_neighbors(pos, tmp_neighbors);
         neighbors[0] = tmp_neighbors[0];
@@ -569,7 +569,7 @@ int get_chest_texture_index(Block *block, const Vec3i &pos, uint8_t face)
         neighbors[3] = tmp_neighbors[5];
     }
 
-    if (std::none_of(neighbors, neighbors + 4, [](Block *block)
+    if (std::none_of(neighbors, neighbors + 4, [](BlockState *block)
                      { return block && block->blockid == BlockID::chest; }))
     {
         // Single chest

@@ -3,7 +3,7 @@
 
 class Chunk;
 class World;
-class Block;
+class BlockState;
 
 struct ChunkCache
 {
@@ -13,7 +13,7 @@ struct ChunkCache
 };
 
 ChunkCache build_chunk_cache(World *world, int cx, int cz);
-Block *get_block_cached(ChunkCache &cache, int x, int y, int z, Chunk *&out_chunk);
-void get_neighbors_cached(ChunkCache &cache, int x, int y, int z, Block **neighbors);
+BlockState *get_block_cached(ChunkCache &cache, int x, int y, int z, Chunk *&out_chunk);
+void get_neighbors_cached(ChunkCache &cache, int x, int y, int z, BlockState **neighbors);
 
 #endif

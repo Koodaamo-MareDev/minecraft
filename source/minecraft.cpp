@@ -688,7 +688,7 @@ void DrawDebugInfo(gertex::GXView &viewport)
 
     if (current_world && current_world->player.chunk)
     {
-        Block *block = current_world->get_block_at(current_world->player.get_foot_blockpos());
+        BlockState *block = current_world->get_block_at(current_world->player.get_foot_blockpos());
         if (block)
         {
             int height_index = (int(current_world->player.position.x) & 0xF) | ((int(current_world->player.position.z) & 0xF) << 4);
@@ -747,7 +747,7 @@ void UpdateFog()
 
     background = get_fog_color();
 
-    Block *block = current_world->get_block_at(current_world->player.get_head_blockpos());
+    BlockState *block = current_world->get_block_at(current_world->player.get_head_blockpos());
     if (block)
         fog_light_multiplier = lerpf(fog_light_multiplier, std::pow(0.9f, (15.0f - block->sky_light)), 0.05f);
 

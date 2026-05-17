@@ -47,13 +47,13 @@ void use_texture(GXTexObj &texture)
     GX_LoadTexObj(&texture, GX_TEXMAP0);
 }
 
-void smooth_light(const Vec3i &pos, uint8_t face_index, const Vec3i &vertex_off, Block *block, uint8_t &lighting, uint8_t &amb_occ)
+void smooth_light(const Vec3i &pos, uint8_t face_index, const Vec3i &vertex_off, BlockState *block, uint8_t &lighting, uint8_t &amb_occ)
 {
     if (pos.y < 0 || pos.y > 255)
         return;
     Vec3i face = pos + face_offsets[face_index];
     uint8_t total = 1;
-    Block *face_block = render_world ? render_world->get_block_at(face) : nullptr;
+    BlockState *face_block = render_world ? render_world->get_block_at(face) : nullptr;
     if (!face_block)
         face_block = block;
     uint8_t block_light = face_block->block_light;
@@ -89,8 +89,8 @@ void smooth_light(const Vec3i &pos, uint8_t face_index, const Vec3i &vertex_off,
     default:
         break;
     }
-    Block *blockA = render_world ? render_world->get_block_at(face + vertex_offA) : nullptr;
-    Block *blockB = render_world ? render_world->get_block_at(face + vertex_offB) : nullptr;
+    BlockState *blockA = render_world ? render_world->get_block_at(face + vertex_offA) : nullptr;
+    BlockState *blockB = render_world ? render_world->get_block_at(face + vertex_offB) : nullptr;
     if (blockA)
     {
         if (properties(blockA->id).m_opacity == 15)
@@ -117,7 +117,7 @@ void smooth_light(const Vec3i &pos, uint8_t face_index, const Vec3i &vertex_off,
             sky_light += blockB->sky_light;
         }
     }
-    Block *blockC = render_world ? render_world->get_block_at(face + vertex_off) : nullptr;
+    BlockState *blockC = render_world ? render_world->get_block_at(face + vertex_off) : nullptr;
     if (blockC)
     {
         if (properties(blockC->id).m_opacity == 15)
@@ -279,10 +279,10 @@ Vec3i vertical_add(const Vec3i &a, uint8_t b)
     return Vec3i(a.x * 16, a.y - 17 + b * 2, a.z * 16);
 }
 
-inline uint8_t get_face_light_index(Vec3i pos, uint8_t face, Block *default_block = nullptr)
+inline uint8_t get_face_light_index(Vec3i pos, uint8_t face, BlockState *default_block = nullptr)
 {
     Vec3i other = pos + face_offsets[face];
-    Block *other_block = render_world ? render_world->get_block_at(other) : nullptr;
+    BlockState *other_block = render_world ? render_world->get_block_at(other) : nullptr;
     if (!other_block)
     {
         if (default_block)
@@ -292,7 +292,7 @@ inline uint8_t get_face_light_index(Vec3i pos, uint8_t face, Block *default_bloc
     return other_block->light;
 }
 
-void get_face(Vec3i pos, uint8_t face, uint32_t texture_index, Block *block, uint8_t min_y, uint8_t max_y, gertex::Vertex16 *out_vertices, uint8_t *out_lighting, uint8_t *out_ao)
+void get_face(Vec3i pos, uint8_t face, uint32_t texture_index, BlockState *block, uint8_t min_y, uint8_t max_y, gertex::Vertex16 *out_vertices, uint8_t *out_lighting, uint8_t *out_ao)
 {
     Vec3i vertex_pos((pos.x & 0xF) << BASE3D_POS_FRAC_BITS, (pos.y & 0xF) << BASE3D_POS_FRAC_BITS, (pos.z & 0xF) << BASE3D_POS_FRAC_BITS);
     uint8_t light_val = get_face_light_index(pos, face, block);
@@ -401,7 +401,7 @@ void get_face(Vec3i pos, uint8_t face, uint32_t texture_index, Block *block, uin
     }
 }
 
-int render_face(gertex::DisplayList<gertex::Vertex16> *list, Vec3i pos, uint8_t face, uint32_t texture_index, Block *block, uint8_t min_y, uint8_t max_y)
+int render_face(gertex::DisplayList<gertex::Vertex16> *list, Vec3i pos, uint8_t face, uint32_t texture_index, BlockState *block, uint8_t min_y, uint8_t max_y)
 {
     uint8_t ao[4] = {0, 0, 0, 0};
     uint8_t lighting[4] = {0, 0, 0, 0};
@@ -433,7 +433,7 @@ int render_face(gertex::DisplayList<gertex::Vertex16> *list, Vec3i pos, uint8_t 
     return 4;
 }
 
-int render_back_face(gertex::DisplayList<gertex::Vertex16> *list, Vec3i pos, uint8_t face, uint32_t texture_index, Block *block, uint8_t min_y, uint8_t max_y)
+int render_back_face(gertex::DisplayList<gertex::Vertex16> *list, Vec3i pos, uint8_t face, uint32_t texture_index, BlockState *block, uint8_t min_y, uint8_t max_y)
 {
     uint8_t ao[4] = {0, 0, 0, 0};
     uint8_t lighting[4] = {0, 0, 0, 0};
@@ -466,7 +466,7 @@ int render_back_face(gertex::DisplayList<gertex::Vertex16> *list, Vec3i pos, uin
     return 4;
 }
 
-void render_single_block_at(Block &selected_block, const Vec3i &pos, uint8_t frac_bits)
+void render_single_block_at(BlockState &selected_block, const Vec3i &pos, uint8_t frac_bits)
 {
     gertex::GXState state = gertex::get_state();
     gertex::set_pos_precision(GX_S16, frac_bits);
@@ -480,12 +480,12 @@ void render_single_block_at(Block &selected_block, const Vec3i &pos, uint8_t fra
     gertex::set_state(state);
 }
 
-void render_single_block(Block &selected_block)
+void render_single_block(BlockState &selected_block)
 {
     render_single_block_at(selected_block, Vec3i(0, -16, 0), BASE3D_POS_FRAC_BITS);
 }
 
-void render_block_as_item(Block &selected_block)
+void render_block_as_item(BlockState &selected_block)
 {
     render_single_block_at(selected_block, Vec3i(0, -16, 0), 0);
 }

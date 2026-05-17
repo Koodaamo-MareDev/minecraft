@@ -41,7 +41,7 @@ void BlockLeaves::on_removed(World *world, const Vec3i &pos)
             for (int y = -1; y <= 1; y++)
             {
                 Chunk *c;
-                Block *block = get_block_cached(cache, pos.x + x, pos.y + y, pos.z + z, c);
+                BlockState *block = get_block_cached(cache, pos.x + x, pos.y + y, pos.z + z, c);
                 if (block && block->blockid == BlockID::leaves)
                     block->meta |= 4;
             }

@@ -28,7 +28,7 @@ int BlockFlowing::get_flow_weight(World *world, Vec3i pos, BlockID fluid_type, i
             neighbor_z--;
         else if (i == 3)
             neighbor_z++;
-        Block *neighbor = world->get_block_at(Vec3i(neighbor_x, pos.y, neighbor_z));
+        BlockState *neighbor = world->get_block_at(Vec3i(neighbor_x, pos.y, neighbor_z));
         if (!neighbor)
             continue;
         BlockID neighbor_id = neighbor->blockid;
@@ -65,7 +65,7 @@ void BlockFlowing::get_flow_directions(World *world, Vec3i pos, BlockID fluid_ty
             neighbor_z--;
         else if (i == 3)
             neighbor_z++;
-        Block *neighbor = world->get_block_at(Vec3i(neighbor_x, pos.y, neighbor_z));
+        BlockState *neighbor = world->get_block_at(Vec3i(neighbor_x, pos.y, neighbor_z));
         if (!neighbor)
             continue;
         BlockID neighbor_id = neighbor->blockid;

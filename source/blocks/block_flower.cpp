@@ -24,7 +24,7 @@ bool BlockFlower::can_place(World *world, const Vec3i &pos)
 
 bool BlockFlower::can_stay(World *world, const Vec3i &pos)
 {
-    Block *block = world->get_block_at(pos);
+    BlockState *block = world->get_block_at(pos);
     return (block->block_light >= 8 || block->sky_light == 15) &&
            can_grow_on(world->get_block_id_at({pos.x, pos.y - 1, pos.z}));
 }

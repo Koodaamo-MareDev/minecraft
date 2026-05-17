@@ -189,7 +189,7 @@ void Gui::draw_item(int x, int y, item::ItemStack stack, gertex::GXView &viewpor
     {
         use_texture(terrain_texture);
 
-        Block block = {uint8_t(item.id & 0xFF), 0x7F, uint8_t(stack.meta & 0xFF), 0xF, 0xF};
+        BlockState block = {uint8_t(item.id & 0xFF), 0x7F, uint8_t(stack.meta & 0xFF), 0xF, 0xF};
 
         RenderType render_type = properties(item.id).m_render_type;
         if (!properties(item.id).m_fluid && (properties(item.id).m_nonflat || render_type == RenderType::full || render_type == RenderType::full_special || render_type == RenderType::slab))

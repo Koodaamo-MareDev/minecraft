@@ -62,13 +62,13 @@ enum class CollisionType : uint8_t
     slab,
 
 };
-class Block;
+class BlockState;
 class World;
 
-void default_aabb(const Vec3i &pos, Block *block, const AABB &other, std::vector<AABB> &aabb_list);
-void slab_aabb(const Vec3i &pos, Block *block, const AABB &other, std::vector<AABB> &aabb_list);
-void default_destroy(World *world, const Vec3i &pos, const Block &old_block);
-item::ItemStack default_drop(const Block &old_block);
+void default_aabb(const Vec3i &pos, BlockState *block, const AABB &other, std::vector<AABB> &aabb_list);
+void slab_aabb(const Vec3i &pos, BlockState *block, const AABB &other, std::vector<AABB> &aabb_list);
+void default_destroy(World *world, const Vec3i &pos, const BlockState &old_block);
+item::ItemStack default_drop(const BlockState &old_block);
 
 struct BlockProperties
 {
@@ -106,19 +106,19 @@ struct BlockProperties
         uint8_t m_flags;
     };
 
-    std::function<void(const Vec3i &, Block *, const AABB &, std::vector<AABB> &)> m_aabb = default_aabb;
+    std::function<void(const Vec3i &, BlockState *, const AABB &, std::vector<AABB> &)> m_aabb = default_aabb;
 
-    std::function<void(World *world, const Vec3i &, const Block &)> m_destroy = default_destroy;
+    std::function<void(World *world, const Vec3i &, const BlockState &)> m_destroy = default_destroy;
 
-    std::function<item::ItemStack(const Block &)> m_drops = default_drop;
+    std::function<item::ItemStack(const BlockState &)> m_drops = default_drop;
 
-    std::function<void(World *world, const Vec3i &, Block &)> m_tick = nullptr;
+    std::function<void(World *world, const Vec3i &, BlockState &)> m_tick = nullptr;
 
-    std::function<void(World *world, const Vec3i &, Block &)> m_added = nullptr;
+    std::function<void(World *world, const Vec3i &, BlockState &)> m_added = nullptr;
 
-    std::function<void(World *world, const Vec3i &, Block &)> m_neighbor_changed = nullptr;
+    std::function<void(World *world, const Vec3i &, BlockState &)> m_neighbor_changed = nullptr;
 
-    bool intersects(const Vec3i &pos, Block *block, const AABB &other)
+    bool intersects(const Vec3i &pos, BlockState *block, const AABB &other)
     {
         std::vector<AABB> aabb_list;
         m_aabb(pos, block, other, aabb_list);
@@ -264,37 +264,37 @@ struct BlockProperties
         return *this;
     }
 
-    BlockProperties &aabb(std::function<void(const Vec3i &, Block *, const AABB &, std::vector<AABB> &)> aabb_func)
+    BlockProperties &aabb(std::function<void(const Vec3i &, BlockState *, const AABB &, std::vector<AABB> &)> aabb_func)
     {
         this->m_aabb = aabb_func;
         return *this;
     }
 
-    BlockProperties &destroy(std::function<void(World *world, const Vec3i &, const Block &)> destroy_func)
+    BlockProperties &destroy(std::function<void(World *world, const Vec3i &, const BlockState &)> destroy_func)
     {
         this->m_destroy = destroy_func;
         return *this;
     }
 
-    BlockProperties &drops(std::function<item::ItemStack(const Block &)> drops_func)
+    BlockProperties &drops(std::function<item::ItemStack(const BlockState &)> drops_func)
     {
         this->m_drops = drops_func;
         return *this;
     }
 
-    BlockProperties &tick(std::function<void(World *world, const Vec3i &, Block &)> tick_func)
+    BlockProperties &tick(std::function<void(World *world, const Vec3i &, BlockState &)> tick_func)
     {
         this->m_tick = tick_func;
         return *this;
     }
 
-    BlockProperties &added(std::function<void(World *world, const Vec3i &, Block &)> added_func)
+    BlockProperties &added(std::function<void(World *world, const Vec3i &, BlockState &)> added_func)
     {
         this->m_added = added_func;
         return *this;
     }
 
-    BlockProperties &neighbor_changed(std::function<void(World *world, const Vec3i &, Block &)> neighbor_changed_func)
+    BlockProperties &neighbor_changed(std::function<void(World *world, const Vec3i &, BlockState &)> neighbor_changed_func)
     {
         this->m_neighbor_changed = neighbor_changed_func;
         return *this;
@@ -357,7 +357,7 @@ inline BlockProperties &properties(uint8_t id)
     return block_properties[id];
 }
 
-class Block
+class BlockState
 {
 public:
     union

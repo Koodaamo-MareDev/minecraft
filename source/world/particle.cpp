@@ -41,7 +41,7 @@ void Particle::update(float dt)
     Vec3i new_pos = Vec3i(std::round(position.x), std::round(position.y), std::round(position.z));
 
     // Get the block at the particle's position
-    Block *block = world->get_block_at(new_pos);
+    BlockState *block = world->get_block_at(new_pos);
     if (block)
     {
         if (old_pos != new_pos)

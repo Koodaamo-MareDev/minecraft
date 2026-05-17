@@ -72,7 +72,7 @@ inline static int DrawVerticalQuad(gertex::DisplayList<gertex::Vertex16> *list, 
 
 int get_capped_fluid_level_at(World *world, Vec3i pos, BlockID src_id)
 {
-    Block *block = world->get_block_at(pos);
+    BlockState *block = world->get_block_at(pos);
     if (block && is_same_fluid(block->blockid, src_id))
     {
         if (block->meta >= 8)
@@ -82,7 +82,7 @@ int get_capped_fluid_level_at(World *world, Vec3i pos, BlockID src_id)
     return -1;
 }
 
-Vec3f get_fluid_direction(World *world, Block *block, Vec3i pos)
+Vec3f get_fluid_direction(World *world, BlockState *block, Vec3i pos)
 {
 
     uint8_t fluid_level = get_capped_fluid_level_at(world, pos, block->blockid);
@@ -90,7 +90,7 @@ Vec3f get_fluid_direction(World *world, Block *block, Vec3i pos)
         return Vec3f(0.0, -1.0, 0.0);
 
     // Used to check block types around the fluid
-    Block *neighbors[6];
+    BlockState *neighbors[6];
     world->get_neighbors(pos, neighbors);
 
     Vec3f direction = Vec3f(0.0, 0.0, 0.0);
@@ -133,7 +133,7 @@ Vec3f get_fluid_direction(World *world, Block *block, Vec3i pos)
     return direction.fast_normalize();
 }
 
-int render_fluid(gertex::DisplayList<gertex::Vertex16> *list, Block *block, const Vec3i &pos, World *world)
+int render_fluid(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3i &pos, World *world)
 {
     BlockID block_id = block->blockid;
 
@@ -141,7 +141,7 @@ int render_fluid(gertex::DisplayList<gertex::Vertex16> *list, Block *block, cons
     Vec3i local_pos = {pos.x & 0xF, pos.y & 0xF, pos.z & 0xF};
 
     // Used to check block types around the fluid
-    Block *neighbors[6];
+    BlockState *neighbors[6];
     BlockID neighbor_ids[6];
 
     // Sorted maximum and minimum values of the corners above

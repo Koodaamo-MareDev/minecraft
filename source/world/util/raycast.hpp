@@ -45,7 +45,7 @@ inline double intbound(double s, double ds)
 }
 inline int checkabove(Vec3i pos, Chunk *chunk = nullptr, World *world = nullptr)
 {
-    Block *block = nullptr;
+    BlockState *block = nullptr;
     chunk = chunk ? chunk : (world ? world->get_chunk_from_pos(pos) : nullptr);
     if (!chunk)
         return pos.y;
@@ -58,7 +58,7 @@ inline int checkabove(Vec3i pos, Chunk *chunk = nullptr, World *world = nullptr)
 }
 inline int checkbelow(Vec3i pos, Chunk *chunk = nullptr, World *world = nullptr)
 {
-    Block *block = nullptr;
+    BlockState *block = nullptr;
     chunk = chunk ? chunk : (world ? world->get_chunk_from_pos(pos) : nullptr);
     if (!chunk)
         return pos.y;
@@ -71,7 +71,7 @@ inline int checkbelow(Vec3i pos, Chunk *chunk = nullptr, World *world = nullptr)
 }
 inline int skycast_safe(Vec3i pos, Chunk *chunk = nullptr, World *world = nullptr)
 {
-    Block *block = nullptr;
+    BlockState *block = nullptr;
     chunk = chunk ? chunk : (world ? world->get_chunk_from_pos(pos) : nullptr);
     if (!chunk)
         return -9999;
@@ -90,8 +90,8 @@ inline int skycast_safe(Vec3i pos, Chunk *chunk = nullptr, World *world = nullpt
 // Assume chunk != null, xzy-ordered coordinates, 0 < x < 16, same for z
 inline int skycast_fast(Vec3i pos, Chunk *chunk)
 {
-    Block *last = &chunk->blockstates[(pos.x & 15) | ((pos.z & 15) << 4)];
-    Block *curr = &last[(MAX_WORLD_Y << 8)];
+    BlockState *last = &chunk->blockstates[(pos.x & 15) | ((pos.z & 15) << 4)];
+    BlockState *curr = &last[(MAX_WORLD_Y << 8)];
     while (curr != last && !block_properties[curr->id].m_opacity)
         curr -= 256;
     return (curr - chunk->blockstates) >> 8;
@@ -100,7 +100,7 @@ inline int skycast_fast(Vec3i pos, Chunk *chunk)
 // Highly optimized (and unsafe) version of skycast that only checks for sky light.
 inline int lightcast(Vec3i pos, Chunk *chunk = nullptr)
 {
-    Block *block = nullptr;
+    BlockState *block = nullptr;
 
     // Starting from world height limit, cast a ray down that stops at the first block with sky light < 15.
     for (pos.y = MAX_WORLD_Y; pos.y > 0; pos.y--)
@@ -183,7 +183,7 @@ inline bool raycast(
         if (!(x < minvec.x || y < minvec.y || z < minvec.z || x >= maxvec.x || y >= maxvec.y || z >= maxvec.z))
         {
             Vec3i block_pos = Vec3i(int(x), int(y), int(z));
-            Block *block = world->get_block_at(block_pos);
+            BlockState *block = world->get_block_at(block_pos);
             if (block)
             {
                 BlockID blockid = block->blockid;
@@ -309,7 +309,7 @@ inline bool raycast_inverse(
         if (!(x < minvec.x || y < minvec.y || z < minvec.z || x >= maxvec.x || y >= maxvec.y || z >= maxvec.z))
         {
             Vec3i block_pos = Vec3i(int(x), int(y), int(z));
-            Block *block = world->get_block_at(block_pos);
+            BlockState *block = world->get_block_at(block_pos);
             if (block)
             {
                 BlockID blockid = block->blockid;
@@ -507,7 +507,7 @@ inline bool raycast_precise(
         if (!(x < minvec.x || y < minvec.y || z < minvec.z || x >= maxvec.x || y >= maxvec.y || z >= maxvec.z))
         {
             Vec3i block_pos = Vec3i(x, y, z);
-            Block *block = world->get_block_at(block_pos);
+            BlockState *block = world->get_block_at(block_pos);
             if (block)
             {
                 BlockID blockid = block->blockid;
@@ -639,7 +639,7 @@ inline void explode_raycast(Vec3f origin, Vec3f direction, float intensity, Worl
     while (true)
     {
         Vec3i block_pos = Vec3i(int(pos.x), int(pos.y), int(pos.z));
-        Block *block = world->get_block_at(block_pos);
+        BlockState *block = world->get_block_at(block_pos);
         if (block)
         {
             if (block->blockid != BlockID::air)
@@ -654,7 +654,7 @@ inline void explode_raycast(Vec3f origin, Vec3f direction, float intensity, Worl
                 {
                     world->add_entity(new EntityExplosiveBlock(*block, block_pos, rand() % 20 + 10));
                 }
-                Block old_block = *block;
+                BlockState old_block = *block;
                 world->destroy_block(block_pos, &old_block);
             }
             intensity -= 0.225;
@@ -671,7 +671,7 @@ inline void explode_raycast(Vec3f origin, Vec3f direction, float intensity, Worl
 inline void explode(Vec3f position, float power, World *world)
 {
     Vec3f dir;
-    Block *center_block = world->get_block_at(Vec3i(int(position.x), int(position.y), int(position.z)));
+    BlockState *center_block = world->get_block_at(Vec3i(int(position.x), int(position.y), int(position.z)));
     power -= (properties(center_block->id).m_blast_resistance + 0.3) * 0.3;
     if (power <= 0)
         return;

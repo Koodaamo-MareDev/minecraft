@@ -203,8 +203,8 @@ class EntityFallingBlock : virtual public EntityPhysical
 public:
     bool placed = false;
     uint16_t fall_time = 0;
-    Block block_state;
-    EntityFallingBlock(Block block_state, const Vec3i &position);
+    BlockState block_state;
+    EntityFallingBlock(BlockState block_state, const Vec3i &position);
 
     size_t size()
     {
@@ -228,7 +228,7 @@ public:
 class EntityExplosiveBlock : public EntityFallingBlock, public EntityExplosive
 {
 public:
-    EntityExplosiveBlock(Block block_state, const Vec3i &position, uint16_t fuse);
+    EntityExplosiveBlock(BlockState block_state, const Vec3i &position, uint16_t fuse);
 
     virtual void tick();
 

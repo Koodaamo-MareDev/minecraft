@@ -59,7 +59,7 @@ void ChunkProviderOverworld::provide_chunk(Chunk *chunk)
     }
 
     // Apply the generated blocks to the chunk
-    Block *block = chunk->blockstates;
+    BlockState *block = chunk->blockstates;
     for (int32_t i = 0; i < 16 * 16 * WORLD_HEIGHT; i++, block++)
     {
         block->blockid = blocks[i];
@@ -113,7 +113,7 @@ void ChunkProviderOverworld::populate_chunk(Chunk *chunk)
 
 void ChunkProviderOverworld::plant_tree(Vec3i pos, int height)
 {
-    Block *base_block = world->get_block_at(pos - Vec3i(0, 1, 0));
+    BlockState *base_block = world->get_block_at(pos - Vec3i(0, 1, 0));
     if (!base_block)
         return;
     BlockID base_id = base_block->blockid;
@@ -206,7 +206,7 @@ void ChunkProviderOverworld::generate_flowers(Vec3i pos, javaport::Random &rng)
         // Flowers should only grow on top of the sea level
         if (flower_pos.y >= 64)
         {
-            Block *block = chunk->get_block(flower_pos - Vec3i(0, 1, 0));
+            BlockState *block = chunk->get_block(flower_pos - Vec3i(0, 1, 0));
             if (block->blockid != BlockID::grass)
                 continue;
             block = chunk->get_block(flower_pos);
@@ -228,7 +228,7 @@ void ChunkProviderOverworld::generate_vein(Vec3i pos, BlockID id, javaport::Rand
                 if (rng.nextInt(2) == 0)
                 {
                     Vec3i pos(x, y, z);
-                    Block *block = world->get_block_at(pos);
+                    BlockState *block = world->get_block_at(pos);
                     if (block && block->blockid == BlockID::stone)
                     {
                         block->blockid = id;
@@ -250,7 +250,7 @@ void ChunkProviderOverworld::generate_ore_type(Vec3i pos, BlockID id, int count,
         if (y > max_height)
             continue;
         generate_vein(offset_pos, id, rng);
-        Block *block = world->get_block_at(offset_pos);
+        BlockState *block = world->get_block_at(offset_pos);
         x = rng.nextInt(3) - 1;
         y = rng.nextInt(3) - 1;
         z = rng.nextInt(3) - 1;

@@ -108,7 +108,7 @@ void LightEngine::process(const Vec3i &start)
         stack.pop_front();
 
         Chunk *chunk = nullptr;
-        Block *block = get_block_cached(cache, n.x, n.y, n.z, chunk);
+        BlockState *block = get_block_cached(cache, n.x, n.y, n.z, chunk);
         if (!block)
             continue;
 
@@ -128,7 +128,7 @@ void LightEngine::process(const Vec3i &start)
             {
                 const Vec3i &o = face_offsets[i];
                 Chunk *n_chunk;
-                Block *nb = get_block_cached(cache, n.x + o.x, n.y + o.y, n.z + o.z, n_chunk);
+                BlockState *nb = get_block_cached(cache, n.x + o.x, n.y + o.y, n.z + o.z, n_chunk);
                 if (!nb)
                     continue;
 
@@ -147,7 +147,7 @@ void LightEngine::process(const Vec3i &start)
         {
             const Vec3i &o = face_offsets[i];
             Chunk *nchunk = nullptr;
-            Block *nblock = nullptr;
+            BlockState *nblock = nullptr;
             if ((nblock = get_block_cached(cache, n.x + o.x, n.y + o.y, n.z + o.z, nchunk)))
             {
                 stack.push_back({n.x + o.x, n.y + o.y, n.z + o.z});

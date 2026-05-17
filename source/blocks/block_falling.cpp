@@ -10,7 +10,7 @@ BlockFalling::BlockFalling(uint16_t id, uint8_t texture_index, Materials materia
 
 void BlockFalling::on_tick(World *world, const Vec3i &pos, javaport::Random &random)
 {
-    Block *block = world->get_block_at(pos + Vec3i{0, -1, 0});
+    BlockState *block = world->get_block_at(pos + Vec3i{0, -1, 0});
 
     if (block->id == 0 || block_list[block->id]->material().is_liquid)
     {

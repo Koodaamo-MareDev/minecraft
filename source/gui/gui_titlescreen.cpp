@@ -94,7 +94,7 @@ void GuiTitleScreen::draw()
     GX_SetAlphaUpdate(GX_TRUE);
 
     gertex::set_alpha_cutoff(0);
-    Block block = {.id = uint8_t(BlockID::stone), .visibility_flags = 0x7F, .meta = 0, .light = 0xFF};
+    BlockState block = {.id = uint8_t(BlockID::stone), .visibility_flags = 0x7F, .meta = 0, .light = 0xFF};
 
     Camera &camera = get_camera();
     camera.transform.set_rotation(Vec3f(15, 0, 0));

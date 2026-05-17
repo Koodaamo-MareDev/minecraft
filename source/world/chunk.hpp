@@ -146,7 +146,7 @@ public:
     World *world = nullptr;
     ChunkState state = ChunkState::empty;
     uint8_t lit_state = 0;
-    Block blockstates[16 * 16 * WORLD_HEIGHT] = {0};
+    BlockState blockstates[16 * 16 * WORLD_HEIGHT] = {0};
     uint8_t height_map[16 * 16] = {0};
     uint8_t terrain_map[16 * 16] = {0};
     Section sections[VERTICAL_SECTION_COUNT] = {0};
@@ -163,7 +163,7 @@ public:
      * This returns the wrong block if the position is out of bounds.
      * You might want to use try_get_block instead.
      */
-    Block *get_block(const Vec3i &pos)
+    BlockState *get_block(const Vec3i &pos)
     {
         return &this->blockstates[(pos.x & 0xF) | ((pos.y & MAX_WORLD_Y) << 8) | ((pos.z & 0xF) << 4)];
     }
@@ -173,7 +173,7 @@ public:
      * @param pos - the position of the block
      * @return the block at the position or nullptr if out of bounds
      */
-    Block *try_get_block(const Vec3i &pos)
+    BlockState *try_get_block(const Vec3i &pos)
     {
         if (block_to_chunk_pos(pos) != Vec2i(this->x, this->z))
             return nullptr;
@@ -213,7 +213,7 @@ public:
      */
     void replace_air(const Vec3i &position, BlockID id)
     {
-        Block *block = this->get_block(position);
+        BlockState *block = this->get_block(position);
         if (!block->blockid)
             block->blockid = id;
     }
@@ -226,7 +226,7 @@ public:
      */
     void try_replace_air(const Vec3i &position, BlockID id)
     {
-        Block *block = this->try_get_block(position);
+        BlockState *block = this->try_get_block(position);
         if (block && !block->blockid)
             block->blockid = id;
     }
@@ -244,7 +244,7 @@ public:
     void update_height_map(Vec3i pos);
     void light_up();
     void recalculate_height_map();
-    void recalculate_visibility(Block *block, const Vec3i &pos, ChunkCache &cache);
+    void recalculate_visibility(BlockState *block, const Vec3i &pos, ChunkCache &cache);
     void refresh_section_block_visibility(int index);
     static void init_floodfill_startpoints();
     void vbo_visibility_flood_fill(Vec3i pos);

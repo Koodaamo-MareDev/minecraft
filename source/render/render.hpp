@@ -50,15 +50,15 @@ void update_textures();
 
 void use_texture(GXTexObj &texture);
 
-int render_face(gertex::DisplayList<gertex::Vertex16> *list, Vec3i pos, uint8_t face, uint32_t texture_index, Block *block = nullptr, uint8_t min_y = 0, uint8_t max_y = 16);
+int render_face(gertex::DisplayList<gertex::Vertex16> *list, Vec3i pos, uint8_t face, uint32_t texture_index, BlockState *block = nullptr, uint8_t min_y = 0, uint8_t max_y = 16);
 
-int render_back_face(gertex::DisplayList<gertex::Vertex16> *list, Vec3i pos, uint8_t face, uint32_t texture_index, Block *block = nullptr, uint8_t min_y = 0, uint8_t max_y = 16);
+int render_back_face(gertex::DisplayList<gertex::Vertex16> *list, Vec3i pos, uint8_t face, uint32_t texture_index, BlockState *block = nullptr, uint8_t min_y = 0, uint8_t max_y = 16);
 
-void render_single_block_at(Block &selected_block, const Vec3i &pos, uint8_t frac_bits);
+void render_single_block_at(BlockState &selected_block, const Vec3i &pos, uint8_t frac_bits);
 
-void render_single_block(Block &selected_block);
+void render_single_block(BlockState &selected_block);
 
-void render_block_as_item(Block &selected_block);
+void render_block_as_item(BlockState &selected_block);
 
 void render_single_item(uint32_t texture_index, bool transparency, uint8_t light = 0xFF);
 

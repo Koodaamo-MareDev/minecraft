@@ -121,7 +121,7 @@ void BlockSign::on_neighbor_changed(World *world, const Vec3i &pos, uint8_t neig
     }
     if (should_break)
     {
-        Block old_block = *world->get_block_at(pos);
+        BlockState old_block = *world->get_block_at(pos);
         world->destroy_block(pos, &old_block);
     }
 }
