@@ -14,9 +14,13 @@ static std::map<RenderType, std::function<int(gertex::DisplayList<gertex::Vertex
     {RenderType::flat_ground, render_flat_ground},
     {RenderType::slab, render_slab},
     {RenderType::special, render_special},
-    {RenderType::fluid, [](gertex::DisplayList<gertex::Vertex16> *list, BlockState *, const Vec3i &)
-     { return 0; }},
+    {RenderType::fluid, render_nothing}
 };
+
+int render_nothing(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3i &pos)
+{
+    return 0;
+}
 
 int render_block(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3i &pos)
 {
