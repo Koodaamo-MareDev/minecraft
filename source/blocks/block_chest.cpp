@@ -3,7 +3,7 @@
 #include <world/world.hpp>
 #include <world/tile_entity/tile_entity_chest.hpp>
 #include <world/chunk.hpp>
-#include <block/block_list.hpp>
+#include <registry/block_list.hpp>
 #include <block/block_properties.hpp>
 #include <gui/gui_container.hpp>
 
@@ -16,65 +16,60 @@ BlockChest::BlockChest(uint16_t id) : BlockContainer(id, Materials::WOOD)
 
 uint8_t BlockChest::texture_index(World *world, const Vec3i &pos, uint8_t face)
 {
-    BlockState *block = world->get_block_at(pos);
-
     // Bottom and top faces are always the same
     if (face == +BlockFace::NY || face == +BlockFace::PY)
         return 25;
 
-    BlockState *neighbors[4];
+    BlockBase *neighbors[4];
     {
-        BlockState *tmp_neighbors[6];
-        if (world)
-            world->get_neighbors(pos, tmp_neighbors);
-        neighbors[0] = tmp_neighbors[0];
-        neighbors[1] = tmp_neighbors[1];
-        neighbors[2] = tmp_neighbors[4];
-        neighbors[3] = tmp_neighbors[5];
+        neighbors[0] = block_at(world, pos + Vec3i{-1, 0, 0});
+        neighbors[1] = block_at(world, pos + Vec3i{+1, 0, 0});
+        neighbors[2] = block_at(world, pos + Vec3i{0, 0, -1});
+        neighbors[3] = block_at(world, pos + Vec3i{0, 0, +1});
     }
 
-    if (std::none_of(neighbors, neighbors + 4, [](BlockState *block)
-                     { return block && block->blockid == BlockID::chest; }))
+    if (!has_neighbor_chest(world, pos))
     {
         // Single chest
-        uint8_t direction = FACE_PZ;
-        if (!(block->visibility_flags & (VIS_PZ)) && (block->visibility_flags & (VIS_NZ)))
-            direction = FACE_NZ;
-        if (!(block->visibility_flags & (VIS_NX)) && (block->visibility_flags & (VIS_PX)))
-            direction = FACE_PX;
-        if (!(block->visibility_flags & (VIS_PX)) && (block->visibility_flags & (VIS_NX)))
-            direction = FACE_NX;
+        uint8_t direction = +BlockFace::PZ;
+        if (!should_render_side(world, pos, +BlockFace::PZ) && should_render_side(world, pos, +BlockFace::NZ))
+            direction = +BlockFace::NZ;
+        if (!should_render_side(world, pos, +BlockFace::NX) && should_render_side(world, pos, +BlockFace::PX))
+            direction = +BlockFace::PX;
+        if (!should_render_side(world, pos, +BlockFace::PX) && should_render_side(world, pos, +BlockFace::NX))
+            direction = +BlockFace::NX;
 
         return 26 + (face == direction);
     }
 
     // Double chest
 
-    if ((face != FACE_NZ && face != FACE_PZ) && neighbors[0]->blockid != BlockID::chest && neighbors[1]->blockid != BlockID::chest)
+    if ((face != +BlockFace::NZ && face != +BlockFace::PZ) && neighbors[0]->block_id() != BlockID::chest && neighbors[1]->block_id() != BlockID::chest)
     {
         // X axis
-        bool half = neighbors[2]->blockid == BlockID::chest;
-        uint8_t other_flags = neighbors[half ? 2 : 3]->visibility_flags;
-        uint8_t direction = FACE_PX;
-        if ((!(block->visibility_flags & (VIS_PX)) || !(other_flags & (VIS_PX))) && (block->visibility_flags & (VIS_NX)) && (other_flags & (VIS_NX)))
-            direction = FACE_NX;
+        bool half = neighbors[2]->block_id() == BlockID::chest;
+        uint8_t direction = +BlockFace::PX;
+        BlockBase *n = neighbors[half ? 2 : 3];
+        if ((!should_render_side(world, pos, +BlockFace::PX) || !n->should_render_side(world, pos, +BlockFace::PX)) &&
+            should_render_side(world, pos, +BlockFace::NX) && n->should_render_side(world, pos, +BlockFace::NX))
+            direction = +BlockFace::NX;
 
-        if (face == FACE_NX)
+        if (face == +BlockFace::NX)
             half = !half;
 
         return 26 + (face == direction ? 16 : 32) - half;
     }
-    else if ((face != FACE_NX && face != FACE_PX) && neighbors[2]->blockid != BlockID::chest && neighbors[3]->blockid != BlockID::chest)
+    else if ((face != +BlockFace::NX && face != +BlockFace::PX) && neighbors[2]->block_id() != BlockID::chest && neighbors[3]->block_id() != BlockID::chest)
     {
         // Z axis
-        bool half = neighbors[0]->blockid == BlockID::chest;
+        bool half = neighbors[0]->block_id() == BlockID::chest;
+        uint8_t direction = +BlockFace::PZ;
+        BlockBase *n = neighbors[half ? 0 : 1];
+        if ((!should_render_side(world, pos, +BlockFace::PZ) || !n->should_render_side(world, pos, +BlockFace::PZ)) &&
+            should_render_side(world, pos, +BlockFace::NZ) && n->should_render_side(world, pos, +BlockFace::NZ))
+            direction = +BlockFace::NZ;
 
-        uint8_t other_flags = neighbors[half ? 0 : 1]->visibility_flags;
-        uint8_t direction = FACE_PZ;
-        if ((!(block->visibility_flags & (VIS_PZ)) || !(other_flags & (VIS_PZ))) && (block->visibility_flags & (VIS_NZ)) && (other_flags & (VIS_NZ)))
-            direction = FACE_NZ;
-
-        if (face == FACE_PZ)
+        if (face == +BlockFace::PZ)
             half = !half;
 
         return 26 + (face == direction ? 16 : 32) - half;

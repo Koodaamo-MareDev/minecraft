@@ -1,6 +1,7 @@
 #include "block_door.hpp"
+#include <render/render_blocks.hpp>
 #include <world/world.hpp>
-#include <block/block_list.hpp>
+#include <registry/block_list.hpp>
 #include <item/item_id.hpp>
 #include <util/constants.hpp>
 #include <sound.hpp>
@@ -10,6 +11,7 @@ BlockDoor::BlockDoor(uint16_t id, Materials material) : BlockBase(id, material)
 {
     data.sound_type = material == Materials::IRON ? BlockSoundType::metal : BlockSoundType::wood;
     data.render_type = BlockRenderType::special;
+    data.render_func = render_door;
 }
 
 bool BlockDoor::is_opaque()

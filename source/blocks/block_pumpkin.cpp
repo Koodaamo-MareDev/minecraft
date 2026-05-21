@@ -1,6 +1,6 @@
 #include "block_pumpkin.hpp"
 #include <world/world.hpp>
-#include <block/block_list.hpp>
+#include <registry/block_list.hpp>
 
 BlockPumpkin::BlockPumpkin(uint16_t id, uint8_t texture_index, Materials material) : BlockBase(id, texture_index, material)
 {

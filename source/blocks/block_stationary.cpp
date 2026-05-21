@@ -1,7 +1,7 @@
 #include "block_stationary.hpp"
 
 #include <world/world.hpp>
-#include <block/block_list.hpp>
+#include <registry/block_list.hpp>
 
 BlockStationary::BlockStationary(uint16_t id, Materials material) : BlockFluids(id, material)
 {

@@ -1,10 +1,13 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <math/aabb.hpp>
 #include <string>
 #include <vector>
 #include <ported/Random.hpp>
+#include <gertex/displaylist.hpp>
+#include <item/item.hpp>
 
 #include "material.hpp"
 #include "block_enums.hpp"
@@ -13,6 +16,8 @@
 class World;
 class EntityPlayer;
 class EntityPhysical;
+class BlockState;
+using BlockRenderFunc = std::function<int(gertex::DisplayList<gertex::Vertex16> *list, BlockState *, const Vec3i &)>;
 
 class BlockBase
 {
@@ -43,6 +48,7 @@ public:
     virtual BlockBase &set_sound_type(BlockSoundType value);
     virtual BlockBase &set_material(Materials value);
     virtual BlockBase &set_name(const std::string &value);
+    virtual BlockBase &tool(item::ToolType tool, item::ToolTier tier);
 
     // Per type properties
     virtual bool is_opaque();
@@ -95,6 +101,8 @@ public:
     bool powers_indirectly(World *world, const Vec3i &pos, uint8_t face);
     bool has_indirect_power(World *world, const Vec3i &pos);
 
+    int render(gertex::DisplayList<gertex::Vertex16> *list, BlockState *state, const Vec3i &pos);
+
 protected:
     struct Data
     {
@@ -119,5 +127,6 @@ protected:
         float slipperiness;
         AABB aabb;
         std::string name;
+        BlockRenderFunc render_func;
     } data;
 };

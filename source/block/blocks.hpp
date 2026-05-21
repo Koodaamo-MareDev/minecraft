@@ -22,6 +22,7 @@ uint8_t get_block_luminance(BlockID block_id);
 void override_texture_index(int32_t texture_index);
 uint32_t get_default_texture_index(BlockID blockid);
 uint32_t get_face_texture_index(BlockState *block, int face);
+uint32_t get_texture_index(World *world, const Vec3i &pos, uint8_t face, BlockState *block);
 
 void schedule_update(World *world, const Vec3i &pos, BlockState &block);
 bool is_solid(BlockID block_id);

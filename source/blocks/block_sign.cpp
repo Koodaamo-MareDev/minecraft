@@ -1,6 +1,6 @@
 #include "block_sign.hpp"
 
-#include <block/block_list.hpp>
+#include <registry/block_list.hpp>
 #include <item/item_id.hpp>
 #include <world/world.hpp>
 #include <world/tile_entity/tile_entity_sign.hpp>

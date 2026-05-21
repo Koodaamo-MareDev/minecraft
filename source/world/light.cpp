@@ -6,6 +6,7 @@
 #include <block/block_properties.hpp>
 #include <world/util/raycast.hpp>
 #include <world/world.hpp>
+#include <registry/block_list.hpp>
 #include <util/lock.hpp>
 #include <util/timers.hpp>
 #include <cmath>
@@ -108,21 +109,22 @@ void LightEngine::process(const Vec3i &start)
         stack.pop_front();
 
         Chunk *chunk = nullptr;
-        BlockState *block = get_block_cached(cache, n.x, n.y, n.z, chunk);
-        if (!block)
+        BlockState *state = get_block_cached(cache, n.x, n.y, n.z, chunk);
+        if (!state)
             continue;
+        BlockBase *block = block_list[state->id];
 
-        uint8_t old_light = block->light;
+        uint8_t old_light = state->light;
 
         uint8_t sky = 0;
-        uint8_t torch = properties(block->id).m_luminance;
+        uint8_t torch = block->light_luminance();
 
         if (!world->hell && n.y >= chunk->height_map[(n.z & 15) << 4 | (n.x & 15)])
             sky = 0xF;
 
-        if (!block->id || can_see_through(properties(block->id)))
+        if (!state->id || !block->is_opaque() || block->light_opacity() < 15)
         {
-            int8_t opacity = std::max<int8_t>(get_block_opacity(block->blockid), 1);
+            int8_t opacity = std::max<int8_t>(block->light_opacity(), 1);
 
             for (int i = 0; i < 6; i++)
             {
@@ -141,7 +143,7 @@ void LightEngine::process(const Vec3i &start)
         if (new_light == old_light && !(n.x == start.x && n.y == start.y && n.z == start.z))
             continue;
 
-        block->light = new_light;
+        state->light = new_light;
 
         for (int i = 0; i < 6; i++)
         {

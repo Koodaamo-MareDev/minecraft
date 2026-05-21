@@ -2,7 +2,7 @@
 
 #include <world/world.hpp>
 #include <world/entity.hpp>
-#include <block/block_list.hpp>
+#include <registry/block_list.hpp>
 
 BlockFalling::BlockFalling(uint16_t id, uint8_t texture_index, Materials material) : BlockBase(id, texture_index, material)
 {

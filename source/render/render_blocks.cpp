@@ -4,6 +4,7 @@
 #include <world/world.hpp>
 #include <world/chunk.hpp>
 #include <block/blocks.hpp>
+#include <registry/block_list.hpp>
 #include <render/render.hpp>
 #include <gertex/displaylist.hpp>
 
@@ -14,36 +15,21 @@ static std::map<RenderType, std::function<int(gertex::DisplayList<gertex::Vertex
     {RenderType::flat_ground, render_flat_ground},
     {RenderType::slab, render_slab},
     {RenderType::special, render_special},
-    {RenderType::fluid, render_nothing}
-};
+    {RenderType::fluid, render_nothing}};
 
 int render_nothing(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3i &pos)
 {
     return 0;
 }
 
-int render_block(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3i &pos)
-{
-    switch (block->blockid)
-    {
-    case BlockID::air:
-        return 0;
-    case BlockID::chest:
-        return render_chest(list, block, pos);
-    case BlockID::snow_layer:
-        return render_snow_layer(list, block, pos);
-    default:
-        return render_functions[properties(block->id).m_render_type](list, block, pos);
-    }
-}
-
 int render_cube(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3i &pos)
 {
     int vertexCount = 0;
-    for (uint8_t face = VIS_MIN, i = 0; face != VIS_MAX; face <<= 1, i++)
+    BlockBase *b = block_list[block->id];
+    for (uint8_t i = 0; i < 6; i++)
     {
-        if ((block->visibility_flags & face))
-            vertexCount += render_face(list, pos, i, get_default_texture_index(block->blockid), block);
+        if (!render_world || b->should_render_side(render_world, pos, i))
+            vertexCount += render_face(list, pos, i, get_texture_index(render_world, pos, i, block), block);
     }
     return vertexCount;
 }
@@ -51,10 +37,11 @@ int render_cube(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, 
 int render_inverted_cube(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3i &pos)
 {
     int vertexCount = 0;
-    for (uint8_t face = VIS_MIN, i = 0; face != VIS_MAX; face <<= 1, i++)
+    BlockBase *b = block_list[block->id];
+    for (uint8_t i = 0; i < 6; i++)
     {
-        if ((block->visibility_flags & face))
-            vertexCount += render_back_face(list, pos, i, get_default_texture_index(block->blockid), block);
+        if (!render_world || b->should_render_side(render_world, pos, i))
+            vertexCount += render_back_face(list, pos, i, get_texture_index(render_world, pos, i, block), block);
     }
     return vertexCount;
 }
@@ -62,10 +49,11 @@ int render_inverted_cube(gertex::DisplayList<gertex::Vertex16> *list, BlockState
 int render_inverted_cube_special(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3i &pos)
 {
     int vertexCount = 0;
-    for (uint8_t face = VIS_MIN, i = 0; face != VIS_MAX; face <<= 1, i++)
+    BlockBase *b = block_list[block->id];
+    for (uint8_t i = 0; i < 6; i++)
     {
-        if ((block->visibility_flags & face))
-            vertexCount += render_back_face(list, pos, i, get_face_texture_index(block, i), block);
+        if (!render_world || b->should_render_side(render_world, pos, i))
+            vertexCount += render_back_face(list, pos, i, get_texture_index(render_world, pos, i, block), block);
     }
     return vertexCount;
 }
@@ -73,10 +61,11 @@ int render_inverted_cube_special(gertex::DisplayList<gertex::Vertex16> *list, Bl
 int render_cube_special(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3i &pos)
 {
     int vertexCount = 0;
-    for (uint8_t face = VIS_MIN, i = 0; face != VIS_MAX; face <<= 1, i++)
+    BlockBase *b = block_list[block->id];
+    for (uint8_t i = 0; i < 6; i++)
     {
-        if ((block->visibility_flags & face))
-            vertexCount += render_face(list, pos, i, get_face_texture_index(block, i), block);
+        if (!render_world || b->should_render_side(render_world, pos, i))
+            vertexCount += render_face(list, pos, i, get_texture_index(render_world, pos, i, block), block);
     }
     return vertexCount;
 }
@@ -105,7 +94,7 @@ int render_flat_ground(gertex::DisplayList<gertex::Vertex16> *list, BlockState *
     uint8_t lighting = block->light;
     Vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
     Vec3f vertex_pos(local_pos.x, local_pos.y, local_pos.z);
-    uint32_t texture_index = get_default_texture_index(block->blockid);
+    uint32_t texture_index = get_face_texture_index(block, FACE_PY);
 
     int16_t x = local_pos.x << BASE3D_POS_FRAC_BITS;
     int16_t y = (local_pos.y << BASE3D_POS_FRAC_BITS) - 14;
@@ -126,7 +115,7 @@ int render_snow_layer(gertex::DisplayList<gertex::Vertex16> *list, BlockState *b
 {
     Vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
     Vec3f vertex_pos(local_pos.x, local_pos.y, local_pos.z);
-    uint32_t texture_index = get_default_texture_index(block->blockid);
+    uint32_t texture_index = get_face_texture_index(block, FACE_PY);
     int vertexCount = 4;
 
     // Top
@@ -438,8 +427,8 @@ int render_cross(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block,
     uint8_t lighting = block->light;
     Vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
     Vec3f vertex_pos(local_pos.x, local_pos.y, local_pos.z);
-    uint32_t texture_index = get_default_texture_index(block->blockid);
-    
+    uint32_t texture_index = get_face_texture_index(block, FACE_PY);
+
     int16_t x0 = (local_pos.x << BASE3D_POS_FRAC_BITS) - 16;
     int16_t x1 = (local_pos.x << BASE3D_POS_FRAC_BITS) + 16;
     int16_t y0 = (local_pos.y << BASE3D_POS_FRAC_BITS) - 16;
@@ -480,7 +469,7 @@ int render_slab(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, 
     Vec3f vertex_pos(local_pos.x, local_pos.y, local_pos.z);
 
     // Check for texture overrides
-    uint32_t texture_index = get_default_texture_index(block->blockid);
+    uint32_t texture_index = get_texture_index(render_world, pos, +BlockFace::PY, block);
     uint32_t top_index = texture_index;
     uint32_t side_index = top_index - 1;
     uint32_t bottom_index = top_index;
@@ -520,30 +509,30 @@ int render_slab(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, 
     if (top_half)
     {
         vertex_pos = vertex_pos + Vec3f(0, 0.5, 0);
-        if (!(block->visibility_flags & VIS_PY))
+        if (!block_list[block->id]->should_render_side(render_world, pos, +BlockFace::PY))
             render_top = false;
     }
     else
     {
-        if (!(block->visibility_flags & VIS_NY))
+        if (!block_list[block->id]->should_render_side(render_world, pos, +BlockFace::NY))
             render_bottom = false;
     }
     bool faces[6] = {
-        (block->visibility_flags & VIS_NX) != 0,
-        (block->visibility_flags & VIS_PX) != 0,
+        block_list[block->id]->should_render_side(render_world, pos, +BlockFace::NX),
+        block_list[block->id]->should_render_side(render_world, pos, +BlockFace::PX),
         render_bottom,
         render_top,
-        (block->visibility_flags & VIS_NZ) != 0,
-        (block->visibility_flags & VIS_PZ) != 0};
+        block_list[block->id]->should_render_side(render_world, pos, +BlockFace::NZ),
+        block_list[block->id]->should_render_side(render_world, pos, +BlockFace::PZ)};
 
     for (int i = 0; i < 6; i++)
     {
         if (faces[i])
         {
             uint32_t face_texture_index = side_index;
-            if (i == FACE_NY)
+            if (i == +BlockFace::NY)
                 face_texture_index = bottom_index;
-            else if (i == FACE_PY)
+            else if (i == +BlockFace::PY)
                 face_texture_index = top_index;
             vertexCount += render_face(list, pos, i, face_texture_index, block, min_y, max_y);
         }

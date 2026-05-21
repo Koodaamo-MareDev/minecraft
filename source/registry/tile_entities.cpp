@@ -6,5 +6,6 @@ namespace registry
     {
         TileEntity::register_ctor<TileEntityChest>("Chest");
         TileEntity::register_ctor<TileEntityFurnace>("Furnace");
+        TileEntity::register_ctor<TileEntitySign>("Sign");
     }
 }

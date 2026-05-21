@@ -1,6 +1,6 @@
 #include "block_button.hpp"
 
-#include <block/block_list.hpp>
+#include <registry/block_list.hpp>
 #include <world/world.hpp>
 #include <sound.hpp>
 #include <sounds.hpp>

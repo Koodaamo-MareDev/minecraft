@@ -25,6 +25,7 @@
 #include <gui/gui_gameover.hpp>
 #include <world/chunkprovider.hpp>
 #include <registry/tile_entities.hpp>
+#include <registry/block_list.hpp>
 #include <util/face_pair.hpp>
 #include <util/debuglog.hpp>
 #include <light_nether_rgba.h>
@@ -250,13 +251,35 @@ void World::tick_blocks()
         BlockState *block = get_block_at(block_tick.pos);
         if (block && block->blockid == block_tick.block_id)
         {
-            BlockProperties &props = properties(block->id);
-            if (props.m_tick)
-            {
-                props.m_tick(this, block_tick.pos, *block);
-            }
+            block_list[block->id]->on_tick(this, block_tick.pos, random);
         }
         scheduled_updates.erase(block_tick);
+    }
+
+    auto has_nearby_chunks = [this](int x, int z) -> bool
+    {
+        for (int dx = -1; dx <= 1; dx++)
+            for (int dz = -1; dz <= 1; dz++)
+                if (!get_chunk(x + dx, z + dz))
+                    return false;
+        return true;
+    };
+
+    for (Chunk *&chunk : chunks)
+    {
+        if (chunk && has_nearby_chunks(chunk->x, chunk->z))
+            for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
+            {
+                Section &current = chunk->sections[j];
+                // Random tick
+                for (int j = 0; j < 3; j++)
+                {
+                    int pos = random.nextInt(4096);
+                    Vec3i to_update = {current.x | (pos & 15), current.y | ((pos >> 4) & 15), current.z | ((pos >> 8) & 15)};
+                    BlockState *state = chunk->get_block(to_update);
+                    block_list[state->id]->on_random_tick(this, to_update, random);
+                }
+            }
     }
 }
 
@@ -291,6 +314,15 @@ bool World::update_sections()
             return nullptr;
 
         return &chunk->sections[pos.y >> 4];
+    };
+
+    auto has_nearby_chunks = [this, section_at](int x, int y, int z) -> bool
+    {
+        for (int dx = -1; dx <= 1; dx++)
+            for (int dz = -1; dz <= 1; dz++)
+                if (!get_chunk_from_pos(Vec3i(x + dx * 16, 0, z + dz * 16)))
+                    return false;
+        return true;
     };
 
     auto has_nearby_sections = [section_at](int x, int y, int z) -> bool
@@ -331,7 +363,7 @@ bool World::update_sections()
                     chunk->refresh_section_block_visibility(j);
                     break;
                 case SectionUpdatePhase::SOLID:
-                    if (chunk->light_pending || !current.visible)
+                    if (chunk->light_pending || !current.visible || !has_nearby_chunks(current.x, current.y, current.z))
                     {
                         processed = false;
                         break;
@@ -340,7 +372,7 @@ bool World::update_sections()
                     ChunkRenderer::render_section(current, false);
                     break;
                 case SectionUpdatePhase::TRANSPARENT:
-                    if (chunk->light_pending || !current.visible)
+                    if (chunk->light_pending || !current.visible || !has_nearby_chunks(current.x, current.y, current.z))
                     {
                         processed = false;
                         break;
@@ -599,6 +631,7 @@ void World::edit_blocks()
                 // Block use handlers
                 if (!finish_destroying && should_place_block)
                 {
+                    /*
                     switch (targeted_block->blockid)
                     {
                     case BlockID::crafting_table:
@@ -637,7 +670,8 @@ void World::edit_blocks()
                     }
                     default:
                         break;
-                    }
+                    }*/
+                    should_place_block = !block_list[targeted_block->id]->on_use(&player, player.raycast_target_pos);
                 }
             }
 
@@ -647,6 +681,9 @@ void World::edit_blocks()
 
                 BlockState old_editable_block = *editable_block;
 
+                BlockBase *block = block_list[old_editable_block.id];
+                if (properties(old_editable_block.id).can_be_broken_with(*player.selected_item))
+                    block->on_harvest(this, result_pos, old_editable_block.meta);
                 destroy_block(result_pos, &old_editable_block);
                 if (is_remote())
                 {
@@ -680,7 +717,8 @@ void World::edit_blocks()
                 {
                     if (result_block.blockid != BlockID::air)
                     {
-                        set_block_and_meta_at(result_pos, result_block.blockid, result_block.meta);
+                        set_block_and_meta_at(result_pos, held_block.blockid, held_block.meta);
+                        block_list[result_block.id]->on_entity_place(this, result_pos, &player);
                     }
                     if (!is_remote())
                     {
@@ -788,14 +826,16 @@ void World::destroy_block(const Vec3i pos, BlockState *old_block)
         return;
 
     // Client side block destruction - only for local play
-    properties(old_blockid).m_destroy(this, pos, *old_block);
+    BlockBase *block = block_list[old_blockid];
     if (properties(old_blockid).can_be_broken_with(*player.selected_item))
-        spawn_drop(pos, properties(old_blockid).m_drops(*old_block));
+        block->drop_item(this, pos, old_block->meta);
+    block->on_destroyed(this, pos);
 }
 
 bool World::place_block(const Vec3i pos, const Vec3i targeted, BlockState *new_block, uint8_t face)
 {
-
+    if (!block_list[new_block->id]->can_place(this, pos))
+        return false;
     // Check if the block has collision
     bool intersects_entity = false;
     if (properties(new_block->blockid).m_solid)
@@ -1775,11 +1815,11 @@ void World::set_block_at(const Vec3i &pos, BlockID id)
     {
         if (block->blockid == id)
             return;
+        if (id == BlockID::air)
+            block_list[id]->on_removed(this, pos);
         block->blockid = id;
         block->meta = 0;
-        BlockProperties &prop = properties(id);
-        if (id != BlockID::air && prop.m_added)
-            prop.m_added(this, pos, *block);
+        block_list[id]->on_added(this, pos);
         mark_block_dirty(pos);
     }
 }
@@ -1804,11 +1844,11 @@ void World::set_block_and_meta_at(const Vec3i &pos, BlockID id, uint8_t meta)
     {
         if (block->blockid == id && block->meta == meta)
             return;
+        if (id == BlockID::air)
+            block_list[id]->on_removed(this, pos);
         block->blockid = id;
         block->meta = meta;
-        BlockProperties &prop = properties(id);
-        if (id != BlockID::air && prop.m_added)
-            prop.m_added(this, pos, *block);
+        block_list[id]->on_added(this, pos);
         mark_block_dirty(pos);
     }
 }
@@ -1834,11 +1874,7 @@ void World::notify_neighbors(const Vec3i &pos)
         BlockState *block = get_block_at(neighbour);
         if (block)
         {
-            BlockProperties &prop = properties(block->id);
-            if (prop.m_neighbor_changed)
-            {
-                prop.m_neighbor_changed(this, neighbour, *block);
-            }
+            block_list[block->id]->on_neighbor_changed(this, neighbour, block->id);
         }
     }
 }

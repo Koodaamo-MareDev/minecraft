@@ -3,6 +3,7 @@
 
 #include <world/tile_entity/tile_entity_chest.hpp>
 #include <world/tile_entity/tile_entity_furnace.hpp>
+#include <world/tile_entity/tile_entity_sign.hpp>
 
 namespace registry
 {

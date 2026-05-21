@@ -1,6 +1,7 @@
 #include "render.hpp"
 #include <render/render_blocks.hpp>
 #include <gertex/displaylist.hpp>
+#include <registry/block_list.hpp>
 
 #include <ported/Random.hpp>
 
@@ -474,7 +475,7 @@ void render_single_block_at(BlockState &selected_block, const Vec3i &pos, uint8_
 
     gertex::DisplayListBuffered16 list(128, VERTEX_ATTR_LENGTH);
     list.begin(GX_QUADS);
-    render_block(&list, &selected_block, pos);
+    block_list[selected_block.id]->render(&list, &selected_block, pos);
     list.flush();
 
     gertex::set_state(state);

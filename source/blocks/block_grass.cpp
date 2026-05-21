@@ -1,7 +1,7 @@
 #include "block_grass.hpp"
 
 #include <world/world.hpp>
-#include <block/block_list.hpp>
+#include <registry/block_list.hpp>
 
 BlockGrass::BlockGrass(uint16_t id, uint8_t texture_index, Materials material) : BlockBase(id, texture_index, material)
 {

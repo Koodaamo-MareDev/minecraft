@@ -1,13 +1,15 @@
 #include "block_reeds.hpp"
 
+#include <render/render_blocks.hpp>
 #include <world/world.hpp>
-#include <block/block_list.hpp>
+#include <registry/block_list.hpp>
 
 BlockReeds::BlockReeds(uint16_t id, uint8_t texture_index) : BlockBase(id, texture_index, Materials::PLANTS)
 {
     data.aabb = AABB(Vec3f(2.0 / 16.0, 0.0, 2.0 / 16.0), Vec3f(14.0 / 16.0, 1.0, 14.0 / 16.0));
     data.tick_on_load = true;
     data.render_type = BlockRenderType::cross;
+    data.render_func = render_cross;
 }
 
 bool BlockReeds::can_place(World *world, const Vec3i &pos)

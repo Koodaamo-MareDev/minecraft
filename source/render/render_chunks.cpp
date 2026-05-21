@@ -9,6 +9,7 @@
 #include <world/chunk.hpp>
 #include <world/world.hpp>
 #include <gertex/displaylist.hpp>
+#include <registry/block_list.hpp>
 
 extern bool render_fast_leaves;
 
@@ -79,7 +80,7 @@ namespace ChunkRenderer
                     Vec3i blockpos = Vec3i(_x, _y, _z) + section_offset;
                     BlockProperties &props = properties(block->id);
                     if (transparent == props.m_transparent)
-                        vertex_count += render_block(list, block, blockpos);
+                        vertex_count += block_list[block->id]->render(list, block, blockpos);
                 }
             }
         }

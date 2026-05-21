@@ -1,7 +1,8 @@
 #include "block_cactus.hpp"
 
+#include <render/render_blocks.hpp>
 #include <world/world.hpp>
-#include <block/block_list.hpp>
+#include <registry/block_list.hpp>
 
 BlockCactus::BlockCactus(uint16_t id, uint8_t texture_index) : BlockBase(id, texture_index, Materials::CACTUS)
 {
@@ -10,6 +11,7 @@ BlockCactus::BlockCactus(uint16_t id, uint8_t texture_index) : BlockBase(id, tex
     data.tick_on_load = true;
     data.sound_type = BlockSoundType::cloth;
     data.render_type = BlockRenderType::special;
+    data.render_func = render_cactus;
 }
 
 void BlockCactus::on_tick(World *world, const Vec3i &pos, javaport::Random &random)

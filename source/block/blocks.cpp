@@ -9,6 +9,7 @@
 #include <sounds.hpp>
 #include <world/world.hpp>
 #include <registry/tile_entities.hpp>
+#include <registry/block_list.hpp>
 #include <item/item_stack.hpp>
 #include <item/item_id.hpp>
 
@@ -41,7 +42,14 @@ void override_texture_index(int32_t texture_index)
 
 uint32_t get_default_texture_index(BlockID blockid)
 {
-    return block_texture_index >= 0 ? (block_texture_index & 0xFF) : block_properties[uint8_t(blockid)].m_texture_index;
+    return block_texture_index >= 0 ? (block_texture_index & 0xFF) : block_list[uint8_t(blockid)]->face_texture_index(0, 0);
+}
+
+uint32_t get_texture_index(World *world, const Vec3i &pos, uint8_t face, BlockState *block)
+{
+    if (block_texture_index >= 0)
+        return (block_texture_index & 0xFF);
+    return world && pos.y >= 0 ? block_list[block->id]->texture_index(world, pos, face) : block_list[block->id]->face_texture_index(face, block->meta);
 }
 
 uint32_t get_face_texture_index(BlockState *block, int face)
@@ -54,7 +62,8 @@ uint32_t get_face_texture_index(BlockState *block, int face)
         // If a custom texture index is set, use it for all blocks
         return (block_texture_index & 0xFF);
     }
-
+    return block_list[uint8_t(block->blockid)]->face_texture_index(face, block->meta);
+#if 0
     const int directionmap[] = {
         FACE_NZ,
         FACE_PX,
@@ -227,6 +236,7 @@ uint32_t get_face_texture_index(BlockState *block, int face)
     default:
         return get_default_texture_index(blockid);
     }
+#endif
 }
 
 // Returns the BlockID of the fluid that the target fluid will

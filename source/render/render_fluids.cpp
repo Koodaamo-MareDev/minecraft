@@ -247,7 +247,7 @@ int render_fluid(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block,
     if (!is_same_fluid(block_id, neighbor_ids[FACE_PY]))
         faceCount += DrawHorizontalQuad(list, topPlaneCoords, !neighbors[FACE_PY] || is_solid(neighbor_ids[FACE_PY]) ? light : neighbors[FACE_PY]->light);
 
-    texture_offset = get_default_texture_index(flowfluid(block_id));
+    texture_offset = get_default_texture_index(block_id) + 1;
 
     gertex::Vertex16 sideCoords[4] = {0};
 

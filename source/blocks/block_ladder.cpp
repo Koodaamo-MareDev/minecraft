@@ -1,7 +1,7 @@
 #include "block_ladder.hpp"
 
 #include <world/world.hpp>
-#include <block/block_list.hpp>
+#include <registry/block_list.hpp>
 
 BlockLadder::BlockLadder(uint16_t id, uint8_t texture_index) : BlockBase(id, texture_index, Materials::CIRCUITS)
 {

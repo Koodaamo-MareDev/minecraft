@@ -1,13 +1,20 @@
 #include "block_fluids.hpp"
 
+#include <render/render_blocks.hpp>
 #include <world/world.hpp>
 #include <world/chunk.hpp>
-#include <block/block_list.hpp>
+#include <registry/block_list.hpp>
 
 BlockFluids::BlockFluids(uint16_t id, Materials material) : BlockBase(id, (material == Materials::LAVA ? 14 : 12) * 16 + 13, material)
 {
+    data.render_func = render_nothing;
     data.liquid = true;
     data.tick_on_load = true;
+}
+
+bool BlockFluids::is_opaque()
+{
+    return false;
 }
 
 uint8_t BlockFluids::texture_index(World *world, const Vec3i &pos, uint8_t face)

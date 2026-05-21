@@ -1,6 +1,6 @@
 #include "block_base.hpp"
-#include "block_list.hpp"
-
+#include <registry/block_list.hpp>
+#include <render/render_blocks.hpp>
 #include <util/constants.hpp>
 #include <world/entity.hpp>
 #include <world/world.hpp>
@@ -33,7 +33,7 @@ uint8_t BlockBase::light_luminance()
 
 uint8_t BlockBase::light_opacity()
 {
-    return data.light_opacity;
+    return is_opaque() ? data.light_opacity : 0;
 }
 
 AABB BlockBase::aabb()
@@ -63,12 +63,13 @@ std::string BlockBase::name()
 
 bool BlockBase::is_opaque()
 {
-    return true;
+    return data.material != Materials::AIR;
 }
 
 bool BlockBase::can_place(World *world, const Vec3i &pos)
 {
-    if (data.liquid || world->get_block_at(pos)->id == 0)
+    BlockBase *block = block_at(world, pos);
+    if (block->material().is_liquid || block->block_id() == BlockID::air)
         return true;
     return false;
 }
@@ -126,9 +127,15 @@ BlockBase &BlockBase::set_name(const std::string &value)
     return *this;
 }
 
+BlockBase &BlockBase::tool(item::ToolType tool, item::ToolTier tier)
+{
+    return *this;
+}
+
 bool BlockBase::should_render_side(World *world, const Vec3i &pos, uint8_t face)
 {
-    AABB bbox = data.aabb;
+    BlockBase *b = block_at(world, pos + block_face[face]);
+    AABB bbox = b->aabb();
     if (face == +BlockFace::NX && bbox.min.x > 0.0)
         return true;
     if (face == +BlockFace::PX && bbox.max.x < 1.0)
@@ -141,7 +148,7 @@ bool BlockBase::should_render_side(World *world, const Vec3i &pos, uint8_t face)
         return true;
     if (face == +BlockFace::PZ && bbox.max.z < 1.0)
         return true;
-    return false;
+    return !b->is_opaque();
 }
 
 uint8_t BlockBase::face_texture_index(uint8_t face, uint8_t meta)
@@ -204,10 +211,12 @@ uint16_t BlockBase::drop_meta(uint16_t meta)
 
 void BlockBase::drop_item_with_chance(World *world, const Vec3i &pos, uint8_t meta, float chance)
 {
+    world->spawn_drop(pos, item::ItemStack(drop_id(meta, world->random), drop_count(world->random), drop_meta(meta)));
 }
 
 void BlockBase::drop_item(World *world, const Vec3i &pos, uint8_t meta)
 {
+    drop_item_with_chance(world, pos, meta, 1.0f);
 }
 
 // Events
@@ -322,6 +331,11 @@ bool BlockBase::has_indirect_power(World *world, const Vec3i &pos)
             powers_indirectly(world, pos + Vec3i{0, 0, +1}, +BlockFace::PZ));
 }
 
+int BlockBase::render(gertex::DisplayList<gertex::Vertex16> *list, BlockState *state, const Vec3i &pos)
+{
+    return data.render_func(list, state, pos);
+}
+
 bool BlockBase::can_stay(World *world, const Vec3i &pos)
 {
     return true;
@@ -342,12 +356,12 @@ BlockBase::BlockBase(uint16_t id, uint8_t texture_index, Materials material)
     data.aabb = AABB(Vec3f(0.0, 0.0, 0.0), Vec3f(1.0, 1.0, 1.0));
     data.sound_type = BlockSoundType::none;
     data.material = material;
+    data.render_func = material == Materials::AIR ? render_nothing : render_cube_special;
     if (block_list[id] != nullptr)
         throw std::runtime_error("Attempt to override block " + std::to_string(id));
     block_list[id] = this;
 }
 
-BlockBase::BlockBase(uint16_t id, Materials material)
+BlockBase::BlockBase(uint16_t id, Materials material) : BlockBase(id, 0, material)
 {
-    BlockBase(id, 0, material);
 }

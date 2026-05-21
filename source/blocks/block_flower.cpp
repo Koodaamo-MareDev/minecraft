@@ -1,10 +1,12 @@
 #include "block_flower.hpp"
+#include <render/render_blocks.hpp>
 #include <world/world.hpp>
 
 BlockFlower::BlockFlower(uint16_t id, uint8_t texture_index, Materials material) : BlockBase(id, texture_index, material)
 {
     data.sound_type = BlockSoundType::grass;
     data.render_type = BlockRenderType::cross;
+    data.render_func = render_cross;
     data.tick_on_load = true;
     data.aabb = AABB(Vec3f(0.3, 0.0, 0.3), Vec3f(0.7, 0.6, 0.7));
 }

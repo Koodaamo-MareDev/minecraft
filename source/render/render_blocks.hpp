@@ -8,7 +8,6 @@
 class BlockState;
 
 int render_nothing(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3i &pos);
-int render_block(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3i &pos);
 int render_cube(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3i &pos);
 int render_inverted_cube(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3i &pos);
 int render_cube_special(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3i &pos);

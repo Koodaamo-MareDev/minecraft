@@ -1,6 +1,6 @@
 #include "block_flowing.hpp"
 #include <world/world.hpp>
-#include <block/block_list.hpp>
+#include <registry/block_list.hpp>
 
 BlockFlowing::BlockFlowing(uint16_t id, Materials material) : BlockFluids(id, material)
 {

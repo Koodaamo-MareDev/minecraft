@@ -6,6 +6,7 @@ class BlockFluids : public BlockBase
 {
 public:
     BlockFluids(uint16_t id, Materials material);
+    virtual bool is_opaque() override;
     virtual uint8_t texture_index(World *world, const Vec3i &pos, uint8_t face) override;
     virtual bool should_render_side(World *world, const Vec3i &pos, uint8_t face) override;
     virtual void apply_entity_velocity(EntityPhysical *entity, const Vec3i &pos) override;

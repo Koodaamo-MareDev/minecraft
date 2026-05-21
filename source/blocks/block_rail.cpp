@@ -1,16 +1,18 @@
 #include "block_rail.hpp"
 
+#include <render/render_blocks.hpp>
 #include <world/world.hpp>
-#include <block/block_list.hpp>
+#include <registry/block_list.hpp>
 
 BlockRail::BlockRail(uint16_t id, uint8_t texture_index) : BlockBase(id, texture_index, Materials::CIRCUITS)
 {
     data.sound_type = BlockSoundType::metal;
+    data.render_func = render_flat_ground;
 }
 
 uint8_t BlockRail::face_texture_index(uint8_t face, uint8_t meta)
 {
-    return 0;
+    return 128;
 }
 
 bool BlockRail::is_opaque()
