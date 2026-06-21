@@ -318,7 +318,7 @@ bool BlockBase::powers_indirectly(World *world, const Vec3i &pos, uint8_t face)
     uint8_t block_id = world->get_block_id_at(pos);
     if (block_id == 0)
         return false;
-    return block_list[block_id]->has_indirect_power(world, pos);
+    return block_list[block_id]->powers_directly(world, pos, face);
 }
 
 bool BlockBase::has_indirect_power(World *world, const Vec3i &pos)
