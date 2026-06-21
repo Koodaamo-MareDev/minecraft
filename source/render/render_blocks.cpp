@@ -159,17 +159,6 @@ int render_snow_layer(gertex::DisplayList<gertex::Vertex16> *list, BlockState *b
     return vertexCount;
 }
 
-int render_chest(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3i &pos)
-{
-    int vertexCount = 0;
-    for (uint8_t face = VIS_MIN, i = 0; face != VIS_MAX; face <<= 1, i++)
-    {
-        if ((block->visibility_flags & face))
-            vertexCount += render_face(list, pos, i, get_chest_texture_index(block, pos, i), block);
-    }
-    return vertexCount;
-}
-
 int render_torch(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3i &pos)
 {
     Vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
@@ -538,75 +527,4 @@ int render_slab(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, 
         }
     }
     return vertexCount;
-}
-
-int get_chest_texture_index(BlockState *block, const Vec3i &pos, uint8_t face)
-{
-    // Check for texture overrides
-    uint32_t texture_index = get_default_texture_index(block->blockid);
-    if (texture_index != properties(block->id).m_texture_index)
-        return texture_index;
-
-    // Bottom and top faces are always the same
-    if (face == FACE_NY || face == FACE_PY)
-        return 25;
-
-    BlockState *neighbors[4];
-    {
-        BlockState *tmp_neighbors[6];
-        if (render_world)
-            render_world->get_neighbors(pos, tmp_neighbors);
-        neighbors[0] = tmp_neighbors[0];
-        neighbors[1] = tmp_neighbors[1];
-        neighbors[2] = tmp_neighbors[4];
-        neighbors[3] = tmp_neighbors[5];
-    }
-
-    if (std::none_of(neighbors, neighbors + 4, [](BlockState *block)
-                     { return block && block->blockid == BlockID::chest; }))
-    {
-        // Single chest
-        uint8_t direction = FACE_PZ;
-        if (!(block->visibility_flags & (VIS_PZ)) && (block->visibility_flags & (VIS_NZ)))
-            direction = FACE_NZ;
-        if (!(block->visibility_flags & (VIS_NX)) && (block->visibility_flags & (VIS_PX)))
-            direction = FACE_PX;
-        if (!(block->visibility_flags & (VIS_PX)) && (block->visibility_flags & (VIS_NX)))
-            direction = FACE_NX;
-
-        return 26 + (face == direction);
-    }
-
-    // Double chest
-
-    if ((face != FACE_NZ && face != FACE_PZ) && neighbors[0]->blockid != BlockID::chest && neighbors[1]->blockid != BlockID::chest)
-    {
-        // X axis
-        bool half = neighbors[2]->blockid == BlockID::chest;
-        uint8_t other_flags = neighbors[half ? 2 : 3]->visibility_flags;
-        uint8_t direction = FACE_PX;
-        if ((!(block->visibility_flags & (VIS_PX)) || !(other_flags & (VIS_PX))) && (block->visibility_flags & (VIS_NX)) && (other_flags & (VIS_NX)))
-            direction = FACE_NX;
-
-        if (face == FACE_NX)
-            half = !half;
-
-        return 26 + (face == direction ? 16 : 32) - half;
-    }
-    else if ((face != FACE_NX && face != FACE_PX) && neighbors[2]->blockid != BlockID::chest && neighbors[3]->blockid != BlockID::chest)
-    {
-        // Z axis
-        bool half = neighbors[0]->blockid == BlockID::chest;
-
-        uint8_t other_flags = neighbors[half ? 0 : 1]->visibility_flags;
-        uint8_t direction = FACE_PZ;
-        if ((!(block->visibility_flags & (VIS_PZ)) || !(other_flags & (VIS_PZ))) && (block->visibility_flags & (VIS_NZ)) && (other_flags & (VIS_NZ)))
-            direction = FACE_NZ;
-
-        if (face == FACE_PZ)
-            half = !half;
-
-        return 26 + (face == direction ? 16 : 32) - half;
-    }
-    return 26;
 }
