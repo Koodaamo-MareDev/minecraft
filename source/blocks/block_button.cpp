@@ -191,7 +191,7 @@ void BlockButton::on_removed(World *world, const Vec3i &pos)
 bool BlockButton::provides_indirect_power(World *world, const Vec3i &pos, uint8_t face)
 {
     uint8_t meta = world->get_meta_at(pos);
-    if ((meta & 8) != 0)
+    if ((meta & 8) == 0)
         return false;
 
     return (meta == 1 && face == +BlockFace::NX) ||
