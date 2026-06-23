@@ -96,8 +96,8 @@ public:
     virtual bool is_power_source();
 
     // Internal redstone
-    bool powers_directly(World *world, const Vec3i &pos, uint8_t face);
-    bool has_direct_power(World *world, const Vec3i &pos);
+    bool powers(World *world, const Vec3i &pos, uint8_t face);
+    bool has_power(World *world, const Vec3i &pos);
     bool powers_indirectly(World *world, const Vec3i &pos, uint8_t face);
     bool has_indirect_power(World *world, const Vec3i &pos);
 

@@ -1860,21 +1860,50 @@ void World::replace_air_at(Vec3i pos, BlockID id)
     set_block_at(pos, id);
 }
 
-void World::notify_at(const Vec3i &pos)
+void World::play_note_at(const Vec3i &pos, uint8_t note_type, int8_t pitch)
 {
-    if (!is_remote())
-        notify_neighbors(pos);
+    float pitch_mult = (float)std::pow(2.0, (pitch - 12) / 12.0);
+    std::string note_name = "harp";
+    switch (note_type)
+    {
+    case 1:
+        note_name = "bd";
+        break;
+    case 2:
+        note_name = "snare";
+        break;
+    case 3:
+        note_name = "hat";
+        break;
+    case 4:
+        note_name = "bassattack";
+        break;
+    default:
+        break;
+    }
+
+    Sound sound = get_sound("note/" + note_name);
+    sound.position = Vec3f{pos.x + 0.5, pos.y + 0.5, pos.z + 0.5};
+    sound.volume = 3.0;
+    sound.pitch = pitch_mult;
+    play_sound(sound);
 }
 
-void World::notify_neighbors(const Vec3i &pos)
+void World::notify_at(const Vec3i &pos, BlockID caused_by)
 {
-    for (int i = 0; i < 6; i++)
+    if (!is_remote())
     {
-        Vec3i neighbour = pos + face_offsets[i];
-        BlockState *block = get_block_at(neighbour);
-        if (block)
+        if (caused_by == BlockID::air)
+            caused_by = get_block_id_at(pos);
+
+        for (int i = 0; i < 6; i++)
         {
-            block_list[block->id]->on_neighbor_changed(this, neighbour, block->id);
+            Vec3i neighbour = pos + face_offsets[i];
+            BlockState *block = get_block_at(neighbour);
+            if (block)
+            {
+                block_list[block->id]->on_neighbor_changed(this, neighbour, caused_by);
+            }
         }
     }
 }

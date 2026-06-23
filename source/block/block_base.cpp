@@ -293,32 +293,26 @@ bool BlockBase::is_power_source()
     return data.is_power_source;
 }
 
-bool BlockBase::powers_directly(World *world, const Vec3i &pos, uint8_t face)
+bool BlockBase::powers(World *world, const Vec3i &pos, uint8_t face)
 {
-    int block_id = world->get_block_id_at(pos);
-    if (block_id == 0)
-        return false;
-    return block_list[block_id]->provides_power(world, pos, face);
+    return block_at(world, pos)->provides_indirect_power(world, pos, face);
 }
 
-bool BlockBase::has_direct_power(World *world, const Vec3i &pos)
+bool BlockBase::has_power(World *world, const Vec3i &pos)
 {
-    return (powers_directly(world, pos + Vec3i{-1, 0, 0}, +BlockFace::NX) ||
-            powers_directly(world, pos + Vec3i{+1, 0, 0}, +BlockFace::PX) ||
-            powers_directly(world, pos + Vec3i{0, -1, 0}, +BlockFace::NY) ||
-            powers_directly(world, pos + Vec3i{0, +1, 0}, +BlockFace::PY) ||
-            powers_directly(world, pos + Vec3i{0, 0, -1}, +BlockFace::NZ) ||
-            powers_directly(world, pos + Vec3i{0, 0, +1}, +BlockFace::PZ));
+    return (powers(world, pos + Vec3i{-1, 0, 0}, +BlockFace::NX) ||
+            powers(world, pos + Vec3i{+1, 0, 0}, +BlockFace::PX) ||
+            powers(world, pos + Vec3i{0, -1, 0}, +BlockFace::NY) ||
+            powers(world, pos + Vec3i{0, +1, 0}, +BlockFace::PY) ||
+            powers(world, pos + Vec3i{0, 0, -1}, +BlockFace::NZ) ||
+            powers(world, pos + Vec3i{0, 0, +1}, +BlockFace::PZ));
 }
 
 bool BlockBase::powers_indirectly(World *world, const Vec3i &pos, uint8_t face)
 {
     if (block_at(world, pos)->is_opaque())
-        return has_direct_power(world, pos);
-    uint8_t block_id = world->get_block_id_at(pos);
-    if (block_id == 0)
-        return false;
-    return block_list[block_id]->powers_directly(world, pos, face);
+        return has_power(world, pos);
+    return block_at(world, pos)->provides_power(world, pos, face);
 }
 
 bool BlockBase::has_indirect_power(World *world, const Vec3i &pos)

@@ -35,6 +35,8 @@
 #include <blocks/block_glowstone.hpp>
 #include <blocks/block_cake.hpp>
 #include <blocks/block_slab.hpp>
+#include <blocks/block_note.hpp>
+#include <blocks/block_redstone_wire.hpp>
 
 #include <world/world.hpp>
 #include <algorithm>
@@ -70,7 +72,7 @@ namespace registry
         (new BlockBase(BlockID::lapis_block, 144, Materials::ROCK))->set_hardness(3.0f).set_resistance(5.0f).set_sound_type(BlockSoundType::stone);
         (new BlockBase(BlockID::dispenser, 46, Materials::ROCK))->set_hardness(3.5f).set_sound_type(BlockSoundType::stone);
         (new BlockSandStone(BlockID::sandstone, 192, Materials::ROCK))->set_hardness(0.8f).set_sound_type(BlockSoundType::stone);
-        (new BlockBase(BlockID::note_block, 74, Materials::WOOD))->set_hardness(0.8f).set_sound_type(BlockSoundType::wood);
+        (new BlockNote(BlockID::note_block))->set_hardness(0.8f).set_sound_type(BlockSoundType::wood);
         (new BlockBase(BlockID::bed, 134, Materials::CLOTH))->set_hardness(0.2f).set_sound_type(BlockSoundType::stone).set_aabb(AABB(Vec3f(0.0, 0.0, 0.0), Vec3f(1.0, 9.0 / 16.0, 1.0)));
         // Rails?
         (new BlockFlower(BlockID::tallgrass, 39, Materials::PLANTS))->set_hardness(0.0f).set_sound_type(BlockSoundType::grass);
@@ -96,7 +98,7 @@ namespace registry
         (new BlockSpawner(BlockID::mob_spawner, 65))->set_hardness(5.0f).set_sound_type(BlockSoundType::metal);
         (new BlockBase(BlockID::oak_stairs, 4, Materials::WOOD))->set_hardness(2.0f).set_sound_type(BlockSoundType::wood);
         (new BlockChest(BlockID::chest))->set_hardness(2.5f).set_sound_type(BlockSoundType::wood);
-        (new BlockBase(BlockID::redstone_wire, Materials::CIRCUITS))->set_hardness(0.0f).set_sound_type(BlockSoundType::stone);
+        (new BlockRedstoneWire(BlockID::redstone_wire, 164))->set_hardness(0.0f).set_sound_type(BlockSoundType::stone);
         (new BlockOre(BlockID::diamond_ore, 50))->set_hardness(3.0f).set_resistance(5.0f).set_sound_type(BlockSoundType::stone);
         (new BlockBase(BlockID::diamond_block, 24, Materials::IRON))->set_hardness(5.0f).set_resistance(10.0f).set_sound_type(BlockSoundType::metal);
         (new BlockWorkbench(BlockID::crafting_table))->set_hardness(2.5f).set_sound_type(BlockSoundType::wood);

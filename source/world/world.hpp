@@ -102,6 +102,7 @@ public:
     void set_meta_at(const Vec3i &pos, uint8_t meta);
     void set_block_and_meta_at(const Vec3i &pos, BlockID id, uint8_t meta);
     void replace_air_at(Vec3i pos, BlockID id);
+    void play_note_at(const Vec3i& pos, uint8_t note_type, int8_t pitch);
     TileEntity *get_tile_entity(const Vec3i &position);
     Chunk *get_chunk_from_pos(const Vec3i &pos);
     Chunk *get_chunk(int32_t x, int32_t z);
@@ -109,9 +110,8 @@ public:
     bool add_chunk(int32_t x, int32_t z);
     void save_chunk(Chunk *chunk);
     void get_neighbors(const Vec3i &pos, BlockState **neighbors);
-    void notify_at(const Vec3i &pos);
+    void notify_at(const Vec3i &pos, BlockID caused_by = BlockID::air);
     void mark_block_dirty(const Vec3i &pos);
-    void notify_neighbors(const Vec3i &pos);
     void add_entity(EntityPhysical *entity);
     void remove_entity(int32_t entity_id);
     EntityPhysical *get_entity_by_id(int32_t entity_id);
