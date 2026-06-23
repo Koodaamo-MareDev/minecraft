@@ -233,7 +233,7 @@ int render_fluid(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block,
     for (int i = 0; i < 4; i++)
     {
         topPlaneCoords[i] = bottomPlaneCoords[3 - i];
-        topPlaneCoords[i].y += (corner_tops[3 - i] * BASE3D_POS_FRAC);
+        topPlaneCoords[i].y = topPlaneCoords[i].y + (corner_tops[3 - i] * BASE3D_POS_FRAC);
     }
     topPlaneCoords[0].u = (tex_off_x - cos_angle - sin_angle);
     topPlaneCoords[1].u = (tex_off_x - cos_angle + sin_angle);
