@@ -96,12 +96,12 @@ int render_flat_ground(gertex::DisplayList<gertex::Vertex16> *list, BlockState *
     Vec3f vertex_pos(local_pos.x, local_pos.y, local_pos.z);
     uint32_t texture_index = get_face_texture_index(block, FACE_PY);
 
-    int16_t x = local_pos.x << BASE3D_POS_FRAC_BITS;
+    int16_t x = (local_pos.x << BASE3D_POS_FRAC_BITS) - (BASE3D_POS_FRAC >> 1);
     int16_t y = (local_pos.y << BASE3D_POS_FRAC_BITS) - 14;
-    int16_t z = local_pos.z << BASE3D_POS_FRAC_BITS;
+    int16_t z = (local_pos.z << BASE3D_POS_FRAC_BITS) - (BASE3D_POS_FRAC >> 1);
 
-    int16_t x1 = (local_pos.x + 1) << BASE3D_POS_FRAC_BITS;
-    int16_t z1 = (local_pos.z + 1) << BASE3D_POS_FRAC_BITS;
+    int16_t x1 = ((local_pos.x + 1) << BASE3D_POS_FRAC_BITS) - (BASE3D_POS_FRAC >> 1);
+    int16_t z1 = ((local_pos.z + 1) << BASE3D_POS_FRAC_BITS) - (BASE3D_POS_FRAC >> 1);
 
     list->put(gertex::Vertex16{.x = x1, .y = y, .z = z, .i = lighting, .nrm = FACE_PY, .u = float(TEXTURE_NX(texture_index)), .v = float(TEXTURE_PY(texture_index))});
     list->put(gertex::Vertex16{.x = x1, .y = y, .z = z1, .i = lighting, .nrm = FACE_PY, .u = float(TEXTURE_NX(texture_index)), .v = float(TEXTURE_NY(texture_index))});
