@@ -6,12 +6,13 @@
 #include <cstring>
 #include <new>
 #include <ogc/gx.h>
+#include <util/unaligned.hpp>
 
 namespace gertex
 {
     struct __attribute__((packed)) Vertex
     {
-        float x, y, z;
+        unaligned<float> x, y, z;
         union
         {
             uint8_t r;
@@ -23,14 +24,14 @@ namespace gertex
 
     struct __attribute__((packed)) Vertex16
     {
-        int16_t x, y, z;
+        unaligned<int16_t> x, y, z;
         union
         {
             uint8_t r;
             uint8_t i;
         };
         uint8_t g, b, a, nrm;
-        float u, v;
+        unaligned<float> u, v;
     };
 
     template <typename T>
