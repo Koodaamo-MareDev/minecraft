@@ -68,7 +68,7 @@ void Sound::update(Vec3f head_right, Vec3f head_position)
     float head_distance = (attenuation - relative_position.magnitude()) / attenuation;
 
     // Clamp the distance to the range [0, 1]
-    float clamped_distance = std::max(0.0f, std::min(1.0f, head_distance)) * volume;
+    float clamped_distance = std::max(0.0f, std::min(1.0f, head_distance * volume));
 
     // Used for smoothing the panning value
     static int previous_pan = 0;
