@@ -101,6 +101,8 @@ public:
     bool powers_indirectly(World *world, const Vec3i &pos, uint8_t face);
     bool has_indirect_power(World *world, const Vec3i &pos);
 
+    virtual bool colored();
+
     int render(gertex::DisplayList<gertex::Vertex16> *list, BlockState *state, const Vec3i &pos);
 
 protected:

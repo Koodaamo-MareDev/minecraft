@@ -16,6 +16,7 @@
 #include <block/block_properties.hpp>
 #include <world/entity.hpp>
 #include <world/chunk_cache.hpp>
+#include <render/buffer_pass.hpp>
 
 enum class ChunkState : uint8_t
 {
@@ -63,54 +64,6 @@ inline Vec2i block_to_chunk_pos(const Vec3i &pos)
     return Vec2i((pos.x & ~0xF) >> 4, (pos.z & ~0xF) >> 4);
 }
 
-class VBO
-{
-public:
-    uint8_t *buffer = nullptr;
-    uint32_t length = 0;
-
-    VBO() : buffer(nullptr), length(0)
-    {
-    }
-
-    VBO(uint8_t *buffer, uint32_t length) : buffer(buffer), length(length)
-    {
-    }
-
-    bool operator==(VBO &other)
-    {
-        return this->buffer == other.buffer && this->length == other.length;
-    }
-
-    bool operator!=(VBO &other)
-    {
-        return this->buffer != other.buffer || this->length != other.length;
-    }
-
-    operator bool()
-    {
-        return this->buffer != nullptr && this->length > 0;
-    }
-
-    // Detach the buffer from the object without freeing it
-    void detach()
-    {
-        this->buffer = nullptr;
-        this->length = 0;
-    }
-
-    // Free the buffer and set the object to an empty state
-    void clear()
-    {
-        if (this->buffer)
-        {
-            delete[] this->buffer;
-            this->buffer = nullptr;
-        }
-        this->length = 0;
-    }
-};
-
 class Section
 {
 public:
@@ -120,10 +73,9 @@ public:
     uint8_t y = 0;
     int32_t z = 0;
     Chunk *chunk = nullptr;
-    VBO solid = VBO();
-    VBO cached_solid = VBO();
-    VBO transparent = VBO();
-    VBO cached_transparent = VBO();
+    BufferPass solid{};
+    BufferPass transparent{};
+    BufferPass colored{};
     uint16_t visibility_flags = 0;
 
     bool has_solid_fluid = false;
@@ -132,6 +84,11 @@ public:
     SectionUpdatePhase phase = SectionUpdatePhase::SECTION_VISIBILITY;
 
     bool has_updated = false;
+
+    bool stable();
+    void refresh();
+    size_t size();
+    void clear();
 };
 
 class NBTTagCompound;

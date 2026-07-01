@@ -8,7 +8,7 @@
 BlockRedstoneWire::BlockRedstoneWire(uint16_t id, uint8_t texture_index) : BlockBase(id, texture_index, Materials::CIRCUITS)
 {
     data.sound_type = BlockSoundType::stone;
-    data.render_func = render_flat_ground;
+    data.render_func = render_wire;
 }
 
 void BlockRedstoneWire::get_raycasting_aabb(World *world, const Vec3i &pos, const AABB &other, std::vector<AABB> &aabb_list)
@@ -153,6 +153,11 @@ bool BlockRedstoneWire::provides_indirect_power(World *world, const Vec3i &pos, 
 bool BlockRedstoneWire::is_power_source()
 {
     return wires_provide_power;
+}
+
+bool BlockRedstoneWire::colored()
+{
+    return true;
 }
 
 void BlockRedstoneWire::common_notify_neighbors(World *world, const Vec3i &pos)

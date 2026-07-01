@@ -195,19 +195,7 @@ void World::update_chunks()
                 continue;
             for (uint8_t i = 0; i < VERTICAL_SECTION_COUNT; i++)
             {
-                Section &current = chunk->sections[i];
-                if (current.solid != current.cached_solid)
-                {
-                    current.cached_solid.clear();
-
-                    current.cached_solid = current.solid;
-                }
-                if (current.transparent != current.cached_transparent)
-                {
-                    current.cached_transparent.clear();
-
-                    current.cached_transparent = current.transparent;
-                }
+                chunk->sections[i].refresh();
             }
         }
     }
@@ -369,7 +357,7 @@ bool World::update_sections()
                         break;
                     }
 
-                    ChunkRenderer::render_section(current, false);
+                    ChunkRenderer::render_section(current, false, current.solid.uncached);
                     break;
                 case SectionUpdatePhase::TRANSPARENT:
                     if (chunk->light_pending || !current.visible || !has_nearby_chunks(current.x, current.y, current.z))
@@ -377,25 +365,13 @@ bool World::update_sections()
                         processed = false;
                         break;
                     }
-                    ChunkRenderer::render_section(current, true);
+                    ChunkRenderer::render_section(current, true, current.transparent.uncached);
                     break;
                 case SectionUpdatePhase::FLUSH:
                     if (!sync_section_updates)
                     {
                         Lock lock(render_mutex);
-                        // Apply the new buffers.
-                        if (current.solid != current.cached_solid)
-                        {
-                            current.cached_solid.clear();
-
-                            current.cached_solid = current.solid;
-                        }
-                        if (current.transparent != current.cached_transparent)
-                        {
-                            current.cached_transparent.clear();
-
-                            current.cached_transparent = current.transparent;
-                        }
+                        current.refresh();
                     }
                     break;
                 case SectionUpdatePhase::SECTION_VISIBILITY:
@@ -765,18 +741,7 @@ void World::save_and_clean_chunk(Chunk *chunk)
     {
         Section &current = chunk->sections[j];
         current.visible = false;
-
-        if (current.solid && current.solid != current.cached_solid)
-        {
-            current.solid.clear();
-        }
-        if (current.transparent && current.transparent != current.cached_transparent)
-        {
-            current.transparent.clear();
-        }
-
-        current.cached_solid.clear();
-        current.cached_transparent.clear();
+        current.clear();
     }
     save_chunk(chunk);
 }
@@ -971,6 +936,7 @@ void World::draw_scene(bool opaque)
     gertex::set_pos_precision(GX_S16, BASE3D_POS_FRAC_BITS);
 
     std::deque<std::pair<Section *, VBO *>> sections_to_draw;
+    std::deque<std::pair<Section *, VBO *>> colored_sections_to_draw;
 
     // Draw the solid pass
     if (opaque)
@@ -982,9 +948,8 @@ void World::draw_scene(bool opaque)
                 for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
                 {
                     Section &current = chunk->sections[j];
-                    if (!current.visible || !current.cached_solid.buffer || !current.cached_solid.length)
-                        continue;
-                    sections_to_draw.push_back(std::make_pair(&current, &current.cached_solid));
+                    if (current.visible && current.solid.cached)
+                        sections_to_draw.push_back(std::make_pair(&current, &current.solid.cached));
                 }
             }
         }
@@ -999,9 +964,10 @@ void World::draw_scene(bool opaque)
                 for (int j = 0; j < VERTICAL_SECTION_COUNT; j++)
                 {
                     Section &current = chunk->sections[j];
-                    if (!current.visible || !current.cached_transparent.buffer || !current.cached_transparent.length)
-                        continue;
-                    sections_to_draw.push_back(std::make_pair(&current, &current.cached_transparent));
+                    if (current.visible && current.transparent.cached)
+                        sections_to_draw.push_back(std::make_pair(&current, &current.transparent.cached));
+                    if (current.visible && current.colored.cached)
+                        colored_sections_to_draw.push_back(std::make_pair(&current, &current.colored.cached));
                 }
             }
         }
@@ -1025,6 +991,23 @@ void World::draw_scene(bool opaque)
         gertex::use_matrix(camera.apply_transform(transform));
 
         GX_CallDispList(buffer->buffer, buffer->length);
+    }
+
+    {
+        gertex::GXState state = gertex::get_state();
+        gertex::set_color_format(0, GX_DIRECT);
+        for (std::pair<Section *, VBO *> &pair : colored_sections_to_draw)
+        {
+            Section *&sect = pair.first;
+            VBO *&buffer = pair.second;
+
+            Transform transform;
+            transform.set_position({sect->x + 0.5f, sect->y + 0.5f, sect->z + 0.5f});
+            gertex::use_matrix(camera.apply_transform(transform));
+
+            GX_CallDispList(buffer->buffer, buffer->length);
+        }
+        gertex::set_state(state);
     }
 
     if (player.raycast_target_found && should_destroy_block && player.mining_tick > 0)

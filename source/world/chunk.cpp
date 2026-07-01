@@ -447,7 +447,7 @@ uint32_t Chunk::size()
 {
     uint32_t base_size = sizeof(Chunk);
     for (int i = 0; i < VERTICAL_SECTION_COUNT; i++)
-        base_size += this->sections[i].cached_solid.length + this->sections[i].cached_transparent.length + this->sections[i].solid.length + this->sections[i].transparent.length;
+        base_size += this->sections[i].size();
     for (EntityPhysical *&entity : entities)
         base_size += entity->size();
     return base_size;
@@ -796,4 +796,28 @@ void Chunk::read()
     {
         sections[vbo_index].dirty = true;
     }
+}
+
+bool Section::stable()
+{
+    return this->solid.is_same() && this->transparent.is_same() && this->colored.is_same();
+}
+
+void Section::refresh()
+{
+    this->solid.refresh();
+    this->transparent.refresh();
+    this->colored.refresh();
+}
+
+size_t Section::size()
+{
+    return sizeof(*this) + this->solid.size() + this->transparent.size() + this->colored.size();
+}
+
+void Section::clear()
+{
+    this->solid.clear();
+    this->transparent.clear();
+    this->colored.clear();
 }

@@ -7,6 +7,7 @@
 #include <registry/block_list.hpp>
 #include <render/render.hpp>
 #include <gertex/displaylist.hpp>
+#include <blocks/block_redstone_wire.hpp>
 
 static std::map<RenderType, std::function<int(gertex::DisplayList<gertex::Vertex16> *list, BlockState *, const Vec3i &)>> render_functions = {
     {RenderType::full, render_cube},
@@ -527,4 +528,178 @@ int render_slab(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, 
         }
     }
     return vertexCount;
+}
+
+int render_wire(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3i &pos)
+{
+    const Vec3i offsets[4]{
+        {-1, 0, 0},
+        {+1, 0, 0},
+        {0, 0, -1},
+        {0, 0, +1},
+    };
+
+    float power = float(int(block->meta) / 15.0f);
+    uint8_t r = uint8_t(power * 170.0f) + 85;
+    r = (light_map[(int(block->light)) << 2] / 255.0f) * r;
+    uint8_t g = 0;
+    uint8_t b = 0;
+    Vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
+    Vec3f vertex_pos(local_pos.x, local_pos.y, local_pos.z);
+    uint32_t texture_index = block_list[block->id]->face_texture_index(0, 0);
+
+    int16_t x = (local_pos.x << BASE3D_POS_FRAC_BITS) - (BASE3D_POS_FRAC >> 1);
+    int16_t y = (local_pos.y << BASE3D_POS_FRAC_BITS) - 14;
+    int16_t z = (local_pos.z << BASE3D_POS_FRAC_BITS) - (BASE3D_POS_FRAC >> 1);
+
+    bool has_connection[4] = {
+        false,
+        false,
+        false,
+        false,
+    };
+
+    bool has_diagonal_connection[4] = {
+        false,
+        false,
+        false,
+        false,
+    };
+    bool has_opaque_above = block_at(render_world, pos + Vec3i{0, 1, 0})->is_opaque();
+
+    for (uint8_t i = 0; i < 4; i++)
+        has_connection[i] = BlockRedstoneWire::is_source_or_wire(render_world, pos + offsets[i]) ||
+                            (!block_at(render_world, pos + offsets[i])->is_opaque() && BlockRedstoneWire::is_source_or_wire(render_world, pos + offsets[i] - Vec3i{0, 1, 0}));
+
+    if (!has_opaque_above)
+    {
+        for (uint8_t i = 0; i < 4; i++)
+            has_connection[i] |= (has_diagonal_connection[i] = (block_at(render_world, pos + offsets[i])->is_opaque() && BlockRedstoneWire::is_source_or_wire(render_world, pos + offsets[i] + Vec3i{0, 1, 0})));
+    }
+
+    int16_t x0 = x;
+    int16_t z0 = z;
+    int16_t x1 = x + 32;
+    int16_t z1 = z + 32;
+    float u0 = float(TEXTURE_NX(texture_index));
+    float v0 = float(TEXTURE_NY(texture_index));
+    float u1 = float(TEXTURE_PX(texture_index));
+    float v1 = float(TEXTURE_PY(texture_index));
+    const int16_t no_connection_pos_margin = BASE3D_POS_FRAC * 5 / 16;
+    const float no_connection_uv_margin = BASE3D_PIXEL_UV_SCALE * 5;
+
+    // 0 = corner/dot, 1 = X line, 2 = Z line
+    uint8_t state = 0;
+    if ((has_connection[0] || has_connection[1]) && !has_connection[2] && !has_connection[3])
+        state = 1;
+    if ((has_connection[2] || has_connection[3]) && !has_connection[0] && !has_connection[1])
+        state = 2;
+
+    int vertex_count = 0;
+
+    if (state == 0)
+    {
+        // Handle corners (if any)
+        if (has_connection[0] || has_connection[1] || has_connection[2] || has_connection[3])
+        {
+            // -X
+            if (!has_connection[0])
+            {
+                x0 += no_connection_pos_margin;
+                u0 += no_connection_uv_margin;
+            }
+
+            // +X
+            if (!has_connection[1])
+            {
+                x1 -= no_connection_pos_margin;
+                u1 -= no_connection_uv_margin;
+            }
+
+            // -Z
+            if (!has_connection[2])
+            {
+                z0 += no_connection_pos_margin;
+                v0 += no_connection_uv_margin;
+            }
+
+            // +Z
+            if (!has_connection[3])
+            {
+                z1 -= no_connection_pos_margin;
+                v1 -= no_connection_uv_margin;
+            }
+        }
+        list->put(gertex::Vertex16{.x = x1, .y = y, .z = z0, .r = r, .g = g, .b = b, .a = 255, .nrm = FACE_PY, .u = u1, .v = v0});
+        list->put(gertex::Vertex16{.x = x1, .y = y, .z = z1, .r = r, .g = g, .b = b, .a = 255, .nrm = FACE_PY, .u = u1, .v = v1});
+        list->put(gertex::Vertex16{.x = x0, .y = y, .z = z1, .r = r, .g = g, .b = b, .a = 255, .nrm = FACE_PY, .u = u0, .v = v1});
+        list->put(gertex::Vertex16{.x = x0, .y = y, .z = z0, .r = r, .g = g, .b = b, .a = 255, .nrm = FACE_PY, .u = u0, .v = v0});
+        vertex_count += 4;
+    }
+    else
+    {
+        u0 += BASE3D_BLOCK_UV_SCALE;
+        u1 += BASE3D_BLOCK_UV_SCALE;
+        if (state == 1)
+        {
+            list->put(gertex::Vertex16{.x = x1, .y = y, .z = z0, .r = r, .g = g, .b = b, .a = 255, .nrm = FACE_PY, .u = u0, .v = v1});
+            list->put(gertex::Vertex16{.x = x1, .y = y, .z = z1, .r = r, .g = g, .b = b, .a = 255, .nrm = FACE_PY, .u = u0, .v = v0});
+            list->put(gertex::Vertex16{.x = x0, .y = y, .z = z1, .r = r, .g = g, .b = b, .a = 255, .nrm = FACE_PY, .u = u1, .v = v0});
+            list->put(gertex::Vertex16{.x = x0, .y = y, .z = z0, .r = r, .g = g, .b = b, .a = 255, .nrm = FACE_PY, .u = u1, .v = v1});
+            vertex_count += 4;
+        }
+        else if (state == 2)
+        {
+            list->put(gertex::Vertex16{.x = x1, .y = y, .z = z0, .r = r, .g = g, .b = b, .a = 255, .nrm = FACE_PY, .u = u0, .v = v1});
+            list->put(gertex::Vertex16{.x = x1, .y = y, .z = z1, .r = r, .g = g, .b = b, .a = 255, .nrm = FACE_PY, .u = u1, .v = v1});
+            list->put(gertex::Vertex16{.x = x0, .y = y, .z = z1, .r = r, .g = g, .b = b, .a = 255, .nrm = FACE_PY, .u = u1, .v = v0});
+            list->put(gertex::Vertex16{.x = x0, .y = y, .z = z0, .r = r, .g = g, .b = b, .a = 255, .nrm = FACE_PY, .u = u0, .v = v0});
+            vertex_count += 4;
+        }
+        u0 -= BASE3D_BLOCK_UV_SCALE;
+        u1 -= BASE3D_BLOCK_UV_SCALE;
+    }
+    if (!has_opaque_above)
+    {
+        u0 += BASE3D_BLOCK_UV_SCALE;
+        u1 += BASE3D_BLOCK_UV_SCALE;
+
+        // Wall -X
+        if (has_diagonal_connection[0])
+        {
+            list->put(gertex::Vertex16{.x = int16_t(x + 2), .y = int16_t(y + 32), .z = z0, .r = r, .g = g, .b = b, .a = 255, .nrm = FACE_PY, .u = u1, .v = v1});
+            list->put(gertex::Vertex16{.x = int16_t(x + 2), .y = y, .z = z0, .r = r, .g = g, .b = b, .a = 255, .nrm = FACE_PY, .u = u0, .v = v1});
+            list->put(gertex::Vertex16{.x = int16_t(x + 2), .y = y, .z = z1, .r = r, .g = g, .b = b, .a = 255, .nrm = FACE_PY, .u = u0, .v = v0});
+            list->put(gertex::Vertex16{.x = int16_t(x + 2), .y = int16_t(y + 32), .z = z1, .r = r, .g = g, .b = b, .a = 255, .nrm = FACE_PY, .u = u1, .v = v0});
+            vertex_count += 4;
+        }
+        // Wall +X
+        if (has_diagonal_connection[1])
+        {
+            list->put(gertex::Vertex16{.x = int16_t(x + 30), .y = y, .z = z0, .r = r, .g = g, .b = b, .a = 255, .nrm = FACE_PY, .u = u0, .v = v0});
+            list->put(gertex::Vertex16{.x = int16_t(x + 30), .y = int16_t(y + 32), .z = z0, .r = r, .g = g, .b = b, .a = 255, .nrm = FACE_PY, .u = u1, .v = v0});
+            list->put(gertex::Vertex16{.x = int16_t(x + 30), .y = int16_t(y + 32), .z = z1, .r = r, .g = g, .b = b, .a = 255, .nrm = FACE_PY, .u = u1, .v = v1});
+            list->put(gertex::Vertex16{.x = int16_t(x + 30), .y = y, .z = z1, .r = r, .g = g, .b = b, .a = 255, .nrm = FACE_PY, .u = u0, .v = v1});
+            vertex_count += 4;
+        }
+        // Wall -Z
+        if (has_diagonal_connection[2])
+        {
+            list->put(gertex::Vertex16{.x = x0, .y = y, .z = int16_t(z + 2), .r = r, .g = g, .b = b, .a = 255, .nrm = FACE_PY, .u = u0, .v = v0});
+            list->put(gertex::Vertex16{.x = x0, .y = int16_t(y + 32), .z = int16_t(z + 2), .r = r, .g = g, .b = b, .a = 255, .nrm = FACE_PY, .u = u1, .v = v0});
+            list->put(gertex::Vertex16{.x = x1, .y = int16_t(y + 32), .z = int16_t(z + 2), .r = r, .g = g, .b = b, .a = 255, .nrm = FACE_PY, .u = u1, .v = v1});
+            list->put(gertex::Vertex16{.x = x1, .y = y, .z = int16_t(z + 2), .r = r, .g = g, .b = b, .a = 255, .nrm = FACE_PY, .u = u0, .v = v1});
+            vertex_count += 4;
+        }
+        // Wall +Z
+        if (has_diagonal_connection[3])
+        {
+            list->put(gertex::Vertex16{.x = x0, .y = int16_t(y + 32), .z = int16_t(z + 30), .r = r, .g = g, .b = b, .a = 255, .nrm = FACE_PY, .u = u1, .v = v1});
+            list->put(gertex::Vertex16{.x = x0, .y = y, .z = int16_t(z + 30), .r = r, .g = g, .b = b, .a = 255, .nrm = FACE_PY, .u = u0, .v = v1});
+            list->put(gertex::Vertex16{.x = x1, .y = y, .z = int16_t(z + 30), .r = r, .g = g, .b = b, .a = 255, .nrm = FACE_PY, .u = u0, .v = v0});
+            list->put(gertex::Vertex16{.x = x1, .y = int16_t(y + 32), .z = int16_t(z + 30), .r = r, .g = g, .b = b, .a = 255, .nrm = FACE_PY, .u = u1, .v = v0});
+            vertex_count += 4;
+        }
+    }
+    return vertex_count;
 }

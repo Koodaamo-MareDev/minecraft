@@ -21,5 +21,6 @@ int render_cactus(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block
 int render_door(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3i &pos);
 int render_cross(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3i &pos);
 int render_slab(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3i &pos);
+int render_wire(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3i &pos);
 
 #endif

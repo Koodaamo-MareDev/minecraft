@@ -325,6 +325,11 @@ bool BlockBase::has_indirect_power(World *world, const Vec3i &pos)
             powers_indirectly(world, pos + Vec3i{0, 0, +1}, +BlockFace::PZ));
 }
 
+bool BlockBase::colored()
+{
+    return false;
+}
+
 int BlockBase::render(gertex::DisplayList<gertex::Vertex16> *list, BlockState *state, const Vec3i &pos)
 {
     return data.render_func(list, state, pos);

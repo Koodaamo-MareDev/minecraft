@@ -46,7 +46,7 @@ bool EntityPhysical::can_remove()
     if (int_pos.y < 0 || int_pos.y >= 256)
         return false;
     Section &vbo = curr_chunk->sections[int_pos.y >> 4];
-    if (vbo.dirty || curr_chunk->light_pending || vbo.cached_solid != vbo.solid || vbo.cached_transparent != vbo.transparent)
+    if (vbo.dirty || curr_chunk->light_pending || !vbo.stable())
         return false;
     return dead;
 }
@@ -545,10 +545,10 @@ bool EntityFallingBlock::can_remove()
     Section &sect = chunk->sections[sect_num];
 
     // Mesh should not be currently updating as that would cause visual glitches
-    bool is_section_updated = sect.cached_solid == sect.solid && sect.cached_transparent == sect.transparent;
+    bool is_section_stable = sect.stable();
 
     // Ensure that the chunk doesn't have any light updates
-    return !chunk->light_pending && is_section_updated && !sect.dirty;
+    return !chunk->light_pending && is_section_stable && !sect.dirty;
 }
 
 void EntityFallingBlock::render(float partial_ticks, bool transparency)

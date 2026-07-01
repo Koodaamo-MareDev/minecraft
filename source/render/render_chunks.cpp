@@ -15,9 +15,21 @@ extern bool render_fast_leaves;
 
 namespace ChunkRenderer
 {
-    void render_section(Section &section, bool transparent)
+    void render_section(Section &section, bool transparent, VBO &section_vbo)
     {
-        VBO &section_vbo = transparent ? section.transparent : section.solid;
+        if (transparent)
+        {
+            gertex::DisplayList<gertex::Vertex16> colored_list(64000, VERTEX_ATTR_LENGTH_DIRECTCOLOR);
+            uint16_t quad_vertices = render_section_colored(&colored_list, section, transparent, 64000U);
+            std::memcpy(&colored_list.buffer[1], &quad_vertices, 2);
+
+            size_t colored_displist_size = colored_list.aligned_size();
+            uint8_t *colored_displist_buf = colored_list.build();
+            DCFlushRange(colored_displist_buf, colored_displist_size);
+            Lock lock(render_mutex);
+            section.colored.uncached.buffer = colored_displist_buf;
+            section.colored.uncached.length = colored_displist_size;
+        }
 
         gertex::DisplayList<gertex::Vertex16> list(64000, VERTEX_ATTR_LENGTH);
         // Render the block mesh
@@ -79,7 +91,32 @@ namespace ChunkRenderer
                 {
                     Vec3i blockpos = Vec3i(_x, _y, _z) + section_offset;
                     BlockProperties &props = properties(block->id);
-                    if (transparent == props.m_transparent)
+                    if (transparent == props.m_transparent && !block_list[block->id]->colored())
+                        vertex_count += block_list[block->id]->render(list, block, blockpos);
+                }
+            }
+        }
+        return vertex_count;
+    }
+
+    uint16_t render_section_colored(gertex::DisplayList<gertex::Vertex16> *list, Section &section, bool transparent, uint16_t max_vertex_count)
+    {
+        list->max_vertices = max_vertex_count;
+        list->begin(GX_QUADS);
+
+        uint16_t vertex_count = 0;
+
+        // Build the mesh from the blockstates
+        Vec3i section_offset = Vec3i(section.x, section.y, section.z);
+        BlockState *block = &section.chunk->blockstates[section.y << 8];
+        for (int _y = 0; _y < 16; _y++)
+        {
+            for (int _z = 0; _z < 16; _z++)
+            {
+                for (int _x = 0; _x < 16; _x++, block++)
+                {
+                    Vec3i blockpos = Vec3i(_x, _y, _z) + section_offset;
+                    if (block_list[block->id]->colored())
                         vertex_count += block_list[block->id]->render(list, block, blockpos);
                 }
             }

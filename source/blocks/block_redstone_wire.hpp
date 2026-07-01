@@ -28,6 +28,8 @@ public:
     virtual bool provides_indirect_power(World *world, const Vec3i &pos, uint8_t face) override;
     virtual bool is_power_source() override;
 
+    virtual bool colored() override;
+
     void common_notify_neighbors(World *world, const Vec3i &pos);
 
     void update_and_propagate(World *world, const Vec3i &pos);
