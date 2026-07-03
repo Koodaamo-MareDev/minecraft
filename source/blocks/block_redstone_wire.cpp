@@ -258,7 +258,7 @@ void BlockRedstoneWire::propagate(World *world, const Vec3i &to, const Vec3i &fr
         }
 
         // Each wire hop attenuates the signal by 1 (minimum 0).
-        new_signal_strength -= (new_signal_strength > 0) ? 1 : 0;
+        new_signal_strength -= new_signal_strength > 0;
     }
 
     if (signal_strength == new_signal_strength)
@@ -286,27 +286,30 @@ void BlockRedstoneWire::propagate(World *world, const Vec3i &to, const Vec3i &fr
         else
             off_v = off_h - Vec3i{0, 1, 0}; // wire below non-opaque neighbour
 
-        decayed = world->get_meta_at(to);
-        // --- Propagate to the vertical-diagonal neighbour ---
         {
+            decayed = world->get_meta_at(to);
+            if (decayed > 0)
+                decayed--;
             // max_current_strength returns the neighbour's signal if it IS a
             // wire, or -1 (as int) if it isn't. We only recurse into wires.
-            int ps = max_current_strength(world, off_v, -1);
+            int ps = max_current_strength(world, off_h, -1);
             if (ps >= 0 && (uint8_t)ps != decayed)
             {
                 // Bug fix: was '{off.x, to.y, off.x}' - the Z component was
                 // incorrectly set to off.x, corrupting diagonal propagation.
-                propagate(world, off_v, to);
+                propagate(world, off_h, to);
             }
         }
-        decayed = world->get_meta_at(to);
 
-        // --- Propagate to the horizontal neighbour ---
         {
-            int ps = max_current_strength(world, off_h, -1);
+            decayed = world->get_meta_at(to);
+            if (decayed > 0)
+                decayed--;
+
+            int ps = max_current_strength(world, off_v, -1);
             if (ps >= 0 && (uint8_t)ps != decayed)
             {
-                propagate(world, off_h, to);
+                propagate(world, off_v, to);
             }
         }
     }
