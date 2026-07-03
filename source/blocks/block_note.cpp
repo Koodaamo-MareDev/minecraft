@@ -11,7 +11,7 @@ void BlockNote::on_neighbor_changed(World *world, const Vec3i &pos, uint8_t neig
 {
     if (block_list[neighbor_id]->is_power_source())
     {
-        bool powered = has_power(world, pos);
+        bool powered = has_indirect_power(world, pos);
 
         TileEntityNote *note_entity = dynamic_cast<TileEntityNote *>(world->get_tile_entity(pos));
         if (note_entity)
