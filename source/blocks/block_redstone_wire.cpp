@@ -209,9 +209,6 @@ void BlockRedstoneWire::propagate(World *world, const Vec3i &to, const Vec3i &fr
         {0, 0, +1},
     };
 
-    if (world->get_block_id_at(to) != data.block_id)
-        return;
-
     int signal_strength = world->get_meta_at(to);
     int new_signal_strength = 0;
 
