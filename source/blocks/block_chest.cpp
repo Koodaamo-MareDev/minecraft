@@ -118,22 +118,22 @@ void BlockChest::on_removed(World *world, const Vec3i &pos)
     if (!world->is_remote())
     {
         TileEntityChest *te = dynamic_cast<TileEntityChest *>(world->get_tile_entity(pos));
-
-        for (size_t i = 0; i < te->items.size(); i++)
-        {
-            item::ItemStack &stack = te->items[i];
-            while (!stack.empty())
+        if (te)
+            for (size_t i = 0; i < te->items.size(); i++)
             {
-                int count = world->random.nextInt(21) + 10;
-                if (count > stack.count)
-                    count = stack.count;
-                item::ItemStack drop = stack;
-                stack.count -= count;
-                drop.count = count;
-                if (!drop.empty())
-                    world->spawn_drop(pos, drop);
+                item::ItemStack &stack = te->items[i];
+                while (!stack.empty())
+                {
+                    int count = world->random.nextInt(21) + 10;
+                    if (count > stack.count)
+                        count = stack.count;
+                    item::ItemStack drop = stack;
+                    stack.count -= count;
+                    drop.count = count;
+                    if (!drop.empty())
+                        world->spawn_drop(pos, drop);
+                }
             }
-        }
     }
     BlockContainer::on_removed(world, pos);
 }
