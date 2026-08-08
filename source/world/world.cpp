@@ -1757,7 +1757,7 @@ void World::set_block_at(const Vec3i &pos, BlockID id)
         if (block->blockid == id)
             return;
         if (id == BlockID::air)
-            block_list[id]->on_removed(this, pos);
+            block_list[block->blockid]->on_removed(this, pos);
         block->blockid = id;
         block->meta = 0;
         block_list[id]->on_added(this, pos);
@@ -1786,7 +1786,7 @@ void World::set_block_and_meta_at(const Vec3i &pos, BlockID id, uint8_t meta)
         if (block->blockid == id && block->meta == meta)
             return;
         if (id == BlockID::air)
-            block_list[id]->on_removed(this, pos);
+            block_list[block->blockid]->on_removed(this, pos);
         block->blockid = id;
         block->meta = meta;
         block_list[id]->on_added(this, pos);
