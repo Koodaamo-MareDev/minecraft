@@ -605,50 +605,8 @@ void World::edit_blocks()
                 }
 
                 // Block use handlers
-                if (!finish_destroying && should_place_block)
-                {
-                    /*
-                    switch (targeted_block->blockid)
-                    {
-                    case BlockID::crafting_table:
-                    {
-                        Gui::set_gui(new GuiCrafting(&player, nullptr, 0));
-                        should_place_block = false;
-                        break;
-                    }
-                    case BlockID::chest:
-                    {
-                        TileEntity *tile_entity = get_tile_entity(player.raycast_target_pos);
-
-                        // The loaded tile entity could technically be any tile entity.
-                        // Who knows if this chest has the data of a furnace?
-                        TileEntityChest *chest = dynamic_cast<TileEntityChest *>(tile_entity);
-                        if (chest)
-                        {
-                            Gui::set_gui(new GuiContainer(&player, &chest->items));
-                        }
-                        should_place_block = false;
-                        break;
-                    }
-                    case BlockID::lit_furnace:
-                    case BlockID::furnace:
-                    {
-                        TileEntity *tile_entity = get_tile_entity(player.raycast_target_pos);
-
-                        // Ensure it's a furnace
-                        TileEntityFurnace *furnace = dynamic_cast<TileEntityFurnace *>(tile_entity);
-                        if (furnace)
-                        {
-                            Gui::set_gui(new GuiSmelting(&player, &furnace->items, 0, furnace));
-                        }
-                        should_place_block = false;
-                        break;
-                    }
-                    default:
-                        break;
-                    }*/
-                    should_place_block = !block_list[targeted_block->id]->on_use(&player, player.raycast_target_pos);
-                }
+                if (!finish_destroying)
+                    should_place_block &= !block_list[targeted_block->id]->on_use(&player, player.raycast_target_pos);
             }
 
             if (finish_destroying)
