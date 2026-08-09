@@ -19,7 +19,7 @@ namespace gertex
             uint8_t i;
         };
         uint8_t g, b, a, nrm;
-        float u, v;
+        unaligned<float> u, v;
     };
 
     struct __attribute__((packed)) Vertex16
