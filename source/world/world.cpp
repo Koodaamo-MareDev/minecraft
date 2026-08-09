@@ -652,6 +652,7 @@ void World::edit_blocks()
                     if (result_block.blockid != BlockID::air)
                     {
                         set_block_and_meta_at(result_pos, held_block.blockid, held_block.meta);
+                        block_list[result_block.id]->on_placed(this, result_pos, face_num);
                         block_list[result_block.id]->on_entity_place(this, result_pos, &player);
                     }
                     if (!is_remote())
