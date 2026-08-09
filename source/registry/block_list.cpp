@@ -37,6 +37,8 @@
 #include <blocks/block_slab.hpp>
 #include <blocks/block_note.hpp>
 #include <blocks/block_redstone_wire.hpp>
+#include <blocks/block_redstone_torch.hpp>
+#include <blocks/block_repeater.hpp>
 
 #include <world/world.hpp>
 #include <algorithm>
@@ -118,8 +120,8 @@ namespace registry
         (new BlockBase(BlockID::wooden_pressure_plate, 4, Materials::CIRCUITS))->set_hardness(0.5f).set_sound_type(BlockSoundType::wood);
         (new BlockOre(BlockID::redstone_ore, 51))->set_hardness(3.0f).set_resistance(5.0f).set_sound_type(BlockSoundType::stone);
         (new BlockOre(BlockID::lit_redstone_ore, 52))->set_hardness(3.0f).set_resistance(5.0f).set_light_luminance(9).set_sound_type(BlockSoundType::stone);
-        (new BlockBase(BlockID::unlit_redstone_torch, Materials::CIRCUITS))->set_hardness(0.0f).set_sound_type(BlockSoundType::wood);
-        (new BlockBase(BlockID::redstone_torch, Materials::CIRCUITS))->set_hardness(0.0f).set_light_luminance(7).set_sound_type(BlockSoundType::wood);
+        (new BlockRedstoneTorch(BlockID::unlit_redstone_torch, 115, false))->set_hardness(0.0f).set_sound_type(BlockSoundType::wood);
+        (new BlockRedstoneTorch(BlockID::redstone_torch, 99, true))->set_hardness(0.0f).set_light_luminance(7).set_sound_type(BlockSoundType::wood);
         (new BlockButton(BlockID::stone_button, 0))->set_hardness(0.5f).set_sound_type(BlockSoundType::stone);
         (new BlockSnowLayer(BlockID::snow_layer, 66, Materials::SNOW_LAYER))->set_hardness(0.1f).set_sound_type(BlockSoundType::cloth);
         (new BlockIce(BlockID::ice, 67, Materials::ICE))->set_hardness(0.5f).set_light_opacity(3).set_sound_type(BlockSoundType::glass);
@@ -136,8 +138,8 @@ namespace registry
         (new BlockBase(BlockID::portal, 14, Materials::GLASS))->set_hardness(-1.0f).set_light_luminance(11).set_sound_type(BlockSoundType::glass);
         (new BlockPumpkin(BlockID::lit_pumpkin, 102, Materials::PUMPKIN))->set_hardness(1.0f).set_sound_type(BlockSoundType::wood);
         (new BlockCake(BlockID::cake, 121))->set_hardness(0.5f).set_sound_type(BlockSoundType::cloth);
-        (new BlockBase(BlockID::unpowered_repeater, Materials::CIRCUITS))->set_hardness(0.0f).set_sound_type(BlockSoundType::wood);
-        (new BlockBase(BlockID::powered_repeater, Materials::CIRCUITS))->set_hardness(0.0f).set_light_luminance(9).set_sound_type(BlockSoundType::wood);
+        (new BlockRepeater(BlockID::unpowered_repeater, false))->set_hardness(0.0f).set_sound_type(BlockSoundType::wood);
+        (new BlockRepeater(BlockID::powered_repeater, true))->set_hardness(0.0f).set_sound_type(BlockSoundType::wood);
 
         // Fill in the blanks
         for (int i = 0; i < 256; i++)

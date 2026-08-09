@@ -703,3 +703,109 @@ int render_wire(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, 
     }
     return vertex_count;
 }
+
+int render_repeater(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block, const Vec3i &pos)
+{
+    Vec3i local_pos(pos.x & 0xF, pos.y & 0xF, pos.z & 0xF);
+    Vec3f vertex_pos(local_pos.x, local_pos.y, local_pos.z);
+    uint32_t texture_index = get_face_texture_index(block, FACE_PY);
+    int vertexCount = 4;
+    uint8_t lighting = block->light;
+
+    uint8_t direction = block->meta & 0x03;
+    uint8_t ticks = (block->meta >> 2) & 0x03;
+
+    BlockID neighbor_ids[6];
+    {
+        BlockState *neighbors[6];
+        if (render_world)
+            render_world->get_neighbors(pos, neighbors);
+        for (int i = 0; i < 6; i++)
+        {
+            neighbor_ids[i] = neighbors[i] ? neighbors[i]->blockid : BlockID::air;
+        }
+    }
+
+    if ((block->visibility_flags & VIS_NX) && neighbor_ids[FACE_NX] != block->blockid)
+    {
+        // Negative X
+        render_face(list, pos, FACE_NX, texture_index, block, 0, 2);
+        vertexCount += 4;
+    }
+    if ((block->visibility_flags & VIS_PX) && neighbor_ids[FACE_PX] != block->blockid)
+    {
+        // Positive X
+        render_face(list, pos, FACE_PX, texture_index, block, 0, 2);
+        vertexCount += 4;
+    }
+    if ((block->visibility_flags & VIS_NZ) && neighbor_ids[FACE_NZ] != block->blockid)
+    {
+        // Negative Z
+        render_face(list, pos, FACE_NZ, texture_index, block, 0, 2);
+        vertexCount += 4;
+    }
+    if ((block->visibility_flags & VIS_PZ) && neighbor_ids[FACE_PZ] != block->blockid)
+    {
+        // Positive Z
+        render_face(list, pos, FACE_PZ, texture_index, block, 0, 2);
+        vertexCount += 4;
+    }
+
+    float u0 = float(TEXTURE_NX(texture_index));
+    float u1 = float(TEXTURE_PX(texture_index));
+    float v0 = float(TEXTURE_NY(texture_index));
+    float v1 = float(TEXTURE_PY(texture_index));
+
+    const float corner_u[4] = {u1, u1, u0, u0};
+    const float corner_v[4] = {v0, v1, v1, v0};
+    float u[4], v[4];
+    for (int i = 0; i < 4; i++)
+    {
+        int src = (i + direction) & 3;
+        u[i] = corner_u[src];
+        v[i] = corner_v[src];
+    }
+
+    int16_t x = (local_pos.x << BASE3D_POS_FRAC_BITS) - (BASE3D_POS_FRAC >> 1);
+    int16_t y = (local_pos.y << BASE3D_POS_FRAC_BITS) - 16;
+    int16_t z = (local_pos.z << BASE3D_POS_FRAC_BITS) - (BASE3D_POS_FRAC >> 1);
+
+    list->put(gertex::Vertex16{.x = x + 32, .y = y + 4, .z = z + 0, .i = lighting, .nrm = FACE_PY, .u = u[0], .v = v[0]});
+    list->put(gertex::Vertex16{.x = x + 32, .y = y + 4, .z = z + 32, .i = lighting, .nrm = FACE_PY, .u = u[1], .v = v[1]});
+    list->put(gertex::Vertex16{.x = x + 0, .y = y + 4, .z = z + 32, .i = lighting, .nrm = FACE_PY, .u = u[2], .v = v[2]});
+    list->put(gertex::Vertex16{.x = x + 0, .y = y + 4, .z = z + 0, .i = lighting, .nrm = FACE_PY, .u = u[3], .v = v[3]});
+
+    float torch_load_off[4] = {-1 / 16., 1 / 16., 3 / 16., 5 / 16.};
+    Vec3f torch_a{0, -3 / 16., 0};
+    Vec3f torch_b{0, -3 / 16., 0};
+
+    switch (direction)
+    {
+    case 0:
+        torch_b.z = -0.3125;
+        torch_a.z = torch_load_off[ticks];
+        break;
+    case 1:
+        torch_b.x = 0.3125;
+        torch_a.x = -torch_load_off[ticks];
+        break;
+    case 2:
+        torch_b.z = 0.3125;
+        torch_a.z = -torch_load_off[ticks];
+        break;
+    case 3:
+        torch_b.x = -0.3125;
+        torch_a.x = torch_load_off[ticks];
+        break;
+    default:
+        break;
+    }
+    BlockState torch_state = *block;
+    torch_state.id = block->blockid == BlockID::powered_repeater ? BlockID::redstone_torch : BlockID::unlit_redstone_torch;
+    torch_state.meta = 0;
+
+    vertexCount += render_torch_with_angle(list, &torch_state, vertex_pos + torch_a, 0, 0);
+    vertexCount += render_torch_with_angle(list, &torch_state, vertex_pos + torch_b, 0, 0);
+
+    return vertexCount;
+}
