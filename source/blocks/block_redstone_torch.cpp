@@ -127,15 +127,15 @@ bool BlockRedstoneTorch::gets_signal(World *world, const Vec3i &pos)
     switch (meta)
     {
     case 1:
-        return provides_indirect_power(world, pos + block_face[+BlockFace::NX], +BlockFace::NX);
+        return powers_indirectly(world, pos + block_face[+BlockFace::NX], +BlockFace::NX);
     case 2:
-        return provides_indirect_power(world, pos + block_face[+BlockFace::PX], +BlockFace::PX);
+        return powers_indirectly(world, pos + block_face[+BlockFace::PX], +BlockFace::PX);
     case 3:
-        return provides_indirect_power(world, pos + block_face[+BlockFace::NZ], +BlockFace::NZ);
+        return powers_indirectly(world, pos + block_face[+BlockFace::NZ], +BlockFace::NZ);
     case 4:
-        return provides_indirect_power(world, pos + block_face[+BlockFace::PZ], +BlockFace::PZ);
+        return powers_indirectly(world, pos + block_face[+BlockFace::PZ], +BlockFace::PZ);
     case 5:
-        return provides_indirect_power(world, pos + block_face[+BlockFace::NY], +BlockFace::NY);
+        return powers_indirectly(world, pos + block_face[+BlockFace::NY], +BlockFace::NY);
 
     default:
         return false;
