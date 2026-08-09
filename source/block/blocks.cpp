@@ -1082,8 +1082,8 @@ BlockProperties block_properties[256] = {
     BlockProperties().id(BlockID::portal).material(Materials::PORTAL).hardness(-1.0f).texture(14).solid(false).opacity(0).transparent(true).luminance(11).sound(SoundType::glass).render_type(RenderType::special).collision(CollisionType::none),
     BlockProperties().id(BlockID::lit_pumpkin).material(Materials::PUMPKIN).tool(item::ToolType::axe, item::ToolTier::no_tier).hardness(1.0f).texture(120).opacity(0).sound(SoundType::wood).render_type(RenderType::full_special),
     BlockProperties().id(BlockID::cake).material(Materials::CAKE).hardness(0.5f).texture(121).opacity(0).sound(SoundType::wood).render_type(RenderType::full_special),
-    BlockProperties().id(BlockID::unpowered_repeater).material(Materials::CIRCUITS).hardness(0.0f).texture(131).opacity(0).sound(SoundType::wood).render_type(RenderType::flat_ground),
-    BlockProperties().id(BlockID::powered_repeater).material(Materials::CIRCUITS).hardness(0.0f).texture(147).opacity(0).sound(SoundType::wood).luminance(10).render_type(RenderType::flat_ground),
+    BlockProperties().id(BlockID::unpowered_repeater).material(Materials::CIRCUITS).hardness(0.0f).texture(131).opacity(0).transparent(true).sound(SoundType::wood).render_type(RenderType::flat_ground),
+    BlockProperties().id(BlockID::powered_repeater).material(Materials::CIRCUITS).hardness(0.0f).texture(147).opacity(0).transparent(true).sound(SoundType::wood).luminance(10).render_type(RenderType::flat_ground),
     // Reserved for a fully white block.
     BlockProperties().id(BlockID::reserved).texture(0).solid(false).opacity(0).transparent(true).luminance(15).sound(SoundType::cloth),
 
