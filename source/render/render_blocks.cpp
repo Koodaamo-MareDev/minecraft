@@ -761,7 +761,7 @@ int render_repeater(gertex::DisplayList<gertex::Vertex16> *list, BlockState *blo
     float u[4], v[4];
     for (int i = 0; i < 4; i++)
     {
-        int src = (i + direction) & 3;
+        int src = (i - direction) & 3;
         u[i] = corner_u[src];
         v[i] = corner_v[src];
     }
