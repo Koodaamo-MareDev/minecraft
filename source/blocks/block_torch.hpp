@@ -13,7 +13,7 @@ public:
     virtual bool can_stay(World *world, const Vec3i &pos) override;
     virtual void on_random_tick(World *world, const Vec3i &pos, javaport::Random &random) override;
     virtual void on_placed(World *world, const Vec3i &pos, uint8_t face) override;
-    virtual void on_added(World *world, const Vec3i &pos);
+    virtual void on_added(World *world, const Vec3i &pos) override;
     virtual void on_neighbor_changed(World *world, const Vec3i &pos, uint8_t neighbor_face) override;
 
 };
