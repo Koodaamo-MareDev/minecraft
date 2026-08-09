@@ -155,15 +155,15 @@ bool BlockButton::on_use(EntityPhysical *entity, const Vec3i &pos)
     button_sound.pitch = 0.6f;
     button_sound.position = Vec3f(pos.x + 0.5f, pos.y + 0.5f, pos.z + 0.5f);
     world->play_sound(button_sound);
-    world->notify_at(pos);
+    world->notify_at(pos, data.block_id);
     if (meta == 1)
-        world->notify_at({pos.x - 1, pos.y, pos.z});
+        world->notify_at({pos.x - 1, pos.y, pos.z}, data.block_id);
     else if (meta == 2)
-        world->notify_at({pos.x + 1, pos.y, pos.z});
+        world->notify_at({pos.x + 1, pos.y, pos.z}, data.block_id);
     else if (meta == 3)
-        world->notify_at({pos.x, pos.y, pos.z - 1});
+        world->notify_at({pos.x, pos.y, pos.z - 1}, data.block_id);
     else if (meta == 4)
-        world->notify_at({pos.x, pos.y, pos.z + 1});
+        world->notify_at({pos.x, pos.y, pos.z + 1}, data.block_id);
     world->schedule_block_update(pos, data.block_id, 20);
 
     return true;
@@ -176,15 +176,15 @@ void BlockButton::on_removed(World *world, const Vec3i &pos)
     {
         meta &= 7;
 
-        world->notify_at(pos);
+        world->notify_at(pos, data.block_id);
         if (meta == 1)
-            world->notify_at({pos.x - 1, pos.y, pos.z});
+            world->notify_at({pos.x - 1, pos.y, pos.z}, data.block_id);
         else if (meta == 2)
-            world->notify_at({pos.x + 1, pos.y, pos.z});
+            world->notify_at({pos.x + 1, pos.y, pos.z}, data.block_id);
         else if (meta == 3)
-            world->notify_at({pos.x, pos.y, pos.z - 1});
+            world->notify_at({pos.x, pos.y, pos.z - 1}, data.block_id);
         else if (meta == 4)
-            world->notify_at({pos.x, pos.y, pos.z + 1});
+            world->notify_at({pos.x, pos.y, pos.z + 1}, data.block_id);
     }
 }
 
@@ -193,6 +193,8 @@ bool BlockButton::provides_indirect_power(World *world, const Vec3i &pos, uint8_
     uint8_t meta = world->get_meta_at(pos);
     if ((meta & 8) == 0)
         return false;
+
+    meta &= 7;
 
     return (meta == 1 && face == +BlockFace::NX) ||
            (meta == 2 && face == +BlockFace::PX) ||
@@ -207,16 +209,17 @@ void BlockButton::on_tick(World *world, const Vec3i &pos, javaport::Random &rand
     uint8_t meta = world->get_meta_at(pos);
     if ((meta & 8) != 0)
     {
-        world->set_block_and_meta_at(pos, data.block_id, meta & 7);
-        world->notify_at(pos);
+        meta &= 7;
+        world->set_block_and_meta_at(pos, data.block_id, meta);
+        world->notify_at(pos, data.block_id);
         if (meta == 1)
-            world->notify_at({pos.x - 1, pos.y, pos.z});
+            world->notify_at({pos.x - 1, pos.y, pos.z}, data.block_id);
         else if (meta == 2)
-            world->notify_at({pos.x + 1, pos.y, pos.z});
+            world->notify_at({pos.x + 1, pos.y, pos.z}, data.block_id);
         else if (meta == 3)
-            world->notify_at({pos.x, pos.y, pos.z - 1});
+            world->notify_at({pos.x, pos.y, pos.z - 1}, data.block_id);
         else if (meta == 4)
-            world->notify_at({pos.x, pos.y, pos.z + 1});
+            world->notify_at({pos.x, pos.y, pos.z + 1}, data.block_id);
 
         Sound button_sound = get_sound("random/click");
         button_sound.volume = 0.3f;
