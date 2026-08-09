@@ -221,12 +221,6 @@ namespace gertex
     using DisplayListBuffered16 = DisplayListBuffered<Vertex16, DisplayListPass16>;
     using DisplayListBufferedF = DisplayListBuffered<Vertex, DisplayListPassF>;
 
-    extern DisplayListPass16 *gx_pass_displist16;
-    extern DisplayListPassF *gx_pass_displistf;
-    extern DisplayListDiscard16 *gx_pass_displist16_discard;
-    extern DisplayListDiscardF *gx_pass_displistf_discard;
-
-    void init_pass_displists();
 } // namespace gertex
 
 #endif
