@@ -339,32 +339,17 @@ bool World::update_sections()
                 if (!current.dirty)
                     continue;
 
-                bool processed = true;
                 switch (current.phase)
                 {
-                case SectionUpdatePhase::BLOCK_VISIBILITY:
-                    if (!has_nearby_sections(current.x, current.y, current.z))
-                    {
-                        processed = false;
-                        break;
-                    }
-                    chunk->refresh_section_block_visibility(j);
-                    break;
                 case SectionUpdatePhase::SOLID:
                     if (chunk->light_pending || !current.visible || !has_nearby_chunks(current.x, current.y, current.z))
-                    {
-                        processed = false;
-                        break;
-                    }
+                        continue;
 
                     ChunkRenderer::render_section(current, false, current.solid.uncached);
                     break;
                 case SectionUpdatePhase::TRANSPARENT:
                     if (chunk->light_pending || !current.visible || !has_nearby_chunks(current.x, current.y, current.z))
-                    {
-                        processed = false;
-                        break;
-                    }
+                        continue;
                     ChunkRenderer::render_section(current, true, current.transparent.uncached);
                     break;
                 case SectionUpdatePhase::FLUSH:
@@ -376,10 +361,7 @@ bool World::update_sections()
                     break;
                 case SectionUpdatePhase::SECTION_VISIBILITY:
                     if (!has_nearby_sections(current.x, current.y, current.z))
-                    {
-                        processed = false;
-                        break;
-                    }
+                        continue;
                     chunk->refresh_section_visibility(j);
 
                     if (current.has_updated)
@@ -388,15 +370,14 @@ bool World::update_sections()
                     current.has_updated = true;
                     break;
                 default:
-                    processed = false;
+                    continue;
+                }
+                current.phase = static_cast<SectionUpdatePhase>(static_cast<uint8_t>(current.phase) + 1);
+                if (current.phase >= SectionUpdatePhase::COUNT)
+                    current.phase = SectionUpdatePhase::BEGIN;
+
+                if (++update_count > max_updates)
                     break;
-                }
-                if (processed)
-                {
-                    current.phase++;
-                    if (++update_count > max_updates)
-                        break;
-                }
             }
             if (update_count >= max_updates)
                 break;

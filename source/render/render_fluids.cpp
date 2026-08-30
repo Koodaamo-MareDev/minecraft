@@ -3,6 +3,7 @@
 #include <world/world.hpp>
 #include <world/chunk.hpp>
 #include <block/blocks.hpp>
+#include <registry/block_list.hpp>
 #include <render/render.hpp>
 #include <gertex/displaylist.hpp>
 
@@ -121,9 +122,10 @@ Vec3f get_fluid_direction(World *world, BlockState *block, Vec3i pos)
     {
         for (int i = 0; i < 6; i++)
         {
-            if (i == FACE_NY || i == FACE_PY)
+            if (i == FACE_NY || i == FACE_PY || !neighbors[i])
                 continue;
-            if (neighbors[i] && ((neighbors[i][0].visibility_flags & (1 << (i ^ 1))) || (pos.y < MAX_WORLD_Y && (neighbors[i][256].visibility_flags & (1 << (i ^ 1))))))
+            if (block_list[neighbors[i][0].id]->should_render_side(render_world, pos, i ^ 1) ||
+                (pos.y < MAX_WORLD_Y && block_list[neighbors[i][256].id]->should_render_side(render_world, pos, i ^ 1)))
             {
                 direction.y -= 6.0;
                 break;

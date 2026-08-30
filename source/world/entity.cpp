@@ -484,7 +484,6 @@ EntityFallingBlock::EntityFallingBlock(BlockState block_state, const Vec3i &posi
     this->width = 0.999;
     this->height = 0.999;
     this->block_state = block_state;
-    this->block_state.visibility_flags = 0x7F;
 }
 void EntityFallingBlock::tick()
 {
@@ -605,7 +604,6 @@ void EntityExplosiveBlock::render(float partial_ticks, bool transparency)
     BlockState *block_at_pos = chunk->get_block(int_pos);
     if (!chunk->light_pending && block_at_pos && !properties(block_at_pos->id).m_solid)
         block_state.light = block_at_pos->light;
-    block_state.visibility_flags = 0x7F;
 
     Transform block_transform;
     block_transform.set_position(get_position(partial_ticks));
@@ -752,7 +750,6 @@ void EntityCreeper::render(float partial_ticks, bool transparency)
     {
         Block block_state;
         block_state.id = 50; // Fire
-        block_state.visibility_flags = 0x7F;
         block_state.meta = 0;
         block_state.light = 0xFF;
         use_texture(terrain_texture);
@@ -843,7 +840,7 @@ void EntityItem::render(float partial_ticks, bool transparency)
     item::Item item = item_stack.as_item();
 
     RenderType render_type = properties(item.id).m_render_type;
-    BlockState block = {uint8_t(item.id & 0xFF), 0x7F, uint8_t(item_stack.meta & 0xFF), 0xF, 0xF};
+    BlockState block = {uint8_t(item.id & 0xFF), uint8_t(item_stack.meta & 0xFF), 0xF, 0xF};
     block.light = light_level;
 
     Vec3f anim_offset = Vec3f(0, std::sin((ticks_existed + partial_ticks) * M_1_PI * 0.25) * 0.125 + 0.125, 0);

@@ -122,36 +122,25 @@ int render_snow_layer(gertex::DisplayList<gertex::Vertex16> *list, BlockState *b
     // Top
     render_face(list, pos, FACE_PY, texture_index, block, 0, 2);
 
-    BlockID neighbor_ids[6];
-    {
-        BlockState *neighbors[6];
-        if (render_world)
-            render_world->get_neighbors(pos, neighbors);
-        for (int i = 0; i < 6; i++)
-        {
-            neighbor_ids[i] = neighbors[i] ? neighbors[i]->blockid : BlockID::air;
-        }
-    }
-
-    if ((block->visibility_flags & VIS_NX) && neighbor_ids[FACE_NX] != BlockID::snow_layer)
+    if (!render_world || block_list[block->id]->should_render_side(render_world, pos, FACE_NX))
     {
         // Negative X
         render_face(list, pos, FACE_NX, texture_index, block, 0, 2);
         vertexCount += 4;
     }
-    if ((block->visibility_flags & VIS_PX) && neighbor_ids[FACE_PX] != BlockID::snow_layer)
+    if (!render_world || block_list[block->id]->should_render_side(render_world, pos, FACE_PX))
     {
         // Positive X
         render_face(list, pos, FACE_PX, texture_index, block, 0, 2);
         vertexCount += 4;
     }
-    if ((block->visibility_flags & VIS_NZ) && neighbor_ids[FACE_NZ] != BlockID::snow_layer)
+    if (!render_world || block_list[block->id]->should_render_side(render_world, pos, FACE_NZ))
     {
         // Negative Z
         render_face(list, pos, FACE_NZ, texture_index, block, 0, 2);
         vertexCount += 4;
     }
-    if ((block->visibility_flags & VIS_PZ) && neighbor_ids[FACE_PZ] != BlockID::snow_layer)
+    if (!render_world || block_list[block->id]->should_render_side(render_world, pos, FACE_PZ))
     {
         // Positive Z
         render_face(list, pos, FACE_PZ, texture_index, block, 0, 2);
@@ -382,7 +371,7 @@ int render_cactus(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block
     list->put(gertex::Vertex16{.x = int16_t(x0 + 1), .y = y0, .z = z1, .i = lighting, .nrm = FACE_NX, .u = float(TEXTURE_PX(texture_index)), .v = float(TEXTURE_PY(texture_index))});
 
     // Bottom face
-    if ((block->visibility_flags & VIS_NY))
+    if (!render_world || block_list[block->id]->should_render_side(render_world, pos, FACE_NY))
     {
         list->put(gertex::Vertex16{.x = x0, .y = y0, .z = z0, .i = lighting, .nrm = FACE_NY, .u = float(TEXTURE_NX(bottom_texture_index)), .v = float(TEXTURE_PY(bottom_texture_index))});
         list->put(gertex::Vertex16{.x = x0, .y = y0, .z = z1, .i = lighting, .nrm = FACE_NY, .u = float(TEXTURE_NX(bottom_texture_index)), .v = float(TEXTURE_NY(bottom_texture_index))});
@@ -390,7 +379,7 @@ int render_cactus(gertex::DisplayList<gertex::Vertex16> *list, BlockState *block
         list->put(gertex::Vertex16{.x = x1, .y = y0, .z = z0, .i = lighting, .nrm = FACE_NY, .u = float(TEXTURE_PX(bottom_texture_index)), .v = float(TEXTURE_PY(bottom_texture_index))});
         vertexCount += 4;
     }
-    if ((block->visibility_flags & VIS_PY))
+    if (!render_world || block_list[block->id]->should_render_side(render_world, pos, FACE_PY))
     {
         // Top face
         list->put(gertex::Vertex16{.x = x1, .y = y1, .z = z0, .i = lighting, .nrm = FACE_PY, .u = float(TEXTURE_NX(top_texture_index)), .v = float(TEXTURE_PY(top_texture_index))});
@@ -715,36 +704,25 @@ int render_repeater(gertex::DisplayList<gertex::Vertex16> *list, BlockState *blo
     uint8_t direction = block->meta & 0x03;
     uint8_t ticks = (block->meta >> 2) & 0x03;
 
-    BlockID neighbor_ids[6];
-    {
-        BlockState *neighbors[6];
-        if (render_world)
-            render_world->get_neighbors(pos, neighbors);
-        for (int i = 0; i < 6; i++)
-        {
-            neighbor_ids[i] = neighbors[i] ? neighbors[i]->blockid : BlockID::air;
-        }
-    }
-
-    if ((block->visibility_flags & VIS_NX) && neighbor_ids[FACE_NX] != block->blockid)
+    if (!render_world || block_list[block->id]->should_render_side(render_world, pos, FACE_NX))
     {
         // Negative X
         render_face(list, pos, FACE_NX, texture_index, block, 0, 2);
         vertexCount += 4;
     }
-    if ((block->visibility_flags & VIS_PX) && neighbor_ids[FACE_PX] != block->blockid)
+    if (!render_world || block_list[block->id]->should_render_side(render_world, pos, FACE_PX))
     {
         // Positive X
         render_face(list, pos, FACE_PX, texture_index, block, 0, 2);
         vertexCount += 4;
     }
-    if ((block->visibility_flags & VIS_NZ) && neighbor_ids[FACE_NZ] != block->blockid)
+    if (!render_world || block_list[block->id]->should_render_side(render_world, pos, FACE_NZ))
     {
         // Negative Z
         render_face(list, pos, FACE_NZ, texture_index, block, 0, 2);
         vertexCount += 4;
     }
-    if ((block->visibility_flags & VIS_PZ) && neighbor_ids[FACE_PZ] != block->blockid)
+    if (!render_world || block_list[block->id]->should_render_side(render_world, pos, FACE_PZ))
     {
         // Positive Z
         render_face(list, pos, FACE_PZ, texture_index, block, 0, 2);

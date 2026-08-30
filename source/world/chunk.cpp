@@ -116,54 +116,6 @@ void Chunk::recalculate_height_map()
         }
 }
 
-void Chunk::recalculate_visibility(BlockState *block, const Vec3i &pos, ChunkCache &cache)
-{
-    BlockState *neighbors[6];
-    get_neighbors_cached(cache, pos.x, pos.y, pos.z, neighbors);
-    uint8_t visibility = 0x40;
-    bool is_transparent = properties(block->id).m_transparent;
-    bool transparent_leaves = (!render_fast_leaves && block->id == BlockID::leaves);
-    for (int i = 0; i < 6; i++)
-    {
-        BlockState *neighbor = neighbors[i];
-        if (!neighbor || !visible(neighbor->id))
-        {
-            visibility |= 1 << i;
-            continue;
-        }
-        BlockProperties &neighbor_prop = properties(neighbor->id);
-
-        if (!is_transparent || transparent_leaves || neighbor->id != block->id)
-        {
-            RenderType other_rt = neighbor_prop.m_render_type;
-            visibility |= (neighbor_prop.m_transparent || (other_rt != RenderType::full && other_rt != RenderType::full_special)) << i;
-        }
-    }
-    block->visibility_flags = visibility;
-}
-
-// recalculates the blockstates of a section
-void Chunk::refresh_section_block_visibility(int index)
-{
-    ChunkCache cache = build_chunk_cache(world, x, z);
-    Vec3i chunk_pos(this->x * 16, index * 16, this->z * 16);
-
-    BlockState *block = this->get_block(chunk_pos); // Gets the first block of the section
-    for (int y = 0; y < 16; y++)
-    {
-        for (int z = 0; z < 16; z++)
-        {
-            for (int x = 0; x < 16; x++, block++)
-            {
-                if (!visible(block->id))
-                    continue;
-                Vec3i pos = Vec3i(x, y, z);
-                this->recalculate_visibility(block, chunk_pos + pos, cache);
-            }
-        }
-    }
-}
-
 // These variables are used for the flood fill algorithm
 static std::vector<Vec3i> floodfill_start_points;
 static uint32_t floodfill_counter = 0;

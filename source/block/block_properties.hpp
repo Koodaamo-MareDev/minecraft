@@ -366,7 +366,6 @@ public:
         BlockID blockid;
     };
 
-    uint8_t visibility_flags = 0;
     uint8_t meta = 0;
     union
     {
@@ -378,34 +377,6 @@ public:
 
         uint8_t light;
     };
-
-    uint8_t get_visibility()
-    {
-        return id && !properties(id).m_fluid;
-    }
-
-    uint8_t get_opacity(uint8_t face)
-    {
-        return (this->visibility_flags & (1 << face));
-    }
-
-    void set_opacity(uint8_t face, uint8_t flag)
-    {
-        this->visibility_flags &= ~(1 << face);
-        this->visibility_flags |= (flag << face);
-    }
-
-    int8_t get_cast_skylight()
-    {
-        uint8_t opacity = properties(id).m_opacity;
-        return sky_light <= opacity ? 0 : sky_light - opacity;
-    }
-
-    int8_t get_cast_blocklight()
-    {
-        uint8_t opacity = properties(id).m_opacity;
-        return block_light <= opacity ? 0 : block_light - opacity;
-    }
 
     void get_aabb(const Vec3i &pos, const AABB &other, std::vector<AABB> &aabb_list)
     {

@@ -32,32 +32,13 @@ enum class ChunkState : uint8_t
 
 enum class SectionUpdatePhase : uint8_t
 {
-    BLOCK_VISIBILITY = 0,   // Update visibility of blocks in a section
-    SOLID = 1,              // Update solid VBOs
-    TRANSPARENT = 2,        // Update transparent VBOs
-    FLUSH = 3,              // Flush all VBOs
-    SECTION_VISIBILITY = 4, // Update visibility of sections in world
-    COUNT = 5               // Total number of phases
+    BEGIN = 0,
+    SOLID = 0,              // Update solid VBOs
+    TRANSPARENT = 1,        // Update transparent VBOs
+    FLUSH = 2,              // Flush all VBOs
+    SECTION_VISIBILITY = 3, // Update visibility of sections in world
+    COUNT = 4               // Total number of phases
 };
-
-inline SectionUpdatePhase operator++(SectionUpdatePhase &phase, int)
-{
-    SectionUpdatePhase old_phase = phase;
-    if (uint8_t(old_phase) + 1 >= uint8_t(SectionUpdatePhase::COUNT))
-        phase = SectionUpdatePhase::BLOCK_VISIBILITY;
-    else
-        phase = SectionUpdatePhase(uint8_t(old_phase) + 1);
-    return old_phase;
-};
-
-inline SectionUpdatePhase &operator++(SectionUpdatePhase &phase)
-{
-    if (uint8_t(phase) + 1 >= uint8_t(SectionUpdatePhase::COUNT))
-        phase = SectionUpdatePhase::BLOCK_VISIBILITY;
-    else
-        phase = SectionUpdatePhase(uint8_t(phase) + 1);
-    return phase;
-}
 
 inline Vec2i block_to_chunk_pos(const Vec3i &pos)
 {
@@ -201,8 +182,6 @@ public:
     void update_height_map(Vec3i pos);
     void light_up();
     void recalculate_height_map();
-    void recalculate_visibility(BlockState *block, const Vec3i &pos, ChunkCache &cache);
-    void refresh_section_block_visibility(int index);
     static void init_floodfill_startpoints();
     void vbo_visibility_flood_fill(Vec3i pos);
     void refresh_section_visibility(int index);
