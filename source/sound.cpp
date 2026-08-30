@@ -164,7 +164,8 @@ void SoundSystem::play_music(std::string filename)
     fclose(file);
 
     // Check if the Ogg player is already running
-    if (StatusOgg() == OGG_STATUS_RUNNING)
+    int ogg_status = StatusOgg();
+    if (ogg_status == OGG_STATUS_ERR || ogg_status == OGG_STATUS_RUNNING)
     {
         // Don't play the music if music is already playing
         return;
