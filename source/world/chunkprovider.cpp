@@ -14,6 +14,7 @@ ChunkProviderOverworld::ChunkProviderOverworld(World *world)
 {
     // Initialize the noise synthesizer with the seed
     this->world = world;
+    terrain_gen = new javaport::MapGenTerrain(javaport::Random(this->world->seed), this->world->seed);
     noiser.Init(world->seed);
 }
 
@@ -34,16 +35,15 @@ void ChunkProviderOverworld::provide_chunk(Chunk *chunk)
     std::fill_n(blocks, 16 * 16 * WORLD_HEIGHT, BlockID::air);
 
     // Generate the base terrain
-    javaport::MapGenTerrain terrain_gen(noiser);
-    terrain_gen.generate(chunk, world->seed, blocks);
+    terrain_gen->populate(chunk->x, chunk->z, chunk->x, chunk->z, blocks);
 
     // Generate the caves
     javaport::MapGenCaves cavegen;
     cavegen.generate(chunk, world->seed, blocks);
 
     // Add the surface layer
-    javaport::MapGenSurface surface_gen(noiser);
-    surface_gen.generate(chunk, world->seed, blocks);
+    //javaport::MapGenSurface surface_gen(noiser);
+    //surface_gen.generate(chunk, world->seed, blocks);
 
     // Generate the bedrock layer
     for (index = 0; index < 256; index++)
@@ -109,6 +109,11 @@ void ChunkProviderOverworld::populate_chunk(Chunk *chunk)
     }
 
     chunk->state = ChunkState::done;
+}
+
+ChunkProviderOverworld::~ChunkProviderOverworld()
+{
+    delete this->terrain_gen;
 }
 
 void ChunkProviderOverworld::plant_tree(Vec3i pos, int height)

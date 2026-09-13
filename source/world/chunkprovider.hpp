@@ -7,6 +7,7 @@
 #include <util/constants.hpp>
 #include <block/block_id.hpp>
 #include <ported/NoiseSynthesizer.hpp>
+#include <ported/MapGenTerrain.hpp>
 
 class Chunk;
 class World;
@@ -34,10 +35,12 @@ protected:
 class ChunkProviderOverworld : public ChunkProvider
 {
 public:
+    javaport::MapGenTerrain *terrain_gen = nullptr;
     ChunkProviderOverworld(World *world);
 
     virtual void provide_chunk(Chunk *chunk);
     virtual void populate_chunk(Chunk *chunk);
+    virtual ~ChunkProviderOverworld();
 
 protected:
     void plant_tree(Vec3i pos, int height);
