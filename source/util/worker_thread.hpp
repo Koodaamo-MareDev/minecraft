@@ -74,7 +74,7 @@ public:
         func_ = func;
         data_ = userData;
         has_job_ = true;
-        done_ = false;
+        ready_ = false;
         cond_.signal();
     }
 
@@ -88,14 +88,14 @@ public:
     bool is_done()
     {
         LockGuard lock(mutex_);
-        return done_;
+        return ready_;
     }
 
     // Blocking wait
     void wait()
     {
         LockGuard lock(mutex_);
-        while (!done_)
+        while (!ready_)
         {
             cond_.wait(mutex_);
         }
@@ -135,7 +135,7 @@ private:
 
             mutex_.lock();
 
-            done_ = true;
+            ready_ = true;
             cond_.signal();
         }
 
@@ -151,7 +151,7 @@ private:
     void *data_ = nullptr;
 
     bool has_job_ = false;
-    bool done_ = false;
+    bool ready_ = true;
     bool shutdown_ = false;
 };
 #endif
