@@ -30,8 +30,6 @@ void LightEngine::start(World *world)
 {
     if (!this->world && world)
         this->world = world;
-    thread_active = true;
-    worker.submit(light_engine_thread, this);
 }
 
 void LightEngine::restart()
@@ -40,42 +38,34 @@ void LightEngine::restart()
     start();
 }
 
-bool LightEngine::busy()
-{
-    return busy_flag;
-}
-
 void LightEngine::update_loop()
 {
-    while (thread_active)
+    while (pending_updates.size() > 0)
     {
-        while (thread_active && pending_updates.size() > 0)
-        {
-            Vec3i current = pending_updates.front();
-            pending_updates.pop_front();
-            process(current);
-            if (pending_updates.size() < 10000)
-                usleep(100);
-        }
-        usleep(500);
+        Vec3i current = pending_updates.front();
+        pending_updates.pop_front();
+        process(current);
+        usleep(0);
     }
 }
 
 void LightEngine::stop()
 {
-    thread_active = false;
     pending_updates.clear();
     worker.wait();
 }
 
 void LightEngine::post(const Vec3i &location)
 {
-    Chunk *chunk = world->get_chunk_from_pos(location);
-    if (!chunk)
-        return;
-    while (pending_updates.size() >= 10000)
-        usleep(500);
+    if (pending_updates.size() > 4000)
+        pending_updates.pop_front();
     pending_updates.push_back(location);
+}
+
+void LightEngine::try_submit()
+{
+    if (worker.is_done() && !pending_updates.empty())
+        worker.submit(light_engine_thread, this);
 }
 
 void LightEngine::process(const Vec3i &start)

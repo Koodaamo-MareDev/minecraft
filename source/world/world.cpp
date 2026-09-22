@@ -208,6 +208,7 @@ void World::update_chunks()
         tick_blocks();
         prepare_chunks(1);
     }
+    light_engine.try_submit();
 }
 
 void World::try_update_sections()

@@ -10,8 +10,6 @@ class World;
 class LightEngine
 {
 private:
-    bool busy_flag = false;
-    bool thread_active = true;
     World *world;
     std::deque<Vec3i> pending_updates;
     WorkerThread worker;
@@ -26,8 +24,7 @@ public:
     void restart();
 
     void post(const Vec3i &location);
-
-    bool busy();
+    void try_submit();
 
     void update_loop();
 };
