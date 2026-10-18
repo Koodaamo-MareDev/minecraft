@@ -138,7 +138,4 @@ public:
     virtual ~GuiButtonWithValue() = default;
 };
 
-extern gertex::GXMatrix gui_block_matrix;
-extern gertex::GXMatrix gui_item_matrix;
-
 #endif

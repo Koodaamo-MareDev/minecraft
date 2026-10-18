@@ -31,18 +31,18 @@ void GuiGameOver::draw()
     GX_EndGroup();
 
     // Save current gui matrix
-    gertex::GXMatrix old_item_matrix;
-    guMtxCopy(gui_item_matrix.mtx, old_item_matrix.mtx);
+    gertex::push_matrix();
 
     // Double the scale for the game over text
-    guMtxScaleApply(gertex::get_matrix().mtx, gui_item_matrix.mtx, 2.0f, 2.0f, 1.0f);
+    guMtxScaleApply(gertex::get_matrix().mtx, gertex::get_matrix().mtx, 2.0f, 2.0f, 1.0f);
 
     // Draw the text
     std::string game_over_text = "Game over!";
     Gui::draw_text_with_shadow((view.width - Gui::text_width(game_over_text) * 2) / 4, 60, game_over_text);
 
     // Restore gui matrix
-    guMtxCopy(old_item_matrix.mtx, gui_item_matrix.mtx);
+    gertex::pop_matrix();
+    gertex::load_pos_matrix();
 
     // Draw score text
     std::string score_text = "§eScore: 0";

@@ -11,8 +11,8 @@
 #include <deque>
 #include <memory>
 
-gertex::GXMatrix gui_block_matrix;
-gertex::GXMatrix gui_item_matrix;
+static gertex::GXMatrix gui_block_matrix;
+static gertex::GXMatrix gui_item_matrix;
 
 static std::deque<std::shared_ptr<Gui>> gui_stack;
 
@@ -119,8 +119,6 @@ void Gui::draw_text(int x, int y, std::string text, GXColor color)
     // Enable direct colors
     gertex::set_color_format(0, GX_DIRECT);
 
-    gertex::use_matrix(gui_item_matrix);
-
     use_texture(font_texture);
 
     int x_offset = 0;
@@ -215,7 +213,7 @@ void Gui::draw_item(int x, int y, item::ItemStack stack, gertex::GXView &viewpor
         if (!properties(item.id).m_fluid && (properties(item.id).m_nonflat || render_type == RenderType::full || render_type == RenderType::full_special || render_type == RenderType::slab))
         {
             // Translate the block to the correct position
-            guMtxCopy(gui_block_matrix.mtx, tmp_matrix.mtx);
+            tmp_matrix = gui_block_matrix;
             guMtxTransApply(tmp_matrix.mtx, tmp_matrix.mtx, x + 16, (y + 16) / viewport.aspect_correction, 0.0f);
             gertex::use_matrix(tmp_matrix);
 
@@ -224,7 +222,7 @@ void Gui::draw_item(int x, int y, item::ItemStack stack, gertex::GXView &viewpor
         }
         else
         {
-            guMtxCopy(gui_item_matrix.mtx, tmp_matrix.mtx);
+            tmp_matrix = gui_item_matrix;
             guMtxTransApply(tmp_matrix.mtx, tmp_matrix.mtx, x + 16, (y + 16) / viewport.aspect_correction, 0.0f);
             gertex::use_matrix(tmp_matrix);
 
@@ -235,7 +233,7 @@ void Gui::draw_item(int x, int y, item::ItemStack stack, gertex::GXView &viewpor
     else
     {
         use_texture(items_texture);
-        guMtxCopy(gui_item_matrix.mtx, tmp_matrix.mtx);
+        tmp_matrix = gui_item_matrix;
         guMtxTransApply(tmp_matrix.mtx, tmp_matrix.mtx, x + 16, (y + 16) / viewport.aspect_correction, 0.0f);
         gertex::use_matrix(tmp_matrix);
 

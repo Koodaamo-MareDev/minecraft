@@ -66,6 +66,7 @@ GuiTitleScreen::GuiTitleScreen(World **current_world)
 
 void GuiTitleScreen::draw()
 {
+    gertex::GXMatrix gui_mtx = gertex::get_matrix();
     gertex::GXView viewport = gertex::get_state().view;
 
     // Disable depth write
@@ -145,13 +146,11 @@ void GuiTitleScreen::draw()
     gertex::use_matrix(matrix);
 
     gertex::GXMatrix old_item_matrix;
-    guMtxCopy(gui_item_matrix.mtx, old_item_matrix.mtx);
-    guMtxCopy(gertex::get_matrix().mtx, gui_item_matrix.mtx);
+    guMtxCopy(gui_mtx.mtx, old_item_matrix.mtx);
+    guMtxCopy(gertex::get_matrix().mtx, gui_mtx.mtx);
 
     // Draw splash text
     draw_text_with_shadow(-text_width(splash_text) / 2, 0, splash_text, GXColor{255, 255, 0, 255});
-
-    guMtxCopy(old_item_matrix.mtx, gui_item_matrix.mtx);
 }
 
 void GuiTitleScreen::update()
