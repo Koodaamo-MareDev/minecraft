@@ -69,6 +69,8 @@ public:
     virtual void draw_buttons();
     virtual void navigate(bool left, bool right, bool up, bool down);
 
+    static void update_active();
+    static void draw_active();
     static void init_matrices(float aspect_correction);
     static void fill_rect(int x, int y, int width, int height, GXColor color = {255, 255, 255, 255});
     static void draw_rect(int x, int y, int width, int height, int border_size, GXColor color = {255, 255, 255, 255});
@@ -85,23 +87,13 @@ public:
      **/
     static void draw_container(int x, int y, inventory::Container &Container, gertex::GXView &viewport);
 
-    static Gui *get_gui()
-    {
-        return current_gui;
-    }
+    static Gui *get();
 
-    static void set_gui(Gui *gui)
-    {
-        if (current_gui && current_gui != gui)
-        {
-            current_gui->close();
-            delete current_gui;
-        }
-        current_gui = gui;
-    }
+    static void push(Gui *gui);
 
-protected:
-    static Gui *current_gui;
+    static void pop();
+
+    static void clear();
 };
 
 class GuiButton

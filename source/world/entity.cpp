@@ -923,8 +923,8 @@ void EntityItem::resolve_collision(EntityPhysical *b)
             sound.volume = 0.5;
             sound.pitch = rng.nextFloat() * 0.8 + 0.6;
             world->play_sound(sound);
-            if (Gui::get_gui())
-                Gui::get_gui()->refresh();
+            if (Gui::get())
+                Gui::get()->refresh();
         }
         item_stack = left_over;
     }
@@ -933,8 +933,8 @@ void EntityItem::resolve_collision(EntityPhysical *b)
         // Play the pop sound if the player picks up the stack
         pickup(b->get_position(0) - Vec3f(0, 0.5, 0));
 
-        if (Gui::get_gui())
-            Gui::get_gui()->refresh();
+        if (Gui::get())
+            Gui::get()->refresh();
     }
 }
 
@@ -1224,7 +1224,7 @@ void EntityPlayerLocal::tick()
 {
     if (health_update_tick > 0)
         health_update_tick--;
-    if (!Gui::get_gui())
+    if (!Gui::get())
     {
         Camera &camera = get_camera();
         for (input::Device *dev : input::devices)
@@ -1268,7 +1268,7 @@ void EntityPlayerLocal::animate()
 
 bool EntityPlayerLocal::should_jump()
 {
-    if (Gui::get_gui())
+    if (Gui::get())
         return false;
 
     for (input::Device *dev : input::devices)

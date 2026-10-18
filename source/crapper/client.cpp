@@ -397,7 +397,7 @@ namespace Crapper
     {
         debug::print("Connecting to %s:%d\n", host.c_str(), port);
 
-        GuiDirtscreen *dirtscreen = dynamic_cast<GuiDirtscreen *>(Gui::get_gui());
+        GuiDirtscreen *dirtscreen = dynamic_cast<GuiDirtscreen *>(Gui::get());
         if (dirtscreen)
             dirtscreen->set_text("Connecting to\n\n\n" + host + ":" + std::to_string(port));
 
@@ -436,7 +436,7 @@ namespace Crapper
             return;
 
         debug::print("Server hash: %s\n", server_hash.c_str());
-        GuiDirtscreen *dirtscreen = dynamic_cast<GuiDirtscreen *>(Gui::get_gui());
+        GuiDirtscreen *dirtscreen = dynamic_cast<GuiDirtscreen *>(Gui::get());
         if (dirtscreen)
             dirtscreen->set_text("Logging in");
         sendLoginRequest();
@@ -507,11 +507,11 @@ namespace Crapper
 
         if (!remote_world->loaded)
         {
-            GuiDirtscreen *dirtscreen = dynamic_cast<GuiDirtscreen *>(Gui::get_gui());
+            GuiDirtscreen *dirtscreen = dynamic_cast<GuiDirtscreen *>(Gui::get());
             if (!dirtscreen)
                 dirtscreen = new GuiDirtscreen;
             dirtscreen->set_text("Loading level\n\n\nDownloading terrain");
-            Gui::set_gui(dirtscreen);
+            Gui::push(dirtscreen);
         }
         login_success = true;
         state = ConnectionState::PLAY;
@@ -1563,19 +1563,19 @@ namespace Crapper
         {
             // Chest
             GuiContainer *gui = new GuiContainer(&remote_world->player, nullptr, window_id, window_title, slot_count);
-            Gui::set_gui(gui);
+            Gui::push(gui);
             break;
         }
         case 1:
         {
             GuiCrafting *gui = new GuiCrafting(&remote_world->player, nullptr, window_id);
-            Gui::set_gui(gui);
+            Gui::push(gui);
             break;
         }
         case 2:
         {
             GuiSmelting *gui = new GuiSmelting(&remote_world->player, nullptr, window_id, nullptr);
-            Gui::set_gui(gui);
+            Gui::push(gui);
             break;
         }
         default:
@@ -1589,10 +1589,10 @@ namespace Crapper
         uint8_t window_id = buffer.readByte();
         if (buffer.underflow)
             return;
-        Gui *current_gui = Gui::get_gui();
+        Gui *current_gui = Gui::get();
         if (current_gui && current_gui->window_id == window_id)
         {
-            Gui::set_gui(nullptr);
+            Gui::pop();
         }
     }
 
@@ -1603,7 +1603,7 @@ namespace Crapper
         bool success = buffer.readBool();
         if (buffer.underflow)
             return;
-        Gui *current_gui = Gui::get_gui();
+        Gui *current_gui = Gui::get();
         if (!success && current_gui && current_gui->window_id == window_id)
         {
             sendTransaction(window_id, action_id, true);
@@ -1638,7 +1638,7 @@ namespace Crapper
         }
         else if (window_id != 0)
         {
-            GuiGenericContainer *container_gui = dynamic_cast<GuiGenericContainer *>(Gui::get_gui());
+            GuiGenericContainer *container_gui = dynamic_cast<GuiGenericContainer *>(Gui::get());
             if (container_gui)
             {
                 if (slot_id == -1 && window_id == 0xFF)
@@ -1699,7 +1699,7 @@ namespace Crapper
         }
         else
         {
-            GuiGenericContainer *container_gui = dynamic_cast<GuiGenericContainer *>(Gui::get_gui());
+            GuiGenericContainer *container_gui = dynamic_cast<GuiGenericContainer *>(Gui::get());
             if (container_gui && container_gui->window_id == window_id)
             {
                 for (size_t i = 0; i < items.size(); i++)
@@ -1720,7 +1720,7 @@ namespace Crapper
         int16_t progress = buffer.readShort();
         if (buffer.underflow)
             return;
-        Gui *gui = Gui::get_gui();
+        Gui *gui = Gui::get();
         if (gui && gui->window_id == window_id)
         {
             GuiSmelting *smelting_gui = dynamic_cast<GuiSmelting *>(gui);

@@ -103,7 +103,7 @@ bool World::tick()
             // Inform the user about the network error
             GuiDirtscreen *dirtscreen = new GuiDirtscreen;
             dirtscreen->set_text(std::string(e.what()));
-            Gui::set_gui(dirtscreen);
+            Gui::push(dirtscreen);
 
             return false;
         }
@@ -126,11 +126,11 @@ bool World::tick()
     {
         player.velocity = Vec3f(0, 0, 0);
         player.prev_position = player.position;
-        GuiGameOver *game_over = dynamic_cast<GuiGameOver *>(Gui::get_gui());
+        GuiGameOver *game_over = dynamic_cast<GuiGameOver *>(Gui::get());
         if (!game_over)
         {
             GuiGameOver *game_over = new GuiGameOver(this);
-            Gui::set_gui(game_over);
+            Gui::push(game_over);
 
             // Drop all items
             for (size_t i = 0; i < player.items.size(); i++)

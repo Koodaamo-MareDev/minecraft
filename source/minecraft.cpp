@@ -171,7 +171,7 @@ void MainGameLoop()
     GuiDirtscreen *dirtscreen = new GuiDirtscreen;
     dirtscreen->set_text("Loading level\n\n\nBuilding terrain");
     dirtscreen->set_progress(&prog);
-    Gui::set_gui(dirtscreen);
+    Gui::push(dirtscreen);
 
     // Fall back to local world if not connected to a server
     if (!current_world->is_remote())
@@ -338,7 +338,7 @@ int main(int argc, char **argv)
     while (!isExiting)
     {
         GuiTitleScreen *titlescreen = new GuiTitleScreen(&current_world);
-        Gui::set_gui(titlescreen);
+        Gui::push(titlescreen);
         set_render_world(nullptr);
 
         // Initialize the light map for block rendering
@@ -348,9 +348,9 @@ int main(int argc, char **argv)
         GX_InvVtxCache();
 
         // Enter the main menu loop
-        while (!isExiting && Gui::get_gui() && !current_world)
+        while (!isExiting && Gui::get() && !current_world)
         {
-            Gui::get_gui()->sound_system = sound_system;
+            Gui::get()->sound_system = sound_system;
             GetInput();
             HandleGUI(state.view);
             GX_DrawDone();
@@ -370,7 +370,7 @@ int main(int argc, char **argv)
             {
                 isExiting = true;
             }
-            if (Gui::get_gui() == nullptr || Gui::get_gui()->quitting)
+            if (Gui::get() == nullptr || Gui::get()->quitting)
                 break;
         }
         if (current_world)
@@ -380,7 +380,7 @@ int main(int argc, char **argv)
             continue;
         }
 
-        isExiting |= !Gui::get_gui();
+        isExiting |= !Gui::get();
     }
     Crapper::deinitNetwork();
     delete sound_system;
@@ -459,7 +459,7 @@ void UpdateLoadingStatus(Progress *prog)
         if (!is_loading)
         {
             current_world->loaded = true;
-            Gui::set_gui(nullptr);
+            Gui::clear();
         }
     }
 }
@@ -571,13 +571,13 @@ void HandleGUI(gertex::GXView &viewport)
         {
             if (current_world && current_world->loaded)
             {
-                if (Gui::get_gui())
+                if (Gui::get())
                 {
-                    Gui::set_gui(nullptr);
+                    Gui::pop();
                 }
                 else
                 {
-                    Gui::set_gui(new GuiSurvival(&current_world->player, nullptr));
+                    Gui::push(new GuiSurvival(&current_world->player, nullptr));
                 }
             }
         }
@@ -782,9 +782,9 @@ void UpdateFog()
 
 void UpdateGUI(gertex::GXView &viewport)
 {
-    if (!Gui::get_gui())
+    if (!Gui::get())
         return;
-    if (Gui::get_gui()->use_cursor())
+    if (Gui::get()->use_cursor())
         for (input::Device *dev : input::devices)
         {
             if (dev->connected())
@@ -799,7 +799,7 @@ void UpdateGUI(gertex::GXView &viewport)
                 cursor_y = std::clamp(cursor_y, 0, int(viewport.height));
             }
         }
-    Gui::get_gui()->update();
+    Gui::update_active();
 }
 
 void DrawHUD(gertex::GXView &viewport)
@@ -902,7 +902,7 @@ void DrawHUD(gertex::GXView &viewport)
 
 void DrawGUI(gertex::GXView &viewport)
 {
-    Gui *m_gui = Gui::get_gui();
+    Gui *m_gui = Gui::get();
     if (!m_gui)
         return;
 
@@ -914,7 +914,7 @@ void DrawGUI(gertex::GXView &viewport)
     gertex::push_matrix();
 
     // Draw the GUI elements
-    Gui::get_gui()->draw();
+    Gui::draw_active();
 
     // Restore the orthogonal position matrix
     gertex::pop_matrix();
@@ -923,7 +923,7 @@ void DrawGUI(gertex::GXView &viewport)
     // Enable direct colors
     gertex::set_color_format(0, GX_DIRECT);
 
-    if (!Gui::get_gui()->use_cursor())
+    if (!Gui::get()->use_cursor())
         return;
 
     bool pointer_visible = false;
@@ -939,7 +939,7 @@ void DrawGUI(gertex::GXView &viewport)
     }
 
     // Draw the cursor
-    if (pointer_visible && !Gui::get_gui()->contains(cursor_x, cursor_y))
+    if (pointer_visible && !Gui::get()->contains(cursor_x, cursor_y))
         draw_textured_quad(icons_texture, cursor_x - 7, cursor_y - 3, 32, 48, 32, 32, 48, 56);
     else
         draw_textured_quad(icons_texture, cursor_x - 16, cursor_y - 16, 32, 32, 0, 32, 32, 64);

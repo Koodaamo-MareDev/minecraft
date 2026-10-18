@@ -8,11 +8,13 @@
 #include <limits>
 #include <sounds.hpp>
 #include <sound.hpp>
+#include <deque>
+#include <memory>
 
 gertex::GXMatrix gui_block_matrix;
 gertex::GXMatrix gui_item_matrix;
 
-Gui *Gui::current_gui = nullptr;
+static std::deque<std::shared_ptr<Gui>> gui_stack;
 
 Gui::~Gui()
 {
@@ -21,6 +23,24 @@ Gui::~Gui()
         if (button)
             delete button;
     }
+}
+
+void Gui::update_active()
+{
+    if (gui_stack.empty())
+        return;
+
+    gui_stack.back()->update();
+}
+
+void Gui::draw_active()
+{
+    if (gui_stack.empty())
+        return;
+
+    gertex::use_matrix(gui_item_matrix);
+
+    gui_stack.back()->draw();
 }
 
 void Gui::init_matrices(float aspect_correction)
@@ -239,6 +259,40 @@ void Gui::draw_container(int x, int y, inventory::Container &Container, gertex::
     for (size_t i = 0; i < Container.size(); i++)
     {
         draw_item(x + (i % 9) * 36, y + (i / 9) * 36, Container[i], viewport);
+    }
+}
+
+Gui *Gui::get()
+{
+    return gui_stack.empty() ? nullptr : gui_stack.back().get();
+}
+
+void Gui::push(Gui *gui)
+{
+    // Prevent pushing null
+    if (!gui)
+        return;
+
+    gui_stack.emplace_back(gui);
+}
+
+void Gui::pop()
+{
+    if (gui_stack.empty())
+        return;
+
+    std::shared_ptr<Gui> current_gui = gui_stack.back();
+    current_gui->close();
+    gui_stack.pop_back();
+}
+
+void Gui::clear()
+{
+    while (!gui_stack.empty())
+    {
+        std::shared_ptr<Gui> current_gui = gui_stack.back();
+        current_gui->close();
+        gui_stack.pop_back();
     }
 }
 

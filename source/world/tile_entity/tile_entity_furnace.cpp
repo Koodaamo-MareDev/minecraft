@@ -124,7 +124,7 @@ void TileEntityFurnace::tick(World *world)
     }
     if (updated)
     {
-        GuiSmelting *gui = dynamic_cast<GuiSmelting *>(Gui::get_gui());
+        GuiSmelting *gui = dynamic_cast<GuiSmelting *>(Gui::get());
         if (gui && gui->furnace == this)
             gui->refresh();
     }
@@ -137,7 +137,7 @@ std::string TileEntityFurnace::id()
 
 TileEntityFurnace::~TileEntityFurnace()
 {
-    GuiSmelting *gui = dynamic_cast<GuiSmelting *>(Gui::get_gui());
+    GuiSmelting *gui = dynamic_cast<GuiSmelting *>(Gui::get());
     if (gui && gui->furnace == this)
-        gui->set_gui(nullptr);
+        Gui::pop();
 }

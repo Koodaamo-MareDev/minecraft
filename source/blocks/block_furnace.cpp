@@ -47,7 +47,7 @@ bool BlockFurnace::on_use(EntityPhysical *entity, const Vec3i &pos)
     TileEntityFurnace *furnace = dynamic_cast<TileEntityFurnace *>(tile_entity);
     if (furnace)
     {
-        Gui::set_gui(new GuiSmelting(entity, &furnace->items, 0, furnace));
+        Gui::push(new GuiSmelting(entity, &furnace->items, 0, furnace));
     }
     return true;
 }

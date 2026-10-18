@@ -28,6 +28,6 @@ bool BlockWorkbench::on_use(EntityPhysical *entity, const Vec3i &pos)
 {
     if (entity->world->is_remote())
         return true;
-    Gui::set_gui(new GuiCrafting(entity, nullptr, 0));
+    Gui::push(new GuiCrafting(entity, nullptr, 0));
     return true;
 }

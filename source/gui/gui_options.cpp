@@ -72,4 +72,5 @@ void GuiOptions::quit_to_title()
 {
     quitting = true;
     config.save();
+    Gui::pop();
 }

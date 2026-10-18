@@ -174,7 +174,7 @@ bool BlockChest::on_use(EntityPhysical *entity, const Vec3i &pos)
 
         // TODO: Handle Large Chest Inventory
 
-        Gui::set_gui(new GuiContainer(entity, &te->items));
+        Gui::push(new GuiContainer(entity, &te->items));
     }
 
     return true;

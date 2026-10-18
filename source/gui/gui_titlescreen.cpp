@@ -161,7 +161,7 @@ void GuiTitleScreen::update()
 
 void GuiTitleScreen::join_singleplayer()
 {
-    Gui::set_gui(new GuiWorldSelect(current_world));
+    Gui::push(new GuiWorldSelect(current_world));
 }
 
 void GuiTitleScreen::join_multiplayer()
@@ -185,7 +185,7 @@ void GuiTitleScreen::join_multiplayer()
             new_world->client->joinServer(server_ip, server_port);
             *current_world = new_world;
 
-            Gui::set_gui(new GuiDirtscreen);
+            Gui::push(new GuiDirtscreen);
         }
         catch (std::runtime_error &e)
         {
@@ -199,10 +199,10 @@ void GuiTitleScreen::join_multiplayer()
 
 void GuiTitleScreen::options()
 {
-    Gui::set_gui(new GuiOptions);
+    Gui::push(new GuiOptions);
 }
 
 void GuiTitleScreen::quit_game()
 {
-    Gui::set_gui(nullptr);
+    Gui::clear();
 }

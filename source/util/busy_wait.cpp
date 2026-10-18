@@ -34,7 +34,7 @@ static void draw_busy_gui()
     gertex::ortho(gertex::get_state().view);
 
     // Draw the GUI elements
-    Gui::get_gui()->draw();
+    Gui::draw_active();
 
     GX_SetDrawDone();
 
@@ -58,7 +58,7 @@ void busy_wait(std::function<void()> blocking_call, Gui *gui)
     if (!blocking_call)
         return;
     active_blocking_call = blocking_call;
-    Gui::set_gui(gui);
+    Gui::push(gui);
 
     thread_done = 0;
 
@@ -81,7 +81,7 @@ void busy_wait(std::function<void()> blocking_call, Gui *gui)
         VIDEO_WaitVSync();
     }
 
-    Gui::set_gui(nullptr);
+    Gui::pop();
     LWP_JoinThread(thread_handle, NULL);
     thread_handle = LWP_THREAD_NULL;
 }
