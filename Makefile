@@ -31,7 +31,7 @@ DEFINES		:=	-DMINIZ_NO_ARCHIVE_APIS -DMINIZ_NO_ZLIB_COMPATIBLE_NAMES \
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
-CFLAGS	= -g -O2 -Wall -fno-optimize-sibling-calls $(MACHDEP) $(INCLUDE) $(DEFINES)
+CFLAGS	= -g -O2 -Wall -fno-optimize-sibling-calls -mstrict-align $(MACHDEP) $(INCLUDE) $(DEFINES)
 CXXFLAGS	=	$(CFLAGS)
 
 LDFLAGS	=	-g $(MACHDEP) -Wl,-Map,$(notdir $@).map
