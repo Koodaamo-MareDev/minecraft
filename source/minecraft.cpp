@@ -481,7 +481,7 @@ void GetInput()
     should_place_block = false;
     should_destroy_block = false;
 
-    if (!Gui::get_gui())
+    if (!Gui::get())
     {
         EntityPlayerLocal &player = current_world->player;
         player.rotation.y -= right_stick.x * current_world->delta_time * input::sensitivity;
