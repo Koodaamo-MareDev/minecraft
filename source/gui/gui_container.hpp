@@ -47,6 +47,7 @@ public:
     virtual ~GuiGenericContainer();
 
 protected:
+    void draw_slots();
     EntityPhysical *owner;
     inventory::Container *linked_container;
     std::vector<GuiSlot *> slots;

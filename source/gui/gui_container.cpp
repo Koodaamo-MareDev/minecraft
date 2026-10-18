@@ -57,52 +57,6 @@ void GuiContainer::draw()
 
     // Draw the inventory part of the background
     draw_textured_quad(container_texture, start_x, start_y + container_height - 2, width, inventory_height + 2, 0, 221 - inventory_height / 2, width / 2, 222);
-
-    // Enable backface culling for the items
-    GX_SetCullMode(GX_CULL_BACK);
-
-    // Draw the hotbar
-    for (GuiSlot *slot : slots)
-    {
-        draw_item(slot->x, slot->y, slot->item, viewport);
-    }
-
-    // Disable backface culling for the rest of the GUI
-    GX_SetCullMode(GX_CULL_NONE);
-
-    // Get the highlighted slot
-    GuiSlot *highlighted_slot = nullptr;
-    for (GuiSlot *slot : slots)
-    {
-        if (slot->contains(cursor_x, cursor_y))
-        {
-            highlighted_slot = slot;
-            break;
-        }
-    }
-    // Draw the highlight
-    if (highlighted_slot)
-    {
-        // Enable direct colors
-        gertex::set_color_format(0, GX_DIRECT);
-
-        // Reset the position matrix
-        gertex::use_matrix(gui_item_matrix);
-
-        draw_colored_quad(highlighted_slot->x, highlighted_slot->y, 32, 32, 255, 255, 255, 128);
-    }
-
-    if (item_in_hand.id != 0)
-    {
-        // Enable backface culling for the items
-        GX_SetCullMode(GX_CULL_BACK);
-
-        // Enable indexed colors
-        gertex::set_color_format(0, GX_INDEX8);
-
-        // Draw the item in hand
-        draw_item(cursor_x - 16, cursor_y - 16, item_in_hand, viewport);
-    }
 }
 
 void GuiGenericContainer::update()
@@ -274,5 +228,60 @@ GuiGenericContainer::~GuiGenericContainer()
     for (GuiSlot *slot : slots)
     {
         delete slot;
+    }
+}
+
+void GuiGenericContainer::draw_slots()
+{
+    gertex::GXView viewport = gertex::get_state().view;
+
+    // Enable backface culling for the items
+    GX_SetCullMode(GX_CULL_BACK);
+
+    // Save gui matrix
+    gertex::push_matrix();
+
+    // Draw the hotbar
+    for (GuiSlot *slot : slots)
+    {
+        draw_item(slot->x, slot->y, slot->item, viewport);
+    }
+
+    // Restore gui matrix
+    gertex::pop_matrix();
+    gertex::load_pos_matrix();
+
+    // Disable backface culling for the rest of the GUI
+    GX_SetCullMode(GX_CULL_NONE);
+
+    // Get the highlighted slot
+    GuiSlot *highlighted_slot = nullptr;
+    for (GuiSlot *slot : slots)
+    {
+        if (slot->contains(cursor_x, cursor_y))
+        {
+            highlighted_slot = slot;
+            break;
+        }
+    }
+    // Draw the highlight
+    if (highlighted_slot)
+    {
+        // Enable direct colors
+        gertex::set_color_format(0, GX_DIRECT);
+
+        draw_colored_quad(highlighted_slot->x, highlighted_slot->y, 32, 32, 255, 255, 255, 128);
+    }
+
+    if (item_in_hand.id != 0)
+    {
+        // Enable backface culling for the items
+        GX_SetCullMode(GX_CULL_BACK);
+
+        // Enable indexed colors
+        gertex::set_color_format(0, GX_INDEX8);
+
+        // Draw the item in hand
+        draw_item(cursor_x - 16, cursor_y - 16, item_in_hand, viewport);
     }
 }
