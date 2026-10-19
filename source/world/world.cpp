@@ -10,10 +10,10 @@
 #include <util/timers.hpp>
 #include <world/chunk.hpp>
 #include <block/blocks.hpp>
-#include <world/entity.hpp>
+#include <world/entity/entity.hpp>
 #include <render/render.hpp>
 #include <render/render_chunks.hpp>
-#include <world/particle.hpp>
+#include <world/entity/particle.hpp>
 #include <util/lock.hpp>
 #include <world/util/raycast.hpp>
 #include <nbt/nbt.hpp>

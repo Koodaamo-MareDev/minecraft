@@ -1,7 +1,7 @@
 #include "block_soil.hpp"
 
 #include <world/world.hpp>
-#include <world/entity.hpp>
+#include <world/entity/entity.hpp>
 #include <registry/block_list.hpp>
 
 BlockSoil::BlockSoil(uint16_t id, uint8_t texture_index) : BlockBase(id, texture_index, Materials::GROUND)

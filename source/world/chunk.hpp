@@ -14,7 +14,7 @@
 #include <math/vec3f.hpp>
 #include <util/constants.hpp>
 #include <block/block_properties.hpp>
-#include <world/entity.hpp>
+#include <world/entity/entity.hpp>
 #include <world/chunk_cache.hpp>
 #include <render/buffer_pass.hpp>
 

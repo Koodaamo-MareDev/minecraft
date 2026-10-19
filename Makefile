@@ -21,7 +21,7 @@ BUILD		:=	build
 SOURCES		:=	source source/crapper source/gertex source/math source/nbt \
 				source/util source/util/input source/pnguin source/auxio \
 				source/ported source/thirdparty/miniz source/block source/blocks \
-				source/world source/world/util source/world/tile_entity \
+				source/world source/world/util source/world/tile_entity source/world/entity \
 				source/render source/item source/gui source/crafting source/registry
 TEXTURES	:=	textures
 INCLUDES	:=	source source/thirdparty

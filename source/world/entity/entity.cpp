@@ -9,8 +9,8 @@
 #include <render/render_fluids.hpp> // For fluid direction
 #include <block/blocks.hpp>
 #include <world/light.hpp>
-#include <world/particle.hpp>
-#include <world/pathfinding.hpp>
+#include <world/entity/particle.hpp>
+#include <world/entity/pathfinding.hpp>
 #include <sounds.hpp>
 #include <item/inventory.hpp>
 #include <gui/gui.hpp>

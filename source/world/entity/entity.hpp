@@ -10,7 +10,7 @@
 #include <block/block_properties.hpp>
 #include <render/model.hpp>
 #include <item/inventory.hpp>
-#include "pathfinding.hpp"
+#include <world/entity/pathfinding.hpp>
 #include "nbt/nbt.hpp"
 
 constexpr vfloat_t ENTITY_GRAVITY = 9.8f;

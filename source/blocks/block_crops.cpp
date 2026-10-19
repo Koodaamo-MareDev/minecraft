@@ -1,7 +1,7 @@
 #include "block_crops.hpp"
 
 #include <world/world.hpp>
-#include <world/entity.hpp>
+#include <world/entity/entity.hpp>
 #include <item/item_id.hpp>
 #include <block/block_id.hpp>
 

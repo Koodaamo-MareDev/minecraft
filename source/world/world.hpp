@@ -11,7 +11,7 @@
 #include <set>
 #include <map>
 
-#include <world/particle.hpp>
+#include <world/entity/particle.hpp>
 #include "sound.hpp"
 #include <item/inventory.hpp>
 #include <block/block_tick.hpp>

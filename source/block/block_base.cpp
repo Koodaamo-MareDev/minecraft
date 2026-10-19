@@ -2,7 +2,7 @@
 #include <registry/block_list.hpp>
 #include <render/render_blocks.hpp>
 #include <util/constants.hpp>
-#include <world/entity.hpp>
+#include <world/entity/entity.hpp>
 #include <world/world.hpp>
 #include <stdexcept>
 

@@ -1,6 +1,6 @@
 #include "gui_survival.hpp"
 
-#include <world/entity.hpp>
+#include <world/entity/entity.hpp>
 #include <world/world.hpp>
 #include <util/input/input.hpp>
 #include <crafting/recipe_manager.hpp>

@@ -1,4 +1,4 @@
-#include <world/particle.hpp>
+#include <world/entity/particle.hpp>
 #include <world/chunk.hpp>
 #include <world/world.hpp>
 #include <block/block_properties.hpp>

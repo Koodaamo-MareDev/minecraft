@@ -1,6 +1,6 @@
 #include "block_jukebox.hpp"
 
-#include <world/entity.hpp>
+#include <world/entity/entity.hpp>
 #include <world/world.hpp>
 #include <item/item_id.hpp>
 #include <item/item_stack.hpp>

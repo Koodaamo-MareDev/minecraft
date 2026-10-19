@@ -15,7 +15,7 @@
 #include <registry/textures.hpp>
 #include <render/base3d.hpp>
 #include <render/texanim.hpp>
-#include <world/particle.hpp>
+#include <world/entity/particle.hpp>
 #include <gertex/gertex.hpp>
 #include <gertex/displaylist.hpp>
 #include <util/lock.hpp>

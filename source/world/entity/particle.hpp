@@ -13,7 +13,7 @@
 
 #define PTYPE_MAX 3
 
-#include "entity.hpp"
+#include <world/entity/entity.hpp>
 
 class Particle : public EntityBase
 {

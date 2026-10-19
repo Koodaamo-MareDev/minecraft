@@ -1,6 +1,6 @@
 #include "block_workbench.hpp"
 #include <world/world.hpp>
-#include <world/entity.hpp>
+#include <world/entity/entity.hpp>
 #include <gui/gui_crafting.hpp>
 
 BlockWorkbench::BlockWorkbench(int16_t id) : BlockBase(id, 59, Materials::WOOD)

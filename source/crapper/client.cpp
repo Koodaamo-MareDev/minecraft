@@ -4,7 +4,7 @@
 #include <miniz/miniz.h>
 
 #include <item/inventory.hpp>
-#include <world/entity.hpp>
+#include <world/entity/entity.hpp>
 #include <world/chunk.hpp>
 #include <util/lock.hpp>
 #include <sounds.hpp>

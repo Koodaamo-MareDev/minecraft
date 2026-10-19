@@ -2,7 +2,7 @@
 
 #include <world/tile_entity/tile_entity_furnace.hpp>
 #include <world/world.hpp>
-#include <world/entity.hpp>
+#include <world/entity/entity.hpp>
 #include <registry/block_list.hpp>
 #include <gui/gui_smelting.hpp>
 
