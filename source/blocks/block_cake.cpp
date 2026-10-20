@@ -1,7 +1,7 @@
 #include "block_cake.hpp"
 
 #include <world/world.hpp>
-#include <world/entity/entity.hpp>
+#include <world/entity/entity_player.hpp>
 #include <registry/block_list.hpp>
 
 BlockCake::BlockCake(uint16_t id, uint8_t texture_index) : BlockBase(id, texture_index, Materials::CAKE)

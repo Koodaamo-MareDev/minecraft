@@ -1,7 +1,11 @@
-#include <world/entity/particle.hpp>
+#include "particle.hpp"
 #include <world/chunk.hpp>
 #include <world/world.hpp>
 #include <block/block_properties.hpp>
+
+constexpr vfloat_t PARTICLE_GRAVITY = 9.8f;
+
+Particle::Particle(World *world) : EntityBase(), life_time(0), physics(0), type(0), size(64), brightness(255), u(0), v(0), world(world) {}
 
 void Particle::update(float dt)
 {
@@ -10,7 +14,7 @@ void Particle::update(float dt)
     if (physics & PPHYSIC_FLAG_GRAVITY)
     {
         // Apply gravity
-        velocity.y -= ENTITY_GRAVITY * dt;
+        velocity.y -= PARTICLE_GRAVITY * dt;
     }
 
     if (physics & PPHYSIC_FLAG_FRICTION)

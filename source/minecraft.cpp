@@ -15,6 +15,7 @@
 #include <gui/gui_dirtscreen.hpp>
 #include <gui/gui_titlescreen.hpp>
 #include <world/world.hpp>
+#include <world/entity/entity_player_local.hpp>
 #include <crafting/recipe_manager.hpp>
 #include <util/input/input.hpp>
 #include <util/string_utils.hpp>

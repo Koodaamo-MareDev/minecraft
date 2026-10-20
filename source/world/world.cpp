@@ -10,7 +10,8 @@
 #include <util/timers.hpp>
 #include <world/chunk.hpp>
 #include <block/blocks.hpp>
-#include <world/entity/entity.hpp>
+#include <world/entity/entity_player_local.hpp>
+#include <world/entity/entity_item.hpp>
 #include <render/render.hpp>
 #include <render/render_chunks.hpp>
 #include <world/entity/particle.hpp>

@@ -4,7 +4,10 @@
 #include <miniz/miniz.h>
 
 #include <item/inventory.hpp>
-#include <world/entity/entity.hpp>
+#include <world/entity/entity_creeper.hpp>
+#include <world/entity/entity_player_remote.hpp>
+#include <world/entity/entity_item.hpp>
+#include <world/entity/entity_falling_block.hpp>
 #include <world/chunk.hpp>
 #include <util/lock.hpp>
 #include <sounds.hpp>

@@ -11,6 +11,7 @@
 #include <world/world.hpp>
 #include <world/chunk.hpp>
 #include <block/blocks.hpp>
+#include <world/entity/entity_explosive_block.hpp>
 
 #ifdef FAST_SKYCAST
 #define skycast skycast_fast

@@ -1,6 +1,6 @@
 #include "gui_crafting.hpp"
 
-#include <world/entity/entity.hpp>
+#include <world/entity/entity_item.hpp>
 #include <world/world.hpp>
 #include <util/input/input.hpp>
 #include <crafting/recipe_manager.hpp>

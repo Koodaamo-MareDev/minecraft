@@ -3,6 +3,7 @@
 
 #include <render/render_gui.hpp>
 #include <item/item_stack.hpp>
+#include <item/inventory.hpp>
 #include <functional>
 
 extern int cursor_x;

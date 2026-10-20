@@ -4,7 +4,7 @@
 #include <unordered_map>
 #include <string>
 #include <functional>
-
+#include <nbt/nbt.hpp>
 #include <world/chunk.hpp>
 
 class World;

@@ -12,6 +12,8 @@
 #include <registry/block_list.hpp>
 #include <item/item_stack.hpp>
 #include <item/item_id.hpp>
+#include <world/entity/entity_falling_block.hpp>
+#include <world/entity/entity_explosive_block.hpp>
 
 // Used for the block breaking animation
 // If negative, use default texture index

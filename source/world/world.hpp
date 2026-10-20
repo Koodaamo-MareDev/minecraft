@@ -15,9 +15,11 @@
 #include "sound.hpp"
 #include <item/inventory.hpp>
 #include <block/block_tick.hpp>
+#include <block/blocks.hpp>
 #include <mcregion.hpp>
 #include <world/chunk_manager.hpp>
 #include <world/light.hpp>
+#include <world/entity/entity_player_local.hpp>
 
 class Chunk;
 class EntityPhysical;

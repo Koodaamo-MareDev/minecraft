@@ -1,5 +1,6 @@
 #include <gui/gui_container.hpp>
 #include <world/world.hpp>
+#include <world/entity/entity_item.hpp>
 #include <util/input/input.hpp>
 
 GuiContainer::GuiContainer(EntityPhysical *owner, inventory::Container *container, uint8_t window_id, std::string title, uint8_t slots) : GuiGenericContainer(owner, container, window_id, title)

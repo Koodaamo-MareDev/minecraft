@@ -14,6 +14,7 @@
 #define PTYPE_MAX 3
 
 #include <world/entity/entity.hpp>
+class World;
 
 class Particle : public EntityBase
 {
@@ -49,7 +50,7 @@ public:
     World *world = nullptr;
 
     Particle() {}
-    Particle(World *world) : EntityBase(), life_time(0), physics(0), type(0), size(64), brightness(255), u(0), v(0), world(world) {}
+    Particle(World *world);
 
     ~Particle() {}
 
