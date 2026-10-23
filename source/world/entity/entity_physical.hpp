@@ -107,6 +107,16 @@ public:
         return true;
     }
 
+    Vec3f get_head_pos()
+    {
+        return Vec3f{position.x, aabb.min.y + y_offset, position.z};
+    }
+
+    Vec3f get_foot_pos()
+    {
+        return Vec3f{position.x, aabb.min.y, position.z};
+    }
+
     Vec3i get_head_blockpos()
     {
         return Vec3i(std::floor(position.x), std::floor(aabb.min.y + y_offset), std::floor(position.z));

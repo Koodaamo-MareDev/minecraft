@@ -58,11 +58,12 @@ void EntityCreeper::tick()
 
     if (follow_entity)
     {
-        Vec3f direction = follow_entity->position - position;
+        Vec3f direction = follow_entity->get_head_pos() - get_head_pos();
         vfloat_t sqrdistance = direction.sqr_magnitude();
         if (sqrdistance < 512 && sqrdistance > 0.5)
         {
             rotation = vector_to_angles(direction.fast_normalize());
+            body_rotation_y = lerpd(body_rotation_y, std::atan2(movement.x, movement.z) / M_DTOR, world->partial_ticks * 0.5f);
             EntityPathfinder::tick();
         }
         // Explode if the player is too close
