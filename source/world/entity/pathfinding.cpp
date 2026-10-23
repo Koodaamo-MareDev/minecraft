@@ -8,14 +8,7 @@
 #include <map>
 #include <list>
 #include <block/blocks.hpp>
-
-static const Vec3i v_off[] = {
-    Vec3i{-1, +0, +0},  // Negative X
-    Vec3i{+1, +0, +0},  // Positive X
-    Vec3i{+0, +0, -1},  // Negative Z
-    Vec3i{+0, +0, +1},  // Positive Z
-    Vec3i{+0, -1, +0},  // Negative Y
-    Vec3i{+0, +1, +0}}; // Positive Y
+#include <registry/block_list.hpp>
 
 std::vector<Vec3i>
 find_path(
@@ -23,16 +16,11 @@ find_path(
     EntityPhysical *entity,
     Vec3i goal,
     int max_distance,
-    int max_deviation)
+    int max_deviation /*unused */)
 {
 
     const int entity_width = (int)std::ceil(entity->width);
     const int entity_height = (int)std::ceil(entity->height);
-
-    auto is_water = [&](const Vec3i &pos)
-    {
-        return block_properties[world->get_block_id_at(pos)].m_material == Materials::WATER;
-    };
 
     auto is_solid = [&](const Vec3i &pos)
     {
@@ -40,7 +28,7 @@ find_path(
         return coll != CollisionType::none && coll != CollisionType::fluid;
     };
 
-    auto valid_pos = [&](const Vec3i &pos) -> bool
+    auto can_fit = [&](const Vec3i &pos) -> bool
     {
         for (int x = 0; x < entity_width; x++)
             for (int z = 0; z < entity_width; z++)
@@ -52,138 +40,182 @@ find_path(
         return true;
     };
 
-    auto has_ground = [&](const Vec3i &pos) -> bool
-    {
-        for (int x = 0; x < entity_width; x++)
-            for (int z = 0; z < entity_width; z++)
-            {
-                if (is_solid(pos + Vec3i{x, -1, z}) || is_water(pos + Vec3i{x, -1, z}))
-                    return true;
-            }
-        return false;
-    };
-
-    constexpr int max_jump_height = 1;
-
     auto can_reach = [&](const Vec3i &pos, const Vec3i &from) -> bool
     {
-        if (!valid_pos(pos))
+        if (!can_fit(pos))
             return false;
 
-        int rel_y = pos.y - from.y;
+        Vec3i min = Vec3i{std::min(from.x, pos.x), std::min(from.y, pos.y), std::min(from.z, pos.z)};
+        Vec3i max = Vec3i{std::max(from.x, pos.x), std::max(from.y, pos.y), std::max(from.z, pos.z)};
 
-        if (rel_y == 0)
-        {
-            Vec3i min = Vec3i{std::min(from.x, pos.x), std::min(from.y, pos.y), std::min(from.z, pos.z)};
-            Vec3i max = Vec3i{std::max(from.x, pos.x), std::max(from.y, pos.y), std::max(from.z, pos.z)};
+        for (int x = min.x; x <= max.x; x++)
+            for (int z = min.z; z <= max.z; z++)
+                for (int y = min.y; y <= max.y; y++)
+                    if (!can_fit(Vec3i{x, y, z}))
+                        return false;
+        return true;
+    };
 
-            for (int x = min.x; x <= max.x; x++)
-                for (int z = min.z; z <= max.z; z++)
-                    for (int y = min.y; y < max.y; y++)
-                        if (is_solid(Vec3i{x, y, z}))
-                            return false;
-            return has_ground(pos);
-        }
+    auto penalize = [&](const Vec3i &pos) -> float
+    {
+        // Always consider block below (or its neighbors)
+        Vec3i a = pos;
+        a.y--;
 
-        if (rel_y > 0)
+        BlockID current_id = world->get_block_id_at(a);
+        switch (current_id)
         {
-            for (int y = 0; y > -max_jump_height; y--)
-                if (has_ground(pos + Vec3i{0, y, 0}) && valid_pos(from + Vec3i{0, -y, 0}))
-                    return true;
+        case BlockID::fence:
+        case BlockID::lava:
+            return std::numeric_limits<float>::infinity();
+
+        case BlockID::flowing_water:
+        case BlockID::water:
+            // Check if it's breach water
+            return block_at(world, pos)->material_type() == Materials::AIR ? 4 : 8;
+        case BlockID::fire:
+            return 16;
+        default:
+            break;
         }
-        else
+        const static std::vector<int> to_check = {FACE_NX, FACE_PX, FACE_NZ, FACE_PZ};
+        for (int i : to_check)
         {
-            for (int y = 0; y > -10; y--)
-                if (has_ground(pos + Vec3i{0, y, 0}) && valid_pos(from + Vec3i{0, -y, 0}))
-                    return true;
+            switch (world->get_block_id_at(a + block_face[i]))
+            {
+            case BlockID::cactus:
+            case BlockID::fire:
+            case BlockID::lava:
+            case BlockID::flowing_water:
+            case BlockID::water:
+                return 8;
+
+            default:
+                break;
+            }
         }
-        return false;
+        return 0;
+    };
+
+    auto heuristic = [&](const Vec3i &a, const Vec3i &b) -> float
+    {
+        int dx = std::abs(b.x - a.x);
+        int dy = std::abs(b.y - a.y);
+        int dz = std::abs(b.z - a.z);
+
+        return float(std::max(dx, dz) + dy) + penalize(a);
+    };
+
+    auto goal_heuristic = [&](const Vec3i &a) -> float
+    {
+        return heuristic(a, goal);
     };
 
     Vec3i start{int(entity->aabb.min.x), int(entity->aabb.min.y), int(entity->aabb.min.z)};
 
-    if (start == goal || !valid_pos(start))
+    if (start == goal || !can_fit(start) || !can_fit(goal))
         return {};
-    std::map<Vec3i, int> dist;
-    std::map<Vec3i, Vec3i> prev;
 
-    Vec3i v_min = start;
-    Vec3i v_max = goal;
-    if (v_min.x > v_max.x)
-        std::swap(v_min.x, v_max.x);
-    if (v_min.y > v_max.y)
-        std::swap(v_min.y, v_max.y);
-    if (v_min.z > v_max.z)
-        std::swap(v_min.z, v_max.z);
-    v_max += Vec3i{max_deviation, max_deviation, max_deviation};
-    v_min -= Vec3i{max_deviation, max_deviation, max_deviation};
+    std::list<Vec3i> open_set;
+    std::map<Vec3i, Vec3i> came_from;
+    std::map<Vec3i, float> g_score;
+    std::map<Vec3i, float> f_score;
 
-    using Node = std::pair<int, Vec3i>; // (distance, position)
-    std::priority_queue<Node, std::vector<Node>, std::greater<Node>> pq;
-    std::vector<int> has_ground_map;
-    has_ground_map.resize((v_max.x - v_min.x + 1) * (v_max.z - v_min.z + 1));
+    open_set.push_back(start);
+    g_score[start] = 0;
+    f_score[start] = goal_heuristic(start);
 
-    for (int x = v_min.x; x <= v_max.x; x++)
-        for (int z = v_min.z; z <= v_max.z; z++)
-            for (int y = v_min.y; y <= v_max.y; y++)
-            {
-                Vec3i v{x, y, z};
-                if (valid_pos(v))
-                {
-                    dist[v] = 1000000;
-                    prev[v] = start;
-                    pq.push({1000000, v});
-                }
-            }
-
-    dist[start] = 0;
-    pq.push({0, start});
-
-    while (!pq.empty())
+    auto filter = [&](const Vec3i &a, const Vec3i &b)
     {
-        auto [d, u] = pq.top();
-        pq.pop();
+        float ad = std::numeric_limits<float>::infinity();
+        float bd = std::numeric_limits<float>::infinity();
+        if (auto it = f_score.find(a); it != f_score.end())
+            ad = it->second;
+        if (auto it = f_score.find(b); it != f_score.end())
+            bd = it->second;
+        return ad < bd;
+    };
 
-        if (d > dist[u])
-            continue;
+    const static std::vector<Vec3i> valid_moves = {
+        // Prioritize cardinals
+        Vec3i{0, 0, -1},
+        Vec3i{1, 0, 0},
+        Vec3i{0, 0, 1},
+        Vec3i{-1, 0, 0},
 
-        if (u == goal)
+        // Cardinals while falling
+        Vec3i{0, -1, -1},
+        Vec3i{1, -1, 0},
+        Vec3i{0, -1, 1},
+        Vec3i{-1, -1, 0},
+
+        // Diagonals
+        Vec3i{-1, 0, -1},
+        Vec3i{1, 0, -1},
+        Vec3i{1, 0, 1},
+        Vec3i{-1, 0, 1},
+
+        // Cardinals while jumping
+        Vec3i{0, 1, -1},
+        Vec3i{1, 1, 0},
+        Vec3i{0, 1, 1},
+        Vec3i{-1, 1, 0},
+
+    };
+
+    int visited = 0;
+    while (!open_set.empty())
+    {
+        visited++;
+        if (visited == 64)
+            return {};
+        auto found = std::min_element(open_set.begin(), open_set.end(), filter);
+        Vec3i current = *found;
+        if (current == goal)
         {
             std::vector<Vec3i> path;
-            Vec3i cur = goal;
-
-            while (cur != start)
+            auto it = came_from.find(current);
+            while (it != came_from.end())
             {
-                path.push_back(cur);
-                cur = prev[cur];
+                current = it->second;
+                path.push_back(current);
+
+                it = came_from.find(current);
             }
 
             std::reverse(path.begin(), path.end());
             return path;
         }
-        for (int x = -1; x <= 1; x++)
-            for (int z = -1; z <= 1; z++)
-                for (int y = -1; y <= 1; y++)
+
+        open_set.erase(found);
+
+        for (const Vec3i &relative : valid_moves)
+        {
+            Vec3i neighbor = current + relative;
+            if (!can_reach(neighbor, current))
+                continue;
+
+            float tentative_g = std::numeric_limits<float>::infinity();
+            if (auto it = g_score.find(current); it != g_score.end())
+                tentative_g = it->second + heuristic(neighbor, current);
+
+            if (tentative_g > max_distance)
+                continue;
+
+            float dist_neighbor = std::numeric_limits<float>::infinity();
+            if (auto it = g_score.find(neighbor); it != g_score.end())
+                dist_neighbor = it->second;
+            if (tentative_g < dist_neighbor)
+            {
+                came_from[neighbor] = current;
+                g_score[neighbor] = tentative_g;
+                f_score[neighbor] = tentative_g + goal_heuristic(neighbor);
+                if (std::find(open_set.begin(), open_set.end(), neighbor) == open_set.end())
                 {
-                    if (x == 0 && y == 0 && z == 0)
-                        continue;
-                    if (x != 0 && y != 0 && z != 0)
-                        continue;
-                    int alt = d + (std::abs(x) + std::abs(y) + std::abs(z)) * 3 / 2;
-                    if (alt > max_distance)
-                        continue;
-                    Vec3i v = u + Vec3i{x, y, z};
-
-                    if (!can_reach(v, u))
-                        continue;
-
-                    if (alt < dist[v])
-                    {
-                        dist[v] = alt;
-                        prev[v] = u;
-                        pq.push({alt, v});
-                    }
+                    open_set.push_back(neighbor);
                 }
+            }
+        }
     }
 
     return {};
